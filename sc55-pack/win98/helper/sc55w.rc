@@ -5,7 +5,7 @@ IDI_APP ICON "sc55w.ico"
 
 IDD_SETTINGS DIALOGEX 0, 0, 402, 242
 STYLE DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
-CAPTION "SC-55 PACK for Windows 98 - Settings"
+CAPTION "NUKED SB-EMU for Windows 98 - Settings"
 FONT 8, "MS Sans Serif"
 BEGIN
     GROUPBOX        "Sound Blaster (DOS)", -1, 7, 4, 128, 100
@@ -39,7 +39,7 @@ BEGIN
     LTEXT           "SoundFont file", -1, 147, 59, 100, 8
     EDITTEXT        IDC_SF, 147, 69, 99, 12, ES_AUTOHSCROLL
     PUSHBUTTON      "...", IDC_SFBROWSE, 248, 69, 16, 12
-    LTEXT           "Windows: MIDI device ""SC-55 PACK""", -1, 147, 88, 118, 8
+    LTEXT           "MIDI device: ""NUKED SB-EMU""", -1, 147, 88, 118, 8
 
     GROUPBOX        "Volume (%)", -1, 141, 108, 128, 72
     LTEXT           "Master", -1, 147, 121, 70, 8
@@ -87,7 +87,7 @@ END
 
 IDD_STATUS DIALOGEX 0, 0, 260, 170
 STYLE DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "SC-55 PACK for Windows 98 - Status"
+CAPTION "NUKED SB-EMU for Windows 98 - Status"
 FONT 8, "MS Sans Serif"
 BEGIN
     LTEXT           "", IDC_STATUSTEXT, 7, 7, 246, 136, SS_NOPREFIX
@@ -98,15 +98,15 @@ END
 
 IDD_INSTALL DIALOGEX 0, 0, 300, 172
 STYLE DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "SC-55 PACK for Windows 98 - Setup"
+CAPTION "NUKED SB-EMU for Windows 98 - Setup"
 FONT 8, "MS Sans Serif"
 BEGIN
     ICON            IDI_APP, -1, 7, 7, 20, 20
-    LTEXT           "Sets up the SC-55 pack in Windows 98: a Sound Blaster (up to SB16) with OPL3 FM and an MPU-401 for DOS programs, and the MIDI device ""SC-55 PACK"" for Windows programs, both played by the SC-55 (or MT-32 / SoundFont) emulation of the DOS pack, with the same settings.", IDC_I_INFO, 34, 7, 259, 42
+    LTEXT           "Sets up NUKED SB-EMU in Windows 98: a Sound Blaster (up to SB16) with OPL3 FM and an MPU-401 for DOS programs, and the MIDI device ""NUKED SB-EMU"" for Windows programs, both played by the SC-55 (or MT-32 / SoundFont) emulation of the DOS pack, with the same settings.", IDC_I_INFO, 34, 7, 259, 42
     LTEXT           "Pack folder (ROMS, SBOPTS.TXT; the Windows files go to its WIN98 folder):", -1, 7, 54, 286, 8
     EDITTEXT        IDC_I_DIR, 7, 65, 286, 12, ES_AUTOHSCROLL
     AUTOCHECKBOX    "Start with Windows (needed for DOS sound and the MIDI device)", IDC_I_AUTO, 7, 84, 286, 10
-    AUTOCHECKBOX    "Make ""SC-55 PACK"" the default MIDI device for Windows programs", IDC_I_MAP, 7, 98, 286, 10
+    AUTOCHECKBOX    "Make ""NUKED SB-EMU"" the default MIDI device for Windows programs", IDC_I_MAP, 7, 98, 286, 10
     AUTOCHECKBOX    "Turn off Windows' own Sound Blaster emulation (SBEMUL) for DOS boxes", IDC_I_SBEMUL, 7, 112, 286, 10
     AUTOCHECKBOX    "Set BLASTER= in AUTOEXEC.BAT for DOS programs", IDC_I_BLASTER, 7, 126, 286, 10
     DEFPUSHBUTTON   "Install", IDOK, 188, 151, 50, 14

@@ -786,7 +786,7 @@ static void draw_all(int sel, const char* msg)
 static void draw_bar(void)
 {
     textattr(A_TITLE); gotoxy(1, 1); cputs("                                                                               ");
-    put(3, 1, A_TITLE, "SC-55 PACK");
+    put(3, 1, A_TITLE, "NUKED SB-EMU");
     put(40, 1, A_TITLE, "Sound Blaster / MIDI / SBEMU setup");
     textattr(A_BAR); gotoxy(1, 25);
     cputs("                                                                               ");

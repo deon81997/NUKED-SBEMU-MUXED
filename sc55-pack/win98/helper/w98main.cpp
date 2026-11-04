@@ -1,7 +1,7 @@
-// w98main.cpp - SC55W.EXE, the Windows 98 side of the SC-55 pack.
+// w98main.cpp - SC55W.EXE, the Windows 98 side of NUKED SB-EMU.
 //
 // Loads SC55W.VXD (Sound Blaster 16 / OPL3 / MPU-401 for DOS boxes, plus the
-// "SC-55 PACK" Windows MIDI device), reads its event and PCM rings and turns
+// "NUKED SB-EMU" Windows MIDI device), reads its event and PCM rings and turns
 // them into sound with the same synths as the DOS pack (SC-55, MT-32,
 // SoundFont, DOSBox / Nuked OPL3). Settings are the DOS pack's SBOPTS.TXT.
 // Lives in the tray; menu: Status, Settings, All notes off, Exit.
@@ -28,7 +28,7 @@
 #define BUILD_ID 0
 #endif
 
-static const char APP_TITLE[] = "SC-55 PACK for Windows 98";
+static const char APP_TITLE[] = "NUKED SB-EMU for Windows 98";
 static const char WND_CLASS[] = "SC55W_Main";
 #define WM_TRAY      (WM_APP + 1)
 #define WM_STATECHG  (WM_APP + 2)
@@ -616,7 +616,7 @@ static std::string status_text()
         if (!pr.empty()) s += pr;
     }
     s += "MIDI synth: " + (p.synth_error.empty() ? p.synth : "none - " + p.synth_error) + "\r\n";
-    s += midi_driver_installed() ? "Windows MIDI device: \"SC-55 PACK\" (installed)\r\n"
+    s += midi_driver_installed() ? "Windows MIDI device: \"NUKED SB-EMU\" (installed)\r\n"
                                  : "Windows MIDI device: not installed (run SETUP98)\r\n";
     if (!p.wave_error.empty()) s += p.wave_error + "\r\n";
     else {
@@ -657,7 +657,7 @@ static void tray_add()
     g_nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     g_nid.uCallbackMessage = WM_TRAY;
     g_nid.hIcon = (HICON)LoadImageA(g_inst, MAKEINTRESOURCEA(IDI_APP), IMAGE_ICON, 16, 16, 0);
-    lstrcpynA(g_nid.szTip, "SC-55 PACK", sizeof g_nid.szTip);
+    lstrcpynA(g_nid.szTip, "NUKED SB-EMU", sizeof g_nid.szTip);
     Shell_NotifyIconA(NIM_ADD, &g_nid);
 }
 
@@ -666,8 +666,8 @@ static void tray_tip()
     EnterCriticalSection(&g_cs);
     std::string st = g_pub.state, syn = g_pub.synth;
     LeaveCriticalSection(&g_cs);
-    std::string t = "SC-55 PACK: " + st;
-    if (st == "Running" && !syn.empty()) t = "SC-55 PACK: " + syn;
+    std::string t = "NUKED SB-EMU: " + st;
+    if (st == "Running" && !syn.empty()) t = "NUKED SB-EMU: " + syn;
     lstrcpynA(g_nid.szTip, t.c_str(), 64);
     g_nid.uFlags = NIF_TIP;
     Shell_NotifyIconA(NIM_MODIFY, &g_nid);

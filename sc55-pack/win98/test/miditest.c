@@ -1,4 +1,4 @@
-/* miditest.c - plays through the "SC-55 PACK" MIDI device and the MIDI
+/* miditest.c - plays through the "NUKED SB-EMU" MIDI device and the MIDI
  * Mapper; writes C:\MIDITEST.LOG */
 #include <windows.h>
 #include <mmsystem.h>
@@ -28,13 +28,13 @@ int main(void)
         MIDIOUTCAPSA c;
         midiOutGetDevCapsA(i, &c, sizeof c);
         fprintf(lg, "  %u: '%s' tech %u\n", i, c.szPname, c.wTechnology);
-        if (!strcmp(c.szPname, "SC-55 PACK")) dev = i;
+        if (!strcmp(c.szPname, "NUKED SB-EMU")) dev = i;
     }
     if (dev != (UINT)-2) {
         static char gs[] = {(char)0xF0, 0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7F, 0x00, 0x41, (char)0xF7};
         MIDIHDR hd;
         r = midiOutOpen(&h, dev, 0, 0, CALLBACK_NULL);
-        fprintf(lg, "open SC-55 PACK -> %u\n", r);
+        fprintf(lg, "open NUKED SB-EMU -> %u\n", r);
         if (!r) {
             memset(&hd, 0, sizeof hd);
             hd.lpData = gs; hd.dwBufferLength = sizeof gs;

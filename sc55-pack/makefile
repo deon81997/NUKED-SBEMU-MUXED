@@ -38,7 +38,7 @@ MIDPLAY := output/midplay.exe
 CDGUI := output/cdgui.exe
 SBSET := output/sbset.exe
 ifeq ($(VSC55),1)
-all: $(TARGET) $(SC55WAV) $(SC55LOG) $(MPUTEST) $(MIDPLAY) $(CDGUI) $(SBSET)
+all: $(TARGET) $(SC55WAV) $(SC55LOG) $(MPUTEST) $(MIDPLAY) $(CDGUI) $(SBSET) $(SC55MENU)
 else
 all: $(TARGET)
 endif
@@ -206,7 +206,13 @@ $(SBSET): output/tools/sbset.o $(SC55_OBJS) $(NUKEDOPL_OBJ) output/sbemu/dbopl.o
 	$(SILENTMSG) "LINK\t$@\n"
 	$(SILENTCMD)$(CXX) -O2 -o $@ $^ -lstdc++ -lm $(if $(filter 0,$(DEBUG)),-s,)
 
-$(CDGUI): tools/cdgui.c
+SC55MENU := output/sc55menu.exe
+$(SC55MENU): tools/sc55menu.c tools/tui.h tools/theme.h tools/fontdata.h
+	@mkdir -p $(dir $@)
+	$(SILENTMSG) "CC\t$@\n"
+	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
+
+$(CDGUI): tools/cdgui.c tools/tui.h tools/theme.h tools/fontdata.h
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
 	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)

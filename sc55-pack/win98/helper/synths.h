@@ -1,5 +1,5 @@
 // synths.h - MIDI synths (SC-55, MT-32, SoundFont) and OPL cores for the
-// SC-55 pack helper. All render float stereo interleaved at the output rate.
+// NUKED SB-EMU helper. All render float stereo interleaved at the output rate.
 #pragma once
 #include <cstdint>
 #include <string>

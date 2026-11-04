@@ -1,10 +1,10 @@
-// install98.cpp - set up / remove the SC-55 pack in Windows 98.
+// install98.cpp - set up / remove NUKED SB-EMU in Windows 98.
 //
 // Install (SC55W.EXE /INSTALL, run from the pack's FILES\WIN98 folder):
 //   - copies SC55W.EXE, SC55W.VXD, SC55MIDI.DRV, README98.TXT to <pack>\WIN98
 //     and any ROMs that are missing to <pack>\ROMS (from FILES\ROMS)
 //   - SC55MIDI.DRV to WINDOWS\SYSTEM, registered in SYSTEM.INI [drivers] and
-//     under MediaResources\midi, so it is the MIDI device "SC-55 PACK"
+//     under MediaResources\midi, so it is the MIDI device "NUKED SB-EMU"
 //   - optional: start with Windows, default MIDI device (MIDI Mapper), turn
 //     off SBEMUL (Windows 98 SE's own SB emulation for WDM sound drivers),
 //     BLASTER= in AUTOEXEC.BAT
@@ -17,9 +17,10 @@
 #include <cstring>
 #include <vector>
 
-static const char TITLE[] = "SC-55 PACK for Windows 98 - Setup";
+static const char TITLE[] = "NUKED SB-EMU for Windows 98 - Setup";
 static const char WND_CLASS[] = "SC55W_Main";
-static const char MIDI_NAME[] = "SC-55 PACK";
+static const char MIDI_NAME[] = "NUKED SB-EMU";
+static const char OLD_MIDI_NAME[] = "SC-55 PACK";      /* before the rename: still recognised */
 static const char RUN_KEY[] = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 static const char UNINST_KEY[] = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SC55W";
 static const char MEDIA_KEY[] = "System\\CurrentControlSet\\Control\\MediaResources\\midi\\sc55midi.drv";
@@ -491,11 +492,11 @@ int run_install(HINSTANCE inst)
         std::string old;
         autoexec_add(o, old);
     }
-    reg_set_str(HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayName", "SC-55 PACK for Windows 98");
+    reg_set_str(HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayName", "NUKED SB-EMU for Windows 98");
     reg_set_str(HKEY_LOCAL_MACHINE, UNINST_KEY, "UninstallString", exe + " /UNINSTALL");
     WritePrivateProfileStringA("Install", "Installed", "1", ini.c_str());
 
-    std::string msg = ok ? "The SC-55 PACK for Windows 98 is installed in " + wdir + ".\r\n"
+    std::string msg = ok ? "The NUKED SB-EMU for Windows 98 is installed in " + wdir + ".\r\n"
                          : "Setup finished with problems:\r\n" + log + "\r\n";
     if (ok && !log.empty()) msg += "\r\n" + log;
     if (roms) {
@@ -505,7 +506,7 @@ int run_install(HINSTANCE inst)
     }
     msg += "\r\nDOS programs: Sound Blaster " + blaster_for(o) +
            " (change it in Settings; it is the DOS pack's SBOPTS.TXT).\r\n"
-           "Windows programs: MIDI device \"SC-55 PACK\".\r\n\r\n"
+           "Windows programs: MIDI device \"NUKED SB-EMU\".\r\n\r\n"
            "Windows must be restarted to load the MIDI driver. Restart now?";
     if (MessageBoxA(NULL, msg.c_str(), TITLE, MB_YESNO | MB_ICONINFORMATION) == IDYES)
         ExitWindowsEx(EWX_REBOOT, 0);
@@ -514,14 +515,14 @@ int run_install(HINSTANCE inst)
 
 int run_uninstall(HINSTANCE)
 {
-    if (MessageBoxA(NULL, "Remove the SC-55 PACK from Windows?\r\n\r\nYour settings (SBOPTS.TXT), the ROMs and the "
+    if (MessageBoxA(NULL, "Remove the NUKED SB-EMU from Windows?\r\n\r\nYour settings (SBOPTS.TXT), the ROMs and the "
                     "DOS pack stay in place.", TITLE, MB_YESNO | MB_ICONQUESTION) != IDYES) return 1;
     stop_running_helper();
     std::string wdir = exe_dir(), ini = join(wdir, "SC55W.INI");
     reg_del_value(HKEY_LOCAL_MACHINE, RUN_KEY, "SC55W");
     midi_unregister();
     std::string cur;
-    if (reg_get_str(HKEY_CURRENT_USER, MIDIMAP_KEY, "CurrentInstrument", cur) && cur == MIDI_NAME) {
+    if (reg_get_str(HKEY_CURRENT_USER, MIDIMAP_KEY, "CurrentInstrument", cur) && (cur == MIDI_NAME || cur == OLD_MIDI_NAME)) {
         char old[256];
         GetPrivateProfileStringA("Install", "OldInstrument", "", old, sizeof old, ini.c_str());
         if (old[0]) reg_set_str(HKEY_CURRENT_USER, MIDIMAP_KEY, "CurrentInstrument", old);
@@ -543,7 +544,7 @@ int run_uninstall(HINSTANCE)
         SetFileAttributesA(p.c_str(), FILE_ATTRIBUTE_NORMAL);
         if (!DeleteFileA(p.c_str())) wininit_line("NUL=" + shortp(p));
     }
-    MessageBoxA(NULL, ("The SC-55 PACK has been removed from Windows. The last files are deleted when Windows "
+    MessageBoxA(NULL, ("The NUKED SB-EMU has been removed from Windows. The last files are deleted when Windows "
                        "restarts; the empty folder " + wdir + " can then be deleted.").c_str(), TITLE, MB_ICONINFORMATION);
     return 0;
 }

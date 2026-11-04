@@ -1,5 +1,5 @@
 =============================================================================
-  SC-55 FOR DOS  -  SBEMU + Nuked-SC55 + HDPMI32i  -  COMPLETE GUIDE
+  NUKED SB-EMU  -  SBEMU + Nuked-SC55 + HDPMI32i  -  COMPLETE GUIDE
   Hybrid pack: SC-55 / SoundFont MIDI, virtual CD drive, CD-Audio mixing
 =============================================================================
 
@@ -62,7 +62,7 @@ CONTENTS
  2. QUICK START
 =============================================================================
 
-   1. Extract the zip. Copy the folder (SC55PACK) to the hard disk.
+   1. Extract the zip. Copy the folder (NUKEDSB) to the hard disk.
    2. In a DOS window inside that folder:    SETUP
    3. (Optional, for disc images)            CDINST
    4. Restart in MS-DOS mode (Start > Shut Down > Restart in MS-DOS mode).
@@ -82,7 +82,7 @@ CONTENTS
 =============================================================================
 
   3.1  Extract the zip
-       Use any unzip tool. Everything is inside one folder (SC55PACK).
+       Use any unzip tool. Everything is inside one folder (NUKEDSB).
        Do NOT extract while an old CD driver is loaded under the device name
        XCDROM: Windows 98 refuses to write files in a folder called XCDROM
        then. If you did a BOOTCFG with an older pack, run C:\RESET.BAT and

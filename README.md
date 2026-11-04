@@ -12,7 +12,7 @@
 ![Licence](https://img.shields.io/badge/licence-GPL--2.0--or--later-green)
 ![Compiler](https://img.shields.io/badge/built%20with-DJGPP%20%7C%20MinGW%20%7C%20Open%20Watcom-orange)
 
-<img src="docs/cd-images-groovy.png" width="720" alt="The CD images screen">
+<img src="docs/main-menu.png" width="720" alt="The NUKED SB-EMU main menu">
 
 </div>
 
@@ -32,7 +32,7 @@ period-correct DOS sound setup. It's tuned on a **Dell Latitude D810**
 | 🎚️ **SoundFont** | Any `.SF2` instead, with its own reverb and chorus |
 | 💿 **Virtual CD drive** | `.CUE/.BIN`, `.ISO` and multi-disc images on drive **M:**, with **CD-Audio mixed into the sound** |
 | 🖥️ **Menus for everything** | Start the synth, change settings, test games, play MIDI files, mount discs, with themes, fonts and display modes |
-| 🪟 **Windows 98 too** | The same SB / OPL3 / MPU-401 in DOS boxes, plus an **"SC-55 PACK" Windows MIDI device** |
+| 🪟 **Windows 98 too** | The same SB / OPL3 / MPU-401 in DOS boxes, plus an **"NUKED SB-EMU" Windows MIDI device** |
 
 > [!IMPORTANT]
 > **ROMs are not included.** Bring your own SC-55 (and MT-32 / CM-32L) dumps.
@@ -124,7 +124,7 @@ MIDI synth replaces the MPU side, so you normally leave these off.
 | `SBDIAG`, `MPUTEST`, `TIMETEST`, `SC55WAV` | Diagnostics, test tune, timer checks, ROM check and speed benchmark |
 | `WIN98\SC55W.EXE` + `.VXD` + `SC55MIDI.DRV` | The Windows 98 part (tray program, virtual SB for DOS boxes, MIDI device) |
 
-Also in the pack zip (not stored here, see [`BINARIES.md`](sc55-pack/pack/BINARIES.md)):
+Also in the release zip `NUKED-SB-EMU.zip` (not stored here, see [`BINARIES.md`](sc55-pack/pack/BINARIES.md)):
 HDPMI32i, JEMM / QPIEMU, uCDD, SHSUCDX and CD-ROM drivers.
 
 ---
@@ -132,7 +132,7 @@ HDPMI32i, JEMM / QPIEMU, uCDD, SHSUCDX and CD-ROM drivers.
 ## 🚀 Getting started
 
 ```text
-1. Put your ROM dumps in FILES\ROMS of the pack zip
+1. Put your ROM dumps in FILES\ROMS of `NUKED-SB-EMU.zip`
 2. Boot DOS (Windows 98: "Restart in MS-DOS mode")
 3. cd to the pack folder and run   SETUP        → installs to C:\SC55
 4. Optional:                       CDINST       → virtual CD drive
@@ -160,7 +160,7 @@ The pack's `README.TXT` is the complete guide.
 
 - **`SC55W.VXD`**: virtual Sound Blaster (1.5 – 16), OPL3 and MPU-401 for DOS boxes
 - **`SC55W.EXE`**: plays it all with the same synths; tray icon, settings window matching `SBSET`, installer / uninstaller
-- **`SC55MIDI.DRV`**: the Windows MIDI device **"SC-55 PACK"**
+- **`SC55MIDI.DRV`**: the Windows MIDI device **"NUKED SB-EMU"**
 
 See [`README98.TXT`](sc55-pack/pack/README98.TXT).
 </details>

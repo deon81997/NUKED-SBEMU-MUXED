@@ -499,17 +499,18 @@ TUI_FN void tui_window(int x, int y, int w, int h, int attr, const char* title)
 }
 
 /* ------------------------------------------------------------------ big logo (half-block letters) */
-/* 3 rows x 4 columns per letter; supported: A C D E G I K L M N O P R S T U 5 - space */
+/* 3 rows x 4 columns per letter (M: 5); supported: A B C D E G I K L M N O P R S T U 5 - space */
 static const char* tui_glyph(char c, int row)
 {
     static const struct { char c; const char* r[3]; } g[] = {
         {'S', {"\xDC\xDF\xDF\xDF", " \xDF\xDF\xDC", "\xDC\xDC\xDC\xDF"}},
         {'C', {"\xDC\xDF\xDF\xDF", "\xDB   ", "\xDF\xDC\xDC\xDC"}},
+        {'B', {"\xDB\xDF\xDF\xDC", "\xDB\xDF\xDF\xDC", "\xDB\xDC\xDC\xDF"}},
         {'P', {"\xDB\xDF\xDF\xDC", "\xDB\xDC\xDC\xDF", "\xDB   "}},
         {'A', {"\xDC\xDF\xDF\xDC", "\xDB\xDC\xDC\xDB", "\xDB  \xDB"}},
         {'K', {"\xDB \xDC\xDF", "\xDB\xDF\xDC ", "\xDB  \xDB"}},
         {'G', {"\xDC\xDF\xDF\xDF", "\xDB \xDF\xDB", "\xDF\xDC\xDC\xDF"}},
-        {'M', {"\xDB\xDC\xDC\xDB", "\xDB\xDF\xDF\xDB", "\xDB  \xDB"}},
+        {'M', {"\xDB\xDC \xDC\xDB", "\xDB \xDF \xDB", "\xDB   \xDB"}},   /* 5 wide */
         {'E', {"\xDB\xDF\xDF\xDF", "\xDB\xDF\xDF ", "\xDB\xDC\xDC\xDC"}},
         {'T', {"\xDF\xDB\xDB\xDF", " \xDB\xDB ", " \xDB\xDB "}},
         {'5', {"\xDB\xDF\xDF\xDF", "\xDF\xDF\xDF\xDC", "\xDC\xDC\xDC\xDF"}},
@@ -537,7 +538,8 @@ TUI_FN int tui_biglogo(int x, int y, int bg, const char* text, const unsigned ch
         for (i = 0; text[i]; i++)
         {
             const char* r = tui_glyph(text[i], row);
-            for (k = 0; k < 4; k++, cx++)
+            int gw = (int)strlen(r);                /* 4 columns, M has 5 */
+            for (k = 0; k < gw; k++, cx++)
             {
                 int c = cols[(i + phase) % ncols];
                 tui_cell(cx, y + row, (bg << 4) | c, (unsigned char)r[k]);

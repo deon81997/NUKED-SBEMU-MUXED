@@ -1,4 +1,4 @@
-/* SC55MENU - one screen for everything in the SC-55 pack. Started by C:\SC55\MENU.BAT.
+/* SC55MENU - one screen for everything in NUKED SB-EMU (the SC-55 pack). Started by C:\SC55\MENU.BAT.
  *
  * The menu never starts SBEMU (or a game) itself: it writes the chosen command to MENUGO.BAT and
  * exits, and MENU.BAT runs that file from plain DOS. SBEMU stays resident, so it must not be loaded
@@ -230,7 +230,7 @@ static int gp_save(void)
     char p[300], tmp[310]; FILE* f; int i;
     home_path(p, "GAMES.CFG");
     if (!(f = sw_open(p, tmp, "wb"))) return 0;
-    fprintf(f, "; SC-55 pack game list: name|program|arguments|SBEMU options|CD image (edit in MENU > Games)\r\n");
+    fprintf(f, "; NUKED SB-EMU game list: name|program|arguments|SBEMU options|CD image (edit in MENU > Games)\r\n");
     for (i = 0; i < g_ngp; i++)
         fprintf(f, "%s|%s|%s|%s|%s\r\n", g_gp[i].name, g_gp[i].exe, g_gp[i].args, g_gp[i].opts, g_gp[i].cd);
     return sw_close(f, tmp, p);
@@ -395,36 +395,37 @@ static void draw_header(void)
     tui_fill(1, 1, 80, 5, BG_DESK << 4, ' ');
     if (TUI_FANCY)
     {
-        x = 3 + tui_biglogo(3, 1, BG_DESK, "SC-55", g_rainbow, sizeof g_rainbow, g_phase);
-        tui_biglogo(x + 3, 1, BG_DESK, "PACK", g_rainbow, sizeof g_rainbow, g_phase + 5);
+        x = 2 + tui_biglogo(2, 1, BG_DESK, "NUKED", g_rainbow, sizeof g_rainbow, g_phase);
+        tui_biglogo(x + 2, 1, BG_DESK, "SB-EMU", g_rainbow, sizeof g_rainbow, g_phase + 5);
     }
     else
     {
         static const unsigned char plain[] = { 15 };
-        x = 3 + tui_biglogo(3, 1, BG_DESK, "SC-55", plain, 1, 0);
-        tui_biglogo(x + 3, 1, BG_DESK, "PACK", (const unsigned char*)"\x0B", 1, 0);
+        x = 2 + tui_biglogo(2, 1, BG_DESK, "NUKED", plain, 1, 0);
+        tui_biglogo(x + 2, 1, BG_DESK, "SB-EMU", (const unsigned char*)"\x0B", 1, 0);
     }
-    tui_put(3, 5, (BG_DESK << 4) | 0x0B, "SBEMU \xFA Roland SC-55 \xFA SoundFont \xFA for DOS");
+    tui_put(3, 5, (BG_DESK << 4) | 0x0B, "SBEMU \xFA Nuked-SC55 \xFA MT-32 \xFA SoundFont \xFA for DOS");
 }
 
 static void draw_status(void)
 {
     const char* sf = opt_val("/VSF", "");
     int a = (BG_DESK << 4);
-    tui_panel(53, 1, 27, 5, 0, 0x0E, "Status");
+    /* narrower than the other screens' panels: the NUKED SB-EMU logo needs the room */
+    tui_panel(59, 1, 21, 5, 0, 0x0E, "Status");
     if (g_running)
     {
-        tui_put(55, 2, 0x0A, "\xFE SBEMU loaded");
+        tui_put(61, 2, 0x0A, "\xFE SBEMU on");
         sbemu_load();
         if (g_load >= 0)
-            tui_printf(70, 2, g_load < 500 ? 0x0A : g_load < 800 ? 0x0E : 0x0C, "CPU%3d%%", (g_load + 5) / 10 > 999 ? 999 : (g_load + 5) / 10);
+            tui_printf(71, 2, g_load < 500 ? 0x0A : g_load < 800 ? 0x0E : 0x0C, "CPU%3d%%", (g_load + 5) / 10 > 999 ? 999 : (g_load + 5) / 10);
     }
-    else tui_put(55, 2, 0x0C, "\xFE SBEMU not loaded");
+    else tui_put(61, 2, 0x0C, "\xFE SBEMU off");
     const char* mt = opt_val("/VMT32", "");
-    if (mt[0] && strcmp(mt, "0") && strcasecmp(mt, "OFF")) tui_printf(55, 3, 0x07, "MIDI: %s (Munt)", !strcasecmp(mt, "CM32L") ? "CM-32L" : "MT-32");
-    else if (sf[0]) { const char* b = strrchr(sf, '\\'); tui_printf(55, 3, 0x07, "MIDI: %.15s", b ? b + 1 : sf); }
-    else tui_printf(55, 3, 0x07, "MIDI: SC-55 %.11s", opt_val("/VSCSET", "(auto)"));
-    tui_printf(55, 4, 0x07, "SB %s IRQ %s DMA %s", opt_val("/A", "220"), opt_val("/I", "7"), opt_val("/D", "1"));
+    if (mt[0] && strcmp(mt, "0") && strcasecmp(mt, "OFF")) tui_printf(61, 3, 0x07, "%s (Munt)", !strcasecmp(mt, "CM32L") ? "CM-32L" : "MT-32");
+    else if (sf[0]) { const char* b = strrchr(sf, '\\'); tui_printf(61, 3, 0x07, "SF %.14s", b ? b + 1 : sf); }
+    else tui_printf(61, 3, 0x07, "SC-55 %.11s", opt_val("/VSCSET", "auto"));
+    tui_printf(61, 4, 0x07, "SB %s I%s D%s", opt_val("/A", "220"), opt_val("/I", "7"), opt_val("/D", "1"));
     (void)a;
 }
 

@@ -1,6 +1,6 @@
 system windows_dll
 name SC55MIDI.DRV
-option description 'MIDI:SC-55 PACK MIDI driver (needs SC55W.EXE)'
+option description 'MIDI:NUKED SB-EMU MIDI driver (needs SC55W.EXE)'
 option modname=SC55MIDI
 option heapsize=1024
 option quiet

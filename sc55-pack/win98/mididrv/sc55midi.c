@@ -1,6 +1,6 @@
 /*
  * sc55midi.c - SC55MIDI.DRV, a 16-bit Windows MIDI output driver for
- * Windows 98. It shows up as the MIDI device "SC-55 PACK" and hands every
+ * Windows 98. It shows up as the MIDI device "NUKED SB-EMU" and hands every
  * byte to SC55W.VXD through its protected-mode API (INT 2Fh AX=1684h by
  * name "SC55W"); SC55W.EXE turns the bytes into sound with the same synth
  * the DOS programs use (SC-55, MT-32 or SoundFont).
@@ -161,7 +161,7 @@ DWORD FAR PASCAL __export __loadds modMessage(UINT dev, UINT msg, DWORD user, DW
     case MODM_GETDEVCAPS: {
         MIDIOUTCAPS FAR *caps = (MIDIOUTCAPS FAR *)p1;
         MIDIOUTCAPS mc;
-        static const char name[] = "SC-55 PACK";
+        static const char name[] = "NUKED SB-EMU";
         BYTE FAR *d;
         const BYTE *s;
         unsigned k, n = (unsigned)p2;

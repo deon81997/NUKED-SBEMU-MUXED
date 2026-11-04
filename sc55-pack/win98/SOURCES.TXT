@@ -1,4 +1,4 @@
-SC55W - source code of the Windows 98 part of the SC-55 pack (GPL v2+)
+SC55W - source code of the Windows 98 part of NUKED SB-EMU (GPL v2+)
 
   helper/    SC55W.EXE: engine (event/PCM rings -> audio), synth wrappers,
              SBOPTS.TXT options, ROM detection, tray UI, setup/uninstall

@@ -13,7 +13,7 @@ REM               C:\HDPMI\HDPMI32I.EXE  and the LG driver files in C:\GSCDROM  
 REM               nothing else is left in it)   the test disc in C:\CDIMAGES
 REM               leftovers of old versions of the pack (the list CLEANUP.BAT uses)
 REM  It never deletes CONFIG.SYS, AUTOEXEC.BAT or backups it did not make. The pack folder you
-REM  extracted (SC55PACK) is not touched: delete it yourself when you no longer need it.
+REM  extracted (NUKEDSB) is not touched: delete it yourself when you no longer need it.
 REM  Best run right after a restart, before SC55 or the CD tools are started.
 REM ======================================================================
 SET DRV=%1
@@ -22,7 +22,7 @@ IF NOT EXIST %DRV%:\NUL GOTO NODRIVE
 SET UN_KEEP=
 
 ECHO.
-ECHO  SC-55 PACK - UNINSTALL
+ECHO  NUKED SB-EMU - UNINSTALL
 ECHO  ======================
 ECHO.
 ECHO  This removes (whatever of it exists):

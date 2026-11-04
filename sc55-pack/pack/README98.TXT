@@ -1,6 +1,6 @@
 =============================================================================
-  SC-55 PACK FOR WINDOWS 98
-  Sound Blaster / OPL3 / MPU-401 for DOS boxes + "SC-55 PACK" MIDI device
+  NUKED SB-EMU FOR WINDOWS 98
+  Sound Blaster / OPL3 / MPU-401 for DOS boxes + "NUKED SB-EMU" MIDI device
 =============================================================================
 
 The DOS pack plays the SC-55 when you boot to DOS. This part does the same
@@ -12,7 +12,7 @@ inside Windows 98:
     MT-32 or a SoundFont), the FM music by the DOSBox or Nuked OPL3 core,
     and the digital sound effects through your sound card.
   * Windows programs (Media Player, MIDI sequencers, Windows games) get a
-    MIDI device called "SC-55 PACK" played by the same synth.
+    MIDI device called "NUKED SB-EMU" played by the same synth.
   * The settings are the DOS pack's: C:\SC55\SBOPTS.TXT. What you set in
     DOS (SETTINGS.BAT) applies in Windows and the other way round.
 
@@ -39,7 +39,7 @@ pack there, as before.
        Start with Windows
                         leave on: the DOS sound and the MIDI device only
                         work while SC55W.EXE runs.
-       Make "SC-55 PACK" the default MIDI device
+       Make "NUKED SB-EMU" the default MIDI device
                         Windows programs that use the MIDI Mapper (most do)
                         then play through the SC-55.
        Turn off Windows' own Sound Blaster emulation (SBEMUL)
@@ -82,7 +82,7 @@ C:\SC55\WIN98\SC55W.INI and the uninstaller puts it back.
   You do NOT load SBEMU, HDPMI or SC55.BAT inside Windows: this program
   takes their place there.
 
-  Windows programs: choose the MIDI device "SC-55 PACK" (or leave the
+  Windows programs: choose the MIDI device "NUKED SB-EMU" (or leave the
   MIDI Mapper, if Setup made it the default). Control Panel > Multimedia >
   MIDI shows and changes the default.
 
@@ -176,7 +176,7 @@ uses almost no CPU while idle.
      play a sound (Control Panel > Sounds).
   No MIDI in a Windows program
      SC55W.EXE must be running (tray icon). Check Control Panel >
-     Multimedia > MIDI, or pick "SC-55 PACK" in the program.
+     Multimedia > MIDI, or pick "NUKED SB-EMU" in the program.
   Stuck notes:   tray icon > All notes off.
   Sound breaks up: raise BufferMs (section 3), lower the sample rate.
   C:\SC55\WIN98\SC55W.LOG shows what happened at the last start.
@@ -186,7 +186,7 @@ uses almost no CPU while idle.
  6. UNINSTALLING
 -----------------------------------------------------------------------------
 
-Control Panel > Add/Remove Programs > "SC-55 PACK for Windows 98", or
+Control Panel > Add/Remove Programs > "NUKED SB-EMU for Windows 98", or
 C:\SC55\WIN98\SC55W.EXE /UNINSTALL. It removes the MIDI device, the start
 entry and the BLASTER line, turns SBEMUL back on if Setup turned it off,
 and restores the previous default MIDI device. The DOS pack, ROMs and your
@@ -203,7 +203,7 @@ first: UNINSTAL.BAT deletes C:\SC55 including C:\SC55\WIN98.
   FILES\WIN98\SC55W.EXE     the program (synths, settings, setup)
   FILES\WIN98\SC55W.VXD     the virtual Sound Blaster / OPL3 / MPU-401
                             (a dynamic VxD, loaded by SC55W.EXE)
-  FILES\WIN98\SC55MIDI.DRV  the Windows MIDI driver ("SC-55 PACK")
+  FILES\WIN98\SC55MIDI.DRV  the Windows MIDI driver ("NUKED SB-EMU")
   FILES\WIN98\SOURCE.ZIP    source code of the three
   FILES\WIN98\COPYING.TXT   GNU General Public License, version 2
 
