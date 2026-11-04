@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎹 NUKED SC55
+# 🎹 NUKED SB-EMU
 
 ### A Roland Sound Canvas for DOS games, with no MIDI hardware at all
 
@@ -20,7 +20,7 @@
 
 ## ✨ What it does
 
-NUKED SC55 turns an ordinary PC with an onboard PCI sound chip into a full
+NUKED SB-EMU turns an ordinary PC with an onboard PCI sound chip into a full
 period-correct DOS sound setup. It's tuned on a **Dell Latitude D810**
 (Pentium M, Intel ICH4 AC'97, Windows 98 / MS-DOS 7.1).
 
