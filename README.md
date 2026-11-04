@@ -1,160 +1,223 @@
-# SC-55 PACK (SC55PACK-HYBRID)
+<div align="center">
 
-A Roland SC-55 for DOS games, on a laptop with no MIDI hardware.
+# 🎹 SC-55 PACK
 
-The pack turns a **Dell Latitude D810** (Pentium M, AC'97 sound, Windows 98 /
-MS-DOS 7.1) into a period-correct DOS sound setup:
+### A Roland Sound Canvas for DOS games, with no MIDI hardware at all
 
-- **Sound Blaster 16 + OPL3 + MPU-401** emulated in pure DOS by
-  [SBEMU](https://github.com/crazii/SBEMU) on the laptop's PCI sound chip.
-- **MIDI music played by a real SC-55 firmware**:
-  [Nuked-SC55](https://github.com/nukeykt/Nuked-SC55) runs the SC-55 / SC-55mkII
-  ROMs inside SBEMU. A Roland MT-32 / CM-32L ([Munt](https://github.com/munt/munt))
-  or any SoundFont can be used instead.
-- **A virtual CD drive** (M:) for `.CUE/.BIN`, `.ISO` and multi-disc images, with
-  the game's **CD-Audio mixed into the sound** through SBEMU.
-- **Menus for everything**: start the SC-55, change settings, test games, play
-  MIDI files, mount disc images, all from text-mode screens with themes, fonts
-  and display modes.
-- **Inside Windows 98 too**: the same Sound Blaster / OPL3 / MPU-401 for DOS
-  boxes, and the SC-55 as a Windows MIDI device ("SC-55 PACK"), with the same
-  settings file.
+**SBEMU** &nbsp;•&nbsp; **Nuked-SC55** &nbsp;•&nbsp; **Munt MT-32** &nbsp;•&nbsp; **SoundFont** &nbsp;•&nbsp; **Virtual CD + CD-Audio** &nbsp;•&nbsp; **Windows 98**
 
-It works on other PCs with a sound card SBEMU supports, but the D810 is what
-it is tuned and tested for.
+![Version](https://img.shields.io/badge/version-1.0.0--beta.35--sc55-blue)
+![Platform](https://img.shields.io/badge/platform-MS--DOS%20%7C%20Windows%2098-008080)
+![Target](https://img.shields.io/badge/tuned%20for-Dell%20Latitude%20D810-555)
+![Licence](https://img.shields.io/badge/licence-GPL--2.0--or--later-green)
+![Compiler](https://img.shields.io/badge/built%20with-DJGPP%20%7C%20MinGW%20%7C%20Open%20Watcom-orange)
 
-> **ROMs are not included.** You need your own SC-55 (and, for the MT-32,
-> MT-32 / CM-32L) ROM dumps. They are found by their contents, so the file names
-> don't matter.
+<img src="docs/cd-images-groovy.png" width="720" alt="The CD images screen">
 
-Current version: **1.0.0-beta.35-sc55** (see `sc55-pack/HANDOFF.md` for the
-state of things and what still needs testing on the D810).
+</div>
 
 ---
 
-## Contents
+## ✨ What it does
 
-- [What's in the pack](#whats-in-the-pack)
-- [Installing on the laptop](#installing-on-the-laptop)
-- [Using it](#using-it)
-- [Windows 98](#windows-98)
-- [Repository layout](#repository-layout)
-- [Building](#building)
-- [Testing](#testing)
-- [Credits and licences](#credits-and-licences)
+The pack turns an ordinary PC with an onboard PCI sound chip into a full
+period-correct DOS sound setup. It's tuned on a **Dell Latitude D810**
+(Pentium M, Intel ICH4 AC'97, Windows 98 / MS-DOS 7.1).
+
+| | |
+|---|---|
+| 🔊 **Sound Blaster 16 + OPL3** | [SBEMU](https://github.com/crazii/SBEMU) emulates SB 1.x/2.0/Pro/Pro 2/16 and OPL3 FM in pure DOS, on the PCI sound chip ([list below](#-supported-sound-chips)) |
+| 🎼 **Real SC-55 firmware** | [Nuked-SC55](https://github.com/nukeykt/Nuked-SC55) runs your SC-55 / SC-55mkII ROMs behind an MPU-401 at port 330 |
+| 🎹 **MT-32 / CM-32L** | [Munt](https://github.com/munt/munt) for games written for the Roland MT-32 |
+| 🎚️ **SoundFont** | Any `.SF2` instead, with its own reverb and chorus |
+| 💿 **Virtual CD drive** | `.CUE/.BIN`, `.ISO` and multi-disc images on drive **M:**, with **CD-Audio mixed into the sound** |
+| 🖥️ **Menus for everything** | Start the synth, change settings, test games, play MIDI files, mount discs, with themes, fonts and display modes |
+| 🪟 **Windows 98 too** | The same SB / OPL3 / MPU-401 in DOS boxes, plus an **"SC-55 PACK" Windows MIDI device** |
+
+> [!IMPORTANT]
+> **ROMs are not included.** Bring your own SC-55 (and MT-32 / CM-32L) dumps.
+> They are recognised by their contents, so the file names don't matter.
 
 ---
 
-## What's in the pack
+## 🔈 Supported sound chips
 
-| In DOS | What it does |
+The sound comes out of the PCI chip in your PC. These are every chip the
+SBEMU in this pack has a driver for, taken from the drivers' own PCI ID
+tables. ✅ = SBEMU lists it as tested and working; 🧪 = driver ported from
+Linux, works for some people, less tested.
+
+### Onboard (motherboard) audio
+
+| Family | Chips | |
+|---|---|:---:|
+| **Intel AC'97** (`sc_ich`) | 82801AA/AB/BA (ICH, ICH0, ICH2), ICH3, **ICH4** *(Dell D810)*, ICH5, ICH6, ICH7, ESB, ESB2, 440MX | ✅ |
+| **nVidia AC'97** (`sc_ich`) | nForce, nForce2, nForce3, MCP04, CK8, CK8S, CK804 | ✅ |
+| **SiS / AMD AC'97** (`sc_ich`) | SiS 7012, AMD-768, AMD-8111 | ✅ |
+| **VIA AC'97** (`sc_via82`) | VT82C686, VT8233 / 8233A / 8235 / 8237 | ✅ |
+| **Intel HD Audio** (`sc_inthd`) | ICH6 – ICH10, ESB2, 5 Series / 3400, Cougar Point, Patsburg, Panther Point, Lynx Point (+LP), 9 Series, Wildcat Point, Wellsburg, Lewisburg, Sunrise Point, Kaby Lake, Coffee Lake, Cannon Lake, Comet Lake, Ice Lake, Jasper Lake, Tiger Lake, Alder Lake, Elkhart Lake, Broxton, Gemini Lake, Bay Trail, Braswell, Poulsbo, Oaktrail | ✅ |
+| **AMD / ATI HD Audio** (`sc_inthd`) | ATI SB450, SB600, AMD Hudson, X370-class, X570-class, Stoney, Raven | ✅ |
+| **nVidia HD Audio** (`sc_inthd`) | MCP51, MCP55, MCP61, MCP65, MCP67, MCP73, MCP77, MCP79, MCP89 | ✅ |
+| **Other HD Audio** (`sc_inthd`) | VIA 82xx / VT7122 / VT6122, SiS 966, ULi M5461, Zhaoxin, C-Media HDA, Vortex86MX, Teradici | ✅ |
+| **HDMI audio** (`sc_inthd`) | Intel Haswell / Broadwell HDMI, ATI/AMD Radeon HDMI (RS600 – R6xxx and later) | 🧪 |
+| **Geode** (`sc_cs5535`) | National CS5535, AMD CS5536 | 🧪 |
+
+### Sound cards
+
+| Family | Cards / chips | |
+|---|---|:---:|
+| **Creative SB Live!** (`sc_sbliv`) | EMU10K1: Live!, Live! Value, Live! 5.1, Live! Platinum, PCI512 (CT4620 – SB0220) | ✅ |
+| **Creative Audigy** (`sc_sbliv`) | EMU10K2: Audigy 1 / ES, Audigy 2 / ZS / EX / Platinum / Value, Audigy 4 / 4 Pro | ✅ |
+| **Creative Audigy LS / Live! 24-bit** (`sc_sbl24`) | CA0106: Audigy LS, Live! 7.1 24-bit, Live24 OEM, X-Fi Xtreme Audio (SB0790) | ✅ |
+| **Creative / Dell SB0200** (`sc_emu10k1x`) | EMU10K1X | 🧪 |
+| **Creative X-Fi** (`sc_ctxfi`) | EMU20K1, EMU20K2 | 🧪 |
+| **Ensoniq / Creative** (`sc_e1371`) | **ES1371**, ES1373, CT5880, Ectiva EV1938 (SB PCI 64/128) | ✅ |
+| **Ensoniq AudioPCI** (`sc_e1370`) | ES1370 | 🧪 |
+| **C-Media** (`sc_cmi`) | CMI8338A, CMI8338B, CMI8738, CMI8738B | ✅ |
+| **C-Media Oxygen** (`sc_oxygen`) | CMI8786/8787/8788: **Asus Xonar DG / DGX**, HT-Omega Claro / Claro halo, AuzenTech X-Meridian / 2G, TempoTec HiFier Fantasia / Serenade, Kuroutoshikou CMI8787, C-Media reference boards | 🧪 |
+| **Yamaha DS-XG** (`sc_ymf`) | YMF724, YMF724F, YMF740, YMF740C, **YMF744**, **YMF754** | 🧪 |
+| **ESS** (`sc_allegro`) | Maestro 2 (ES1968), Maestro 2E (ES1978), Allegro / Allegro-1 (ES1988S/ES1989S), Maestro-3i (ES1983), Canyon3D 2 / LE (ES1990/1992) | 🧪 |
+| **Avance Logic** (`sc_als4000`) | ALS4000 | 🧪 |
+| **Trident / SiS** (`sc_trident`) | 4DWave DX, 4DWave NX, SiS 7018 | 🧪 |
+| **Cirrus Logic** (`sc_cs4281`) | CS4281 | 🧪 |
+
+> [!TIP]
+> Not sure what your PC has? Boot DOS and run `SBEMU` once: it prints the chip it found.
+> Under emulators, QEMU's `AC97` (ICH) and `intel-hda` devices both work.
+
+<details>
+<summary><b>Hardware FM and MPU passthrough</b></summary>
+
+On cards that have them, SBEMU can pass the OPL3 FM and MPU-401 straight
+to the hardware instead of emulating them (`/SCFM`, `/SCMPU`, off by
+default): C-Media CMI8338/8738 and the Yamaha YMF7x4. The SC-55 pack's own
+MIDI synth replaces the MPU side, so you normally leave these off.
+</details>
+
+---
+
+## 📸 Screenshots
+
+<table>
+<tr>
+<td align="center"><img src="docs/cd-images-groovy.png" width="400"><br><sub>CD images, <i>Groovy</i> style: label, tracks, CD music, installer</sub></td>
+<td align="center"><img src="docs/cd-images-classic.png" width="400"><br><sub>The same screen, <i>Classic</i> style</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/cd-files.png" width="400"><br><sub>Files on a disc image, read without mounting it</sub></td>
+<td align="center"><img src="docs/win98-settings.png" width="400"><br><sub>Windows 98: settings, shared with DOS</sub></td>
+</tr>
+</table>
+
+---
+
+## 🧰 What's in the pack
+
+| Program | What it does |
 |---|---|
-| `SBEMU.EXE` | SBEMU with the SC-55 / MT-32 / SoundFont MIDI synth built in, CD-Audio mixing, diagnostics, an in-game LCD overlay (Ctrl+Alt+F12) |
-| `MENU.BAT` / `SC55MENU.EXE` | One menu for everything: sound, games (with per-game profiles and CD images), CD-ROM, settings, tools |
-| `SETTINGS.BAT` / `SBSET.EXE` | Every SBEMU option on one screen, plus an automatic setup that benchmarks the ROM sets and picks the best one the CPU can run |
-| `GAMETEST.EXE` | Runs your games unattended with SBDIAG and finds the SBEMU settings that give each one the best music timing |
-| `MIDPLAY.EXE` | MIDI file player with a live SC-55 / MT-32 front panel |
-| `SBDIAG.EXE`, `MPUTEST.EXE`, `TIMETEST.EXE` | Diagnostics: SBEMU statistics, a test tune, timer checks |
-| `SC55WAV.EXE` / `SC55LOG.EXE` | ROM check and speed benchmark (writes a WAV / a report) |
-| `CDSET\GUI.BAT` / `CDGUI.EXE` | The CD images screen: mount images on drive M:, run a disc's installer, fix CUE files |
+| `SBEMU.EXE` | SBEMU with the SC-55 / MT-32 / SoundFont synth built in, CD-Audio mixing, diagnostics, in-game LCD overlay (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>F12</kbd>) |
+| `MENU.BAT` → `SC55MENU.EXE` | One menu for everything: sound, games (per-game profiles and CD images), CD-ROM, settings, tools |
+| `SETTINGS.BAT` → `SBSET.EXE` | Every option on one screen, plus **automatic setup** that benchmarks the ROM sets and picks the best one your CPU can run |
+| `GAMETEST.EXE` | Runs your games unattended and finds the settings that give each one the best music timing |
+| `MIDPLAY.EXE` | MIDI player with a live SC-55 / MT-32 front panel |
+| `CDSET\GUI.BAT` → `CDGUI.EXE` | CD images: mount on M:, run a disc's installer, list its files, fix CUE files |
+| `SBDIAG`, `MPUTEST`, `TIMETEST`, `SC55WAV` | Diagnostics, test tune, timer checks, ROM check and speed benchmark |
+| `WIN98\SC55W.EXE` + `.VXD` + `SC55MIDI.DRV` | The Windows 98 part (tray program, virtual SB for DOS boxes, MIDI device) |
 
-Third-party DOS programs that come with the pack zip (not stored in this
-repository, see `sc55-pack/pack/BINARIES.md`): HDPMI32i, JEMM / QPIEMU, uCDD,
-SHSUCDX and CD-ROM drivers.
+Also in the pack zip (not stored here, see [`BINARIES.md`](sc55-pack/pack/BINARIES.md)):
+HDPMI32i, JEMM / QPIEMU, uCDD, SHSUCDX and CD-ROM drivers.
 
-## Installing on the laptop
+---
 
-1. Download the pack zip (`SC55PACK-HYBRID.zip`) and put your ROM dumps in
-   `FILES\ROMS`.
-2. In DOS (Windows 98: *Restart in MS-DOS mode*), go to the pack folder and run
-   `SETUP` (installs to `C:\SC55`).
-3. Optional: `CDINST` for the virtual CD drive and the CD images screen.
-4. Run `C:\SC55\MENU.BAT`.
+## 🚀 Getting started
 
-`README.TXT` in the pack is the complete guide: every option, every screen,
-real-mode games (JEMM+QPIEMU or QEMM), the virtual CD drive and
-troubleshooting.
-
-## Using it
-
-- **Protected-mode games** (DOS/4GW and the like): `C:\SC55\SC55.BAT`, then
-  start the game. In its setup choose Sound Blaster 16 (220, IRQ 7, DMA 1/5 by
-  default) and General MIDI / Sound Canvas at port 330.
-- **Real-mode games**: the JEMM or QEMM launchers (`SC55JEM.BAT` /
-  `SC55QMM.BAT`); you supply QPIEMU or QEMM.
-- **Games with CD music**: put the disc image in `C:\CDIMAGES`, mount it from
-  the CD images screen, and start with `HYBRID.BAT`.
-- **Settings** are saved in `C:\SC55\SBOPTS.TXT`, shared by every launcher and
-  by the Windows 98 part.
-
-## Windows 98
-
-`SETUP98.BAT` (in the pack zip) installs the Windows part into `C:\SC55\WIN98`:
-
-- `SC55W.VXD`: a virtual Sound Blaster (1.5 to 16), OPL3 and MPU-401 for DOS
-  boxes.
-- `SC55W.EXE`: makes the sound with the same synths (SC-55, MT-32, SoundFont,
-  DOSBox or Nuked OPL3). It lives in the tray, with a settings window that matches
-  `SBSET`, and also installs / uninstalls.
-- `SC55MIDI.DRV`: the Windows MIDI device "SC-55 PACK".
-
-See `README98.TXT` in the pack. The source is in `sc55-pack/win98/`.
-
-## Repository layout
-
-Everything lives in `sc55-pack/`:
-
-| Folder | |
-|---|---|
-| `main.c`, `sbemu/`, `mpxplay/`, `drivers/` | SBEMU (sound card drivers, SB/OPL/MPU emulation) with the pack's additions: `sbemu/vmpu_sc55.c` (SC-55 MPU), `sbemu/vmpu_mt32.cpp` (Munt), `sbemu/vmpu_sf.c` (SoundFont), `sbemu/cdlink.c` (CD-Audio), `sbemu/vdiag.c` (diagnostics, key player, overlay) |
-| `sc55/` | The SC-55 engine around Nuked-SC55 (`sc55synth.cpp`, shims) |
-| `upstream/Nuked-SC55` | Nuked-SC55, unmodified |
-| `third_party/` | Munt mt32emu 2.8.3, Nuked OPL3 |
-| `tools/` | The DOS programs: `sc55menu.c`, `sbset.c`, `gametest.c`, `midplay.c`, `cdgui.c`, `sbdiag.c`, `mputest.c`, `timetest.c`, `sc55wav.cpp`; the shared text UI `tui.h`, `theme.h`, `fontdata.h` |
-| `pack/` | The pack's batch files, README and folder layout (binaries and ROMs are added when the zip is made) |
-| `win98/` | The Windows 98 part: `vxd/` (SC55W.VXD), `helper/` (SC55W.EXE: engine, synths, settings, setup), `mididrv/` (SC55MIDI.DRV), `common/`, `compat/` (Windows 98 replacements for newer DLL imports), `tools/`, `test/` |
-| `testrig/` | QEMU test machine: FreeDOS disk builder, ISO builder, VM driver, key player |
-| `tests/` | Host-side tests of the engine (`make -f tests/Makefile.host`) |
-
-`README-SBEMU.md` is SBEMU's own README (supported sound cards, all SBEMU
-options); `README-VSC55.md` describes the SC-55 additions to SBEMU.
-
-## Building
-
-Needs the DJGPP cross compiler (`i586-pc-msdosdjgpp-gcc`, GCC 12):
-
-```sh
-export PATH=/path/to/djgpp/bin:$PATH
-cd sc55-pack
-make -j2            # everything goes to output/
+```text
+1. Put your ROM dumps in FILES\ROMS of the pack zip
+2. Boot DOS (Windows 98: "Restart in MS-DOS mode")
+3. cd to the pack folder and run   SETUP        → installs to C:\SC55
+4. Optional:                       CDINST       → virtual CD drive
+5. Start:                          C:\SC55\MENU.BAT
 ```
 
-After changing a header, delete `output/*.o` first. `make VSC55=0` builds plain
-SBEMU without the SC-55.
+In each game's setup pick **Sound Blaster 16** (220, IRQ 7, DMA 1/5 by default)
+and **General MIDI / Sound Canvas** at port **330**, or **MT-32** if you chose it.
 
-The Windows 98 part (`win98/build98.sh`) is built with MinGW-w64 (i686, GCC 13),
-Open Watcom 2 and JWasm, against Nuked-SC55 (jcmoyer fork) and Munt; see
-`win98/SOURCES.TXT` for the versions and paths.
+<details>
+<summary><b>More: real-mode games, CD music, settings</b></summary>
 
-## Testing
+- **Protected-mode games** (DOS/4GW and friends): `C:\SC55\SC55.BAT`, then the game.
+- **Real-mode games**: `SC55JEM.BAT` (JEMM + QPIEMU) or `SC55QMM.BAT` (QEMM); you supply those files.
+- **CD music**: put the image in `C:\CDIMAGES`, mount it in the CD images screen, start with `HYBRID.BAT`.
+- **Settings** live in `C:\SC55\SBOPTS.TXT`, shared by every launcher and by Windows 98.
 
-`sc55-pack/testrig/` runs a DOS PC in QEMU (AC'97 like the D810) and drives it
-by script: build a FreeDOS disk from a folder (`mkdisk.py`), boot it
-(`vm.py start`), send keys and take screenshots (`vm.py key` / `vm.py shot`).
-Emulators are not the real thing: what matters is the D810, and
-`HANDOFF.md` lists what still has to be checked there.
+The pack's `README.TXT` is the complete guide.
+</details>
 
-## Credits and licences
+<details>
+<summary><b>Windows 98</b></summary>
 
-The combined work is **GPL-2.0-or-later** (`sc55-pack/COPYING`).
+`SETUP98.BAT` installs to `C:\SC55\WIN98`:
 
-- SBEMU: crazii and contributors (GPL-2.0-or-later), based on MPXPlay.
-- Nuked-SC55: nukeykt and contributors.
-- Munt mt32emu: the Munt team (LGPL-2.1-or-later).
-- Nuked OPL3: nukeykt (LGPL-2.1-or-later); DOSBox OPL: the DOSBox team.
-- TinySoundFont: Bernhard Schelling (MIT).
-- Terminus font: Dimitar Zhekov (OFL).
-- Third-party DOS programs in the pack zip keep their own licences.
+- **`SC55W.VXD`**: virtual Sound Blaster (1.5 – 16), OPL3 and MPU-401 for DOS boxes
+- **`SC55W.EXE`**: plays it all with the same synths; tray icon, settings window matching `SBSET`, installer / uninstaller
+- **`SC55MIDI.DRV`**: the Windows MIDI device **"SC-55 PACK"**
 
-Roland, SC-55, MT-32 and CM-32L are trademarks of Roland Corporation. This
-project is not affiliated with Roland.
+See [`README98.TXT`](sc55-pack/pack/README98.TXT).
+</details>
+
+---
+
+## 🗂️ Repository layout
+
+```text
+sc55-pack/
+├── main.c, sbemu/, mpxplay/, drivers/   SBEMU + sound-chip drivers, with the pack's additions
+│   └── sbemu/vmpu_sc55.c, vmpu_mt32.cpp, vmpu_sf.c, cdlink.c, vdiag.c
+├── sc55/                 SC-55 engine around Nuked-SC55
+├── upstream/Nuked-SC55   Nuked-SC55, unmodified
+├── third_party/          Munt mt32emu 2.8.3, Nuked OPL3
+├── tools/                DOS programs (menu, settings, GAMETEST, MIDPLAY, CD images …) + text UI
+├── win98/                Windows 98 part: vxd/, helper/, mididrv/, compat/
+├── pack/                 the pack's batch files and guides
+├── testrig/              QEMU test machine (disk builder, VM driver)
+└── tests/                host-side engine tests
+```
+
+📖 [`HANDOFF.md`](sc55-pack/HANDOFF.md): current state and what still needs testing &nbsp;•&nbsp;
+[`README-VSC55.md`](sc55-pack/README-VSC55.md): the SC-55 options &nbsp;•&nbsp;
+[`README-SBEMU.md`](sc55-pack/README-SBEMU.md): SBEMU's own guide
+
+---
+
+## 🔨 Building
+
+```sh
+export PATH=/path/to/djgpp/bin:$PATH   # i586-pc-msdosdjgpp-gcc (GCC 12)
+cd sc55-pack
+make -j2                               # → output/
+```
+
+Delete `output/*.o` after changing a header. `make VSC55=0` builds plain SBEMU.
+The Windows 98 part (`win98/build98.sh`) needs MinGW-w64 i686, Open Watcom 2 and
+JWasm; see [`win98/SOURCES.TXT`](sc55-pack/win98/SOURCES.TXT).
+
+## 🧪 Testing
+
+[`testrig/`](sc55-pack/testrig) boots a DOS PC in QEMU with AC'97 like the D810 and
+drives it by script (keys, screenshots). Emulators aren't the real thing, though:
+the D810 has the final say.
+
+---
+
+## 🙏 Credits
+
+Combined work: **GPL-2.0-or-later** ([`COPYING`](sc55-pack/COPYING)).
+
+**SBEMU**: crazii & contributors, on MPXPlay (Attila Padar), Linux drivers ported by jiyunomegami
+&nbsp;•&nbsp; **Nuked-SC55**: nukeykt & contributors
+&nbsp;•&nbsp; **Munt**: the Munt team (LGPL-2.1+)
+&nbsp;•&nbsp; **Nuked OPL3**: nukeykt (LGPL-2.1+) &nbsp;•&nbsp; **DOSBox OPL**: the DOSBox team
+&nbsp;•&nbsp; **TinySoundFont**: Bernhard Schelling (MIT)
+&nbsp;•&nbsp; **Terminus font**: Dimitar Zhekov (OFL)
+
+<sub>Roland, SC-55, MT-32 and CM-32L are trademarks of Roland Corporation. Not affiliated with Roland.</sub>
