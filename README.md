@@ -124,17 +124,70 @@ MIDI synth replaces the MPU side, so you normally leave these off.
 | `SBDIAG`, `MPUTEST`, `TIMETEST`, `SC55WAV` | Diagnostics, test tune, timer checks, ROM check and speed benchmark |
 | `WIN98\SC55W.EXE` + `.VXD` + `SC55MIDI.DRV` | The Windows 98 part (tray program, virtual SB for DOS boxes, MIDI device) |
 
-Also in the release zip `NUKED-SB-EMU.zip` (not stored here, see [`BINARIES.md`](sc55-pack/pack/BINARIES.md)):
-HDPMI32i, JEMM / QPIEMU, uCDD, SHSUCDX and CD-ROM drivers.
+The release zip also carries the third-party DOS programs it may share
+(HDPMI32i, JEMM / QPIEMU, uCDD, SHSUCDX, XCDROM). See [Downloads](#-downloads).
+
+---
+
+## ⬇️ Downloads
+
+### NUKED SB-EMU
+
+| | |
+|---|---|
+| 📦 **Latest release** | [**NUKED-SB-EMU-1.0.0-beta.35.zip**](release/NUKED-SB-EMU-1.0.0-beta.35.zip) (4.6 MB): DOS pack + Windows 98 part, ready to install |
+| 🧾 **Source** | this repository (GPL-2.0-or-later) |
+
+### What you have to supply yourself
+
+The release leaves out what it may not legally share. Only the ROMs are needed for the SC-55.
+
+| What | Needed for | Where to get it | Put it in |
+|---|---|---|---|
+| 🎹 **Roland SC-55 / SC-55mkII ROMs** | the SC-55 synth | Copyrighted; **dump them from a unit you own**. Not needed if you use a SoundFont | `FILES\ROMS` |
+| 🎹 **Roland MT-32 / CM-32L ROMs** | the MT-32 synth (optional) | Dump them from a unit you own | `FILES\ROMS` |
+| 🎚️ **A SoundFont** (`.SF2`) | the SoundFont synth (optional) | Any General MIDI SoundFont; many free ones exist | `C:\SC55\SF2` |
+| 💿 **MSCDEX.EXE** (Microsoft) | your real CD-ROM drive in DOS (optional) | Part of Windows 98: SETUP takes `C:\WINDOWS\COMMAND\MSCDEX.EXE` by itself | automatic |
+| 💿 **VIDE-CDD.SYS** (Acer / BenQ) | an alternative CD-ROM driver (optional; XCDROM is included) | Acer's `APICD214.EXE` package: [Vogons wiki](https://www.vogonswiki.com/index.php/VIDE-CDD.SYS), [DOS Days](https://www.dosdays.co.uk/topics/Software/optical_downloads.php) | `FILES\VIDECD` |
+| 💿 **GSCDROM.SYS** (LG) | LG drives that don't work with XCDROM (optional) | [DOS Days](https://www.dosdays.co.uk/topics/Software/optical_downloads.php) | `FILES\GSCDROM` |
+| 🧠 **QEMM 8 / 9** | `SC55QMM.BAT` only (optional) | Commercial, out of print. Not needed: JEMMEX + QPIEMU (included) does the same | `FILES\QEMM` |
+
+`DOWNLOADS.TXT` in the zip has the same list.
+
+### Third-party programs included in the release
+
+| Program | Project | Licence |
+|---|---|---|
+| HDPMI32I | [HX DOS extender](https://github.com/Baron-von-Riedesel/HX), Japheth | freeware, source available |
+| JEMMEX, JEMM386, JLOAD, QPIEMU | [Jemm](https://github.com/Baron-von-Riedesel/Jemm), Japheth | freeware, source available |
+| UCDD 0.9.5-a2 | [uCDD](https://github.com/vorvek/uCDD), Vorvek | GPL-3.0 |
+| SHSUCDX | [SHSUCD suite](https://github.com/adoxa/shsucd), Jason Hood | freeware, source available |
+| XCDROM | XCDROM | GPL, source in the zip |
+
+---
+
+## 📋 Requirements
+
+| | Minimum | Recommended |
+|---|---|---|
+| **CPU** | SoundFont / FM: a far smaller CPU than the SC-55 needs | SC-55: a fast Pentium-class CPU (the D810's Pentium M works). It runs the real firmware: `SC55WAV` or *Settings > Automatic setup* measures yours |
+| **Memory** | 32 MB (about 21 MB stay resident with the SC-55) | 64 MB or more |
+| **Sound** | a PCI / onboard chip from the [list above](#-supported-sound-chips) | Intel AC'97 or HD Audio |
+| **DOS** | MS-DOS 6.22 / 7.x or FreeDOS, booted to plain DOS | Windows 98 "Restart in MS-DOS mode" (MS-DOS 7.1) |
+| **Windows** (optional) | Windows 98 / 98 SE with a working sound driver | — |
+| **Disk** | about 25 MB (more for disc images) | — |
+| **Real-mode games** (optional) | JEMMEX + QPIEMU (included) or QEMM | — |
+
+**Building from source:** [DJGPP](https://github.com/andrewwutw/build-djgpp) cross compiler (GCC 12) for DOS; for the Windows 98 part MinGW-w64 i686, [Open Watcom 2](https://github.com/open-watcom/open-watcom-v2) and [JWasm](https://github.com/Baron-von-Riedesel/JWasm).
 
 ---
 
 ## 🚀 Getting started
 
 ```text
-1. Put your ROM dumps in FILES\ROMS of `NUKED-SB-EMU.zip`
+1. Download the release zip and unzip it; put your ROM dumps in NUKEDSB\FILES\ROMS
 2. Boot DOS (Windows 98: "Restart in MS-DOS mode")
-3. cd to the pack folder and run   SETUP        → installs to C:\SC55
+3. cd to the NUKEDSB folder, run  SETUP        → installs to C:\SC55
 4. Optional:                       CDINST       → virtual CD drive
 5. Start:                          C:\SC55\MENU.BAT
 ```

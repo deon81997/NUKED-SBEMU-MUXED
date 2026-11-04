@@ -1,0 +1,57 @@
+=============================================================================
+  NUKED SB-EMU  -  WHAT IS NOT IN THE PUBLIC RELEASE, AND WHERE TO GET IT
+=============================================================================
+
+The public release leaves out everything it may not legally share. Most of it
+is optional. Put each file where it says and run SETUP / CDINST again.
+
+-----------------------------------------------------------------------------
+ REQUIRED for the SC-55 / MT-32
+-----------------------------------------------------------------------------
+
+  Roland ROMs                        -> FILES\ROMS
+      SC-55 / SC-55mkII (and MT-32 / CM-32L for Munt). Roland's firmware is
+      copyrighted and is not available legally for download: dump the ROMs
+      from a unit you own. They are found by their contents, so the file
+      names do not matter. Without ROMs you can still use a SoundFont
+      (Settings > MIDI synth > SoundFont, any .SF2 file in C:\SC55\SF2).
+
+-----------------------------------------------------------------------------
+ OPTIONAL
+-----------------------------------------------------------------------------
+
+  MSCDEX.EXE  (Microsoft)            -> found automatically
+      Part of Windows 98 (C:\WINDOWS\COMMAND\MSCDEX.EXE); SETUP copies it
+      from there. Only needed for the REAL CD-ROM drive in DOS. Otherwise
+      copy it from your own MS-DOS 6.x / Windows 9x disks to C:\SC55\CDDRV.
+
+  VIDE-CDD.SYS  (Acer / BenQ)        -> FILES\VIDECD
+      IDE CD-ROM driver, an alternative to XCDROM (which IS included, GPL,
+      and works with most drives). Comes in Acer's driver package
+      APICD214.EXE. Information and downloads:
+        https://www.vogonswiki.com/index.php/VIDE-CDD.SYS
+        https://www.dosdays.co.uk/topics/Software/optical_downloads.php
+
+  GSCDROM.SYS  (LG / GoldStar)       -> FILES\GSCDROM
+      LG CD-ROM driver, for LG drives that do not work with XCDROM. Also on
+        https://www.dosdays.co.uk/topics/Software/optical_downloads.php
+
+  QEMM 8 / 9  (Quarterdeck)          -> FILES\QEMM
+      Commercial, no longer sold; only for SC55QMM.BAT. Not needed: JEMMEX
+      with QPIEMU (included) does the same job (SC55JEM.BAT).
+
+-----------------------------------------------------------------------------
+ INCLUDED THIRD-PARTY PROGRAMS (their own licences, sources here)
+-----------------------------------------------------------------------------
+
+  HDPMI32I.EXE                 HX DOS extender, Japheth
+                               https://github.com/Baron-von-Riedesel/HX
+  JEMMEX, JEMM386, JLOAD,      Jemm, Japheth
+  QPIEMU.DLL                   https://github.com/Baron-von-Riedesel/Jemm
+  UCDD.EXE (0.9.5-a2)          uCDD, Vorvek - GPL-3.0 (FILES\CDSET\UCDD-LIC.TXT)
+                               https://github.com/vorvek/uCDD
+  SHSUCDX.COM                  SHSUCD suite, Jason Hood (freeware)
+                               https://github.com/adoxa/shsucd
+  XCDROM.SYS                   GPL, source included (FILES\XCDROM\XCDROM.ASM)
+  SBEMU.EXE and the pack's     GPL-2.0-or-later, source:
+  own programs                 https://github.com/deon81997/NUKED-SBEMU-MUXED
