@@ -1,0 +1,39 @@
+CD-ROM IN DOS ON A DELL LATITUDE D810 (Windows 98 "MS-DOS mode")
+==================================================================
+
+Why the drivers cause "file errors" and "Fail on INT 24"
+  The D810's CD/DVD drive is an ATAPI drive on the Intel ICH6-M IDE channel. If a DOS driver such
+  as XCDROM.SYS is loaded from the real CONFIG.SYS, Windows 98 sees a real-mode driver on the IDE
+  channel and falls back to slow "MS-DOS compatibility mode", and the UltraDMA setup of the DOS
+  driver clashes with Windows' own. The fix is to load the DOS driver ONLY when you are in DOS,
+  and to turn UltraDMA off in the DOS driver (/UX). A CD-ROM driver is not needed in Windows 98.
+
+Do it with a private MS-DOS-mode configuration (no boot file is changed)
+  1. Right-click the desktop > New > Shortcut. Command line: C:\COMMAND.COM  Name: DOS with CD.
+  2. Right-click the shortcut > Properties > Program > Advanced.
+     Tick "MS-DOS mode" and "Specify a new MS-DOS configuration".
+  3. Click Configuration..., and in the Config.sys box type the lines from CONFIG.XCD,
+     in the Autoexec.bat box the lines from AUTOEXEC.XCD (the REM lines are not needed).
+  4. OK. Double-click the shortcut: Windows restarts into DOS with only that configuration.
+  5. Check:  DIR D:   (a disc must be in the drive). Then run C:\SC55\SC55.BAT or HYBRID.BAT.
+  When you exit DOS (type EXIT) Windows starts again as before.
+
+If XCDROM says it found no CD-ROM drive
+  * Add the unit it should test: /SM (secondary master) or /PM, /PS, /SS. The D810's modular-bay drive
+    is normally the secondary master: DEVICE=C:\SC55\CDDRV\XCDROM.SYS /D:XCD0001 /UX /SM
+  * Still nothing, or read errors: use VIDE-CDD (CONFIG.VID / AUTOEXEC.VID). It is PIO-only, uses the
+    IDE interrupt and is installed in C:\SC55\CDDRV. Try /P:170,15 (secondary) or /P:1f0,14 (primary),
+    or remove /P so it searches all channels.
+  * Then the Oak driver (CONFIG.OAK / AUTOEXEC.OAK) - the pack has no copy of it
+    unless you add your OAKCDROM.SYS to C:\SC55\CDDRV.
+  * For an LG drive use CONFIG.LG / AUTOEXEC.LG.
+
+If it works but reading is slow or errors appear
+  * Keep /UX (no UltraDMA). Data then comes through PIO: about 3-6 MB/s, fine for games.
+  * Check that the disc is clean and not a burned CD-R the drive dislikes: try a pressed CD first.
+
+Drive letter
+  MSCDEX /L:D asks for D:. If D: is a hard-disk partition (Dell Utility partition, etc.) use /L:E or
+  leave /L out.
+
+CD images (uCDD) need no CD-ROM driver at all - they work from the hard disk. Use CDINST.BAT and MOUNT.

@@ -1,0 +1,41 @@
+// DJGPP has no threads, so libstdc++'s <mutex> is empty. The SC-55 core only
+// uses std::mutex to guard the optional LCD front-end hand-off, which this
+// single-threaded DOS port never enables. These no-op types keep the upstream
+// core source compiling unchanged. GPL-2.0-or-later.
+#pragma once
+#include <cstddef>
+#include <cstdint>
+namespace std
+{
+struct mutex
+{
+    constexpr mutex() noexcept = default;
+    mutex(const mutex&) = delete;
+    mutex& operator=(const mutex&) = delete;
+    void lock() {}
+    bool try_lock() { return true; }
+    void unlock() {}
+};
+struct adopt_lock_t { explicit adopt_lock_t() = default; };
+inline constexpr adopt_lock_t adopt_lock{};
+template <class M> struct lock_guard
+{
+    explicit lock_guard(M&) {}
+    lock_guard(M&, adopt_lock_t) {}
+    lock_guard(const lock_guard&) = delete;
+    lock_guard& operator=(const lock_guard&) = delete;
+};
+template <class... M> struct scoped_lock
+{
+    explicit scoped_lock(M&...) {}
+    scoped_lock(const scoped_lock&) = delete;
+    scoped_lock& operator=(const scoped_lock&) = delete;
+};
+template <class M> struct unique_lock
+{
+    unique_lock() = default;
+    explicit unique_lock(M&) {}
+    void lock() {}
+    void unlock() {}
+};
+}

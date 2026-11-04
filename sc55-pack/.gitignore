@@ -1,0 +1,10 @@
+output/*
+.vscode
+.idea
+*.o
+*.ROM
+*.rom
+FILES/ROMS/
+pack/FILES/ROMS/
+*.img
+*.iso

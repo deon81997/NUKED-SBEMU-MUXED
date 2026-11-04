@@ -1,0 +1,2 @@
+REM Paste into the Autoexec.bat box of the same dialog.
+C:\SC55\CDDRV\MSCDEX.EXE /D:XCD0001 /L:D

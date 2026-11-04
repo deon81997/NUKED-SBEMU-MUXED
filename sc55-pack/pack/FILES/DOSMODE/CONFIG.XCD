@@ -1,0 +1,6 @@
+REM Paste these lines into: Properties > Program > Advanced > "Specify a new MS-DOS configuration" > Configuration...
+REM (Config.sys box). This applies ONLY to the MS-DOS-mode shortcut. Your real CONFIG.SYS is not changed.
+DEVICE=C:\WINDOWS\HIMEM.SYS
+DEVICE=C:\SC55\CDDRV\XCDROM.SYS /D:XCD0001 /UX
+REM LASTDRIVE=Z leaves room for the virtual CD drive M: (CD images, CDON.BAT).
+LASTDRIVE=Z

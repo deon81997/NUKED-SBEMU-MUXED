@@ -1,0 +1,6 @@
+REM Alternative if XCDROM finds no drive: the generic Oak ATAPI driver (PIO only, slow but very compatible).
+REM Copy OAKCDROM.SYS to C:\SC55\CDDRV first.
+DEVICE=C:\WINDOWS\HIMEM.SYS
+DEVICE=C:\SC55\CDDRV\OAKCDROM.SYS /D:OAKCD
+REM LASTDRIVE=Z leaves room for the virtual CD drive M: (CD images, CDON.BAT).
+LASTDRIVE=Z

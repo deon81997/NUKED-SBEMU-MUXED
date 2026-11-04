@@ -1,0 +1,22 @@
+SC55W - source code of the Windows 98 part of the SC-55 pack (GPL v2+)
+
+  helper/    SC55W.EXE: engine (event/PCM rings -> audio), synth wrappers,
+             SBOPTS.TXT options, ROM detection, tray UI, setup/uninstall
+  vxd/       SC55W.VXD: virtual SB/OPL3/MPU-401 (JWasm + Open Watcom C)
+  mididrv/   SC55MIDI.DRV: 16-bit MIDI output driver (Open Watcom)
+  common/    interface shared by the VxD and the EXE
+  compat/    Windows 98 replacements for newer KERNEL32/MSVCRT imports
+  tools/     build helpers (LE object flag fix, import checker, WAV checker)
+  test/      DOS and Win32 test programs, native engine test
+  third_party/  DOSBox DBOPL (GPL v2+), Nuked OPL3 (LGPL v2.1+),
+             TinySoundFont tsf.h (MIT), as used from the SBEMU sources
+
+Also used, unmodified (get them from their projects):
+  Nuked-SC55, jcmoyer fork  https://github.com/jcmoyer/Nuked-SC55
+                            commit 66d12727cc43000d38094aaf2f76dc30cc93f448
+  Munt mt32emu              https://github.com/munt/munt
+                            commit d885a95a2485ea6ebf723d7861244fb70aa2ab35
+
+Build (Linux): MinGW-w64 i686 (GCC 13, win32 threads), Open Watcom 2.0,
+JWasm. build98.sh builds the EXE, the VxD and the driver; the paths at its
+top point to the checkouts above. Compiled for Pentium M (SSE2).

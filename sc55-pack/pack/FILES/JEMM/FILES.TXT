@@ -1,0 +1,11 @@
+JEMM 5.86 (included)
+====================
+
+JEMMEX.EXE    memory manager (XMS + EMM in one), loaded from CONFIG.SYS
+JEMM386.EXE   the same without XMS: needs an XMS manager first (e.g. C:\WINDOWS\HIMEM.SYS)
+JLOAD.EXE     loads DLL modules ("JLMs") from the command line
+QPIEMU.DLL    QEMM port-trap emulation that SBEMU uses
+JLOAD.TXT, QPIEMU.TXT, JEMMREAD.TXT (Jemm manual), JEMMLIC.TXT (licence)
+
+From the Jemm distribution (https://github.com/Baron-von-Riedesel/Jemm), version 5.86.
+JLOAD and Jemm must be the same version. Used by  C:\SC55\SC55JEM.BAT  (README.TXT, section 11).

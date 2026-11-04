@@ -1,0 +1,11 @@
+PUT THE QEMM FILES HERE  (then run SETUP.BAT, or copy them to C:\SC55\RM\QEMM)
+=============================================================================
+
+Needed for  C:\SC55\SC55QMM.BAT  (real-mode games through QEMM):
+
+   QEMM386.SYS   the memory manager, loaded from CONFIG.SYS
+   plus every other file your QEMM version needs next to it
+   (for example QEMM.COM, QEMM386.COM / LOADHI.COM / QDPMI.* files, and its data files)
+
+QEMM is commercial software; use your own copy. Nothing here is started automatically.
+See README.TXT, section 11.

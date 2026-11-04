@@ -1,0 +1,114 @@
+#include <windows.h>
+#include "resource.h"
+
+IDI_APP ICON "sc55w.ico"
+
+IDD_SETTINGS DIALOGEX 0, 0, 402, 242
+STYLE DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
+CAPTION "SC-55 PACK for Windows 98 - Settings"
+FONT 8, "MS Sans Serif"
+BEGIN
+    GROUPBOX        "Sound Blaster (DOS)", -1, 7, 4, 128, 100
+    LTEXT           "Port", -1, 13, 17, 48, 8
+    COMBOBOX        IDC_PORT, 60, 15, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "IRQ", -1, 13, 31, 48, 8
+    COMBOBOX        IDC_IRQ, 60, 29, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "8-bit DMA", -1, 13, 45, 48, 8
+    COMBOBOX        IDC_DMA, 60, 43, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "16-bit DMA", -1, 13, 59, 48, 8
+    COMBOBOX        IDC_HDMA, 60, 57, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Type", -1, 13, 73, 48, 8
+    COMBOBOX        IDC_TYPE, 60, 71, 70, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "FM music", -1, 13, 87, 48, 8
+    COMBOBOX        IDC_FM, 60, 85, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    GROUPBOX        "Output", -1, 7, 108, 128, 58
+    LTEXT           "Sample rate", -1, 13, 121, 48, 8
+    COMBOBOX        IDC_RATE, 60, 119, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Render-ahead (ms)", -1, 13, 135, 70, 8
+    EDITTEXT        IDC_AHEAD, 96, 133, 34, 12, ES_NUMBER
+    AUTOCHECKBOX    "Fix time constants", IDC_FIXTC, 13, 150, 118, 10
+
+    GROUPBOX        "MIDI", -1, 141, 4, 128, 100
+    LTEXT           "MPU-401", -1, 147, 17, 46, 8
+    COMBOBOX        IDC_MPU, 194, 15, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Synth", -1, 147, 31, 46, 8
+    COMBOBOX        IDC_SYNTH, 194, 29, 70, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "SC-55 ROM set", -1, 147, 45, 46, 8
+    COMBOBOX        IDC_ROMSET, 194, 43, 70, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "SoundFont file", -1, 147, 59, 100, 8
+    EDITTEXT        IDC_SF, 147, 69, 99, 12, ES_AUTOHSCROLL
+    PUSHBUTTON      "...", IDC_SFBROWSE, 248, 69, 16, 12
+    LTEXT           "Windows: MIDI device ""SC-55 PACK""", -1, 147, 88, 118, 8
+
+    GROUPBOX        "Volume (%)", -1, 141, 108, 128, 72
+    LTEXT           "Master", -1, 147, 121, 70, 8
+    EDITTEXT        IDC_VOL, 224, 119, 40, 12, ES_NUMBER
+    LTEXT           "Sound effects", -1, 147, 135, 70, 8
+    EDITTEXT        IDC_SBVOL, 224, 133, 40, 12, ES_NUMBER
+    LTEXT           "FM music", -1, 147, 149, 70, 8
+    EDITTEXT        IDC_OPLVOL, 224, 147, 40, 12, ES_NUMBER
+    LTEXT           "MIDI music (0-400)", -1, 147, 163, 74, 8
+    EDITTEXT        IDC_MIDIVOL, 224, 161, 40, 12, ES_NUMBER
+
+    GROUPBOX        "SC-55 / MT-32", -1, 275, 4, 120, 72
+    LTEXT           "Gain % (100 = unity)", -1, 281, 17, 72, 8
+    EDITTEXT        IDC_SCGAIN, 356, 15, 34, 12, ES_NUMBER
+    LTEXT           "Note limit", -1, 281, 31, 72, 8
+    COMBOBOX        IDC_SCVOICES, 356, 29, 34, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    AUTOCHECKBOX    "Reverb and chorus", IDC_SCFX, 281, 46, 110, 10
+    AUTOCHECKBOX    "Automatic speed control", IDC_SCAUTO, 281, 59, 110, 10
+
+    GROUPBOX        "SoundFont", -1, 275, 80, 120, 100
+    LTEXT           "Reverb", -1, 281, 93, 30, 8
+    EDITTEXT        IDC_SFREV, 311, 91, 22, 12, ES_NUMBER
+    LTEXT           "Room", -1, 339, 93, 26, 8
+    EDITTEXT        IDC_SFROOM, 368, 91, 22, 12, ES_NUMBER
+    LTEXT           "Damping", -1, 281, 107, 30, 8
+    EDITTEXT        IDC_SFDAMP, 311, 105, 22, 12, ES_NUMBER
+    LTEXT           "Chorus", -1, 339, 107, 26, 8
+    EDITTEXT        IDC_SFCHO, 368, 105, 22, 12, ES_NUMBER
+    LTEXT           "Speed", -1, 281, 121, 30, 8
+    EDITTEXT        IDC_SFCRATE, 311, 119, 22, 12, ES_NUMBER
+    LTEXT           "Depth", -1, 339, 121, 26, 8
+    EDITTEXT        IDC_SFCDEPTH, 368, 119, 22, 12, ES_NUMBER
+    LTEXT           "Voices", -1, 281, 135, 30, 8
+    EDITTEXT        IDC_SFVOICES, 311, 133, 22, 12, ES_NUMBER
+    AUTOCHECKBOX    "Follow the song's effect sends", IDC_SFSEND, 281, 150, 112, 10
+    LTEXT           "Levels in %, speed in 0.1 Hz", -1, 281, 164, 112, 8
+
+    AUTOCHECKBOX    "Start with Windows", IDC_AUTOSTART, 7, 170, 128, 10
+    LTEXT           "", IDC_PREVIEW, 7, 186, 388, 26, SS_NOPREFIX | SS_SUNKEN
+    PUSHBUTTON      "Defaults", IDC_DEFAULTS, 7, 221, 50, 14
+    DEFPUSHBUTTON   "Save", IDOK, 235, 221, 50, 14
+    PUSHBUTTON      "Apply", IDC_APPLY, 290, 221, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 345, 221, 50, 14
+END
+
+IDD_STATUS DIALOGEX 0, 0, 260, 170
+STYLE DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "SC-55 PACK for Windows 98 - Status"
+FONT 8, "MS Sans Serif"
+BEGIN
+    LTEXT           "", IDC_STATUSTEXT, 7, 7, 246, 136, SS_NOPREFIX
+    PUSHBUTTON      "All notes off", IDC_PANIC, 7, 149, 60, 14
+    PUSHBUTTON      "Settings...", IDM_SETTINGS, 72, 149, 60, 14
+    DEFPUSHBUTTON   "Close", IDCANCEL, 203, 149, 50, 14
+END
+
+IDD_INSTALL DIALOGEX 0, 0, 300, 172
+STYLE DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "SC-55 PACK for Windows 98 - Setup"
+FONT 8, "MS Sans Serif"
+BEGIN
+    ICON            IDI_APP, -1, 7, 7, 20, 20
+    LTEXT           "Sets up the SC-55 pack in Windows 98: a Sound Blaster (up to SB16) with OPL3 FM and an MPU-401 for DOS programs, and the MIDI device ""SC-55 PACK"" for Windows programs, both played by the SC-55 (or MT-32 / SoundFont) emulation of the DOS pack, with the same settings.", IDC_I_INFO, 34, 7, 259, 42
+    LTEXT           "Pack folder (ROMS, SBOPTS.TXT; the Windows files go to its WIN98 folder):", -1, 7, 54, 286, 8
+    EDITTEXT        IDC_I_DIR, 7, 65, 286, 12, ES_AUTOHSCROLL
+    AUTOCHECKBOX    "Start with Windows (needed for DOS sound and the MIDI device)", IDC_I_AUTO, 7, 84, 286, 10
+    AUTOCHECKBOX    "Make ""SC-55 PACK"" the default MIDI device for Windows programs", IDC_I_MAP, 7, 98, 286, 10
+    AUTOCHECKBOX    "Turn off Windows' own Sound Blaster emulation (SBEMUL) for DOS boxes", IDC_I_SBEMUL, 7, 112, 286, 10
+    AUTOCHECKBOX    "Set BLASTER= in AUTOEXEC.BAT for DOS programs", IDC_I_BLASTER, 7, 126, 286, 10
+    DEFPUSHBUTTON   "Install", IDOK, 188, 151, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 243, 151, 50, 14
+END

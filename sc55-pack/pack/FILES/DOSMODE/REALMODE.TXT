@@ -1,0 +1,29 @@
+REAL-MODE GAMES WITH JEMM+QPIEMU OR QEMM  (Windows 98 "MS-DOS mode" or plain DOS)
+================================================================================
+
+Plain SC55.BAT (HDPMI only) serves protected-mode games. Real-mode games (most older DOS games)
+need a V86 manager that can trap I/O ports: JEMM with QPIEMU.DLL, or QEMM.
+  C:\SC55\RM\JEMM    JEMM 5.86 is included: JEMMEX.EXE, JEMM386.EXE, JLOAD.EXE, QPIEMU.DLL
+  C:\SC55\RM\QEMM    you provide QEMM386.SYS and the other files your QEMM needs
+(put the QEMM files in FILES\QEMM in the pack before SETUP, or copy them there afterwards).
+
+These managers must be loaded by CONFIG.SYS. Do it in a private MS-DOS-mode configuration so
+Windows 98 and your real boot files stay untouched (a memory manager in the real CONFIG.SYS stops
+Windows 98 from starting normally):
+  1. Right-click the desktop > New > Shortcut. Command line: C:\COMMAND.COM  Name: SC55 JEMM  (or SC55 QEMM).
+  2. Right-click it > Properties > Program > Advanced. Tick "MS-DOS mode" and
+     "Specify a new MS-DOS configuration".
+  3. Click Configuration... and paste CONFIG.JEM (or CONFIG.QMM) into the Config.sys box and
+     AUTOEXEC.JEM (or AUTOEXEC.QMM) into the Autoexec.bat box. REM lines may be left out.
+  4. OK, double-click the shortcut: Windows restarts into DOS with that configuration only.
+  5. At the DOS prompt run   C:\SC55\SC55JEM.BAT   (or   C:\SC55\SC55QMM.BAT ), then your game.
+  When you type EXIT Windows starts again as before.
+
+On a PC that boots plain DOS you can put the same lines into the real CONFIG.SYS / AUTOEXEC.BAT instead.
+
+Tips (from the SBEMU notes)
+  * NOEMS turns EMS off (most games do not need it). Remove it for games that require EMS.
+  * X2MAX=8192 limits XMS to 8 MB; some real-mode games lose sound effects with more.
+  * Games whose DOS extender picks VCPI instead of DPMI get no sound; run  JEMMEX NOVCPI  at the prompt
+    after SBEMU is loaded (JEMM only).
+  * SBEMU cannot be unloaded; restart to stop it.

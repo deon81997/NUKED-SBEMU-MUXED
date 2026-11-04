@@ -1,0 +1,5 @@
+REM Alternative for LG drives.
+DEVICE=C:\WINDOWS\HIMEM.SYS
+DEVICE=C:\GSCDROM\GSCDROM.SYS /D:MSCD000
+REM LASTDRIVE=Z leaves room for the virtual CD drive M: (CD images, CDON.BAT).
+LASTDRIVE=Z

@@ -1,0 +1,4 @@
+REM Paste into the Autoexec.bat box of the same MS-DOS-mode configuration.
+REM Nothing else is needed here: run C:\SC55\SC55QMM.BAT yourself at the prompt (it loads HDPMI and SBEMU).
+REM Optional real CD-ROM:
+REM C:\SC55\CDDRV\MSCDEX.EXE /D:XCD0001 /L:D

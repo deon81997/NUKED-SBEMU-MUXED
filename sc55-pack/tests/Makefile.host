@@ -1,0 +1,20 @@
+# Host-side tests (Linux/macOS/MinGW with g++ 11+). Run:  make -f tests/Makefile.host
+# engine_test      - MIDI queue, resampler, gain, idle gating (fake core, no ROMs needed)
+# synth_errors_test- ROM discovery / error messages (fake files, links the real core)
+CXX ?= g++
+CORE := upstream/Nuked-SC55/src/backend
+FLAGS := -std=gnu++20 -O1 -g -fsanitize=address,undefined -I sc55/config -I sc55 -I $(CORE) \
+         -include sc55/shim/sc55_compat.h
+CORE_SRC := $(wildcard $(CORE)/*.cpp)
+
+all: out/engine_test out/synth_errors_test
+	out/engine_test && out/synth_errors_test
+
+out/engine_test: tests/engine_test.cpp sc55/sc55engine.hpp
+	@mkdir -p out
+	$(CXX) $(FLAGS) $< -o $@
+
+out/synth_errors_test: tests/synth_errors_test.cpp sc55/sc55synth.cpp $(CORE_SRC) $(CORE)/sha/sha224-256.c
+	@mkdir -p out
+	gcc -O1 -c $(CORE)/sha/sha224-256.c -o out/sha.o
+	$(CXX) $(FLAGS) tests/synth_errors_test.cpp sc55/sc55synth.cpp $(CORE_SRC) out/sha.o -o $@

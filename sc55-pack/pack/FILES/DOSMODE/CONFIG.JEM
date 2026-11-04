@@ -1,0 +1,13 @@
+REM Paste into: Properties > Program > Advanced > "Specify a new MS-DOS configuration" > Configuration... (Config.sys box).
+REM Real-mode + protected-mode SC-55 with JEMM. Applies ONLY to the MS-DOS-mode shortcut; your real CONFIG.SYS is not changed.
+REM JEMMEX provides XMS and EMM. Remove NOEMS if a game needs EMS. X2MAX=8192 limits XMS to 8 MB (some real-mode games need that).
+DEVICE=C:\SC55\RM\JEMM\JEMMEX.EXE X2MAX=8192 NOEMS
+DOS=HIGH,UMB
+REM Alternative with separate managers (use instead of the JEMMEX line; HIMEM.SYS is the one that comes with Windows 98):
+REM DEVICE=C:\WINDOWS\HIMEM.SYS
+REM DEVICE=C:\SC55\RM\JEMM\JEMM386.EXE NOEMS
+REM Optional real CD-ROM (see CDROM-D810.TXT):
+REM DEVICEHIGH=C:\SC55\CDDRV\XCDROM.SYS /D:XCD0001 /UX
+
+REM LASTDRIVE=Z leaves room for the virtual CD drive M: (CD images, CDON.BAT).
+LASTDRIVE=Z
