@@ -412,15 +412,15 @@ static void draw_status(void)
     const char* sf = opt_val("/VSF", "");
     int a = (BG_DESK << 4);
     /* narrower than the other screens' panels: the NUKED SB-EMU logo needs the room */
-    tui_panel(59, 1, 21, 5, 0, 0x0E, "Status");
+    tui_panel(59, 1, 21, 5, 0, 0x0E, "SBEMU");
     if (g_running)
     {
-        tui_put(61, 2, 0x0A, "\xFE SBEMU on");
+        tui_put(61, 2, 0x0A, "\xFE Loaded");
         sbemu_load();
         if (g_load >= 0)
-            tui_printf(71, 2, g_load < 500 ? 0x0A : g_load < 800 ? 0x0E : 0x0C, "CPU%3d%%", (g_load + 5) / 10 > 999 ? 999 : (g_load + 5) / 10);
+            tui_printf(70, 2, g_load < 500 ? 0x0A : g_load < 800 ? 0x0E : 0x0C, "CPU %3d%%", (g_load + 5) / 10 > 999 ? 999 : (g_load + 5) / 10);
     }
-    else tui_put(61, 2, 0x0C, "\xFE SBEMU off");
+    else tui_put(61, 2, 0x0C, "\xFE Not loaded");
     const char* mt = opt_val("/VMT32", "");
     if (mt[0] && strcmp(mt, "0") && strcasecmp(mt, "OFF")) tui_printf(61, 3, 0x07, "%s (Munt)", !strcasecmp(mt, "CM32L") ? "CM-32L" : "MT-32");
     else if (sf[0]) { const char* b = strrchr(sf, '\\'); tui_printf(61, 3, 0x07, "SF %.14s", b ? b + 1 : sf); }
