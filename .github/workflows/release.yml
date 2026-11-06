@@ -1,0 +1,100 @@
+# Publishes a GitHub release whenever a push to main changes the zip in release/.
+#
+# The version comes from the zip's file name:
+#   release/NUKED-SB-EMU-1.0.0-beta.39.zip  ->  tag v1.0.0-beta.39
+# Release notes are the commit messages since the previous release.
+# If that version was already released, its zip is replaced instead of
+# making a duplicate release.
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'release/**'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:        # "Run workflow" button on the Actions tab
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0      # full history + tags for the release notes
+
+      - name: Find the release zip and its version
+        id: ver
+        run: |
+          shopt -s nullglob
+          zips=(release/NUKED-SB-EMU-*.zip)
+          if [ ${#zips[@]} -eq 0 ]; then
+            echo "::error::No release/NUKED-SB-EMU-*.zip found"
+            exit 1
+          fi
+          # newest version wins if more than one zip is in the folder
+          zip=$(printf '%s\n' "${zips[@]}" | sort -V | tail -n 1)
+          version=$(basename "$zip" .zip)
+          version=${version#NUKED-SB-EMU-}
+          {
+            echo "zip=$zip"
+            echo "version=$version"
+            echo "tag=v$version"
+          } >> "$GITHUB_OUTPUT"
+          echo "Zip: $zip  ->  version $version"
+
+      - name: Write release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          ZIP: ${{ steps.ver.outputs.zip }}
+        run: |
+          # previous release = newest release that isn't this version
+          prev=$(gh release list --limit 20 --json tagName --jq '.[].tagName' | grep -vx "$TAG" | head -n 1 || true)
+          {
+            echo "## Changes"
+            echo
+            if [ -n "$prev" ] && git rev-parse -q --verify "refs/tags/$prev^{commit}" >/dev/null; then
+              git log --no-merges --pretty='- %s' "$prev..HEAD"
+            else
+              git log --no-merges --pretty='- %s' -n 1
+            fi
+            echo
+            echo "## Download"
+            echo
+            echo "**$(basename "$ZIP")**: DOS pack + Windows 98 part."
+            cat <<'TXT'
+          Unzip it, put your ROM dumps in `NUKEDSB\FILES\ROMS`, then follow the README.
+          ROMs and some third-party files are not included (see `DOWNLOADS.TXT` in the zip).
+          TXT
+          } > notes.md
+          cat notes.md
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          VERSION: ${{ steps.ver.outputs.version }}
+          ZIP: ${{ steps.ver.outputs.zip }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists - replacing its zip with this build."
+            gh release upload "$TAG" "$ZIP" --clobber
+            gh release edit "$TAG" --notes-file notes.md
+          else
+            gh release create "$TAG" "$ZIP" \
+              --title "NUKED-SB-EMU $VERSION" \
+              --notes-file notes.md \
+              --target "$GITHUB_SHA" \
+              --latest
+          fi
+          echo "### Released [$TAG](${{ github.server_url }}/${{ github.repository }}/releases/tag/$TAG)" >> "$GITHUB_STEP_SUMMARY"
