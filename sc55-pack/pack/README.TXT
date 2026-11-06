@@ -829,6 +829,24 @@ CONTENTS
  15. TROUBLESHOOTING
 =============================================================================
 
+  REPORTING A PROBLEM: MENU > Files > Make a bug report (or BUGREP in
+  C:\SC55). It writes C:\SC55\BUGREP.TXT with everything needed to find
+  the cause: CONFIG.SYS, AUTOEXEC.BAT, MSDOS.SYS, the environment, MEM /C,
+  your settings, SBEMU's messages (SBLOG.TXT), SBEMU's start-up details
+  (SBDETAIL.TXT), test results, the Windows 98 log and the file lists
+  (ROMs by name only). Nothing is changed or sent anywhere. Run SC55 once
+  first, so SBLOG.TXT and SBDETAIL.TXT are from the problem.
+
+  SBDETAIL.TXT is written every time SC55.BAT starts SBEMU: the command
+  line, every option and whether you set it, DOS and Windows versions,
+  the CPU, every PCI sound device with its IRQ, the card SBEMU chose,
+  each start-up step ("[step] ...") and every port trap. Each line is
+  saved at once, so if the PC hangs while SBEMU starts, the last
+  "[step]" line shows where. SET SBEMUDETAIL=OFF turns it off.
+
+  SBEMU SAYS "Not loaded" IN THE MENU: the line under the logo shows
+  the first error from SBLOG.TXT.
+
   MUSIC SLOWER THAN IT SHOULD BE IN A GAME (but fine in MIDPLAY): run SBDIAG.
       SC55                start SBEMU as usual
       SBDIAG START        start measuring

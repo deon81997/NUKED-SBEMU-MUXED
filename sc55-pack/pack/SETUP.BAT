@@ -54,7 +54,7 @@ IF NOT EXIST %DST%\RM\JEMM\JEMMEX.EXE ECHO WARNING: JEMM files not copied to %DS
 IF NOT EXIST %DST%\RM\JEMM\QPIEMU.DLL ECHO WARNING: QPIEMU.DLL is missing from %DST%\RM\JEMM.
 IF NOT EXIST %DRV%:\GSCDROM\NUL MD %DRV%:\GSCDROM
 COPY FILES\GSCDROM\*.* %DRV%:\GSCDROM > NUL
-REM  The CD images screen (MENU > CD-ROM > 2) lives in %DRV%:\CDSET. If an older pack put its own
+REM  The CD images screen (MENU, CD-ROM, item 2) lives in %DRV%:\CDSET. If an older pack put its own
 REM  mounter there, replace it now so the screen matches this menu (CDINST does the full CD install).
 IF NOT EXIST %DRV%:\CDSET\NUL GOTO NOCDSET
 ECHO Updating the CD images screen in %DRV%:\CDSET ...

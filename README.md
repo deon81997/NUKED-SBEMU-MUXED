@@ -6,7 +6,7 @@
 
 **SBEMU** &nbsp;•&nbsp; **Nuked-SC55** &nbsp;•&nbsp; **Munt MT-32** &nbsp;•&nbsp; **SoundFont** &nbsp;•&nbsp; **Virtual CD + CD-Audio** &nbsp;•&nbsp; **Windows 98**
 
-![Version](https://img.shields.io/badge/version-1.0.0--beta.37-blue)
+![Version](https://img.shields.io/badge/version-1.0.0--beta.38-blue)
 ![Platform](https://img.shields.io/badge/platform-MS--DOS%20%7C%20Windows%2098-008080)
 ![Target](https://img.shields.io/badge/tuned%20for-Dell%20Latitude%20D810-555)
 ![Licence](https://img.shields.io/badge/licence-GPL--2.0--or--later-green)
@@ -135,7 +135,7 @@ The release zip also carries the third-party DOS programs it may share
 
 | | |
 |---|---|
-| 📦 **Latest release** | [**NUKED-SB-EMU-1.0.0-beta.37.zip**](release/NUKED-SB-EMU-1.0.0-beta.37.zip) (4.6 MB): DOS pack + Windows 98 part, ready to install |
+| 📦 **Latest release** | [**NUKED-SB-EMU-1.0.0-beta.38.zip**](release/NUKED-SB-EMU-1.0.0-beta.38.zip) (4.6 MB): DOS pack + Windows 98 part, ready to install |
 | 🧾 **Source** | this repository (GPL-2.0-or-later) |
 
 ### What you have to supply yourself
@@ -253,6 +253,23 @@ make -j2                               # → output/
 Delete `output/*.o` after changing a header. `make VSC55=0` builds plain SBEMU.
 The Windows 98 part (`win98/build98.sh`) needs MinGW-w64 i686, Open Watcom 2 and
 JWasm; see [`win98/SOURCES.TXT`](sc55-pack/win98/SOURCES.TXT).
+
+## 🐞 Reporting a bug
+
+In DOS, open **MENU → Files → Make a bug report** (or run `BUGREP` in `C:\SC55`). It writes
+`C:\SC55\BUGREP.TXT`: CONFIG.SYS, AUTOEXEC.BAT, the environment, `MEM /C`, your settings,
+SBEMU's messages, SBEMU's start-up details, test results and the Windows 98 log. Attach that
+file to an [issue](https://github.com/deon81997/NUKED-SBEMU-MUXED/issues).
+
+- `SBDETAIL.TXT` is written every time SBEMU starts. It holds every option and where it came
+  from, the DOS and Windows versions, the CPU, each PCI sound device with its IRQ, the card SBEMU
+  chose, and each start-up step. Each line is saved at once, so after a hang the last `[step]`
+  line shows where it stopped.
+- `WIN98\SC55W.LOG` records the Windows version, BLASTER, memory, the wave and MIDI devices,
+  and, every 30 seconds, any audio underruns or late MIDI events.
+- When SBEMU fails to load, the DOS menu shows the error under the logo.
+
+---
 
 ## 🧪 Testing
 

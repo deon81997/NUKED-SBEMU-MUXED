@@ -1,0 +1,63 @@
+@ECHO OFF
+REM Collects everything needed to find a problem into one file: BUGREP.TXT in the SC55 folder.
+REM Usage: BUGREP [folder]   (the menu item Files, Make a bug report, does this for you)
+REM Nothing is changed or sent anywhere. ROM files are listed by name only.
+SET BR=%1
+IF "%BR%"=="" SET BR=C:\SC55
+SET BRF=%BR%\BUGREP.TXT
+ECHO Writing %BRF% ...
+ECHO ==== NUKED SB-EMU bug report> %BRF%
+VER>> %BRF%
+ECHO.| DATE>> %BRF%
+ECHO.| TIME>> %BRF%
+ECHO.>> %BRF%
+ECHO ==== Environment (SET)>> %BRF%
+SET>> %BRF%
+ECHO.>> %BRF%
+ECHO ==== Memory (MEM /C)>> %BRF%
+MEM /C>> %BRF%
+ECHO.>> %BRF%
+ECHO ==== C:\CONFIG.SYS>> %BRF%
+IF EXIST C:\CONFIG.SYS TYPE C:\CONFIG.SYS>> %BRF%
+ECHO.>> %BRF%
+ECHO ==== C:\AUTOEXEC.BAT>> %BRF%
+IF EXIST C:\AUTOEXEC.BAT TYPE C:\AUTOEXEC.BAT>> %BRF%
+ECHO.>> %BRF%
+ECHO ==== C:\MSDOS.SYS>> %BRF%
+IF EXIST C:\MSDOS.SYS TYPE C:\MSDOS.SYS | FIND /V ";xxxx">> %BRF%
+ECHO.>> %BRF%
+ECHO ==== Settings (SBOPTS.TXT / SBOPTS.BAT)>> %BRF%
+IF EXIST %BR%\SBOPTS.TXT TYPE %BR%\SBOPTS.TXT>> %BRF%
+IF EXIST %BR%\SBOPTS.BAT TYPE %BR%\SBOPTS.BAT>> %BRF%
+ECHO.>> %BRF%
+ECHO ==== SBEMU messages (SBLOG.TXT)>> %BRF%
+IF EXIST %BR%\SBLOG.TXT TYPE %BR%\SBLOG.TXT>> %BRF%
+ECHO.>> %BRF%
+ECHO ==== SBEMU start-up details (SBDETAIL.TXT)>> %BRF%
+IF EXIST %BR%\SBDETAIL.TXT TYPE %BR%\SBDETAIL.TXT>> %BRF%
+ECHO.>> %BRF%
+ECHO ==== Boot / speed test (SC55LOG.TXT)>> %BRF%
+IF EXIST %BR%\SC55LOG.TXT TYPE %BR%\SC55LOG.TXT>> %BRF%
+ECHO.>> %BRF%
+ECHO ==== Last SBDIAG report (SBDIAG.TXT)>> %BRF%
+IF EXIST %BR%\SBDIAG.TXT TYPE %BR%\SBDIAG.TXT>> %BRF%
+ECHO.>> %BRF%
+ECHO ==== GAMETEST results (GAMETEST.TXT)>> %BRF%
+IF EXIST %BR%\GAMETEST.TXT TYPE %BR%\GAMETEST.TXT>> %BRF%
+ECHO.>> %BRF%
+ECHO ==== Windows 98 part (WIN98\SC55W.INI, WIN98\SC55W.LOG)>> %BRF%
+IF EXIST %BR%\WIN98\SC55W.INI TYPE %BR%\WIN98\SC55W.INI>> %BRF%
+IF EXIST %BR%\WIN98\SC55W.LOG TYPE %BR%\WIN98\SC55W.LOG>> %BRF%
+ECHO.>> %BRF%
+ECHO ==== CD set-up (C:\CDSET\MOUNTED.FLG, CDGUI.CFG)>> %BRF%
+IF EXIST C:\CDSET\MOUNTED.FLG TYPE C:\CDSET\MOUNTED.FLG>> %BRF%
+IF EXIST %BR%\CDGUI.CFG TYPE %BR%\CDGUI.CFG>> %BRF%
+ECHO.>> %BRF%
+ECHO ==== Files>> %BRF%
+DIR %BR%>> %BRF%
+DIR %BR%\ROMS>> %BRF%
+ECHO ==== end>> %BRF%
+ECHO Done: %BRF%
+ECHO Copy it to a USB stick or floppy and attach it to your bug report.
+SET BRF=
+SET BR=

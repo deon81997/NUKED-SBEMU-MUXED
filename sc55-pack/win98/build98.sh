@@ -4,7 +4,7 @@ set -e
 cd "$(dirname "$0")"
 N=/home/claude/nsc55j; M=/home/claude/munt/mt32emu; S=/home/claude/sbemu-src/sbemu; O=/home/claude/nopl3
 ARCH="-march=pentium-m -mfpmath=sse -O2"
-BID=$(date +%s | tail -c 6)
+BID=$(( $(date +%s) % 100000 + 100000 ))
 CXX="i686-w64-mingw32-g++ -std=c++23 $ARCH -DBUILD_ID=$BID -D_USE_MATH_DEFINES -I$N/build98/backend -I$N/src -I$N/src/backend -I$M/b98 -I$M/src -I$S -I$O"
 mkdir -p out/obj
 for f in opts romscan synths engine w98main install98; do

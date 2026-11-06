@@ -10,6 +10,9 @@
 #include <stdbool.h>
 #include <dos.h>
 #include <stdarg.h>
+#include <time.h>
+#include <pc.h>
+#include <dpmi.h>
 #include <dpmi/dbgutil.h>
 #include <sbemucfg.h>
 #include <pic.h>
@@ -798,6 +801,122 @@ static void MAIN_SetBlasterEnv(struct MAIN_OPT* opt) //alter BLASTER env.
 static int MAIN_LogOn = 0; //set when the SBEMULOG environment variable names a log file: all text goes there
 static void MAIN_LogCommit(void) { if(MAIN_LogOn) { fflush(stdout); fsync(fileno(stdout)); } } //DOS only updates the file size on close/commit; the resident program never closes it
 static void MAIN_PutStr(const char* t) { if(MAIN_LogOn) { for(; *t; ++t) if(*t != '\r') fputc(*t, stdout); MAIN_LogCommit(); } else cputs(t); }
+
+/* ---- detail log (SBDETAIL.TXT) ------------------------------------------------------------------------
+ * SC55.BAT sets SBEMUDETAIL=<file>. SBEMU then writes everything it found and decided while starting:
+ * the command line, every option and where it came from, DOS / Windows / memory managers, the CPU, all
+ * PCI sound devices with their IRQs, the card it chose, each start-up step and every port trap. Each line
+ * is committed to disk at once, so after a hang or a crash the last "[step]" line shows where it stopped.
+ * Only written while starting (never from an interrupt); closed before SBEMU goes resident. */
+static FILE* MAIN_Det;
+static const char* MAIN_DetStage = "start";
+static void MAIN_D(const char* fmt, ...)
+{
+    va_list ap;
+    if(!MAIN_Det) return;
+    va_start(ap, fmt); vfprintf(MAIN_Det, fmt, ap); va_end(ap);
+    fflush(MAIN_Det); fsync(fileno(MAIN_Det));
+}
+static void MAIN_Step(const char* s)
+{
+    MAIN_DetStage = s;
+    MAIN_D("[step] %s\n", s);
+}
+static void MAIN_DetClose(const char* why)
+{
+    if(!MAIN_Det) return;
+    MAIN_D("---- %s (last step: %s)\n", why, MAIN_DetStage);
+    fclose(MAIN_Det); MAIN_Det = NULL;
+}
+static void MAIN_DetAtExit(void) { MAIN_DetClose("SBEMU quit without going resident"); }
+static uint32_t MAIN_PCIRead(int bus, int dev, int fn, int reg)
+{
+    outportl(0xCF8, 0x80000000UL | ((uint32_t)bus << 16) | ((uint32_t)dev << 11) | ((uint32_t)fn << 8) | (reg & 0xFC));
+    return inportl(0xCFC);
+}
+static void MAIN_DetSystem(int argc, char* argv[])
+{
+    union REGS r; int i;
+    time_t t = time(NULL);
+    MAIN_D("==== SBEMU %s detail log, %s", MAIN_SBEMU_VER, ctime(&t));
+    MAIN_D("Command line:");
+    for(i = 1; i < argc; ++i) MAIN_D(" %s", argv[i]);
+    MAIN_D("\n");
+    { const char* e[] = {"BLASTER", "SBOPTS", "SBEMULOG", "COMSPEC", "PATH", "DOS16M", "DOS4G", "HDPMI"};
+      for(i = 0; i < (int)(sizeof(e)/sizeof(e[0])); ++i) { const char* v = getenv(e[i]); MAIN_D("  %%%s%% = %s\n", e[i], v ? v : "(not set)"); } }
+    r.x.ax = 0x3000; int86(0x21, &r, &r);
+    MAIN_D("DOS version %d.%02d", r.h.al, r.h.ah);
+    r.x.ax = 0x3306; r.x.bx = 0; int86(0x21, &r, &r);
+    if(r.h.al != 0xFF) MAIN_D(" (true %d.%02d)", r.h.bl, r.h.bh);
+    r.x.ax = 0x1600; int86(0x2F, &r, &r);
+    if(r.h.al != 0 && r.h.al != 0x80) MAIN_D(", running inside Windows %d.%02d", r.h.al, r.h.ah); else MAIN_D(", no Windows");
+    MAIN_D("\n");
+    { unsigned int hi, lo; uint32_t m = 0, f = 0;
+      __dpmi_free_mem_info fi;
+      if(__dpmi_get_free_memory_information(&fi) == 0) f = fi.largest_available_free_block_in_bytes;
+      MAIN_D("DPMI largest free block: %lu KB\n", (unsigned long)(f >> 10)); (void)hi; (void)lo; (void)m; }
+    {   /* CPU name (CPUID 0x80000002-4), or the vendor string */
+        uint32_t a, b, c, d; char name[49]; int ok = 0;
+        asm volatile("pushfl; popl %%eax; movl %%eax, %%ecx; xorl $0x200000, %%eax; pushl %%eax; popfl; pushfl; popl %%eax; xorl %%ecx, %%eax" : "=a"(a) : : "ecx");
+        if(a & 0x200000)
+        {
+            asm volatile("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "a"(0x80000000));
+            if(a >= 0x80000004)
+            {
+                uint32_t* n = (uint32_t*)name;
+                for(i = 0; i < 3; ++i) asm volatile("cpuid" : "=a"(n[i*4]), "=b"(n[i*4+1]), "=c"(n[i*4+2]), "=d"(n[i*4+3]) : "a"(0x80000002 + i));
+                name[48] = 0; ok = 1;
+            }
+            else
+            {
+                asm volatile("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "a"(0));
+                memcpy(name, &b, 4); memcpy(name + 4, &d, 4); memcpy(name + 8, &c, 4); name[12] = 0; ok = 1;
+            }
+        }
+        MAIN_D("CPU: %s\n", ok ? name : "(no CPUID)");
+    }
+    {   /* every PCI multimedia device (class 04): the sound chip(s) SBEMU can choose from */
+        int bus, dev, fn, n = 0, any = 0;
+        for(bus = 0; bus < 8; ++bus)
+        for(dev = 0; dev < 32; ++dev)
+        for(fn = 0; fn < 8; ++fn)
+        {
+            uint32_t id = MAIN_PCIRead(bus, dev, fn, 0);
+            if(id == 0xFFFFFFFFUL || id == 0) { if(fn == 0) break; continue; }
+            ++any;
+            uint32_t cls = MAIN_PCIRead(bus, dev, fn, 8);
+            uint32_t hdr = MAIN_PCIRead(bus, dev, fn, 0x0C);
+            if((cls >> 24) == 0x04)
+            {
+                uint32_t irq = MAIN_PCIRead(bus, dev, fn, 0x3C), cmd = MAIN_PCIRead(bus, dev, fn, 4);
+                MAIN_D("PCI %02x:%02x.%d  %04lx:%04lx  class %02lx.%02lx  IRQ line %lu pin %c  cmd %04lx  BAR0 %08lx BAR1 %08lx\n",
+                    bus, dev, fn, id & 0xFFFF, id >> 16, cls >> 24, (cls >> 16) & 0xFF,
+                    irq & 0xFF, ((irq >> 8) & 0xFF) ? 'A' - 1 + (char)((irq >> 8) & 0xFF) : '-', cmd & 0xFFFF,
+                    MAIN_PCIRead(bus, dev, fn, 0x10), MAIN_PCIRead(bus, dev, fn, 0x14));
+                ++n;
+            }
+            if(fn == 0 && !(hdr & 0x00800000UL)) break;   /* not multi-function */
+        }
+        MAIN_D("PCI: %d devices, %d sound device(s)\n", any, n);
+    }
+    {   /* which IRQs the PICs have unmasked now */
+        unsigned m = inportb(0x21) | (inportb(0xA1) << 8);
+        MAIN_D("PIC mask %04x (IRQs in use:", m);
+        for(i = 0; i < 16; ++i) if(!(m & (1 << i))) MAIN_D(" %d", i);
+        MAIN_D(")\n");
+    }
+}
+static void MAIN_DetOptions(const char* title)
+{
+    int i;
+    MAIN_D("%s (* = given on the command line or in SBOPTS):\n", title);
+    for(i = 0; i < OPT_COUNT; ++i)
+    {
+        const struct MAIN_OPT* o = &MAIN_Options[i];
+        if(o->setcmd & MAIN_SETCMD_STR) MAIN_D("  %c%-12s %s\n", (o->setcmd & MAIN_SETCMD_SET) ? '*' : ' ', o->option, o->value ? (const char*)(uintptr_t)o->value : "(none)");
+        else MAIN_D("  %c%-12s %x (%d)\n", (o->setcmd & MAIN_SETCMD_SET) ? '*' : ' ', o->option, o->value, o->value);
+    }
+}
 static void MAIN_CPrintf(int color, const char* fmt, ...)
 {
     char buf[2048]; //limit for cprintf (DJGPP): 2048
@@ -931,6 +1050,26 @@ int main(int argc, char* argv[])
             MAIN_LogOn = 1;
         }
     }
+    {
+        /* SBEMUDETAIL names the file; otherwise SBDETAIL.TXT next to the SBEMULOG file (SC55.BAT sets that) */
+        static char dbuf[260];
+        const char* dn = getenv("SBEMUDETAIL");
+        const char* ln = getenv("SBEMULOG");
+        if((!dn || !*dn) && ln && *ln && strlen(ln) < sizeof(dbuf) - 16)
+        {
+            char* e;
+            strcpy(dbuf, ln);
+            e = strrchr(dbuf, '\\'); if(!e) e = strrchr(dbuf, '/'); if(!e) e = strrchr(dbuf, ':');
+            strcpy(e ? e + 1 : dbuf, "SBDETAIL.TXT");
+            dn = dbuf;
+        }
+        if(dn && *dn && stricmp(dn, "OFF") && (MAIN_Det = fopen(dn, "w")) != NULL)
+        {
+            atexit(&MAIN_DetAtExit);
+            MAIN_DetSystem(argc, argv);
+            MAIN_Step("reading options");
+        }
+    }
     MAIN_CPrintf(CYAN, "\r\n%s ", PROGNAME);
     MAIN_CPrintf(LIGHTCYAN, "%s ", MAIN_SBEMU_VER);
     MAIN_CPrintf(LIGHTGRAY,"(");
@@ -1032,6 +1171,8 @@ int main(int argc, char* argv[])
         }
     }
 
+    MAIN_DetOptions("Options after BLASTER and the command line");
+    MAIN_Step("checking options");
 #if MPU_DEBUG
     mpu_debug = MAIN_Options[OPT_MDBG].value;
 #endif
@@ -1100,7 +1241,9 @@ int main(int argc, char* argv[])
         MAIN_Options[OPT_HDMA].value = MAIN_Options[OPT_DMA].value; //only one low DMA channel allowed, use same channel for hdma & low dma.
     }
 
+    MAIN_Step("DPMI init");
     DPMI_Init();
+    MAIN_Step("looking for QEMM / QPIEMU and HDPMI");
 
     MAIN_QEMM_Present = TRUE;
     if(MAIN_Options[OPT_RM].value)
@@ -1203,6 +1346,7 @@ int main(int argc, char* argv[])
 #endif
 
     //TSR installation check: update parameter & exit if already installed
+    MAIN_Step("checking for a resident SBEMU");
     MAIN_TSR_InstallationCheck();
 
 #if SBEMU_VMPU && SBEMU_VSC55
@@ -1270,11 +1414,25 @@ int main(int argc, char* argv[])
     if(MAIN_Options[OPT_SC].value)
         aui.card_select_index = MAIN_Options[OPT_SC].value;
     aui.card_select_config = MAIN_Options[OPT_OUTPUT].value;
+    MAIN_D("Real mode support %s, protected mode support %s, QEMM/QPIEMU %s, HDPMI %s\n", enableRM ? "on" : "off", enablePM ? "on" : "off",
+        MAIN_QEMM_Present ? "found" : "not found", MAIN_HDPMI_Present ? "found" : "not found");
+    MAIN_Step("sound card init (AU_init)");
     AU_init(&aui, &fm_aui, &mpu401_aui);
     if(!aui.card_handler)
+    {
+        MAIN_D("No usable sound card found (AU_init gave no card handler)\n");
         return 1;
+    }
+    MAIN_D("Card: %s (test index %d), IRQ %d, PCI %s %04x:%04x at %02x:%02x.%d\n",
+        aui.card_handler->shortname ? aui.card_handler->shortname : "?", aui.card_test_index, aui.card_irq,
+        aui.card_pci_dev && aui.card_pci_dev->device_name ? aui.card_pci_dev->device_name : "-",
+        aui.card_pci_dev ? aui.card_pci_dev->vendor_id : 0, aui.card_pci_dev ? aui.card_pci_dev->device_id : 0,
+        aui.card_pci_dev ? aui.card_pci_dev->bBus : 0, aui.card_pci_dev ? aui.card_pci_dev->bDev : 0, aui.card_pci_dev ? aui.card_pci_dev->bFunc : 0);
+    MAIN_D("FM card: %s, MPU-401 card: %s\n", fm_aui.card_handler ? fm_aui.card_handler->shortname : "none (emulated)",
+        mpu401_aui.card_handler ? mpu401_aui.card_handler->shortname : "none");
     atexit(&MAIN_Cleanup);
 
+    MAIN_Step("checking the sound card IRQ");
     if(aui.card_irq > 15) //UEFI with CSM may have APIC enabled (16-31) - but we need read APIC, not implemented for now.
     {
         printf("Invalid Sound card IRQ: ");
@@ -1304,6 +1462,7 @@ int main(int argc, char* argv[])
         MAIN_SetBlasterEnv(MAIN_Options);
     }
     pcibios_enable_interrupt(aui.card_pci_dev);
+    MAIN_Step("OPL3 / MPU-401 setup");
 
     printf("Real mode support: ");
     MAIN_Print_Enabled_Newline(enableRM);
@@ -1378,6 +1537,7 @@ int main(int argc, char* argv[])
                     MAIN_Options[OPT_VSFCHO].value, MAIN_Options[OPT_VSFCRATE].value, MAIN_Options[OPT_VSFCDEPTH].value, MAIN_Options[OPT_VSFSEND].value);
             }
             #endif
+            MAIN_Step("MPU-401 synth init (ROM scan, firmware boot)");
             if( VMPU_Init(MAIN_Options[OPT_MPUADDR].value, &MAIN_Options[OPT_VMPU_VOICES].value, aui.freq_card, get_abs_path(fullpath, sizeof(fullpath), sf) ) )
             {
                 #if SBEMU_VSC55
@@ -1445,6 +1605,7 @@ int main(int argc, char* argv[])
         MAIN_Print_Enabled_Newline(true);
     }
 
+    MAIN_Step("Sound Blaster init");
     VIRQ_Init();
 
     MAIN_SbemuExtFun.StartPlayback = NULL; //not used
@@ -1551,6 +1712,7 @@ int main(int argc, char* argv[])
         OPL3EMU_SetCore(MAIN_Options[OPT_FMCORE].value);
         OPL3EMU_Init(aui.freq_card); //aui.freq_card available after AU_setrate
 
+    MAIN_Step("installing the sound card interrupt handlers");
     BOOL PM_ISR = DPMI_InstallISR(PIC_IRQ2VEC(aui.card_irq), MAIN_InterruptPM, &MAIN_IntHandlePM, MAIN_ISR_CHAINED) == 0;
 
     #if MAIN_INSTALL_RM_ISR
@@ -1641,6 +1803,16 @@ int main(int argc, char* argv[])
         if(!freopen("CON", "w", stdout)) freopen("NUL", "w", stdout);
         MAIN_LogOn = 0;
     }
+    MAIN_D("Resolved: SB port %x IRQ %d DMA %d HDMA %d type %d, MPU %x, sample rate %u, card IRQ %d\n",
+        MAIN_Options[OPT_ADDR].value, MAIN_Options[OPT_IRQ].value, MAIN_Options[OPT_DMA].value, MAIN_Options[OPT_HDMA].value,
+        MAIN_Options[OPT_TYPE].value, MAIN_Options[OPT_MPUADDR].value, aui.freq_card, aui.card_irq);
+    MAIN_D("Traps: QEMM vdma %d virq %d sb %d | HDPMI vdma %d%d%d vhdma %d%d%d virq %d%d sb %d | ISR pm %d rm %d tsr %d\n",
+        QEMMInstalledVDMA, QEMMInstalledVIRQ, QEMMInstalledSB, HDPMIInstalledVDMA1, HDPMIInstalledVDMA2, HDPMIInstalledVDMA3,
+        HDPMIInstalledVHDMA1, HDPMIInstalledVHDMA2, HDPMIInstalledVHDMA3, HDPMIInstalledVIRQ1, HDPMIInstalledVIRQ2, HDPMIInstalledSB,
+        PM_ISR, RM_ISR, TSR_ISR);
+    MAIN_Step("going resident");
+    MAIN_DetClose(PM_ISR && RM_ISR && TSR_ISR && QEMMInstalledVDMA && QEMMInstalledVIRQ && QEMMInstalledSB && HDPMIInstalledSB
+        ? "start-up finished, going resident" : "a trap or handler failed (see Traps above)");
     MAIN_TSRed = TRUE;
     if(!PM_ISR || !RM_ISR || !TSR_ISR
     || !QEMMInstalledVDMA || !QEMMInstalledVIRQ || !QEMMInstalledSB

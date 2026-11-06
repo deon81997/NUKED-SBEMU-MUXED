@@ -382,6 +382,13 @@ static void build_menu(void)
         " too fast or locked up. Right arrow shows the rest of each line.", IT_VIEW, "GAMETEST.TXT", 0, 0, NULL);
     add(C_FILES, "GAMETEST full reports", "GTFULL.TXT: the complete SBDIAG report of every GAMETEST test.",
         IT_VIEW, "GTFULL.TXT", 0, 0, NULL);
+    add(C_FILES, "SBEMU start-up details", "SBDETAIL.TXT: everything SBEMU found and decided at its last start - options and"
+        " where they came from, DOS and memory managers, the CPU, every PCI sound device and its IRQ, each start-up step.",
+        IT_VIEW, "SBDETAIL.TXT", 0, 0, NULL);
+    snprintf(c, sizeof c, "CALL %s\\BUGREP.BAT %s", g_home, g_home);
+    add(C_FILES, "Make a bug report", "Collects the settings, CONFIG.SYS, AUTOEXEC.BAT, memory, SBEMU's messages and"
+        " start-up details, test results and the Windows 98 log into one file, BUGREP.TXT, then shows it. Attach it"
+        " when you report a problem.", IT_BAT, c, 0, 0, "BUGREP.TXT");
     add(C_FILES, "README", "The pack's manual: installing, every option, the tools, troubleshooting.",
         IT_VIEW, "README.TXT", 0, 0, NULL);
 }

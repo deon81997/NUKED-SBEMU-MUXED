@@ -461,6 +461,16 @@ static DWORD WINAPI audio_main(LPVOID)
         // the CPU cannot keep up: always leave some time for everything else
         if (load > 0.9) Sleep(load > 1.2 ? 10 : 2);
 
+        {   // every 30 s, when something went wrong since the last line: a trace in SC55W.LOG
+            static DWORD last_log; static unsigned lu, ll, lr;
+            if (now - last_log > 30000) {
+                last_log = now;
+                if (underruns != lu || eng.st.late_events != ll || eng.st.resyncs != lr)
+                    logf("audio: underruns %u, late events %u, resyncs %u, load %d%%%s", underruns, eng.st.late_events,
+                         eng.st.resyncs, (int)(load * 100), shed ? ", reverb/chorus shed" : "");
+                lu = underruns; ll = eng.st.late_events; lr = eng.st.resyncs;
+            }
+        }
         if (now - last_pub > 250) {
             last_pub = now;
             EnterCriticalSection(&g_cs);
@@ -1120,6 +1130,18 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR cmd, int)
     tray_add();
 
     logf("%s build %d, pack folder %s, options: %s", APP_TITLE, BUILD_ID, g_base.c_str(), g_opt.format().c_str());
+    {   // the system, for bug reports
+        OSVERSIONINFOA v; v.dwOSVersionInfoSize = sizeof v;
+        if (GetVersionExA(&v)) logf("Windows %lu.%lu build %lu %s", v.dwMajorVersion, v.dwMinorVersion, v.dwBuildNumber & 0xFFFF, v.szCSDVersion);
+        const char* bl = getenv("BLASTER");
+        logf("BLASTER = %s", bl ? bl : "(not set)");
+        MEMORYSTATUS ms; ms.dwLength = sizeof ms; GlobalMemoryStatus(&ms);
+        logf("memory: %lu MB total, %lu MB free", (unsigned long)(ms.dwTotalPhys >> 20), (unsigned long)(ms.dwAvailPhys >> 20));
+        UINT n = waveOutGetNumDevs();
+        for (UINT i = 0; i < n; i++) { WAVEOUTCAPSA c; if (waveOutGetDevCapsA(i, &c, sizeof c) == 0) logf("wave out %u: %s", i, c.szPname); }
+        n = midiOutGetNumDevs();
+        for (UINT i = 0; i < n; i++) { MIDIOUTCAPSA c; if (midiOutGetDevCapsA(i, &c, sizeof c) == 0) logf("MIDI out %u: %s", i, c.szPname); }
+    }
     if (vxd_open()) logf("SC55W.VXD loaded, build %lu", g_vxd_build);
     else logf("VxD: %s", g_vxd_error.c_str());
     g_wev = CreateEventA(NULL, FALSE, FALSE, NULL);
