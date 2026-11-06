@@ -62,8 +62,19 @@ ECHO  If your CONFIG.SYS / AUTOEXEC.BAT still load old pack drivers, compare the
 ECHO  (EDIT C:\CONFIG.SYS) and copy one back yourself, e.g.  COPY C:\AUTOEXEC.SC5 C:\AUTOEXEC.BAT
 
 :ASK
+REM (No "/" in a CHOICE prompt: CHOICE takes it for a switch, "only one prompt string allowed".)
+REM The Windows 98 part (SETUP98) is registered in Windows: removing its files from DOS would leave
+REM Windows looking for them (MIDI driver, start entry). Its own uninstaller has to go first.
+IF NOT EXIST %DRV%:\SC55\WIN98\SC55W.INI GOTO ASK1
 ECHO.
-CHOICE /C:YN /N  Uninstall now (Y/N)?
+ECHO  The Windows 98 part is still installed. Remove it first, in Windows:
+ECHO    Control Panel, Add/Remove Programs, "NUKED SB-EMU for Windows 98"
+ECHO    (or Start, Run:  %DRV%:\SC55\WIN98\SC55W.EXE /UNINSTALL)
+ECHO  Then restart and run UNINSTAL again. Nothing was changed.
+GOTO END
+:ASK1
+ECHO.
+CHOICE /C:YN  Uninstall now
 IF ERRORLEVEL 2 GOTO CANCEL
 IF ERRORLEVEL 1 GOTO ASK2
 ECHO CHOICE.COM is not available (it is in C:\WINDOWS\COMMAND). Nothing was changed.
@@ -75,7 +86,7 @@ ECHO  Your own files: SC-55 ROM dumps (%DRV%:\SC55\ROMS), SoundFonts (%DRV%:\SC5
 ECHO  your settings (SBOPTS.TXT, style, games list) and disc images (%DRV%:\CDIMAGES).
 ECHO    K = keep them (ROMs, SoundFonts and settings go to %DRV%:\SC55SAVE, images stay)
 ECHO    D = delete them too (back to exactly how the PC was before the install)
-CHOICE /C:KD /N  Keep or Delete (K/D)?
+CHOICE /C:KD  Keep or Delete
 IF ERRORLEVEL 2 GOTO BOOT
 SET UN_KEEP=1
 

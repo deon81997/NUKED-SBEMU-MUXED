@@ -50,7 +50,7 @@ IF EXIST C:\AUTOEXEC.BAT FIND /I "JEMMEX" C:\AUTOEXEC.BAT
 ECHO.
 ECHO If a line above is not from BOOTCFG.BAT, remove it yourself (EDIT C:\AUTOEXEC.BAT) or run C:\RESET.BAT.
 ECHO.
-CHOICE /C:YN /N Delete the folders and files listed first (Y/N)?
+CHOICE /C:YN Delete the folders and files listed first
 IF ERRORLEVEL 2 GOTO NO
 IF ERRORLEVEL 1 GOTO GO
 ECHO CHOICE is not available here. Nothing was deleted.
