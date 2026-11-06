@@ -1292,9 +1292,16 @@ int main(int argc, char* argv[])
     }
     if(aui.card_irq == MAIN_Options[OPT_IRQ].value)
     {
-        printf("Sound card IRQ %d conflict with options /i%d, abort.\n", aui.card_irq, aui.card_irq);
-        printf("Please try use /i5 or /i7 switch, or disable some onboard devices in the BIOS settings to release IRQs.\n");
-        return 1;
+        /* the real card already uses this IRQ: take another of the SB IRQs instead of refusing to load
+         * (a BLASTER line or saved setting written for another PC often asks for the card's own IRQ) */
+        static const int sbirqs[3] = {7, 5, 9};
+        int old = MAIN_Options[OPT_IRQ].value, k;
+        for(k = 0; k < 3 && sbirqs[k] == aui.card_irq; ++k);
+        MAIN_Options[OPT_IRQ].value = sbirqs[k];
+        MAIN_CPrintf(YELLOW, "Warning: ");
+        printf("the sound card itself uses IRQ %d, so the emulated SB uses IRQ %d instead of /I:%d.\n", aui.card_irq, MAIN_Options[OPT_IRQ].value, old);
+        printf("Save /I:%d in the settings to stop this message.\n", MAIN_Options[OPT_IRQ].value);
+        MAIN_SetBlasterEnv(MAIN_Options);
     }
     pcibios_enable_interrupt(aui.card_pci_dev);
 

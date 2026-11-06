@@ -20,11 +20,12 @@
 #include "tui.h"
 #include "safewr.h"
 
-#define MPU 0x330
+static int MPU = 0x330;          /* the MPU-401 port from the saved settings (/P) */
 #define NGAMES 4
 
 static char g_home[200];
-static int  g_running;          /* SBEMU answers at port 330 */
+static int  g_running;          /* SBEMU answers at its MPU-401 port */
+static char g_lasterr[80];      /* why SBEMU last refused to load (SBLOG.TXT), "" = no error */
 static char g_opts[300];        /* saved settings (SBOPTS.TXT / SBOPTS.BAT) */
 static char g_optfile[16];      /* "@SBOPTS.TXT" or "@SBOPTS.BAT" or "" */
 static int  g_gt_green, g_gt_yellow, g_gt_red, g_gt_lock;
@@ -111,6 +112,23 @@ static const char* opt_val(const char* name, const char* def)
         p += n;
     }
     return def;
+}
+/* the first error SBEMU wrote to SBLOG.TXT the last time it was started (SC55.BAT logs there) */
+static void read_lasterr(void)
+{
+    char p[300], line[200]; FILE* f;
+    g_lasterr[0] = 0;
+    home_path(p, "SBLOG.TXT");
+    if ((f = fopen(p, "r")) == NULL) return;
+    while (fgets(line, sizeof line, f))
+    {
+        char* t = line;
+        line[strcspn(line, "\r\n")] = 0;
+        while (*t == ' ') t++;
+        if (strstr(t, "rror") || strstr(t, "abort") || strstr(t, "not found") || strstr(t, "soundcard found") || strstr(t, "failed"))
+        { strncpy(g_lasterr, t, sizeof g_lasterr - 1); g_lasterr[sizeof g_lasterr - 1] = 0; break; }
+    }
+    fclose(f);
 }
 
 /* clock classes: 0 green 99-101%, 1 yellow 95-99% or 101-105%, 2 red (too slow / too fast / locked up) */
@@ -395,16 +413,19 @@ static void draw_header(void)
     tui_fill(1, 1, 80, 5, BG_DESK << 4, ' ');
     if (TUI_FANCY)
     {
-        x = 2 + tui_biglogo(2, 1, BG_DESK, "NUKED", g_rainbow, sizeof g_rainbow, g_phase);
-        tui_biglogo(x + 2, 1, BG_DESK, "SB-EMU", g_rainbow, sizeof g_rainbow, g_phase + 5);
+        x = 1 + tui_biglogo(1, 1, BG_DESK, "NUKED", g_rainbow, sizeof g_rainbow, g_phase);
+        tui_biglogo(x + 1, 1, BG_DESK, "SB-EMU", g_rainbow, sizeof g_rainbow, g_phase + 5);
     }
     else
     {
         static const unsigned char plain[] = { 15 };
-        x = 2 + tui_biglogo(2, 1, BG_DESK, "NUKED", plain, 1, 0);
-        tui_biglogo(x + 2, 1, BG_DESK, "SB-EMU", (const unsigned char*)"\x0B", 1, 0);
+        x = 1 + tui_biglogo(1, 1, BG_DESK, "NUKED", plain, 1, 0);
+        tui_biglogo(x + 1, 1, BG_DESK, "SB-EMU", (const unsigned char*)"\x0B", 1, 0);
     }
-    tui_put(3, 5, (BG_DESK << 4) | 0x0B, "SBEMU \xFA Nuked-SC55 \xFA MT-32 \xFA SoundFont \xFA for DOS");
+    if (!g_running && g_lasterr[0])
+        tui_printf(2, 5, (BG_DESK << 4) | 0x0C, "Last start failed: %.37s", g_lasterr);
+    else
+        tui_put(2, 5, (BG_DESK << 4) | 0x0B, "SBEMU \xFA Nuked-SC55 \xFA MT-32 \xFA SoundFont \xFA for DOS");
 }
 
 static void draw_status(void)
@@ -896,8 +917,10 @@ int main(int argc, char** argv)
     { char p[300]; home_path(p, "MENUGO.BAT"); remove(p); }
 
     putenv("LFN=n");                       /* 8.3 names: the menu writes them into batch files for plain DOS */
-    g_running = sbemu_present();
     read_sbopts();
+    { const char* pv = opt_val("/P", "330"); long v = strtol(pv, NULL, 16); if (v == 0x300 || v == 0x330) MPU = (int)v; }
+    g_running = sbemu_present();
+    if (!g_running) read_lasterr();
     read_gametest_summary();
     build_menu();
     g_sel = load_sel();

@@ -19,16 +19,20 @@ static int num(const std::string& v, int hex = 0)
 
 void Options::apply_blaster(const char* b)
 {
-    // the same reading as SBEMU's main.c: one digit for I, D, T, H; hex for A and P
+    // the same reading as SBEMU's main.c: one digit for I, D, T, H; hex for A and P.
+    // Values SBEMU would refuse (it only emulates A220/240, I5/7/9, D0/1/3, H5/6/7) are ignored,
+    // so a BLASTER line written for another card can't stop SBEMU from loading.
     if (!b) return;
     while (*b) {
         char c = (char)toupper((unsigned char)*b++);
-        if (c == 'A') sb_port = (int)strtol(b, (char**)&b, 16);
-        else if (c == 'P') mpu_port = (int)strtol(b, (char**)&b, 16);
-        else if (c == 'I' && isdigit((unsigned char)*b)) irq = *b++ - '0';
-        else if (c == 'D' && isdigit((unsigned char)*b)) dma8 = *b++ - '0';
+        int v;
+        if (c == 'A' && isxdigit((unsigned char)*b)) { v = (int)strtol(b, (char**)&b, 16); if (v == 0x220 || v == 0x240) sb_port = v; }
+        else if (c == 'P' && isxdigit((unsigned char)*b)) { v = (int)strtol(b, (char**)&b, 16); if (v == 0x300 || v == 0x330) mpu_port = v; }
+        else if (c == 'I' && isdigit((unsigned char)*b)) { v = *b++ - '0'; if (v == 5 || v == 7 || v == 9) irq = v; }
+        else if (c == 'D' && isdigit((unsigned char)*b)) { v = *b++ - '0'; if (v == 0 || v == 1 || v == 3) dma8 = v; }
         else if (c == 'T' && isdigit((unsigned char)*b)) sbtype = *b++ - '0';
-        else if (c == 'H' && isdigit((unsigned char)*b)) dma16 = *b++ - '0';
+        else if (c == 'H' && isdigit((unsigned char)*b)) { v = *b++ - '0'; if (v >= 5 && v <= 7) dma16 = v; }
+        else while (*b && *b != ' ' && *b != '\t') b++;   // skip the rest of a word we don't know
     }
     if (sbtype < 1 || sbtype > 6) sbtype = 5;
 }
