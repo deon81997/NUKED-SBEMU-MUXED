@@ -17,6 +17,22 @@ static int num(const std::string& v, int hex = 0)
     return (int)strtol(v.c_str(), nullptr, hex ? 16 : 10);
 }
 
+void Options::apply_blaster(const char* b)
+{
+    // the same reading as SBEMU's main.c: one digit for I, D, T, H; hex for A and P
+    if (!b) return;
+    while (*b) {
+        char c = (char)toupper((unsigned char)*b++);
+        if (c == 'A') sb_port = (int)strtol(b, (char**)&b, 16);
+        else if (c == 'P') mpu_port = (int)strtol(b, (char**)&b, 16);
+        else if (c == 'I' && isdigit((unsigned char)*b)) irq = *b++ - '0';
+        else if (c == 'D' && isdigit((unsigned char)*b)) dma8 = *b++ - '0';
+        else if (c == 'T' && isdigit((unsigned char)*b)) sbtype = *b++ - '0';
+        else if (c == 'H' && isdigit((unsigned char)*b)) dma16 = *b++ - '0';
+    }
+    if (sbtype < 1 || sbtype > 6) sbtype = 5;
+}
+
 void Options::parse(const std::string& text)
 {
     std::vector<std::string> toks;
@@ -90,11 +106,13 @@ std::string Options::format() const
     std::string s;
     char b[300];
     auto add = [&](const char* fmt, auto v) { snprintf(b, sizeof b, fmt, v); s += (s.empty() ? "" : " "); s += b; };
-    if (sb_port != d.sb_port) add("/A:%X", sb_port);
-    if (irq != d.irq) add("/I:%d", irq);
-    if (dma8 != d.dma8) add("/D:%d", dma8);
-    if (dma16 != d.dma16) add("/H:%d", dma16);
-    if (sbtype != d.sbtype) add("/T:%d", sbtype);
+    // Always written: otherwise SBEMU takes them from the BLASTER variable, which
+    // may say something else than what Windows uses (games then freeze).
+    add("/A:%X", sb_port);
+    add("/I:%d", irq);
+    add("/D:%d", dma8);
+    if (sbtype >= 6) add("/H:%d", dma16);
+    add("/T:%d", sbtype);
     if (opl != d.opl) add("/OPL:%d", opl);
     if (fmcore != d.fmcore) add("/FMCORE:%d", fmcore);
     if (fixtc != d.fixtc) add("/FIXTC:%d", fixtc);
@@ -103,7 +121,7 @@ std::string Options::format() const
     if (oplvol != d.oplvol) add("/VOPLVOL:%d", oplvol);
     if (midivol != d.midivol) add("/VMIDIVOL:%d", midivol);
     if (rate != d.rate) add("/K:%d", rate);
-    if (mpu_port != d.mpu_port) add("/P:%X", mpu_port);
+    add("/P:%X", mpu_port);
     if (!vmpu) add("/VMPU:%d", 0);
     if (synth() == SYN_SF2) {
         add("/VSF:%s", sf.c_str());

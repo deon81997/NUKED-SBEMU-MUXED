@@ -491,6 +491,7 @@ static void load_options()
 {
     std::string t;
     g_opt = Options();
+    g_opt.apply_blaster(getenv("BLASTER"));      // what SBEMU does in DOS too
     if (load_text(g_optpath, t)) g_opt.parse(t);
 }
 
@@ -719,7 +720,7 @@ static void settings_fill_lists(HWND d)
 {
     cb_add(d, IDC_PORT, "220", 0x220);
     cb_add(d, IDC_PORT, "240", 0x240);
-    const int irqs[] = {5, 7, 9, 10};
+    const int irqs[] = {5, 7, 9};                 // what SBEMU offers (BLASTER holds one digit)
     for (int v : irqs) { char b[8]; snprintf(b, sizeof b, "%d", v); cb_add(d, IDC_IRQ, b, v); }
     const int d8[] = {0, 1, 3};
     for (int v : d8) { char b[8]; snprintf(b, sizeof b, "%d", v); cb_add(d, IDC_DMA, b, v); }

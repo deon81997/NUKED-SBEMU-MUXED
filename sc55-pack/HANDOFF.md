@@ -27,6 +27,16 @@
   entry). Release zip: NUKED-SB-EMU.zip with folder NUKEDSB. C:\SC55 and the BOOTCFG REM markers
   keep their names (RESET.BAT and existing installs rely on them). makefile builds SC55MENU now.
 
+## 2026-11-06 (beta.36): game freezes after installing the Windows 98 part
+- Cause (most likely): SETUP98 v1 replaced the user's own SET BLASTER line in AUTOEXEC.BAT with one
+  built from the helper's defaults (I7, T4). SBEMU takes /A /I /D /H /T /P from BLASTER when
+  SBOPTS.TXT does not give them, so in DOS mode SBEMU and in Windows the VxD moved to another IRQ
+  than the games were set up for: freezes / stuck sound.
+- Fix: the installer restores a "REM [SC55W-OLD]" line, never replaces a user BLASTER line, reads
+  the user's line like SBEMU does (Options::apply_blaster), and writes /A /I /D (/H) /T /P
+  explicitly into SBOPTS.TXT/.BAT. Settings always write them too. IRQ 10 removed from the list
+  (BLASTER holds one digit). BLASTER T now uses SBEMU's numbering. Tested in QEMU Win98.
+
 ## Not verified on the D810 yet
 - MT-32 sound, Ctrl+Alt+F12 overlay, VESA graphics modes, automatic-setup numbers, beta.33 timer give-back change (choppy music).
 

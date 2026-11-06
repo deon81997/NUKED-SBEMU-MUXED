@@ -50,6 +50,9 @@ struct Options {
         return SYN_SC55;
     }
 
+    // Like SBEMU: port, IRQ, DMA, type and MPU port not given in SBOPTS.TXT
+    // come from the BLASTER variable. Call before parse().
+    void apply_blaster(const char* blaster);
     // parse a whole SBOPTS.TXT / command line; unknown switches go to passthru
     void parse(const std::string& text);
     // the shortest option line that reproduces these settings

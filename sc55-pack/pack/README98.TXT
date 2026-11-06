@@ -48,8 +48,12 @@ pack there, as before.
                         and must be off for this one. Greyed out if your
                         Windows does not have it.
        Set BLASTER= in AUTOEXEC.BAT
-                        so DOS programs find the Sound Blaster. It is kept
-                        up to date when you change the settings.
+                        only if AUTOEXEC.BAT has no BLASTER line of its own:
+                        an existing line is never changed, because SBEMU
+                        and your games' setups go by it. Ours is kept up to
+                        date when you change the settings. (Version 1 of
+                        Setup replaced an existing line, which could make
+                        games freeze; running Setup again puts it back.)
   4. Restart Windows (Setup asks). A keyboard icon appears next to the
      clock. It takes a few seconds after Windows starts before the SC-55
      is ready.

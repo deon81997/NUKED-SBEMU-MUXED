@@ -6,7 +6,7 @@
 
 **SBEMU** &nbsp;•&nbsp; **Nuked-SC55** &nbsp;•&nbsp; **Munt MT-32** &nbsp;•&nbsp; **SoundFont** &nbsp;•&nbsp; **Virtual CD + CD-Audio** &nbsp;•&nbsp; **Windows 98**
 
-![Version](https://img.shields.io/badge/version-1.0.0--beta.35--sc55-blue)
+![Version](https://img.shields.io/badge/version-1.0.0--beta.36-blue)
 ![Platform](https://img.shields.io/badge/platform-MS--DOS%20%7C%20Windows%2098-008080)
 ![Target](https://img.shields.io/badge/tuned%20for-Dell%20Latitude%20D810-555)
 ![Licence](https://img.shields.io/badge/licence-GPL--2.0--or--later-green)
@@ -135,7 +135,7 @@ The release zip also carries the third-party DOS programs it may share
 
 | | |
 |---|---|
-| 📦 **Latest release** | [**NUKED-SB-EMU-1.0.0-beta.35.zip**](release/NUKED-SB-EMU-1.0.0-beta.35.zip) (4.6 MB): DOS pack + Windows 98 part, ready to install |
+| 📦 **Latest release** | [**NUKED-SB-EMU-1.0.0-beta.36.zip**](release/NUKED-SB-EMU-1.0.0-beta.36.zip) (4.6 MB): DOS pack + Windows 98 part, ready to install |
 | 🧾 **Source** | this repository (GPL-2.0-or-later) |
 
 ### What you have to supply yourself

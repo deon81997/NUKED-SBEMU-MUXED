@@ -207,9 +207,9 @@ void stop_running_helper()
 // BLASTER / AUTOEXEC.BAT
 std::string blaster_for(const Options& o)
 {
-    static const int tval[7] = {0, 1, 3, 3, 2, 4, 6};   // /T 1..6 -> BLASTER T
+    // the same line SBEMU sets: T is SBEMU's own type number (5 is written as 4)
     char b[80];
-    int t = o.sbtype >= 1 && o.sbtype <= 6 ? tval[o.sbtype] : 4;
+    int t = o.sbtype == 5 ? 4 : o.sbtype >= 1 && o.sbtype <= 6 ? o.sbtype : 4;
     snprintf(b, sizeof b, "A%X I%d D%d", o.sb_port, o.irq, o.dma8);
     std::string s = b;
     if (o.sbtype >= 6) { snprintf(b, sizeof b, " H%d", o.dma16); s += b; }
@@ -273,26 +273,6 @@ bool autoexec_update_blaster(const Options& o)
     return write_lines(p, lines);
 }
 
-static void autoexec_add(const Options& o, std::string& ini_old)
-{
-    std::string p = boot_root() + "AUTOEXEC.BAT";
-    std::vector<std::string> lines;
-    read_lines(p, lines);
-    if (find_mark(lines) >= 0) { autoexec_update_blaster(o); return; }
-    // an existing BLASTER line is turned into a remark (put back on uninstall)
-    for (auto& l : lines) {
-        std::string u = upper(l);
-        size_t k = u.find_first_not_of(" \t@");
-        if (k != std::string::npos && u.compare(k, 12, "SET BLASTER=") == 0) {
-            ini_old = l;
-            l = "REM [SC55W-OLD] " + l;
-        }
-    }
-    lines.push_back(MARK);
-    lines.push_back("SET BLASTER=" + blaster_for(o));
-    write_lines(p, lines);
-}
-
 static void autoexec_remove()
 {
     std::string p = boot_root() + "AUTOEXEC.BAT";
@@ -314,6 +294,36 @@ static void autoexec_remove()
         out.push_back(lines[i]);
     }
     if (changed) write_lines(p, out);
+}
+
+// The BLASTER value of the user's own SET BLASTER line in AUTOEXEC.BAT ("" if none)
+static std::string autoexec_user_blaster()
+{
+    std::vector<std::string> lines;
+    read_lines(boot_root() + "AUTOEXEC.BAT", lines);
+    for (size_t i = 0; i < lines.size(); i++) {
+        std::string u = upper(lines[i]);
+        size_t k = u.find_first_not_of(" \t@");
+        if (k == std::string::npos || u.compare(k, 12, "SET BLASTER=")) continue;
+        if (i > 0 && upper(lines[i - 1]).find("REM [SC55W]") == 0) continue;   // ours
+        return lines[i].substr(k + 12);
+    }
+    return "";
+}
+
+// Add our BLASTER line, but only if AUTOEXEC.BAT has none of its own: SBEMU takes
+// the port / IRQ / DMA the user's games were set up for from that line, so it
+// is never replaced. (Version 1 replaced it, which made games freeze: put it back.)
+static void autoexec_add(const Options& o)
+{
+    autoexec_remove();                       // undo version 1 (restores a REM [SC55W-OLD] line)
+    if (!autoexec_user_blaster().empty()) return;
+    std::string p = boot_root() + "AUTOEXEC.BAT";
+    std::vector<std::string> lines;
+    read_lines(p, lines);
+    lines.push_back(MARK);
+    lines.push_back("SET BLASTER=" + blaster_for(o));
+    write_lines(p, lines);
 }
 
 // ---------------------------------------------------------------------------
@@ -475,11 +485,17 @@ int run_install(HINSTANCE inst)
             reg_set_dword(HKEY_LOCAL_MACHINE, SBEMUL_KEY, "Start", 4);
         }
     }
-    // the BLASTER line follows the saved settings
+    // Settings: like SBEMU, what SBOPTS.TXT does not say comes from the user's own
+    // BLASTER line. Version 1 replaced that line, so restore it first and read it
+    // from the file (this program's environment may still hold the replaced one).
+    autoexec_remove();
+    std::string ub = autoexec_user_blaster();
     Options o;
+    o.apply_blaster(ub.empty() ? getenv("BLASTER") : ub.c_str());
     {
         std::string t;
-        FILE* f = fopen(join(base, "SBOPTS.TXT").c_str(), "rb");
+        std::string op = join(base, "SBOPTS.TXT");
+        FILE* f = fopen(op.c_str(), "rb");
         if (f) {
             char b[4096];
             size_t n;
@@ -487,11 +503,15 @@ int run_install(HINSTANCE inst)
             fclose(f);
             o.parse(t);
         }
+        // write port / IRQ / DMA out in full, so DOS and Windows use the same ones
+        // whatever BLASTER says later
+        f = fopen(op.c_str(), "wb");
+        std::string l = o.format();
+        if (f) { fwrite(l.data(), 1, l.size(), f); fclose(f); }
+        f = fopen(join(base, "SBOPTS.BAT").c_str(), "wb");
+        if (f) { fprintf(f, "@ECHO OFF\r\nSET SBOPTS=%s\r\n", l.c_str()); fclose(f); }
     }
-    if (flags & 8) {
-        std::string old;
-        autoexec_add(o, old);
-    }
+    if (flags & 8) autoexec_add(o);
     reg_set_str(HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayName", "NUKED SB-EMU for Windows 98");
     reg_set_str(HKEY_LOCAL_MACHINE, UNINST_KEY, "UninstallString", exe + " /UNINSTALL");
     WritePrivateProfileStringA("Install", "Installed", "1", ini.c_str());
