@@ -87,7 +87,7 @@ period-correct DOS sound setup. It's tuned on a **Dell Latitude D810**
 - **SETTINGS**: every option on one screen; changes apply to a running SBEMU at once
 - **GAMETEST**: runs games unattended (Doom demos, Duke 3D with typed quit keys), measures music timing and finds each game's best settings. It sets Doom-engine and Apogee/Build games' own sound setup to SBEMU's port, IRQ, DMA and MIDI port by itself
 - Seven styles (Groovy, Classic, Sunset, Ocean, Neon, Candy, Midnight), animated rainbow logo, Terminus or VGA fonts, text modes from 80×25 to 80×60 plus the VESA modes your card has (132×25 …), safe mode (hold <kbd>Shift</kbd>)
-- `SBDIAG`, `MPUTEST`, `TIMETEST`, `JOYTEST`, `CPUMHZ`: measuring, test tune, timer checks, joystick view, CPU clock
+- `SBDIAG`, `MPUTEST`, `TIMETEST`, `JOYTEST`, `USBTEST`, `CPUMHZ`: measuring, test tune, timer checks, joystick view, USB pad finder, CPU clock
 - `SETUP`, `CDINST`, `CLEANUP`, `UNINSTAL`: install and remove without touching `CONFIG.SYS` or `AUTOEXEC.BAT`; uninstall keeps your ROMs and settings if you want
 </details>
 
@@ -96,7 +96,7 @@ period-correct DOS sound setup. It's tuned on a **Dell Latitude D810**
 
 - Wired Xbox 360 pads (Microsoft and compatible) as an analog gameport joystick: two sticks, four buttons, Start/Back as Enter/Esc
 - Every USB controller kind: UHCI, OHCI, EHCI and xHCI, through hubs, hot-plugging
-- Axes, buttons, keys and dead zone adjustable; `JOYTEST` shows what games see. [Details below](#-usb-joystick-xbox-360-pad)
+- Axes, buttons, keys and dead zone adjustable; `JOYTEST` shows what games see, `USBTEST` shows each step of finding the pad and logs it for bug reports. [Details below](#-usb-joystick-xbox-360-pad)
 </details>
 
 <details>
@@ -114,6 +114,7 @@ period-correct DOS sound setup. It's tuned on a **Dell Latitude D810**
 - `SBLOG.TXT`: everything SBEMU printed at its last start
 - `SBDETAIL.TXT`: every option and where it came from, DOS / Windows / CPU, every PCI sound device and its IRQ, each start-up step saved at once (so a hang shows where it stopped)
 - **MENU → Files → Make a bug report** collects all of it, plus `CONFIG.SYS`, `AUTOEXEC.BAT`, memory and test results, into `BUGREP.TXT`
+- `USBTEST.TXT`: the USB pad finder's log
 - `WIN98\SC55W.LOG`: Windows version, devices, and any audio drop-outs
 </details>
 
