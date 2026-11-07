@@ -7,7 +7,7 @@ DEBUG ?= 0
 # 0: original SBEMU build with the TinySoundFont SoundFont synth
 VSC55 ?= 1
 
-VERSION ?= 1.0.0-beta.39-sc55
+VERSION ?= 1.0.0-beta.40-usb-sc55
 
 INCLUDES := -I./mpxplay -I./sbemu -I./drivers/include -I./sc55 -I./third_party/nuked-opl3-fast
 DEFINES := -D__DOS__ -DSBEMU -DDEBUG=$(DEBUG) -DSBEMU_VSC55=$(VSC55) -DMAIN_SBEMU_VER=\"$(VERSION)\"
@@ -38,7 +38,7 @@ MIDPLAY := output/midplay.exe
 CDGUI := output/cdgui.exe
 SBSET := output/sbset.exe
 ifeq ($(VSC55),1)
-all: $(TARGET) $(SC55WAV) $(SC55LOG) $(MPUTEST) $(MIDPLAY) $(CDGUI) $(SBSET) $(SC55MENU) output/gametest.exe output/sbdiag.exe output/timetest.exe
+all: $(TARGET) $(SC55WAV) $(SC55LOG) $(MPUTEST) $(MIDPLAY) $(CDGUI) $(SBSET) output/sc55menu.exe output/gametest.exe output/sbdiag.exe output/timetest.exe output/joytest.exe
 else
 all: $(TARGET)
 endif
@@ -113,6 +113,8 @@ SBEMU_SRC := sbemu/dbopl.cpp \
 	     sbemu/virq.c \
 	     sbemu/serial.c \
              sbemu/vpcspeaker.c \
+             sbemu/usbpad.c \
+             sbemu/vjoy.c \
 	     sbemu/dpmi/xms.c \
 	     sbemu/dpmi/dpmi.c \
 	     sbemu/dpmi/dbgutil.c \
@@ -197,6 +199,11 @@ output/gametest.exe: tools/gametest.c $(wildcard tools/*.h)
 	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
 
 output/sbdiag.exe: tools/sbdiag.c $(wildcard tools/*.h)
+	@mkdir -p $(dir $@)
+	$(SILENTMSG) "CC\t$@\n"
+	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
+
+output/joytest.exe: tools/joytest.c
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
 	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)

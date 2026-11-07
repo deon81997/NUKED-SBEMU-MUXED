@@ -44,7 +44,7 @@ enum {
     /* main screen */
     F_PORT, F_IRQ, F_DMA, F_HDMA, F_TYPE,                 /* Sound Blaster */
     F_MPU, F_SYNTH, F_SCMENU, F_SFMENU,                    /* MIDI */
-    F_RATE, F_VOLMENU, F_ADVMENU,                          /* Output */
+    F_RATE, F_VOLMENU, F_ADVMENU, F_JOYMENU,               /* Output */
     NMAIN,
     /* SC-55 sub-menu */
     F_ROMSET = NMAIN, F_SCGAIN, F_SCFX, F_SCVOICES, F_SCAUTO,
@@ -54,6 +54,8 @@ enum {
     F_AHEAD, F_VTIMER, F_OPL, F_FM, F_OUT, F_FIXTC, F_VCDA, F_PM, F_RM, F_SC, F_SCFM, F_SCMPU, F_MCOM,
     /* Volume sub-menu (also shows the SC-55 gain and the CD audio volume) */
     F_VOL, F_SBVOL, F_OPLVOL, F_MIDIVOL,
+    /* Joystick sub-menu (USB Xbox 360 pad on the gameport) */
+    F_JOY, F_JOYAX, F_JOYBT, F_JOYKEY, F_JOYDZ,
     NF };
 
 #define LV11 { "0", "10", "20", "30", "40", "50", "60", "70", "80", "90", "100" }, 11
@@ -72,6 +74,7 @@ static Field F[NF] = {
     { "Sample rate",     "/K",       { "22050", "32000", "44100", "48000" }, 4, 0, 0, "Output rate. Higher = clearer but heavier: 22050 Hz with the SC-55.", {0}, "Output" },
     { "Volume",          0,          { "" }, 1, 0, 0, "Master, sound effects, FM music, MIDI music, SC-55 and CD audio volume. Enter opens.", {0}, 0 },
     { "Timing & advanced", 0,        { "" }, 1, 0, 0, "Render-ahead, timer give-back, OPL, output jack, CD audio, cards. Enter opens.", {0}, 0 },
+    { "Joystick",        0,          { "" }, 1, 0, 0, "A USB Xbox 360 pad as the gameport joystick (port 201h). Enter opens.", {0}, 0 },
 
     /* SC-55 */
     { "ROM set",         "/VSCSET",  { "auto" }, 1, 0, 0, "ROM sets found (by content) in the ROMS folder. mkII is a bit heavier.", {0}, 0 },
@@ -111,6 +114,13 @@ static Field F[NF] = {
     { "Sound effects",   "/VSBVOL",  { "100", "90", "80", "70", "60", "50", "40", "30", "20", "10", "0" }, 11, 0, 0, "Digital Sound Blaster sound (guns, voices), on top of the game's own mixer.", {0}, 0 },
     { "FM music",        "/VOPLVOL", { "100", "90", "80", "70", "60", "50", "40", "30", "20", "10", "0" }, 11, 0, 0, "OPL / AdLib FM music and sounds, on top of the game's own mixer.", {0}, 0 },
     { "MIDI music",      "/VMIDIVOL",{ "100", "50", "75", "125", "150", "200", "300", "400" }, 8, 0, 0, "General MIDI music (SC-55 or SoundFont). Over 100% makes it louder.", {0}, 0 },
+
+    /* Joystick */
+    { "USB pad",         "/JOY",     { "0", "1" }, 2, 0, 0, "Xbox 360 pad (wired) on a UHCI USB port. Takes effect when SBEMU next starts. Test: JOYTEST.", {0}, 0 },
+    { "Sticks",          "/JOYAX",   { "LX,LY,RX,RY", "LX,LY,RX,TR", "LX,LY,TR,RY", "LX,LY,-,-" }, 4, 0, 0, "Which pad axes the game sees as joystick A X/Y and joystick B X/Y. D-pad also moves A.", {0}, 0 },
+    { "Buttons 1-4",     "/JOYBT",   { "A,B,X,Y", "A,X,B,Y", "RT,A,B,X", "A,B,LB,RB" }, 4, 0, 0, "Pad buttons on gameport buttons 1-4 (button 1 is usually fire).", {0}, 0 },
+    { "Keys",            "/JOYKEY",  { "ST:1C,BK:01", "ST:1C,BK:01,LB:39,RB:1D", "ST:1C,BK:01,DU:E048,DD:E050,DL:E04B,DR:E04D", "-" }, 4, 0, 0, "Pad buttons typed as keyboard keys, for menus and games without joystick support.", {0}, 0 },
+    { "Dead zone",       "/JOYDZ",   { "10", "0", "5", "15", "20", "25" }, 6, 0, 0, "Stick movement ignored around the centre (stops drift).", {0}, 0 },
 };
 
 static char g_dir[160] = "C:\\SC55";
@@ -173,6 +183,13 @@ static void set_labels(void)
     onoff(F_OUT, "Speaker / S/PDIF (default)", "Headphone");
     onoff(F_FIXTC, "On (default)", "Off");
     { static const char* c[7] = { "Off (default)", "50%", "75%", "100%", "125%", "150%", "200%" }; for (i = 0; i < 7; i++) F[F_VCDA].labels[i] = c[i]; }
+    onoff(F_JOY, "Off (default)", "On");
+    F[F_JOYAX].labels[0] = "Left = A, right = B (default)"; F[F_JOYAX].labels[1] = "Left = A, right X + triggers = B";
+    F[F_JOYAX].labels[2] = "Left = A, triggers + right Y = B"; F[F_JOYAX].labels[3] = "Left stick only (A)";
+    F[F_JOYBT].labels[0] = "A B X Y (default)"; F[F_JOYBT].labels[1] = "A X B Y"; F[F_JOYBT].labels[2] = "RT A B X (trigger fires)"; F[F_JOYBT].labels[3] = "A B LB RB";
+    F[F_JOYKEY].labels[0] = "Start=Enter, Back=Esc (default)"; F[F_JOYKEY].labels[1] = "+ LB=Space, RB=Ctrl";
+    F[F_JOYKEY].labels[2] = "+ D-pad = arrow keys"; F[F_JOYKEY].labels[3] = "None";
+    { static const char* d[6] = { "10% (default)", "Off", "5%", "15%", "20%", "25%" }; for (i = 0; i < 6; i++) F[F_JOYDZ].labels[i] = d[i]; }
     onoff(F_PM, "On (default)", "Off");
     onoff(F_RM, "On (default)", "Off");
     {
@@ -708,8 +725,8 @@ static int g_dirty = 0;
 
 static int row_of(int i)
 {
-    /* group headers take a line each: Sound Blaster (5 fields), MIDI (4), Output (3) */
-    int r = WY + 2;
+    /* group headers take a line each: Sound Blaster (5 fields), MIDI (4), Output (4) */
+    int r = WY + 1;   /* (no blank line under the title since the Joystick row was added) */
     if (i <= F_TYPE) return r + 1 + i;
     r += 1 + 5;
     if (i <= F_SFMENU) return r + 1 + (i - F_MPU);
@@ -717,7 +734,7 @@ static int row_of(int i)
     return r + 1 + (i - F_RATE);
 }
 
-static int is_menu(int i) { return i == F_SCMENU || i == F_SFMENU || i == F_VOLMENU || i == F_ADVMENU; }
+static int is_menu(int i) { return i == F_SCMENU || i == F_SFMENU || i == F_VOLMENU || i == F_ADVMENU || i == F_JOYMENU; }
 
 static int enabled(int i)
 {
@@ -746,6 +763,11 @@ static void summary(int i, char* v)
     else if (i == F_VOLMENU)
         sprintf(v, "master %s, effects %s, FM %s, MIDI %s", F[F_VOL].vals[F[F_VOL].cur], F[F_SBVOL].vals[F[F_SBVOL].cur],
                 F[F_OPLVOL].vals[F[F_OPLVOL].cur], F[F_MIDIVOL].vals[F[F_MIDIVOL].cur]);
+    else if (i == F_JOYMENU)
+    {
+        if (!F[F_JOY].cur) strcpy(v, "off");
+        else sprintf(v, "USB pad on, %.20s", show(&F[F_JOYBT]));
+    }
     else
         sprintf(v, "ahead %s ms, give-back %s%s", F[F_AHEAD].vals[F[F_AHEAD].cur], F[F_VTIMER].cur ? "off" : "on",
                 F[F_OPL].cur ? ", OPL off" : "");
@@ -830,6 +852,9 @@ static const MI M_VOL[] = { {-1, "Volume"}, {F_VOL, 0}, {F_SBVOL, 0}, {F_OPLVOL,
 static const MI M_ADV[] = { {-1, "Timing (game music tempo)"}, {F_AHEAD, 0}, {F_VTIMER, 0},
                             {-1, "Sound"}, {F_OPL, 0}, {F_FM, 0}, {F_OUT, 0}, {F_FIXTC, 0}, {F_VCDA, 0},
                             {-1, "Games and cards"}, {F_PM, 0}, {F_RM, 0}, {F_SC, 0}, {F_SCFM, 0}, {F_SCMPU, 0}, {F_MCOM, 0}, {-2, 0} };
+static const MI M_JOY[] = { {-1, "USB Xbox 360 pad as the gameport joystick"}, {F_JOY, 0},
+                            {-1, "What the game sees"}, {F_JOYAX, 0}, {F_JOYBT, 0}, {F_JOYDZ, 0},
+                            {-1, "Keyboard"}, {F_JOYKEY, 0}, {-2, 0} };
 
 static void sub_value(int f, char* v)
 {
@@ -907,6 +932,7 @@ static void open_menu(int i)
         if (!g_sf[0]) F[F_SYNTH].cur = 0;                      /* no file chosen: back to the SC-55 */
     }
     else if (i == F_VOLMENU) sub_menu("Volume", M_VOL);
+    else if (i == F_JOYMENU) sub_menu("Joystick", M_JOY);
     else sub_menu("Timing & advanced", M_ADV);
 }
 
@@ -1102,6 +1128,7 @@ int main(int argc, char** argv)
             else if (!strcasecmp(p, "SF")) page = F_SFMENU;
             else if (!strcasecmp(p, "ADV")) page = F_ADVMENU;
             else if (!strcasecmp(p, "VOL")) page = F_VOLMENU;
+            else if (!strcasecmp(p, "JOY")) page = F_JOYMENU;
         }
         else if (!strcasecmp(argv[i], "/TUNE")) want_tune = 1;
         else if (argv[i][0] != '/') { strncpy(g_dir, argv[i], sizeof g_dir - 1); g_dir[sizeof g_dir - 1] = 0; }

@@ -347,11 +347,19 @@ static void build_menu(void)
     add(C_SETTINGS, "Timing & advanced", "Render-ahead and timer give-back (these keep game music at the right tempo), OPL on/off"
         " and core, output jack, sample-rate fix, CD audio, protected/real-mode support, which sound card, MIDI out port.",
         IT_BAT, c, 0, 0, NULL);
+    snprintf(c, sizeof c, "CALL %s\\SETTINGS.BAT /PAGE:JOY", g_home);
+    add(C_SETTINGS, "Joystick (USB pad)", "A wired USB Xbox 360 pad (or compatible) as the PC gameport joystick at port 201h"
+        " (/JOY): which sticks and buttons the game sees, a dead zone, and pad buttons typed as keys (Start = Enter,"
+        " Back = Esc). Needs a UHCI USB controller (Intel / VIA chipsets). Applies the next time SBEMU starts.",
+        IT_BAT, c, 0, 0, NULL);
     /* Tests */
     add(C_TESTS, "MIDI player (MIDPLAY)", "Browse your folders for .MID files and play them through the running SC-55 or"
         " SoundFont. A quick way to hear the synth without a game.", IT_BAT, "MIDPLAY.EXE /B", 1, 0, NULL);
     add(C_TESTS, "Test tune (MPUTEST)", "Plays a short tune on the MPU-401 (found on whatever port SBEMU uses). If you hear it, General MIDI works.",
         IT_BAT, "MPUTEST.EXE", 1, 1, NULL);
+    add(C_TESTS, "Joystick test (JOYTEST)", "Shows what games see on the gameport: the four axes and four buttons, live."
+        " With the USB pad on (Settings > Joystick) move the sticks and press A/B/X/Y. Esc or Q quits.",
+        IT_BAT, "JOYTEST.EXE", 1, 0, NULL);
     snprintf(c, sizeof c, "CALL %s\\TEST.BAT", g_home);
     add(C_TESTS, "ROM + speed test", "Checks that your SC-55 ROMs boot and measures how fast this PC runs the emulation"
         " (written to SC55LOG.TXT). Under 1.5x real time is too slow for the SC-55.", IT_BAT, c, 0, 1, NULL);

@@ -8,3 +8,6 @@ FILES/ROMS/
 pack/FILES/ROMS/
 *.img
 *.iso
+testrig/rufus/
+testrig/fakepad.log
+testrig/mon.sock

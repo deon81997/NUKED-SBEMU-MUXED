@@ -1,0 +1,11 @@
+0    lx=0 ly=0
+5    lx=32767
+7    lx=-32768 ly=32767
+9    lx=0 ly=0 buttons=1000
+11   buttons=0 rx=20000 ry=-32768
+13   buttons=0010
+13.6 buttons=0
+15   buttons=0008 rx=0 ry=0
+17   buttons=0 lt=255 rt=0
+19   lt=0 buttons=A000
+21   buttons=0

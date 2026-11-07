@@ -32,6 +32,7 @@ period-correct DOS sound setup. It's tuned on a **Dell Latitude D810**
 | 🎚️ **SoundFont** | Any `.SF2` instead, with its own reverb and chorus |
 | 💿 **Virtual CD drive** | `.CUE/.BIN`, `.ISO` and multi-disc images on drive **M:**, with **CD-Audio mixed into the sound** |
 | 🖥️ **Menus for everything** | Start the synth, change settings, test games, play MIDI files, mount discs, with themes, fonts and display modes |
+| 🎮 **USB joystick** | A wired **Xbox 360 pad** answers on the gameport (port 201h), so DOS games get an analog joystick on laptops with no gameport *(experimental)* |
 | 🪟 **Windows 98 too** | The same SB / OPL3 / MPU-401 in DOS boxes, plus an **"NUKED SB-EMU" Windows MIDI device** |
 
 > [!IMPORTANT]
@@ -96,6 +97,36 @@ MIDI synth replaces the MPU side, so you normally leave these off.
 
 ---
 
+## 🎮 USB joystick (Xbox 360 pad)
+
+<img src="docs/joytest.png" width="560" alt="JOYTEST showing the pad's sticks and buttons">
+
+DOS games read an analog joystick on the gameport, port 201h. With `/JOY:1`
+(MENU > Settings > **Joystick**), SBEMU answers there itself with a USB
+Xbox 360 pad: left stick = joystick A (the D-pad moves it too), right stick
+= joystick B, A/B/X/Y = buttons 1-4. Start and Back are typed as Enter and
+Esc so game menus work from the pad. Sticks, buttons, keys and the dead zone
+can be changed (`/JOYAX`, `/JOYBT`, `/JOYKEY`, `/JOYDZ`).
+
+- **Pads:** the wired Microsoft pad and wired pads that speak the same
+  protocol (Hori, Mad Catz, Logitech, Saitek, ...). The PC wireless receiver
+  may work (first pad, untested). Not Xbox One / Series pads, not through a hub.
+- **USB controllers:** UHCI (Intel ICH / VIA). The EHCI (USB 2.0) part is
+  taken over from the BIOS and every port handed to UHCI. OHCI boards (SiS,
+  ALi, nVidia, AMD) and xHCI are not supported yet.
+- **How:** a small polled USB host inside SBEMU (`sbemu/usbpad.c`): no USB
+  interrupt is used, so it never fights the sound chip for an IRQ. Reports
+  are read from the sound interrupt and on every port 201h read; the port's
+  one-shot timers are emulated with the CPU's time stamp counter
+  (`sbemu/vjoy.c`). Hot-plugging works.
+- While it runs, the BIOS's own USB keyboard/mouse support stops until the
+  next restart.
+
+Tested in QEMU (UHCI, and ICH9 EHCI with UHCI companions) with a pretend pad
+(`sc55-pack/testrig/fakepad.py`, usbredir); not yet on a real D810.
+
+---
+
 ## 📸 Screenshots
 
 <table>
@@ -121,6 +152,7 @@ MIDI synth replaces the MPU side, so you normally leave these off.
 | `GAMETEST.EXE` | Runs your games unattended and finds the settings that give each one the best music timing |
 | `MIDPLAY.EXE` | MIDI player with a live SC-55 / MT-32 front panel |
 | `CDSET\GUI.BAT` → `CDGUI.EXE` | CD images: mount on M:, run a disc's installer, list its files, fix CUE files |
+| `JOYTEST.EXE` | Shows what games see on the gameport: four axes and four buttons, live |
 | `SBDIAG`, `MPUTEST`, `TIMETEST`, `SC55WAV` | Diagnostics, test tune, timer checks, ROM check and speed benchmark |
 | `WIN98\SC55W.EXE` + `.VXD` + `SC55MIDI.DRV` | The Windows 98 part (tray program, virtual SB for DOS boxes, MIDI device) |
 
@@ -274,7 +306,8 @@ file to an [issue](https://github.com/deon81997/NUKED-SBEMU-MUXED/issues).
 ## 🧪 Testing
 
 [`testrig/`](sc55-pack/testrig) boots a DOS PC in QEMU with AC'97 like the D810 and
-drives it by script (keys, screenshots). Emulators aren't the real thing, though:
+drives it by script (keys, screenshots); `fakepad.py` plugs a pretend Xbox 360 pad
+into QEMU's USB (see `testrig/README.md`). Emulators aren't the real thing, though:
 the D810 has the final say.
 
 ---
@@ -289,5 +322,6 @@ Combined work: **GPL-2.0-or-later** ([`COPYING`](sc55-pack/COPYING)).
 &nbsp;•&nbsp; **Nuked OPL3**: nukeykt (LGPL-2.1+) &nbsp;•&nbsp; **DOSBox OPL**: the DOSBox team
 &nbsp;•&nbsp; **TinySoundFont**: Bernhard Schelling (MIT)
 &nbsp;•&nbsp; **Terminus font**: Dimitar Zhekov (OFL)
+&nbsp;•&nbsp; **USB joystick**: UHCI handling after [USBDDOS](https://github.com/crazii/USBDDOS) (crazii, GPL-2.0), pad report layout after Linux `xpad.c`
 
-<sub>Roland, SC-55, MT-32 and CM-32L are trademarks of Roland Corporation. Not affiliated with Roland.</sub>
+<sub>Roland, SC-55, MT-32 and CM-32L are trademarks of Roland Corporation. Xbox is a trademark of Microsoft. Not affiliated with either.</sub>

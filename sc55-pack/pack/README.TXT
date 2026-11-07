@@ -1,6 +1,7 @@
 =============================================================================
   NUKED SB-EMU  -  SBEMU + Nuked-SC55 + HDPMI32i  -  COMPLETE GUIDE
-  Hybrid pack: SC-55 / SoundFont MIDI, virtual CD drive, CD-Audio mixing
+  Hybrid pack: SC-55 / SoundFont MIDI, virtual CD drive, CD-Audio mixing,
+  USB Xbox 360 pad as the gameport joystick
 =============================================================================
 
 Roland SC-55 (or any SoundFont) General MIDI for protected-mode DOS games,
@@ -24,6 +25,7 @@ CONTENTS
    8. Playing MIDI files and testing
    9. Virtual CD drive and disc images
   10. CD-Audio through your sound card (HYBRID, experimental)
+ 10b. USB joystick: an Xbox 360 pad on the gameport (experimental)
   11. Real-mode games: JEMM+QPIEMU or QEMM (optional, you supply the files)
   12. Using your real CD-ROM drive in DOS
   13. Optional: load the CD-ROM driver at every start (BOOTCFG / RESET)
@@ -504,6 +506,20 @@ CONTENTS
      /VCDA:pct             mix CD-Audio from the virtual CD (uCDD link):
                            0 off, 100 unity, 1-400 (section 10)
 
+  Joystick (section 10b)
+     /JOY:0|1              USB Xbox 360 pad as the gameport joystick at port
+                           201h (default off)
+     /JOYAX:a,a,a,a        pad axes for joystick A X, A Y, B X, B Y: LX LY
+                           RX RY LT RT TR (RT minus LT) or -; ~ in front
+                           inverts (default LX,LY,RX,RY)
+     /JOYBT:b,b,b,b        pad buttons for gameport buttons 1-4: A B X Y LB
+                           RB LT RT ST BK LS RS GD DU DD DL DR or -
+                           (default A,B,X,Y)
+     /JOYKEY:b:code,...    pad buttons typed as keys, set-1 scan codes in
+                           hex, E0xx for extended keys; - = none
+                           (default ST:1C,BK:01 = Start Enter, Back Esc)
+     /JOYDZ:pct            stick dead zone, 0-90 (default 10)
+
   Selection and diagnostics
      /SCL                  list installed sound cards
      /SC:n  /SCFM:n  /SCMPU:n   choose the card (all, FM only, MPU only)
@@ -688,6 +704,63 @@ CONTENTS
   lines; mount with CDIMG or GUI (they pass a full path). While DOS itself
   is busy the track keeps playing from a 1.5-second buffer. If the PC hangs
   when a track starts, remove /VCDA from HYBRID.BAT.
+
+
+=============================================================================
+ 10b. USB JOYSTICK: AN XBOX 360 PAD ON THE GAMEPORT  (experimental)
+=============================================================================
+
+  DOS games only know the analog PC joystick on the gameport (port 201h).
+  Laptops such as the D810 have no gameport, so SBEMU can answer on port
+  201h itself, with the sticks and buttons of a USB Xbox 360 pad.
+
+  Turn it on:  MENU > Settings > Joystick (USB pad): USB pad = On, Save.
+  It takes effect the next time SBEMU starts (SC55.BAT, SC55JEM.BAT ...).
+  SBEMU then prints a line like
+         Joystick (Port 201): enabled
+           USB: 4 UHCI controller(s) (EHCI ports handed over),
+                Xbox 360 pad 045E:028E on UHCI 2 port 1.
+  The pad's ring lights up "player 1". You can also plug it in later: it
+  is found within a second, also while a game runs, and unplugging is fine.
+
+  Test without a game:  MENU > Tests > Joystick test (JOYTEST), or run
+  JOYTEST.EXE. Move the sticks: about 24 = left/up, 575 = centre and 1124
+  = right/down (microseconds). Then calibrate the joystick in each game's
+  setup as usual.
+
+  What the game sees (Settings > Joystick, or the /JOY... options):
+     Sticks       joystick A = left stick (the D-pad moves it too),
+                  joystick B = right stick; or the triggers as an axis
+                  (flight games: throttle / rudder), or only joystick A
+     Buttons 1-4  A B X Y; or A X B Y; or RT A B X (trigger fires); or
+                  A B LB RB. Button 1 is the usual fire button.
+     Keys         Start = Enter, Back = Esc, so menus work from the pad;
+                  optional LB = Space, RB = Ctrl, or the D-pad as arrow
+                  keys. Typed like real keys (games with their own
+                  keyboard handler see them too).
+     Dead zone    stick movement ignored around the centre (default 10%).
+
+  Works with: the wired Microsoft Xbox 360 pad and wired pads that use the
+  same protocol (Hori, Mad Catz, Logitech ChillStream, Saitek ... the
+  pads in the Windows 98 x360c driver). The wireless receiver for PC may
+  work (first pad only; not tested). Not: Xbox One / Series pads, other
+  USB joysticks, pads plugged into a USB hub.
+  Needs a UHCI USB controller: Intel (ICH, ICH2-ICH10, the D810's ICH6)
+  and VIA chipsets. Their USB 2.0 (EHCI) part is taken from the BIOS and
+  every port is handed to the UHCI part, which serves the pad. SiS, ALi,
+  nVidia and AMD boards use OHCI and are not supported yet.
+
+  Good to know
+     * While SBEMU runs with the joystick on, it owns the USB controllers:
+       the BIOS's USB keyboard / mouse / stick support stops until the next
+       restart (the D810's own keyboard and touchpad are not USB). Don't
+       use it together with USBDDOS or another DOS USB driver.
+     * It works for protected-mode games (HDPMI) and, with SC55JEM.BAT or
+       SC55QMM.BAT, real-mode games too - the same as the sound.
+     * Each read of port 201h is a trap, so a game polling the stick in a
+       tight loop sees slightly coarser steps than with a real joystick;
+       calibration takes care of it.
+     * Not under Windows 98: Windows has its own driver for the pad.
 
 
 =============================================================================
@@ -968,7 +1041,7 @@ CONTENTS
      README.TXT       this guide
      FILES\SC55       SBEMU.EXE, SBSET.EXE, SC55WAV.EXE, SC55LOG.EXE,
                       MPUTEST.EXE, MIDPLAY.EXE, CPUMHZ.EXE, SC55MENU.EXE,
-                      SBDIAG.EXE, GAMETEST.EXE, TIMETEST.EXE
+                      SBDIAG.EXE, GAMETEST.EXE, TIMETEST.EXE, JOYTEST.EXE
      FILES\ROMS       ROM dumps (yours)
      FILES\HDPMI      HDPMI32I.EXE
      FILES\CDSET      uCDD, SHSUCDX, CDGUI, CDPLAY, GUI/CDIMG/CDON/CDDIAG
@@ -1007,6 +1080,9 @@ CONTENTS
   Sergey V. Mikayev and others): LGPL-2.1+ (C:\SC55\MUNT-LIC.TXT), source
   at https://github.com/munt/munt.
   The screen font Terminus (Dimitar Zhekov): SIL Open Font Licence 1.1.
+  USB joystick: written for this pack (GPL-2.0); UHCI handling after
+  USBDDOS (crazii, GPL-2.0), the pad's report layout after Linux xpad.c.
+  Xbox and Xbox 360 are trademarks of Microsoft.
   HDPMI32i is part of HX (japheth). Jemm, JLoad and QPIEMU (japheth): see
   JEMMLIC.TXT. uCDD: GPL-3.0 (UCDD-LIC.TXT).
   XCDROM: GPL (source in FILES\XCDROM). SHSUCDX, VIDE-CDD, GSCDROM and

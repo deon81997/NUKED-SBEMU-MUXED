@@ -29,6 +29,8 @@
 #endif
 #include <vpcspeaker.h>
 #include <cdlink.h>
+#include "sbemu/usbpad.h"
+#include "sbemu/vjoy.h"
 #include "qemm.h"
 #include "hdpmipt.h"
 #include "serial.h"
@@ -527,6 +529,11 @@ struct MAIN_OPT
     "/VSBVOL", "Sound effects (digital Sound Blaster) volume in percent (0-100), on top of the game's own mixer", 100, MAIN_SETCMD_BASE10,
     "/VOPLVOL", "FM (OPL / AdLib) music volume in percent (0-100), on top of the game's own mixer", 100, MAIN_SETCMD_BASE10,
     "/VMIDIVOL", "General MIDI music volume in percent (0-400; SC-55: multiplies /VSCGAIN; SoundFont: its master volume)", 100, MAIN_SETCMD_BASE10,
+    "/JOY", "USB Xbox 360 pad as a PC gameport joystick at port 201h (1=on, 0=off; needs a UHCI USB controller)", 0, MAIN_SETCMD_BASE10,
+    "/JOYAX", "Pad -> gameport axes 1-4 (joystick A X,Y, joystick B X,Y): LX LY RX RY LT RT TR(RT minus LT) or - ; ~ in front inverts", (uintptr_t)"LX,LY,RX,RY", MAIN_SETCMD_STR,
+    "/JOYBT", "Pad -> gameport buttons 1-4: A B X Y LB RB LT RT ST BK LS RS GD DU DD DL DR or -", (uintptr_t)"A,B,X,Y", MAIN_SETCMD_STR,
+    "/JOYKEY", "Pad buttons typed as keys, button:scan code (hex, E0xx extended), e.g. ST:1C,BK:01 (Start=Enter, Back=Esc)", (uintptr_t)"ST:1C,BK:01", MAIN_SETCMD_STR,
+    "/JOYDZ", "Stick dead zone in percent (0-90)", 10, MAIN_SETCMD_BASE10,
     NULL, NULL, 0,
 };
 enum EOption
@@ -586,6 +593,11 @@ enum EOption
     OPT_VSBVOL,
     OPT_VOPLVOL,
     OPT_VMIDIVOL,
+    OPT_JOY,
+    OPT_JOYAX,
+    OPT_JOYBT,
+    OPT_JOYKEY,
+    OPT_JOYDZ,
     OPT_COUNT,
 };
 
@@ -980,12 +992,19 @@ update_serial_mpu_output()
 }
 
 static BOOL OPLRMInstalled, OPLPMInstalled, MPURMInstalled, MPUPMInstalled;
+/* USB Xbox 360 pad -> gameport 201h (/JOY) */
+static QEMM_IODT MAIN_JOY_IODT[1] = { { 0x201, (void*)&VJOY_IOHandler } };
+static QEMM_IOPT MAIN_JOY_IOPT, MAIN_JOY_IOPT_PM;
+static BOOL MAIN_JOY_RM, MAIN_JOY_PM, MAIN_JOY_On;
 static HDPMIPT_IRQRoutedHandle OldRoutedHandle = HDPMIPT_IRQRoutedHandle_Default;
 static HDPMIPT_IRQRoutedHandle OldRoutedHandle5 = HDPMIPT_IRQRoutedHandle_Default;
 static HDPMIPT_IRQRoutedHandle OldRoutedHandle7 = HDPMIPT_IRQRoutedHandle_Default;
 static HDPMIPT_IRQRoutedHandle OldRoutedHandle9 = HDPMIPT_IRQRoutedHandle_Default;
 static void MAIN_Cleanup()
 {
+    if(MAIN_JOY_RM) { QEMM_Uninstall_IOPortTrap(&MAIN_JOY_IOPT); MAIN_JOY_RM = FALSE; }
+    if(MAIN_JOY_PM) { HDPMIPT_Uninstall_IOPortTrap(&MAIN_JOY_IOPT_PM); MAIN_JOY_PM = FALSE; }
+    if(MAIN_JOY_On) { MAIN_JOY_On = FALSE; USBPAD_Shutdown(); }
     if(OldRoutedHandle.valid)
         HDPMIPT_InstallIRQRoutedHandlerH(aui.card_irq, &OldRoutedHandle);
     //must be after OldRoutedHandle in case aui.card_irq is 5/7/9
@@ -1798,6 +1817,32 @@ int main(int argc, char* argv[])
     MAIN_Print_Enabled_Newline(MAIN_PCSPEAKER_Installed);
 #endif // SBEMU_PCSPEAKER
 
+    if(MAIN_Options[OPT_JOY].value)
+    {
+        const char* bad = NULL;
+        const char* msg = "";
+        MAIN_Step("USB joystick (/JOY)");
+        if(!VJOY_Init(MAIN_TCps, (const char*)MAIN_Options[OPT_JOYAX].value, (const char*)MAIN_Options[OPT_JOYBT].value,
+            (const char*)MAIN_Options[OPT_JOYKEY].value, MAIN_Options[OPT_JOYDZ].value, &bad))
+            MAIN_CPrintf(YELLOW, "Joystick: \"%s\" not understood in /JOYAX, /JOYBT or /JOYKEY, joystick off.\n", bad ? bad : "?");
+        else if(!USBPAD_Init(MAIN_TCps, 1500, &msg))
+            MAIN_CPrintf(YELLOW, "Joystick: %s, joystick off.\n", msg);
+        else
+        {
+            MAIN_JOY_On = TRUE;
+            if(enableRM) MAIN_JOY_RM = QEMM_Install_IOPortTrap(MAIN_JOY_IODT, 1, &MAIN_JOY_IOPT);
+            if(enablePM) MAIN_JOY_PM = HDPMIPT_Install_IOPortTrap(0x201, 0x201, MAIN_JOY_IODT, 1, &MAIN_JOY_IOPT_PM);
+            printf("Joystick (Port 201): ");
+            MAIN_Print_Enabled_Newline(MAIN_JOY_RM || MAIN_JOY_PM);
+            MAIN_CPrintf(LIGHTGRAY, "  USB: %s.\n", msg);
+            if(!USBPAD_Get()->connected)
+                MAIN_CPrintf(LIGHTGRAY, "  Plug the pad in any time; it is picked up while games run.\n");
+        }
+        MAIN_D("Joystick: %s | axes %s buttons %s keys %s dz %d | traps rm %d pm %d\n", msg,
+            (const char*)MAIN_Options[OPT_JOYAX].value, (const char*)MAIN_Options[OPT_JOYBT].value,
+            (const char*)MAIN_Options[OPT_JOYKEY].value, MAIN_Options[OPT_JOYDZ].value, MAIN_JOY_RM, MAIN_JOY_PM);
+    }
+
     MAIN_LogCommit();
     /* Close the log before going resident. Until beta.28 the resident SBEMU kept SBLOG.TXT open as its
      * stdout: anything it printed while a game ran became a DOS disk write (possibly from inside the sound
@@ -1959,6 +2004,7 @@ static void MAIN_InterruptRM()
 
 static void MAIN_Interrupt()
 {
+    if(MAIN_JOY_On) VJOY_Tick();
     if(!(aui.card_infobits&AUINFOS_CARDINFOBIT_PLAYING))
         return;
 
