@@ -25,7 +25,7 @@ CONTENTS
    8. Playing MIDI files and testing
    9. Virtual CD drive and disc images
   10. CD-Audio through your sound card (HYBRID, experimental)
- 10b. USB joystick: an Xbox 360 pad on the gameport (experimental)
+ 10b. USB in DOS: Xbox 360 pads on the gameport, USB keyboard and mouse
   11. Real-mode games: JEMM+QPIEMU or QEMM (optional, you supply the files)
   12. Using your real CD-ROM drive in DOS
   13. Optional: load the CD-ROM driver at every start (BOOTCFG / RESET)
@@ -708,7 +708,7 @@ CONTENTS
 
 
 =============================================================================
- 10b. USB JOYSTICK: AN XBOX 360 PAD ON THE GAMEPORT  (experimental)
+ 10b. USB IN DOS: XBOX 360 PADS, USB KEYBOARD AND MOUSE  (experimental)
 =============================================================================
 
   DOS games only know the analog PC joystick on the gameport (port 201h).
@@ -716,15 +716,33 @@ CONTENTS
   201h itself, with the sticks and buttons of a USB Xbox 360 pad.
 
   It is on by default: every start of SBEMU (SC55.BAT, SC55JEM.BAT ...)
-  looks for the pad, and with nothing plugged into USB it costs no time.
-  To turn it off (you use a USB keyboard or mouse in DOS - SBEMU takes the
-  USB ports over): MENU > Settings > Joystick: USB pad = Off, Save.
-  SBEMU then prints a line like
+  takes the USB ports over and sets up what is plugged in, all at once:
+     - up to two Xbox 360 pads: pad 1 = joystick A, pad 2 = joystick B
+       (two-player games), ring lit "player 1" / "player 2";
+     - USB keyboards: typed through the PC's keyboard controller, so DOS
+       and games see them like a PS/2 keyboard (keys repeat, lock LEDs
+       follow);
+     - a USB mouse: answers like a PS/2 mouse to a DOS mouse driver.
+  With nothing plugged into USB it costs no time. SBEMU prints a line like
          Joystick (Port 201): enabled
-           USB: 4 UHCI + 0 OHCI controller(s) (EHCI ports handed over),
-                Xbox 360 pad 045E:028E on UHCI 2 port 1.
-  The pad's ring lights up "player 1". You can also plug it in later: it
-  is found within a second, also while a game runs, and unplugging is fine.
+           USB: 4 UHCI controller(s) (EHCI ports handed to companions),
+                found: pad 1 keyboard mouse.
+  Plug in or unplug any time, also while a game runs; it is picked up
+  within a second (a mouse: see below). To leave USB to the BIOS instead:
+  MENU > Settings > Joystick: USB pad = Off, Save.
+
+  USB keyboard (/USBKB:1, default on): the BIOS's own USB keyboard support
+  stops when SBEMU takes USB over, so SBEMU types the keys itself (as set 1
+  scan codes through the 8042 keyboard controller). Needs a PC with a real
+  keyboard controller (every PC with PS/2 ports; the D810 and P5PE-VM have
+  one).
+
+  USB mouse (/USBMS:1, default "auto"): a DOS mouse driver (CTMOUSE,
+  MOUSE.COM) loaded AFTER SBEMU finds a PS/2 mouse - SBEMU answers its
+  commands and sends the USB mouse's movement as PS/2 packets (the wheel
+  too, for drivers that ask). Auto = only when a USB mouse is plugged in
+  as SBEMU starts (a real PS/2 mouse is then not used); 2 = always; 0 =
+  off. Test with MENU > Tests > Keyboard / mouse test (KMTEST).
 
   Test without a game:  MENU > Tests > Joystick test (JOYTEST), or run
   JOYTEST.EXE. Move the sticks: about 24 = left/up, 575 = centre and 1124
@@ -737,6 +755,9 @@ CONTENTS
                   (flight games: throttle / rudder), or only joystick A
      Buttons 1-4  A B X Y; or A X B Y; or RT A B X (trigger fires); or
                   A B LB RB. Button 1 is the usual fire button.
+     Two pads     pad 1 = joystick A, pad 2 = joystick B, each with the
+                  first two Sticks axes and the first two Buttons below
+                  (left stick, A + B by default). One pad: all four.
      Keys         Start = Enter, Back = Esc, so menus work from the pad;
                   optional LB = Space, RB = Ctrl, or the D-pad as arrow
                   keys. Typed like real keys (games with their own
@@ -746,7 +767,9 @@ CONTENTS
   Works with: the wired Microsoft Xbox 360 pad and wired pads that use the
   same protocol (Hori, Mad Catz, Logitech ChillStream, Saitek ... the
   pads in the Windows 98 x360c driver). The wireless receiver for PC may
-  work (first pad only; not tested). Not: Xbox One / Series pads, other
+  work (two pads; not tested). Keyboards / mice: any USB keyboard, and
+  mice that offer the standard "boot" mode (nearly all); wireless
+  keyboard + mouse receivers too. Not: Xbox One / Series pads, other
   USB joysticks. A USB hub in between is fine (up to four deep).
   USB controllers - all PC kinds; the pad can go in any port of any of them:
      UHCI  Intel (ICH - ICH10, the D810's ICH6) and VIA chipsets
@@ -763,10 +786,14 @@ CONTENTS
   off in DOS) and Renesas uPD720201/202 cards without their firmware ROM.
 
   Good to know
-     * While SBEMU runs with the joystick on, it owns the USB controllers:
-       the BIOS's USB keyboard / mouse / stick support stops until the next
-       restart (the D810's own keyboard and touchpad are not USB). Don't
-       use it together with USBDDOS or another DOS USB driver.
+     * While SBEMU runs with USB on, it owns the USB controllers: the BIOS's
+       USB keyboard / mouse support stops until the next restart; SBEMU's
+       own keyboard / mouse support takes over (the D810's own keyboard
+       and touchpad are not USB). Don't use it together with USBDDOS or
+       another DOS USB driver.
+     * USB mouse: load the mouse driver after SBEMU (put it after SC55.BAT
+       in your batch file). If the driver says no mouse found, check that
+       the USB mouse was plugged in when SBEMU started (or use /USBMS:2).
      * It works for protected-mode games (HDPMI) and, with SC55JEM.BAT or
        SC55QMM.BAT, real-mode games too - the same as the sound.
      * Each read of port 201h is a trap, so a game polling the stick in a
@@ -778,8 +805,9 @@ CONTENTS
        uses the same USB code as SBEMU and shows every step: which USB
        controllers it found and what it did with each, what is plugged in,
        then the pad live and every plug / unplug. USBTEST USBTEST.TXT also
-       writes it all to USBTEST.TXT - send that with a bug report. (Esc
-       quits; a USB keyboard stops working while it runs, use a PS/2 one.)
+       writes it all to USBTEST.TXT - send that with a bug report. It shows
+       USB keyboards and mice too (keys pressed, mouse movement). Esc quits
+       (PS/2 or USB keyboard).
 
 
 =============================================================================
@@ -1061,7 +1089,7 @@ CONTENTS
      FILES\SC55       SBEMU.EXE, SBSET.EXE, SC55WAV.EXE, SC55LOG.EXE,
                       MPUTEST.EXE, MIDPLAY.EXE, CPUMHZ.EXE, SC55MENU.EXE,
                       SBDIAG.EXE, GAMETEST.EXE, TIMETEST.EXE, JOYTEST.EXE,
-                      USBTEST.EXE
+                      USBTEST.EXE, KMTEST.EXE
      FILES\ROMS       ROM dumps (yours)
      FILES\HDPMI      HDPMI32I.EXE
      FILES\CDSET      uCDD, SHSUCDX, CDGUI, CDPLAY, GUI/CDIMG/CDON/CDDIAG

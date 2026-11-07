@@ -1,7 +1,7 @@
 #ifndef SBEMU_USBPAD_H
 #define SBEMU_USBPAD_H
-/* USB Xbox 360 controller for SBEMU (polled UHCI / OHCI / EHCI / xHCI host with hub support, no USB interrupt used).
- * See usbpad.c for how it works. */
+/* USB for SBEMU: up to two Xbox 360 pads, USB keyboards and USB mice, all at once (polled UHCI / OHCI /
+ * EHCI / xHCI host with hub support, no USB interrupt used). See usbpad.c for how it works. */
 #include <stdint.h>
 
 /* button bits, in the order of the pad's own report (bytes 2 and 3) */
@@ -30,16 +30,40 @@ typedef struct
     volatile uint32_t reports;     /* input reports received */
 } USBPAD_State;
 
+#define USBPAD_PADS 2
+
+/* USBPAD_Init flags: which kinds of device to use (pads always) */
+#define USBPAD_F_KBD   1
+#define USBPAD_F_MOUSE 2
+
+/* USBPAD_Have() bits */
+#define USBPAD_HAVE_PAD1  1
+#define USBPAD_HAVE_PAD2  2
+#define USBPAD_HAVE_KBD   4
+#define USBPAD_HAVE_MOUSE 8
+
+/* called from inside USBPAD_Poll / PollLight for every new report:
+ * keyboard: the 8-byte boot report (modifiers, 0, six key usages); all zero = every key released
+ * mouse: buttons (bit 0 left, 1 right, 2 middle), movement (y down = positive), wheel (up = positive) */
+typedef void (*USBPAD_KbdFn)(int id, const uint8_t* report);   /* id: which keyboard (0..5) */
+typedef void (*USBPAD_MouseFn)(int buttons, int dx, int dy, int dw);
+
 /* Finds the USB controllers, takes them over from the BIOS (EHCI ports handed to companions where there are some)
- * and waits up to wait_ms for a pad. cps = TSC cycles per second. Returns the number of usable
- * controllers (0 = nothing usable). Messages go to *msg (a static string). */
-int  USBPAD_Init(uint64_t cps, int wait_ms, const char** msg);
+ * and waits up to wait_ms for what is plugged in to be set up. cps = TSC cycles per second. Returns the number of
+ * usable controllers (0 = nothing usable). Messages go to *msg (a static string). */
+int  USBPAD_Init(uint64_t cps, int wait_ms, int flags, const char** msg);
+void USBPAD_SetHid(USBPAD_KbdFn kb, USBPAD_MouseFn ms);
+void USBPAD_SetLeds(int leds);     /* keyboard LEDs: bit 0 num, 1 caps, 2 scroll (sent on the next full poll) */
 void USBPAD_Poll(void);
-void USBPAD_PollLight(void);       /* only collects reports: safe inside a game's port read */            /* cheap; call often (sound interrupt, port 201h reads) */
+void USBPAD_PollLight(void);       /* only collects reports: safe inside a game's port read */
 void USBPAD_Shutdown(void);
-const USBPAD_State* USBPAD_Get(void);
-const char* USBPAD_Trace(void);
-void USBPAD_TraceStop(void);       /* stop adding to it (SBEMU, once resident) */    /* short log of the USB steps, for reports */
-const char* USBPAD_Describe(void); /* "... 045E:028E on OHCI 2 port 1" etc. */
+const USBPAD_State* USBPAD_Get(void);       /* pad 1 */
+const USBPAD_State* USBPAD_GetPad(int n);   /* 0 = pad 1, 1 = pad 2 */
+int  USBPAD_Have(void);            /* USBPAD_HAVE_* of what is connected now */
+const char* USBPAD_Trace(void);    /* short log of the USB steps, for reports */
+void USBPAD_TraceStop(void);       /* stop adding to it (SBEMU, once resident) */
+const char* USBPAD_Describe(void); /* last plug-in / unplug, e.g. "Xbox 360 pad 045E:028E on OHCI 2 port 1" */
+const char* USBPAD_Devices(void);  /* what is in use now, one line each */
+uint32_t USBPAD_Changes(void);     /* counts plug-ins and unplugs */
 
 #endif

@@ -1,40 +1,41 @@
-/* USB Xbox 360 controller support for SBEMU.
+/* USB pads, keyboards and mice for SBEMU.
  *
- * A small USB host for one device (plus the hubs in front of it), written for SBEMU's resident
- * setting:
+ * A small USB host written for SBEMU's resident setting:
  *   - no USB interrupt at all. Every controller's interrupt enables (and UHCI's PIRQ routing) are
- *     off; USBPAD_Poll() looks at the transfer descriptors / event ring in memory instead. It is
+ *     off; USBPAD_Poll() looks at the transfer descriptors / event rings in memory instead. It is
  *     called from the sound card interrupt and from every read of the emulated gameport (port 201h),
  *     so it never shares an IRQ line with the sound chip.
  *   - every PC USB controller kind:
  *       UHCI  Intel ICH / VIA (the Dell D810's ICH6)
  *       OHCI  NEC uPD720100/720101 PCI cards, SiS, ALi, nVidia, AMD, Apple ...
  *       EHCI  with companion controllers: taken from the BIOS, CONFIGFLAG cleared, so every port goes
- *             to its UHCI / OHCI companion (the pad is a full-speed device);
+ *             to its UHCI / OHCI companion (pads, keyboards and mice are full / low speed devices);
  *             without companions (Intel 5-series and later: a rate-matching hub on every port):
- *             driven itself, with split transactions to reach the pad behind the hub's TT
+ *             driven itself, with split transactions to reach devices behind the hub's TT
  *       xHCI  USB 3 controllers (Intel 7-series and later, NEC/Renesas uPD720200/201/202, ASMedia,
  *             VIA, Fresco, AMD): only their USB 2 ports are powered and used (as xhci98 does);
  *             on Intel 7/8/9-series the shared ports are switched over from EHCI (XUSB2PR)
- *   - USB hubs (any depth up to 4): the pad may be behind one, as it always is on hub-only EHCIs.
- *   - one controller carries the pad at a time. UHCI: frame list -> interrupt QH -> control QH.
- *     OHCI: its own HCCA (set once at reset: real chips such as NEC's read HcHCCA only when they start,
- *     so it is never changed while running), whose interrupt table points at the interrupt ED only
- *     while that controller has the pad, plus a control ED. EHCI: periodic frame list ->
- *     interrupt QH, async list = one control QH. xHCI: command ring, one event ring, a transfer ring
- *     per endpoint. Controllers without the pad stay running with empty schedules, so their root
- *     hubs keep reporting plug-ins.
- *   - enumeration is a small state machine (debounce, reset, recovery are waited by time stamp, so
- *     hot-plugging does not stall the sound interrupt for long); control transfers and hub port
- *     resets are synchronous and take a few milliseconds.
+ *   - USB hubs (any depth up to 4), as many as there are ports.
+ *   - devices in use: up to two Xbox 360 pads (wired, or the wireless receiver's first slots), USB keyboards
+ *     and USB mice (HID boot protocol), at once, on any mix of controllers and hubs. Each one is a "pipe"
+ *     (its interrupt IN endpoint); every controller runs all the time with its own schedule:
+ *       UHCI  frame list -> one QH per pipe slot (a TD only while that pipe is on this controller) -> control QH
+ *       OHCI  HCCA (set once at reset: real chips such as NEC's read HcHCCA only when they start) interrupt
+ *             table -> one ED per pipe slot (skipped unless in use); control list = one ED
+ *       EHCI  periodic list -> the QHs of its pipes, relinked with the schedule stopped; async = control QH
+ *       xHCI  command ring, one event ring, a transfer ring per endpoint
+ *   - enumeration is a small state machine for root ports (debounce, reset, recovery waited by time stamp,
+ *     so hot-plugging does not stall the sound interrupt for long) and a round-robin check of one hub port
+ *     at a time; control transfers and hub port resets are synchronous and take a few milliseconds.
  *
- * Supported pads: anything with the Xbox 360 interface (vendor class FFh, subclass 5Dh, protocol 01h:
- * Microsoft wired pad and the third-party wired pads in x360c.inf), and the Microsoft wireless
- * receiver (protocol 81h, first pad slot only; untested). Not supported: Xbox One / Series pads,
+ * Pads: anything with the Xbox 360 interface (vendor class FFh, subclass 5Dh, protocol 01h: Microsoft wired
+ * pad and the third-party wired pads in x360c.inf), and the Microsoft wireless receiver (protocol 81h, one pad
+ * per slot; untested). Keyboards / mice: HID boot interfaces (every USB keyboard; nearly every mouse); their
+ * reports go to the callbacks set with USBPAD_SetHid (SBEMU: vkbc.c). Not supported: Xbox One / Series pads,
  * CardBus cards (the BIOS leaves the slot unconfigured), Renesas uPD720201/202 cards without their
  * firmware ROM (they need a firmware upload).
  *
- * Report layout (wired, 20 bytes): 00 14, buttons lo (dpad U D L R, start, back, LS, RS),
+ * Pad report layout (wired, 20 bytes): 00 14, buttons lo (dpad U D L R, start, back, LS, RS),
  * buttons hi (LB, RB, guide, -, A, B, X, Y), LT, RT, LX, LY, RX, RY (int16 little endian, Y up = +).
  * The wireless receiver wraps the same layout 4 bytes further on. Layout from Linux drivers/input/
  * joystick/xpad.c. Controllers after the UHCI 1.1, OHCI 1.0a, EHCI 1.0 and xHCI 1.2 specs, Linux
@@ -198,12 +199,14 @@ enum { TT_NORMAL = 1, TT_SETUP = 2, TT_DATA = 3, TT_STATUS = 4, TT_LINK = 6, TT_
 
 #define MAX_HC    16
 #define MAX_PORT  32
-#define MAX_DEV   8
+#define MAX_DEV   16
 #define MAX_DEPTH 4
+#define MAX_PIPE  6
 #define NTD       40
 
 enum { T_UHCI, T_OHCI, T_EHCI, T_XHCI };
 enum { SP_FS, SP_LS, SP_HS };
+enum { PT_PAD, PT_KBD, PT_MOUSE };
 
 typedef struct { volatile uint32_t* t; uint32_t ph; int n, enq, cyc; } Ring;
 typedef struct
@@ -217,58 +220,83 @@ typedef struct
     Ring cmd, ev;
     int evcyc;
 } XHC;
-
-typedef struct { int type, idx, nports, ncc, given; uint16_t io; uint32_t mmio, op; uint8_t bus, dev, func; XHC* x; } HCI;
-static HCI      HC[MAX_HC];
-static int      HCn, UhciN, OhciN, EhciN, XhciN, EhciGiven;
+/* xHCI memory (per controller) */
+#define XO_EP0  0x2000                  /* + device * 512: EP0 transfer rings */
+#define XO_IN   0x4000                  /* input context */
+#define XO_DEV  0x5000                  /* + device * 2048: output device contexts */
+#define XO_SPA  0xD000                  /* scratchpad buffer array */
+#define XO_SIZE 0xE000
 
 typedef struct
 {
-    int used, addr, speed, mps0, parent, pport, rootport, depth, hub, nports, slot, tt, ttport;
-    uint32_t route, ignore;             /* hub: bit per port: device there is not a pad */
-    uint32_t child;                     /* hub: bit per port with an enumerated device */
+    int type, idx, nports, ncc, given, nextaddr;
+    uint16_t io; uint32_t mmio, op; uint8_t bus, dev, func; XHC* x;
+    volatile uint32_t* fl;              /* UHCI / EHCI frame list; OHCI HCCA */
+    volatile uint32_t* ctl;             /* UHCI control QH / OHCI control ED / EHCI async QH */
+    volatile uint32_t* pq;              /* MAX_PIPE interrupt QHs / EDs, 128 bytes apart (pipe k uses its own) */
+    uint32_t own;                       /* root ports with a device in use */
+    uint32_t ignore;                    /* root ports: nothing usable there, skip until unplugged */
+    uint8_t  fails[MAX_PORT];
+} HCI;
+static HCI      HC[MAX_HC];
+static int      HCn, UhciN, OhciN, EhciN, XhciN, EhciGiven;
+#define PQ(h, k) (HC[h].pq + (k) * 32)
+
+typedef struct
+{
+    int used, hc, addr, speed, mps0, parent, pport, rootport, depth, hub, nports, slot, tt, ttport, maxdci;
+    uint16_t vid, pid;
+    uint32_t route;
+    uint32_t ignore, child, pend;       /* hub: bit per port: not usable / enumerated / seen, waiting for debounce */
+    uint64_t pendt[16];
 } Dev;
 static Dev       D[MAX_DEV];
-static int       NextAddr, PadD = -1;
+
+/* one interrupt IN endpoint in use: a pad, a keyboard or a mouse */
+typedef struct
+{
+    int used, type, dev, hc, ifc, ep, mps, intv, tog, ocur, outep, outmps, otog, pad, wireless, wlpresent, watched;
+    volatile uint32_t* td;              /* its IN TD(s): UHCI 1, OHCI 2, EHCI 2 (used in turn) */
+    uint8_t *ibuf, *obuf;
+    Ring xin, xout;
+    volatile int xdone, xodone;
+    int xcc, xres, xocc;
+    uint8_t prev[8];
+    uint64_t since;
+    uint32_t reports;
+} Pipe;
+static Pipe      P[MAX_PIPE];
 
 static xmsmem_t Mem;
-static volatile uint32_t* FL;           /* UHCI / EHCI frame list, 1024 entries */
-static volatile uint32_t* HCCAS;        /* OHCI communication areas, 256 bytes per controller (by HC index) */
-#define HCCA_OF(i) (HCCAS + (i) * 64)
-static volatile uint32_t* QHI;          /* UHCI interrupt QH */
-static volatile uint32_t* QHC;          /* UHCI control QH */
-static volatile uint32_t* EDI;          /* OHCI interrupt ED */
-static volatile uint32_t* EDC;          /* OHCI control ED */
-static volatile uint32_t* TDI;          /* the pad's IN TD(s) */
-static volatile uint32_t* QHA;          /* EHCI async (control) QH */
-static volatile uint32_t* QHP;          /* EHCI periodic (interrupt) QH */
-static volatile uint32_t* TD;           /* NTD control TDs, 8 dwords each */
-static uint8_t*  CBuf;                  /* control data, 512 bytes */
-static uint8_t*  IBuf;                  /* IN report, 64 */
-static uint8_t*  OBuf;                  /* OUT report, 64 */
+#define M_TD    0x0000                  /* NTD control TDs, 64 bytes apart */
+#define M_CBUF  0x0C00                  /* control data, 512 bytes */
+#define M_PIPE  0x1000                  /* + pipe * 0x800: TDs 0, IN buffer 0x100, OUT 0x140, xHCI rings 0x200 / 0x400 */
+#define M_HC    0x4000                  /* + controller * 0x2000: frame list / HCCA 0, control QH 0x1000, pipe QHs 0x1080 */
+static volatile uint32_t* TD;
+static uint8_t*  CBuf;
 static uint32_t  PBase;
 #define PHYS(p) (PBase + (uint32_t)((volatile uint8_t*)(p) - (volatile uint8_t*)Mem.linearptr))
 
 static uint64_t  Cps;
-static USBPAD_State St;
-static char      Desc[112];
+static USBPAD_State Pad[USBPAD_PADS];
+static char      Desc[112], DevList[480];
+static uint32_t  Changes;
+static int       Flags;
+static USBPAD_KbdFn KbFn;
+static USBPAD_MouseFn MsFn;
+static volatile int LedsWant = 0;
+static int       LedsHave = -1;
 
-/* state machine */
-enum { S_SCAN, S_DEBOUNCE, S_RESET, S_RECOVER, S_HUB, S_RUN };
-static int       S, Cur = -1, CurPort, LastHubKey = -1;
-static uint64_t  Until, NextScan, HubSince;
-static uint32_t  Ignore[MAX_HC];        /* root port bits: not a pad, skip until unplugged */
-static uint32_t  HubRoot[MAX_HC];       /* root port bits: a hub is there */
-static uint8_t   Fails[MAX_HC][MAX_PORT];
-static int       InEp, OutEp, InMps = 32, InIntv = 4, InTog, OutTog, Wireless, WlPresent;
-static int       OCur;                  /* OHCI / EHCI: which of the two IN TDs is the empty tail */
-static Ring      XIn, XOut;             /* xHCI rings of the pad's endpoints */
+/* enumeration: one root port at a time (state machine); hub ports one per call (hub_task) */
+enum { S_SCAN, S_DEBOUNCE, S_RESET, S_RECOVER };
+static int       S, Cur = -1, CurPort;
+static uint64_t  Until, NextScan, NextMon, NextHub;
+static int       HubCur, HubPort, HubQuiet, HubBusy;
 static Ring      XEp0[MAX_DEV];
-static volatile int XCmdDone, XCtlDone, XInDone, XOutDone;
-static uint32_t  XCmdPh; static int XCmdCC, XCmdSlot, XCtlCC, XInCC, XInRes, XOutCC;
+static volatile int XCmdDone, XCtlDone;
+static uint32_t  XCmdPh; static int XCmdCC, XCmdSlot, XCtlCC;
 static volatile int Busy;
-static int       Inited, Light;
-static uint64_t  RunSince; static int Watched;
+static int       Inited, Light, Settling;
 
 /* short trace of what happened (start-up report / SBDETAIL), oldest first, stops when full */
 static char      Trace[4096]; static int TraceN, TraceOff;
@@ -567,7 +595,7 @@ static int ehci_setup(int i)
     {
         /* all ports to the companions. CONFIGFLAG=0 alone does it on paper, but give every port away
          * explicitly too (Port Owner, which is only writable while CONFIGFLAG=1) and power it: an empty port
-         * can otherwise stay with the halted EHCI, so a pad plugged in later is never seen, and on a card
+         * can otherwise stay with the halted EHCI, so a device plugged in later is never seen, and on a card
          * no BIOS has set up the port power can still be off */
         ewr(i, E_CONFIG, 1);
         wait_us(1000);
@@ -583,10 +611,14 @@ static int ehci_setup(int i)
     for (n = 0; n < 100 && (erd(i, E_CMD) & EC_HCRST); ++n) wait_us(1000);
     ewr(i, E_INTR, 0);
     if (rd(h->mmio + 8) & 1) ewr(i, E_SEG, 0);         /* 64-bit capable: our structures are below 4 GB */
-    ewr(i, E_PERIOD, PHYS(FL));
-    ewr(i, E_ASYNC, PHYS(QHA));
+    for (n = 0; n < 1024; ++n) h->fl[n] = LP_T;        /* periodic list: filled by ehci_relink() */
+    zero(h->ctl, 24);
+    h->ctl[0] = PHYS(h->ctl) | LP_Q; h->ctl[1] = 1UL << 15; h->ctl[4] = h->ctl[5] = LP_T;   /* async: the control QH */
+    fl(h->fl, 4096); fl(h->ctl, 96);
+    ewr(i, E_PERIOD, PHYS(h->fl));
+    ewr(i, E_ASYNC, PHYS(h->ctl));
     ewr(i, E_FRINDEX, 0);
-    ewr(i, E_CMD, (8UL << 16) | EC_RS);               /* run, schedules off until it has the pad */
+    ewr(i, E_CMD, (8UL << 16) | EC_RS);               /* run; schedules on when there is something on them */
     ewr(i, E_CONFIG, 1);                              /* ports to this controller */
     if (hcs & 0x10)                                   /* port power control */
         for (p = 0; p < h->nports; ++p) eport_set(i, p, EP_PP, 0);
@@ -597,23 +629,40 @@ static int ehci_setup(int i)
 static void uhci_reset(int i)
 {
     HCI* h = &HC[i];
-    int n;
+    int n, k;
+    uint16_t io = h->io;
     PCI_WriteWord(h->bus, h->dev, h->func, UHCI_LEGSUP, 0x8F00);  /* legacy off, SMIs off, PIRQ off */
     PCI_WriteWord(h->bus, h->dev, h->func, 0x04, (uint16_t)(PCI_ReadWord(h->bus, h->dev, h->func, 0x04) | 0x05));
-    outportw(h->io + U_INTR, 0);
-    outportw(h->io + U_CMD, 0);
-    for (n = 0; n < 20 && !(inportw(h->io + U_STS) & STS_HALT); ++n) wait_us(1000);
-    outportw(h->io + U_CMD, CMD_GRST); wait_us(20000); outportw(h->io + U_CMD, 0); wait_us(1000);
-    outportw(h->io + U_CMD, CMD_HCRST);
-    for (n = 0; n < 100 && (inportw(h->io + U_CMD) & CMD_HCRST); ++n) wait_us(100);
-    outportw(h->io + U_INTR, 0);
-    outportw(h->io + U_STS, 0x3F);
+    outportw(io + U_INTR, 0);
+    outportw(io + U_CMD, 0);
+    for (n = 0; n < 20 && !(inportw(io + U_STS) & STS_HALT); ++n) wait_us(1000);
+    outportw(io + U_CMD, CMD_GRST); wait_us(20000); outportw(io + U_CMD, 0); wait_us(1000);
+    outportw(io + U_CMD, CMD_HCRST);
+    for (n = 0; n < 100 && (inportw(io + U_CMD) & CMD_HCRST); ++n) wait_us(100);
+    outportw(io + U_INTR, 0);
+    outportw(io + U_STS, 0x3F);
+    /* schedule, for good: frame list -> pipe QH 0 -> ... -> pipe QH 5 -> control QH. A pipe's QH has
+     * a TD only while that pipe is on this controller */
+    h->ctl[0] = LP_T; h->ctl[1] = LP_T;
+    for (k = 0; k < MAX_PIPE; ++k)
+    {
+        PQ(i, k)[0] = (k + 1 < MAX_PIPE ? PHYS(PQ(i, k + 1)) : PHYS(h->ctl)) | LP_Q;
+        PQ(i, k)[1] = LP_T;
+    }
+    for (k = 0; k < 1024; ++k) h->fl[k] = PHYS(PQ(i, 0)) | LP_Q;
+    fl(h->fl, 4096); fl(h->ctl, 0x400);
+    outportw(io + U_FRNUM, 0);
+    outportl(io + U_FLBASE, PHYS(h->fl));
+    outportb(io + U_SOF, 0x40);
+    outportw(io + U_STS, 0x3F);
+    outportw(io + U_CMD, CMD_RS | CMD_CF | CMD_MAXP);
 }
 
 static void ohci_reset(int i)
 {
+    HCI* h = &HC[i];
     uint32_t fi, rha, w;
-    int n, p;
+    int n, p, k;
     if (ord(i, O_CONTROL) & OC_IR)                            /* the BIOS's SMM code owns it */
     {
         owr(i, O_CMDSTS, OS_OCR);
@@ -629,19 +678,30 @@ static void ohci_reset(int i)
     owr(i, O_FMINT, ((ord(i, O_FMINT) & 0x80000000UL) ^ 0x80000000UL) | (((fi - 210) * 6 / 7) << 16) | fi);
     owr(i, O_PERSTART, fi * 9 / 10);
     owr(i, O_LSTHRESH, 0x628);
-    zero(HCCA_OF(i), 64);
-    owr(i, O_HCCA, PHYS(HCCA_OF(i)));                         /* for good: never changed while running */
-    owr(i, O_CTLHEAD, 0); owr(i, O_CTLCUR, 0);
+    /* schedule, for good (real chips such as NEC's read HcHCCA only when they start, so it is never changed):
+     * every interrupt slot -> pipe ED 0 -> ... -> pipe ED 5 (skipped unless in use); control list = one ED */
+    zero(h->fl, 64);
+    zero(h->ctl, 4); h->ctl[0] = ED_SKIP;
+    for (k = 0; k < MAX_PIPE; ++k)
+    {
+        zero(PQ(i, k), 4);
+        PQ(i, k)[0] = ED_SKIP;
+        PQ(i, k)[3] = k + 1 < MAX_PIPE ? PHYS(PQ(i, k + 1)) : 0;
+    }
+    for (k = 0; k < 32; ++k) h->fl[k] = PHYS(PQ(i, 0));
+    fl(h->fl, 256); fl(h->ctl, 0x400);
+    owr(i, O_HCCA, PHYS(h->fl));
+    owr(i, O_CTLHEAD, PHYS(h->ctl)); owr(i, O_CTLCUR, 0);
     owr(i, O_BLKHEAD, 0); owr(i, O_BLKCUR, 0);
     owr(i, O_INTSTS, 0xFFFFFFFFUL);
-    owr(i, O_CONTROL, OC_OPER | 3);
+    owr(i, O_CONTROL, OC_OPER | OC_PLE | OC_CLE | 3);
     rha = ord(i, O_RHDA);
-    HC[i].nports = (int)(rha & 0xFF);
-    if (HC[i].nports > MAX_PORT) HC[i].nports = MAX_PORT;
+    h->nports = (int)(rha & 0xFF);
+    if (h->nports > MAX_PORT) h->nports = MAX_PORT;
     owr(i, O_RHSTS, 1UL << 16);
-    for (p = 0; p < HC[i].nports; ++p) owr(i, O_PORT + p * 4, OP_PPS);
-    trace("OHCI %02x:%02x.%x: rev %02lx, %d ports, rhda %08lx\n", HC[i].bus, HC[i].dev, HC[i].func,
-        (unsigned long)(ord(i, 0) & 0xFF), HC[i].nports, (unsigned long)rha);
+    for (p = 0; p < h->nports; ++p) owr(i, O_PORT + p * 4, OP_PPS);
+    trace("OHCI %02x:%02x.%x: rev %02lx, %d ports, rhda %08lx\n", h->bus, h->dev, h->func,
+        (unsigned long)(ord(i, 0) & 0xFF), h->nports, (unsigned long)rha);
     w = (rha >> 24) * 2;
     if (w < 20) w = 20;
     if (w > 100) w = 100;
@@ -655,6 +715,7 @@ static void ring_init(Ring* r, volatile uint32_t* t, uint32_t ph, int n)
     zero(t, n * 4);
     t[(n - 1) * 4 + 0] = ph;
     t[(n - 1) * 4 + 3] = TRB_TYPE(TT_LINK) | 2;               /* toggle cycle */
+    fl(t, n * 16);
 }
 static uint32_t ring_push(Ring* r, uint32_t p0, uint32_t p1, uint32_t st, uint32_t ctl)
 {
@@ -679,22 +740,27 @@ static uint32_t ring_deq(const Ring* r) { return (r->ph + r->enq * 16) | (r->cyc
 static void x_events(int h)
 {
     XHC* x = HC[h].x;
-    int guard = 0;
+    int guard = 0, k;
     for (;;)
     {
         volatile uint32_t* e = x->ev.t + x->ev.enq * 4;
         uint32_t ctl;
+        int type, cc, slot, ep;
         fl(e, 16);
         ctl = e[3];
-        int type, cc, slot, ep;
         if ((ctl & 1) != (uint32_t)x->evcyc || guard++ > XEVT_TRBS) break;
         type = (int)TRB_GTYPE(ctl); cc = (int)(e[2] >> 24); slot = (int)(ctl >> 24); ep = (int)((ctl >> 16) & 0x1F);
         if (type == TT_EV_CMD && e[0] == XCmdPh) { XCmdCC = cc; XCmdSlot = slot; XCmdDone = 1; }
         else if (type == TT_EV_XFER)
         {
             if (ep == 1) { XCtlCC = cc; XCtlDone = 1; }
-            else if (PadD >= 0 && slot == D[PadD].slot && ep == InEp * 2 + 1) { XInCC = cc; XInRes = (int)(e[2] & 0xFFFFFF); XInDone = 1; }
-            else if (PadD >= 0 && slot == D[PadD].slot && ep == OutEp * 2) { XOutCC = cc; XOutDone = 1; }
+            else for (k = 0; k < MAX_PIPE; ++k)
+            {
+                Pipe* q = &P[k];
+                if (!q->used || q->hc != h || D[q->dev].slot != slot) continue;
+                if (ep == q->ep * 2 + 1) { q->xcc = cc; q->xres = (int)(e[2] & 0xFFFFFF); q->xdone = 1; break; }
+                if (q->outep && ep == q->outep * 2) { q->xocc = cc; q->xodone = 1; break; }
+            }
         }
         if (++x->ev.enq == XEVT_TRBS) { x->ev.enq = 0; x->evcyc ^= 1; }
         wr(x->rt + 0x38, x->ev.ph + x->ev.enq * 16);              /* ERDP (keeps EHB) */
@@ -719,13 +785,12 @@ static int x_cmd(int h, uint32_t p0, uint32_t ctl, int* slot)
     return XCmdCC;
 }
 
-static volatile uint32_t* x_ctx(volatile uint32_t* base, int i) { return base + i * (HC[Cur].x->ctxsz / 4); }
-static volatile uint32_t* x_out(int di)                         /* output device context of device di */
+static volatile uint32_t* x_ctx(int h, volatile uint32_t* base, int i) { return base + i * (HC[h].x->ctxsz / 4); }
+static volatile uint32_t* x_out(int h, int di)                   /* output device context of device di */
 {
-    XHC* x = HC[Cur].x;
-    return (volatile uint32_t*)((uint8_t*)x->mem.linearptr + 0x4000 + di * 2048);
+    return (volatile uint32_t*)((uint8_t*)HC[h].x->mem.linearptr + XO_DEV + di * 2048);
 }
-static uint32_t x_outph(int di) { return HC[Cur].x->pbase + 0x4000 + di * 2048; }
+static uint32_t x_outph(int h, int di) { return HC[h].x->pbase + XO_DEV + di * 2048; }
 
 static int xhci_setup(int i)
 {
@@ -775,14 +840,14 @@ static int xhci_setup(int i)
         if (prm && prm != 0xFFFFFFFFUL) PCI_WriteDWord(h->bus, h->dev, h->func, 0xD0, prm);
     }
     /* memory */
-    if (!pds_dpmi_xms_allocmem(&x->mem, 0x9000)) return 0;
+    if (!pds_dpmi_xms_allocmem(&x->mem, XO_SIZE)) return 0;
     m = (uint8_t*)x->mem.linearptr;
     x->pbase = (uint32_t)(uintptr_t)x->mem.physicalptr;
-    memset(m, 0, 0x9000);
+    memset(m, 0, XO_SIZE);
     x->dcbaa = (volatile uint32_t*)m;
     x->erst  = (volatile uint32_t*)(m + 0x400);
-    x->inctx = (volatile uint32_t*)(m + 0x3000);
-    x->spa   = (volatile uint32_t*)(m + 0x8000);
+    x->inctx = (volatile uint32_t*)(m + XO_IN);
+    x->spa   = (volatile uint32_t*)(m + XO_SPA);
     ring_init(&x->cmd, (volatile uint32_t*)(m + 0x800), x->pbase + 0x800, XCMD_TRBS);
     x->ev.t = (volatile uint32_t*)(m + 0xA00); x->ev.ph = x->pbase + 0xA00; x->ev.n = XEVT_TRBS; x->ev.enq = 0; x->evcyc = 1;
     x->erst[0] = x->ev.ph; x->erst[1] = 0; x->erst[2] = XEVT_TRBS; x->erst[3] = 0;
@@ -791,7 +856,7 @@ static int xhci_setup(int i)
         if (x->nsp > 512 || !pds_dpmi_xms_allocmem(&x->sp, x->nsp * 4096)) return 0;
         memset(x->sp.linearptr, 0, x->nsp * 4096);
         for (n = 0; n < x->nsp; ++n) { x->spa[n * 2] = (uint32_t)(uintptr_t)x->sp.physicalptr + n * 4096; x->spa[n * 2 + 1] = 0; }
-        x->dcbaa[0] = x->pbase + 0x8000; x->dcbaa[1] = 0;
+        x->dcbaa[0] = x->pbase + XO_SPA; x->dcbaa[1] = 0;
     }
     /* halt, reset (xhci98's order: wait HCH, then HCRST and CNR) */
     for (n = 0; n < 1000 && (rd(x->op + X_USBSTS) & XS_CNR); ++n) wait_us(1000);
@@ -810,7 +875,7 @@ static int xhci_setup(int i)
     wr(x->rt + 0x28, (rd(x->rt + 0x28) & 0xFFFF0000UL) | 1);      /* ERSTSZ */
     wr(x->rt + 0x38, x->ev.ph); wr(x->rt + 0x3C, 0);              /* ERDP */
     wr(x->rt + 0x30, (rd(x->rt + 0x30) & 0x3FUL) | (x->pbase + 0x400)); wr(x->rt + 0x34, 0); /* ERSTBA */
-    fl(m, 0x9000);
+    fl(m, XO_SIZE);
     if (x->nsp) fl(x->sp.linearptr, x->nsp * 4096);
     wr(x->op + X_USBCMD, (rd(x->op + X_USBCMD) & ~(1UL << 2)) | XC_RUN);
     for (n = 0; n < 100 && (rd(x->op + X_USBSTS) & XS_HCH); ++n) wait_us(1000);
@@ -825,7 +890,7 @@ static int xhci_setup(int i)
     return 1;
 }
 
-/* schedules on / off for controller i (it stays running either way) */
+/* EHCI schedules on / off (the controller stays running either way) */
 static void ehci_sched(int i, uint32_t bits, int on)
 {
     int n;
@@ -835,73 +900,27 @@ static void ehci_sched(int i, uint32_t bits, int on)
     for (n = 0; n < 40 && ((erd(i, E_STS) & sts) != (on ? sts : 0)); ++n) wait_us(100);
 }
 
-static void hc_run(int i, int on)
+/* EHCI periodic list = the QHs of the pipes on this controller, linked one after the other; rebuilt with the
+ * schedule stopped whenever a pipe comes or goes */
+static void ehci_relink(int h)
 {
-    int k;
-    switch (HC[i].type)
+    int k, first = -1, last = -1;
+    ehci_sched(h, EC_PSE, 0);
+    for (k = 0; k < MAX_PIPE; ++k)
     {
-    case T_UHCI:
-    {
-        uint16_t io = HC[i].io;
-        if (on)
-        {
-            for (k = 0; k < 1024; ++k) FL[k] = PHYS(QHI) | LP_Q;
-            fl(FL, 4096); fl(QHI, 32);
-            outportw(io + U_INTR, 0);
-            outportw(io + U_FRNUM, 0);
-            outportl(io + U_FLBASE, PHYS(FL));
-            outportb(io + U_SOF, 0x40);
-            outportw(io + U_STS, 0x3F);
-            outportw(io + U_CMD, CMD_RS | CMD_CF | CMD_MAXP);
-        }
-        else
-        {
-            outportw(io + U_CMD, 0);
-            for (k = 0; k < 20 && !(inportw(io + U_STS) & STS_HALT); ++k) wait_us(1000);
-        }
-        break;
+        if (!P[k].used || P[k].hc != h || !P[k].ep) continue;
+        if (last >= 0) PQ(h, last)[0] = PHYS(PQ(h, k)) | LP_Q;
+        else first = k;
+        last = k;
     }
-    case T_OHCI:
-        EDI[0] |= ED_SKIP; EDC[0] |= ED_SKIP;
-        if (on)
-        {
-            for (k = 0; k < 32; ++k) HCCA_OF(i)[k] = PHYS(EDI);  /* every interrupt slot: the pad's ED */
-            fl(HCCA_OF(i), 256); fl(EDI, 32);
-            owr(i, O_CTLHEAD, PHYS(EDC)); owr(i, O_CTLCUR, 0);
-            owr(i, O_CONTROL, (ord(i, O_CONTROL) & ~(OC_PLE | OC_CLE | OC_BLE)) | OC_PLE | OC_CLE);
-            trace("[on ctl%08lx hcca%08lx/%08lx fi%08lx ps%04lx] ", (unsigned long)ord(i, O_CONTROL),
-                (unsigned long)ord(i, O_HCCA), (unsigned long)PHYS(HCCA_OF(i)), (unsigned long)ord(i, O_FMINT),
-                (unsigned long)ord(i, O_PERSTART));
-        }
-        else
-        {
-            owr(i, O_CONTROL, ord(i, O_CONTROL) & ~(OC_PLE | OC_CLE | OC_BLE));
-            wait_us(2000);
-            owr(i, O_CTLHEAD, 0); owr(i, O_CTLCUR, 0);
-            for (k = 0; k < 32; ++k) HCCA_OF(i)[k] = 0;
-            fl(HCCA_OF(i), 256);
-        }
-        break;
-    case T_EHCI:
-        ehci_sched(i, EC_PSE | EC_ASE, 0);
-        if (on)
-        {
-            zero(QHP, 24);
-            QHP[0] = LP_T; QHP[4] = LP_T; QHP[5] = LP_T;              /* idle interrupt QH */
-            for (k = 0; k < 1024; ++k) FL[k] = PHYS(QHP) | LP_Q;
-            fl(FL, 4096); fl(QHP, 96);
-            ewr(i, E_PERIOD, PHYS(FL));
-            ewr(i, E_ASYNC, PHYS(QHA));
-            ehci_sched(i, EC_PSE, 1);
-        }
-        break;
-    default:
-        break;                                                        /* xHCI: rings only move when rung */
-    }
+    if (last >= 0) PQ(h, last)[0] = LP_T;
+    for (k = 0; k < 1024; ++k) HC[h].fl[k] = first >= 0 ? (PHYS(PQ(h, first)) | LP_Q) : LP_T;
+    fl(HC[h].fl, 4096); fl(HC[h].pq, MAX_PIPE * 128);
+    if (first >= 0) ehci_sched(h, EC_PSE, 1);
 }
 
 /* ================================================================== devices */
-static int dev_new(int parent, int port, int rootport, int speed)
+static int dev_new(int hc, int parent, int port, int rootport, int speed)
 {
     int i;
     for (i = 0; i < MAX_DEV; ++i)
@@ -909,7 +928,7 @@ static int dev_new(int parent, int port, int rootport, int speed)
         {
             Dev* d = &D[i];
             memset(d, 0, sizeof(*d));
-            d->used = 1; d->parent = parent; d->pport = port; d->rootport = rootport; d->speed = speed;
+            d->used = 1; d->hc = hc; d->parent = parent; d->pport = port; d->rootport = rootport; d->speed = speed;
             d->mps0 = speed == SP_HS ? 64 : 8;
             d->depth = parent < 0 ? 0 : D[parent].depth + 1;
             d->route = parent < 0 ? 0 : D[parent].route | ((uint32_t)(port > 15 ? 15 : port) << (4 * (d->depth - 1)));
@@ -924,17 +943,59 @@ static int dev_new(int parent, int port, int rootport, int speed)
     return -1;
 }
 
+static const char* where(int di)
+{
+    static char w[48];
+    const Dev* d = &D[di];
+    int n = snprintf(w, sizeof(w), "%s %d port %d", tname(d->hc), HC[d->hc].idx, d->rootport + 1);
+    if (d->depth)
+    {
+        int k, p[MAX_DEPTH + 1], c = di;
+        for (k = d->depth; k > 0; --k) { p[k] = D[c].pport; c = D[c].parent; }
+        n += snprintf(w + n, sizeof(w) - n, ", hub port");
+        for (k = 1; k <= d->depth && n < (int)sizeof(w) - 4; ++k) n += snprintf(w + n, sizeof(w) - n, "%s%d", k > 1 ? "." : " ", p[k]);
+    }
+    return w;
+}
+
+static const char* pipe_name(const Pipe* q)
+{
+    static char s[40];
+    if (q->type == PT_KBD) return "keyboard";
+    if (q->type == PT_MOUSE) return "mouse";
+    snprintf(s, sizeof(s), "%s %d", q->wireless ? "wireless 360 pad" : "360 pad", q->pad + 1);
+    return s;
+}
+
+/* the list USBPAD_Devices() gives (built when something changes: no formatting in the interrupt otherwise) */
+static void devlist(void)
+{
+    int k, n = 0;
+    DevList[0] = 0;
+    for (k = 0; k < MAX_PIPE; ++k)
+    {
+        const Pipe* q = &P[k];
+        if (!q->used || n > (int)sizeof(DevList) - 80) continue;
+        n += snprintf(DevList + n, sizeof(DevList) - n, "%s %04X:%04X on %s\n", pipe_name(q), D[q->dev].vid, D[q->dev].pid, where(q->dev));
+    }
+    ++Changes;
+}
+
+static void pipe_stop(int k);
+
 static void dev_free(int di)                    /* and everything behind it */
 {
-    int i;
+    int i, h;
     if (di < 0 || !D[di].used) return;
+    h = D[di].hc;
     for (i = 0; i < MAX_DEV; ++i) if (D[i].used && D[i].parent == di) dev_free(i);
-    if (Cur >= 0 && HC[Cur].type == T_XHCI && D[di].slot)
+    for (i = 0; i < MAX_PIPE; ++i) if (P[i].used && P[i].dev == di) pipe_stop(i);
+    if (HC[h].type == T_XHCI && D[di].slot)
     {
-        x_cmd(Cur, 0, TRB_TYPE(TT_DISSLOT) | ((uint32_t)D[di].slot << 24), NULL);
-        HC[Cur].x->dcbaa[D[di].slot * 2] = 0;
+        x_cmd(h, 0, TRB_TYPE(TT_DISSLOT) | ((uint32_t)D[di].slot << 24), NULL);
+        HC[h].x->dcbaa[D[di].slot * 2] = 0;
+        fl(HC[h].x->dcbaa + D[di].slot * 2, 8);
     }
-    if (di == PadD) PadD = -1;
     D[di].used = 0;
 }
 
@@ -946,13 +1007,14 @@ static uint32_t td_tok(int pid, int addr, int ep, int tog, int len)
 }
 static volatile uint32_t* tdn(int i) { return TD + i * 8; }
 
-static int u_run_tds(int n, uint32_t timeout_us)
+static int u_run_tds(int h, int n, uint32_t timeout_us)
 {
     uint64_t end = tsc() + us2c(timeout_us);
+    volatile uint32_t* qh = HC[h].ctl;
     int i;
     fl(TD, n * 32); fl(CBuf, 512);
-    QHC[1] = PHYS(tdn(0));
-    fl(QHC, 16);
+    qh[1] = PHYS(tdn(0));
+    fl(qh, 16);
     for (;;)
     {
         int done = 1;
@@ -961,25 +1023,15 @@ static int u_run_tds(int n, uint32_t timeout_us)
         {
             uint32_t cs = tdn(i)[1];
             if (cs & TD_ACTIVE) { done = 0; break; }
-            if (cs & TD_ERRMASK) { QHC[1] = LP_T; return -1; }
+            if (cs & TD_ERRMASK) { qh[1] = LP_T; fl(qh, 16); return -1; }
         }
-        if (done) { QHC[1] = LP_T; return 0; }
+        if (done) { qh[1] = LP_T; fl(qh, 16); return 0; }
         if (tsc() > end)
         {
-            uint16_t io = HC[Cur].io, f1 = inportw(io + U_FRNUM), f2;
-            static uint32_t alt;                                 /* same memory through a second mapping */
-            uint32_t ph = PHYS(tdn(0)) & ~0xFFFUL;
-            wait_us(3000);
-            f2 = inportw(io + U_FRNUM);
-            if (!alt) alt = DPMI_MapMemory(ph, 0x1000);
-            if (alt) trace("[alt td %08lx qh %08lx, cl%d] ", (unsigned long)rd(alt + (PHYS(tdn(0)) & 0xFFF) + 4),
-                (unsigned long)rd(alt + (PHYS(QHC) - ph) + 4), ClLine);
-            trace("[u%08lx t cmd%04x sts%04x fr%03x>%03x fl%08lx/%08lx pci%04x leg%04x qh%08lx td%08lx %08lx] ",
-                (unsigned long)tdn(0)[1], inportw(io + U_CMD), inportw(io + U_STS), f1 & 0x7FF, f2 & 0x7FF,
-                (unsigned long)inportl(io + U_FLBASE), (unsigned long)PHYS(FL),
-                PCI_ReadWord(HC[Cur].bus, HC[Cur].dev, HC[Cur].func, 4), PCI_ReadWord(HC[Cur].bus, HC[Cur].dev, HC[Cur].func, UHCI_LEGSUP),
-                (unsigned long)QHC[1], (unsigned long)tdn(0)[2], (unsigned long)tdn(0)[3]);
-            QHC[1] = LP_T; wait_us(1000);
+            uint16_t io = HC[h].io;
+            trace("[u%08lx t cmd%04x sts%04x fr%03x leg%04x] ", (unsigned long)tdn(0)[1], inportw(io + U_CMD), inportw(io + U_STS),
+                inportw(io + U_FRNUM) & 0x7FF, PCI_ReadWord(HC[h].bus, HC[h].dev, HC[h].func, UHCI_LEGSUP));
+            qh[1] = LP_T; fl(qh, 16); wait_us(1000);
             return -1;
         }
     }
@@ -998,7 +1050,7 @@ static int u_control(const Dev* d, int len, int in)
     }
     tdn(n)[1] = td_cs(d); tdn(n)[2] = td_tok(in && len ? PID_OUT : PID_IN, d->addr, 0, 1, 0); tdn(n)[3] = 0; ++n;
     for (i = 0; i < n; ++i) tdn(i)[0] = (i + 1 < n) ? (PHYS(tdn(i + 1)) | LP_VF) : LP_T;
-    return u_run_tds(n, 300000);
+    return u_run_tds(d->hc, n, 300000);
 }
 
 /* ================================================================== OHCI transfers */
@@ -1010,51 +1062,47 @@ static void otd(volatile uint32_t* t, uint32_t flags, uint32_t buf, int len, vol
     t[3] = len ? buf + len - 1 : 0;
 }
 
+/* runs TDs 0..n-1 on the control ED */
 static int o_run_tds(const Dev* d, int ep, int mps, int n, uint32_t timeout_us)
 {
     uint64_t end;
-    int i, r = -1;
+    int i, r = -1, h = d->hc;
+    volatile uint32_t* ed = HC[h].ctl;
     volatile uint32_t* tail = tdn(n);
     zero(tail, 4);
-    EDC[0] = ED_SKIP | (uint32_t)d->addr | ((uint32_t)ep << 7) | (d->speed == SP_LS ? ED_LS : 0) | ((uint32_t)mps << 16);
-    EDC[1] = PHYS(tail);
-    EDC[2] = PHYS(tdn(0));
-    EDC[3] = 0;
-    fl(TD, (n + 1) * 32); fl(CBuf, 512); fl(OBuf, 64);
-    EDC[0] &= ~ED_SKIP;
-    fl(EDC, 16);
-    owr(Cur, O_CMDSTS, OS_CLF);
+    ed[0] = ED_SKIP | (uint32_t)d->addr | ((uint32_t)ep << 7) | (d->speed == SP_LS ? ED_LS : 0) | ((uint32_t)mps << 16);
+    ed[1] = PHYS(tail);
+    ed[2] = PHYS(tdn(0));
+    ed[3] = 0;
+    fl(TD, (n + 1) * 32); fl(CBuf, 512);
+    ed[0] &= ~ED_SKIP;
+    fl(ed, 16);
+    owr(h, O_CMDSTS, OS_CLF);
     end = tsc() + us2c(timeout_us);
     for (;;)
     {
         int done = 1, err = 0;
-        fl(TD, n * 32); fl(EDC, 16);
+        fl(TD, n * 32); fl(ed, 16);
         for (i = 0; i < n; ++i)
         {
             uint32_t cc = OTD_CC(tdn(i)[0]);
             if (cc >= 0xE) { done = 0; break; }
             if (cc) { err = 1; break; }
         }
-        if (err || (EDC[2] & ED_HALT)) break;
+        if (err || (ed[2] & ED_HALT)) break;
         if (done) { r = 0; break; }
         if (tsc() > end) break;
-        owr(Cur, O_CMDSTS, OS_CLF);
+        owr(h, O_CMDSTS, OS_CLF);
     }
     if (r)
-    {
-        uint32_t f1 = ord(Cur, 0x3C) & 0xFFFF;
-        wait_us(2000);
-        trace("[o%08lx/%08lx ed%08lx %08lx ctl%08lx cs%08lx cur%08lx head%08lx/%08lx fn%04lx>%04lx] ",
-            (unsigned long)tdn(0)[0], (unsigned long)tdn(n - 1)[0], (unsigned long)EDC[0], (unsigned long)EDC[2],
-            (unsigned long)ord(Cur, O_CONTROL), (unsigned long)ord(Cur, O_CMDSTS), (unsigned long)ord(Cur, O_CTLCUR),
-            (unsigned long)ord(Cur, O_CTLHEAD), (unsigned long)PHYS(EDC), (unsigned long)f1, (unsigned long)(ord(Cur, 0x3C) & 0xFFFF));
-    }
-    EDC[0] |= ED_SKIP;
-    fl(EDC, 16);
+        trace("[o%08lx/%08lx ed%08lx %08lx ctl%08lx fn%04lx] ", (unsigned long)tdn(0)[0], (unsigned long)tdn(n - 1)[0],
+            (unsigned long)ed[0], (unsigned long)ed[2], (unsigned long)ord(h, O_CONTROL), (unsigned long)(ord(h, 0x3C) & 0xFFFF));
+    ed[0] |= ED_SKIP;
+    fl(ed, 16);
     wait_us(1100);
-    EDC[2] = PHYS(tail);
-    fl(EDC, 16);
-    owr(Cur, O_INTSTS, 0x06);                                 /* WDH, SF: let the done queue be written back */
+    ed[2] = PHYS(tail);
+    fl(ed, 16);
+    owr(h, O_INTSTS, 0x06);                                   /* WDH, SF: let the done queue be written back */
     return r;
 }
 
@@ -1096,16 +1144,17 @@ static uint32_t e_caps(const Dev* d, uint32_t smask, uint32_t cmask)
 static int e_run(const Dev* d, int ep, int mps, int n, uint32_t timeout_us)
 {
     uint64_t end;
-    int i, r = -1;
-    ehci_sched(Cur, EC_ASE, 0);
-    zero(QHA, 24);
-    QHA[0] = PHYS(QHA) | LP_Q;
-    QHA[1] = e_ch(d, ep, mps, 1, 1);
-    QHA[2] = e_caps(d, 0, 0);
-    QHA[4] = PHYS(qtdn(0));
-    QHA[5] = LP_T;
-    fl(TD, n * 64); fl(QHA, 96); fl(CBuf, 512); fl(OBuf, 64);
-    ehci_sched(Cur, EC_ASE, 1);
+    int i, r = -1, h = d->hc;
+    volatile uint32_t* qh = HC[h].ctl;
+    ehci_sched(h, EC_ASE, 0);
+    zero(qh, 24);
+    qh[0] = PHYS(qh) | LP_Q;
+    qh[1] = e_ch(d, ep, mps, 1, 1);
+    qh[2] = e_caps(d, 0, 0);
+    qh[4] = PHYS(qtdn(0));
+    qh[5] = LP_T;
+    fl(TD, n * 64); fl(qh, 96); fl(CBuf, 512);
+    ehci_sched(h, EC_ASE, 1);
     end = tsc() + us2c(timeout_us);
     for (;;)
     {
@@ -1121,8 +1170,8 @@ static int e_run(const Dev* d, int ep, int mps, int n, uint32_t timeout_us)
         if (done) { r = 0; break; }
         if (tsc() > end) break;
     }
-    ehci_sched(Cur, EC_ASE, 0);
-    if (r) trace("[q%08lx %08lx s%08lx] ", (unsigned long)qtdn(0)[2], (unsigned long)QHA[6], (unsigned long)erd(Cur, E_STS));
+    ehci_sched(h, EC_ASE, 0);
+    if (r) trace("[q%08lx %08lx s%08lx] ", (unsigned long)qtdn(0)[2], (unsigned long)qh[6], (unsigned long)erd(h, E_STS));
     return r;
 }
 
@@ -1136,15 +1185,16 @@ static int e_control(const Dev* d, int len, int in)
 }
 
 /* ================================================================== xHCI transfers */
-static int x_recover(int slot, int dci, Ring* r)
+static int x_recover(int h, int slot, int dci, Ring* r)
 {
-    x_cmd(Cur, 0, TRB_TYPE(TT_RESETEP) | ((uint32_t)slot << 24) | ((uint32_t)dci << 16), NULL);
-    return x_cmd(Cur, ring_deq(r), TRB_TYPE(TT_SETDEQ) | ((uint32_t)slot << 24) | ((uint32_t)dci << 16), NULL);
+    x_cmd(h, 0, TRB_TYPE(TT_RESETEP) | ((uint32_t)slot << 24) | ((uint32_t)dci << 16), NULL);
+    return x_cmd(h, ring_deq(r), TRB_TYPE(TT_SETDEQ) | ((uint32_t)slot << 24) | ((uint32_t)dci << 16), NULL);
 }
 
 static int x_control(int di, int len, int in)
 {
     const Dev* d = &D[di];
+    int h = d->hc;
     Ring* r = &XEp0[di];
     uint64_t end;
     uint32_t* s = (uint32_t*)CBuf;
@@ -1152,12 +1202,12 @@ static int x_control(int di, int len, int in)
     ring_push(r, s[0], s[1], 8, TRB_TYPE(TT_SETUP) | (1UL << 6) | ((uint32_t)(len ? (in ? 3 : 2) : 0) << 16));
     if (len) ring_push(r, PHYS(CBuf + 16), 0, (uint32_t)len, TRB_TYPE(TT_DATA) | (in ? (1UL << 16) : 0));
     ring_push(r, 0, 0, 0, TRB_TYPE(TT_STATUS) | (1UL << 5) | ((len && in) ? 0 : (1UL << 16)));
-    wr(HC[Cur].x->db + d->slot * 4, 1);
+    wr(HC[h].x->db + d->slot * 4, 1);
     end = tsc() + us2c(300000);
-    while (!XCtlDone && tsc() < end) x_events(Cur);
+    while (!XCtlDone && tsc() < end) x_events(h);
     if (XCtlDone && (XCtlCC == 1 || XCtlCC == 13)) return 0;
     trace("[x cc%d] ", XCtlDone ? XCtlCC : -1);
-    x_recover(d->slot, 1, r);
+    x_recover(h, d->slot, 1, r);
     return -1;
 }
 
@@ -1174,92 +1224,118 @@ static void x_slotctx(volatile uint32_t* sc, const Dev* d, int entries)
 /* enable slot + address device; also sets the device's address (the controller sends SET_ADDRESS) */
 static int x_address(int di)
 {
-    XHC* x = HC[Cur].x;
     Dev* d = &D[di];
+    int h = d->hc;
+    XHC* x = HC[h].x;
     volatile uint32_t* ic = x->inctx;
     volatile uint32_t* ep0;
     int slot = 0;
-    if (x_cmd(Cur, 0, TRB_TYPE(TT_ENSLOT), &slot) != 1 || !slot || slot > x->maxslots) return -1;
+    if (x_cmd(h, 0, TRB_TYPE(TT_ENSLOT), &slot) != 1 || !slot || slot > x->maxslots) return -1;
     d->slot = slot;
-    zero(x_out(di), 512);
-    x->dcbaa[slot * 2] = x_outph(di); x->dcbaa[slot * 2 + 1] = 0;
-    fl(x->dcbaa + slot * 2, 8); fl(x_out(di), 2048);
-    ring_init(&XEp0[di], (volatile uint32_t*)((uint8_t*)x->mem.linearptr + 0x1600 + di * 512), x->pbase + 0x1600 + di * 512, XRING_TRBS);
+    zero(x_out(h, di), 512);
+    x->dcbaa[slot * 2] = x_outph(h, di); x->dcbaa[slot * 2 + 1] = 0;
+    fl(x->dcbaa + slot * 2, 8); fl(x_out(h, di), 2048);
+    ring_init(&XEp0[di], (volatile uint32_t*)((uint8_t*)x->mem.linearptr + XO_EP0 + di * 512), x->pbase + XO_EP0 + di * 512, XRING_TRBS);
     zero(ic, 33 * 16);
     ic[1] = 3;                                                   /* add slot + EP0 */
-    x_slotctx(x_ctx(ic, 1), d, 1);
-    ep0 = x_ctx(ic, 2);
+    x_slotctx(x_ctx(h, ic, 1), d, 1);
+    ep0 = x_ctx(h, ic, 2);
     ep0[1] = (3UL << 1) | (4UL << 3) | ((uint32_t)d->mps0 << 16);
     ep0[2] = XEp0[di].ph | 1; ep0[3] = 0; ep0[4] = 8;
-    if (x_cmd(Cur, x->pbase + 0x3000, TRB_TYPE(TT_ADDR) | ((uint32_t)slot << 24), NULL) != 1) return -1;
-    fl(x_out(di), 64);
-    d->addr = (int)(x_out(di)[3] & 0xFF);
+    if (x_cmd(h, x->pbase + XO_IN, TRB_TYPE(TT_ADDR) | ((uint32_t)slot << 24), NULL) != 1) return -1;
+    fl(x_out(h, di), 64);
+    d->addr = (int)(x_out(h, di)[3] & 0xFF);
+    d->maxdci = 1;
     return 0;
 }
 
 static int x_set_mps0(int di)
 {
-    XHC* x = HC[Cur].x;
+    int h = D[di].hc;
+    XHC* x = HC[h].x;
     volatile uint32_t* ic = x->inctx;
     volatile uint32_t* ep0;
     zero(ic, 33 * 16);
     ic[1] = 2;
-    ep0 = x_ctx(ic, 2);
+    ep0 = x_ctx(h, ic, 2);
     ep0[1] = (3UL << 1) | (4UL << 3) | ((uint32_t)D[di].mps0 << 16);
-    return x_cmd(Cur, x->pbase + 0x3000, TRB_TYPE(TT_EVAL) | ((uint32_t)D[di].slot << 24), NULL) == 1 ? 0 : -1;
+    return x_cmd(h, x->pbase + XO_IN, TRB_TYPE(TT_EVAL) | ((uint32_t)D[di].slot << 24), NULL) == 1 ? 0 : -1;
 }
 
 static int x_hubinfo(int di)
 {
-    XHC* x = HC[Cur].x;
+    int h = D[di].hc;
+    XHC* x = HC[h].x;
     volatile uint32_t* ic = x->inctx;
     volatile uint32_t* sc;
-    volatile uint32_t* out = x_out(di);
+    volatile uint32_t* out = x_out(h, di);
     int k;
     zero(ic, 33 * 16);
     ic[1] = 1;
-    sc = x_ctx(ic, 1);
+    sc = x_ctx(h, ic, 1);
+    fl(out, 64);
     for (k = 0; k < 4; ++k) sc[k] = out[k];
     sc[0] = (sc[0] & ~(0x1FUL << 27)) | (1UL << 27) | (1UL << 26);   /* hub */
     sc[1] = (sc[1] & 0x00FFFFFFUL) | ((uint32_t)D[di].nports << 24);
     sc[2] &= ~(3UL << 16);
     sc[3] = 0;
-    return x_cmd(Cur, x->pbase + 0x3000, TRB_TYPE(TT_CONFEP) | ((uint32_t)D[di].slot << 24), NULL) == 1 ? 0 : -1;
+    return x_cmd(h, x->pbase + XO_IN, TRB_TYPE(TT_CONFEP) | ((uint32_t)D[di].slot << 24), NULL) == 1 ? 0 : -1;
 }
 
-static int x_pad_eps(int di)
+/* xHCI interval for an interrupt endpoint: 2^iv x 125 us */
+static int x_intv(const Dev* d, int bint)
 {
-    XHC* x = HC[Cur].x;
+    int iv;
+    if (d->speed == SP_HS) iv = bint - 1;
+    else { iv = 3; while ((1 << (iv - 3)) * 2 <= bint && iv < 10) ++iv; }  /* 2^iv x 125 us <= bInterval ms */
+    return iv < 0 ? 0 : iv > 15 ? 15 : iv;
+}
+
+/* add the interrupt endpoints of every pipe of device di (one Configure Endpoint) */
+static int x_conf_eps(int di)
+{
+    Dev* d = &D[di];
+    int h = d->hc, k, maxd = d->maxdci;
+    XHC* x = HC[h].x;
     volatile uint32_t* ic = x->inctx;
     volatile uint32_t* sc;
     volatile uint32_t* e;
-    volatile uint32_t* out = x_out(di);
-    const Dev* d = &D[di];
-    int k, idci = InEp * 2 + 1, odci = OutEp ? OutEp * 2 : 0, maxd = idci > odci ? idci : odci, iv;
-    uint8_t* m = (uint8_t*)x->mem.linearptr;
-    ring_init(&XIn, (volatile uint32_t*)(m + 0x1200), x->pbase + 0x1200, XRING_TRBS);
-    ring_init(&XOut, (volatile uint32_t*)(m + 0x1400), x->pbase + 0x1400, XRING_TRBS);
-    if (d->speed == SP_HS) iv = InIntv - 1;
-    else { iv = 3; while ((1 << (iv - 3)) * 2 <= InIntv && iv < 10) ++iv; }  /* 2^iv x 125 us <= bInterval ms */
-    if (iv < 0) iv = 0;
+    volatile uint32_t* out = x_out(h, di);
     zero(ic, 33 * 16);
-    ic[1] = 1 | (1UL << idci) | (odci ? (1UL << odci) : 0);
-    sc = x_ctx(ic, 1);
+    ic[1] = 1;
+    for (k = 0; k < MAX_PIPE; ++k)
+    {
+        Pipe* q = &P[k];
+        int idci, odci, iv;
+        if (!q->used || q->dev != di) continue;
+        idci = q->ep * 2 + 1; odci = q->outep ? q->outep * 2 : 0;
+        iv = x_intv(d, q->intv);
+        ring_init(&q->xin, (volatile uint32_t*)(q->ibuf + 0x100), PHYS(q->ibuf + 0x100), XRING_TRBS);
+        ring_init(&q->xout, (volatile uint32_t*)(q->ibuf + 0x300), PHYS(q->ibuf + 0x300), XRING_TRBS);
+        ic[1] |= 1UL << idci;
+        if (idci > maxd) maxd = idci;
+        e = x_ctx(h, ic, idci + 1);
+        e[0] = (uint32_t)iv << 16;
+        e[1] = (3UL << 1) | (7UL << 3) | ((uint32_t)q->mps << 16);
+        e[2] = q->xin.ph | 1; e[3] = 0; e[4] = (uint32_t)q->mps | ((uint32_t)q->mps << 16);
+        if (odci)
+        {
+            ic[1] |= 1UL << odci;
+            if (odci > maxd) maxd = odci;
+            e = x_ctx(h, ic, odci + 1);
+            e[0] = (uint32_t)iv << 16;
+            e[1] = (3UL << 1) | (3UL << 3) | ((uint32_t)q->outmps << 16);
+            e[2] = q->xout.ph | 1; e[3] = 0; e[4] = (uint32_t)q->outmps | ((uint32_t)q->outmps << 16);
+        }
+    }
+    sc = x_ctx(h, ic, 1);
+    fl(out, 64);
     for (k = 0; k < 4; ++k) sc[k] = out[k];
     sc[0] = (sc[0] & ~(0x1FUL << 27)) | ((uint32_t)maxd << 27);
     sc[3] = 0;
-    e = x_ctx(ic, idci + 1);
-    e[0] = (uint32_t)iv << 16;
-    e[1] = (3UL << 1) | (7UL << 3) | ((uint32_t)InMps << 16);
-    e[2] = XIn.ph | 1; e[3] = 0; e[4] = (uint32_t)InMps | ((uint32_t)InMps << 16);
-    if (odci)
-    {
-        e = x_ctx(ic, odci + 1);
-        e[0] = (uint32_t)iv << 16;
-        e[1] = (3UL << 1) | (3UL << 3) | (32UL << 16);
-        e[2] = XOut.ph | 1; e[3] = 0; e[4] = 32 | (32UL << 16);
-    }
-    return x_cmd(Cur, x->pbase + 0x3000, TRB_TYPE(TT_CONFEP) | ((uint32_t)d->slot << 24), NULL) == 1 ? 0 : -1;
+    if (x_cmd(h, x->pbase + XO_IN, TRB_TYPE(TT_CONFEP) | ((uint32_t)d->slot << 24), NULL) != 1) return -1;
+    d->maxdci = maxd;
+    return 0;
 }
 
 /* ================================================================== transfers, any controller */
@@ -1267,251 +1343,363 @@ static int control(int di, uint8_t rt, uint8_t req, uint16_t val, uint16_t idx, 
 {
     const Dev* d = &D[di];
     uint8_t* s = CBuf;
-    int in = (rt & 0x80) != 0;
+    int in = (rt & 0x80) != 0, r;
     s[0] = rt; s[1] = req; s[2] = (uint8_t)val; s[3] = (uint8_t)(val >> 8);
     s[4] = (uint8_t)idx; s[5] = (uint8_t)(idx >> 8); s[6] = (uint8_t)len; s[7] = (uint8_t)(len >> 8);
     fl(CBuf, 512);
+    switch (HC[d->hc].type)
     {
-        int r;
-        switch (HC[Cur].type)
-        {
-        case T_UHCI: r = u_control(d, len, in); break;
-        case T_OHCI: r = o_control(d, len, in); break;
-        case T_EHCI: r = e_control(d, len, in); break;
-        default:     r = x_control(di, len, in); break;
-        }
-        fl(CBuf, 512);                                            /* read what the device sent, not a cached copy */
-        return r;
+    case T_UHCI: r = u_control(d, len, in); break;
+    case T_OHCI: r = o_control(d, len, in); break;
+    case T_EHCI: r = e_control(d, len, in); break;
+    default:     r = x_control(di, len, in); break;
     }
+    fl(CBuf, 512);                                                /* read what the device sent, not a cached copy */
+    return r;
 }
 
-static int send_out(const uint8_t* data, int len)
+/* OUT report on pipe k's interrupt OUT endpoint (pad LEDs), synchronous */
+static int send_out(int k, const uint8_t* data, int len)
 {
+    Pipe* q = &P[k];
     const Dev* d;
-    int r;
-    if (!OutEp || PadD < 0) return -1;
-    d = &D[PadD];
-    memcpy(OBuf, data, len);
-    fl(OBuf, 64);
-    switch (HC[Cur].type)
+    int r, h = q->hc;
+    if (!q->outep) return -1;
+    d = &D[q->dev];
+    memcpy(q->obuf, data, len);
+    fl(q->obuf, 64);
+    switch (HC[h].type)
     {
     case T_UHCI:
-        tdn(0)[0] = LP_T; tdn(0)[1] = td_cs(d); tdn(0)[2] = td_tok(PID_OUT, d->addr, OutEp, OutTog, len); tdn(0)[3] = PHYS(OBuf);
-        r = u_run_tds(1, 100000);
+        tdn(0)[0] = LP_T; tdn(0)[1] = td_cs(d); tdn(0)[2] = td_tok(PID_OUT, d->addr, q->outep, q->otog, len); tdn(0)[3] = PHYS(q->obuf);
+        r = u_run_tds(h, 1, 100000);
         break;
     case T_OHCI:
-        otd(tdn(0), OTD_OUT | (OutTog ? OTD_T1 : OTD_T0), PHYS(OBuf), len, tdn(1));
-        r = o_run_tds(d, OutEp, 64, 1, 100000);
+        otd(tdn(0), OTD_OUT | (q->otog ? OTD_T1 : OTD_T0), PHYS(q->obuf), len, tdn(1));
+        r = o_run_tds(d, q->outep, q->outmps, 1, 100000);
         break;
     case T_EHCI:
-        qtd(qtdn(0), 0, OutTog, PHYS(OBuf), len, NULL);
-        r = e_run(d, OutEp, 64, 1, 100000);
+        qtd(qtdn(0), 0, q->otog, PHYS(q->obuf), len, NULL);
+        r = e_run(d, q->outep, q->outmps, 1, 100000);
         break;
     default:
     {
         uint64_t end = tsc() + us2c(100000);
-        XOutDone = 0;
-        ring_push(&XOut, PHYS(OBuf), 0, (uint32_t)len, TRB_TYPE(TT_NORMAL) | (1UL << 5));
-        wr(HC[Cur].x->db + d->slot * 4, (uint32_t)(OutEp * 2));
-        while (!XOutDone && tsc() < end) x_events(Cur);
-        r = (XOutDone && XOutCC == 1) ? 0 : -1;
-        if (!r) return 0;                                       /* the controller keeps the toggle */
-        if (XOutDone) x_recover(d->slot, OutEp * 2, &XOut);
+        q->xodone = 0;
+        ring_push(&q->xout, PHYS(q->obuf), 0, (uint32_t)len, TRB_TYPE(TT_NORMAL) | (1UL << 5));
+        wr(HC[h].x->db + d->slot * 4, (uint32_t)(q->outep * 2));
+        while (!q->xodone && tsc() < end) x_events(h);
+        if (q->xodone && q->xocc == 1) return 0;                 /* the controller keeps the toggle */
+        if (q->xodone) x_recover(h, d->slot, q->outep * 2, &q->xout);
         return -1;
     }
     }
     if (r != 0) return -1;
-    OutTog ^= 1;
+    q->otog ^= 1;
     return 0;
 }
 
-/* the pad's IN endpoint: two TDs used in turn on OHCI / EHCI (the empty tail is filled, a new
+/* the IN endpoint of pipe k: two TDs used in turn on OHCI / EHCI (the empty tail is filled, a new
  * empty one appended - the only change allowed while the controller runs the queue) */
-static volatile uint32_t* o_tdi(int k) { return TDI + k * 4; }
-static volatile uint32_t* e_tdi(int k) { return TDI + k * 16; }
+static volatile uint32_t* o_tdi(const Pipe* q, int i) { return q->td + i * 4; }
+static volatile uint32_t* e_tdi(const Pipe* q, int i) { return q->td + i * 16; }
 
-static void arm_in(void)
+static void arm_in(int k)
 {
-    const Dev* d = &D[PadD];
-    switch (HC[Cur].type)
+    Pipe* q = &P[k];
+    const Dev* d = &D[q->dev];
+    int h = q->hc;
+    switch (HC[h].type)
     {
     case T_UHCI:
-        TDI[0] = LP_T;
-        TDI[1] = td_cs(d);
-        TDI[2] = td_tok(PID_IN, d->addr, InEp, InTog, InMps);
-        TDI[3] = PHYS(IBuf);
-        fl(TDI, 16); fl(IBuf, 64);
-        QHI[1] = PHYS(TDI);
-        fl(QHI, 16);
+        q->td[0] = LP_T;
+        q->td[1] = td_cs(d);
+        q->td[2] = td_tok(PID_IN, d->addr, q->ep, q->tog, q->mps);
+        q->td[3] = PHYS(q->ibuf);
+        fl(q->td, 16); fl(q->ibuf, 64);
+        PQ(h, k)[1] = PHYS(q->td);
+        fl(PQ(h, k), 16);
         break;
     case T_OHCI:
     {
-        volatile uint32_t* nt = o_tdi(OCur ^ 1);
+        volatile uint32_t* nt = o_tdi(q, q->ocur ^ 1);
         zero(nt, 4);
-        otd(o_tdi(OCur), OTD_IN | OTD_R, PHYS(IBuf), InMps, nt);
-        fl(TDI, 32); fl(IBuf, 64);
-        EDI[1] = PHYS(nt);
-        fl(EDI, 16);
-        OCur ^= 1;
+        otd(o_tdi(q, q->ocur), OTD_IN | OTD_R, PHYS(q->ibuf), q->mps, nt);
+        fl(q->td, 32); fl(q->ibuf, 64);
+        PQ(h, k)[1] = PHYS(nt);
+        fl(PQ(h, k), 16);
+        q->ocur ^= 1;
         break;
     }
     case T_EHCI:
     {
-        volatile uint32_t* t = e_tdi(OCur);
-        volatile uint32_t* nt = e_tdi(OCur ^ 1);
+        volatile uint32_t* t = e_tdi(q, q->ocur);
+        volatile uint32_t* nt = e_tdi(q, q->ocur ^ 1);
         zero(nt, 16); nt[0] = LP_T; nt[1] = LP_T;           /* inactive: the controller waits on it */
         fl(nt, 64);
-        qtd(t, 1, 0, PHYS(IBuf), InMps, nt);                  /* written active last (token) */
-        fl(t, 64); fl(IBuf, 64);
-        OCur ^= 1;
+        qtd(t, 1, 0, PHYS(q->ibuf), q->mps, nt);              /* written active last (token) */
+        fl(t, 64); fl(q->ibuf, 64);
+        q->ocur ^= 1;
         break;
     }
     default:
-        XInDone = 0;
-        fl(IBuf, 64);
-        ring_push(&XIn, PHYS(IBuf), 0, (uint32_t)InMps, TRB_TYPE(TT_NORMAL) | (1UL << 5) | (1UL << 2));
-        wr(HC[Cur].x->db + d->slot * 4, (uint32_t)(InEp * 2 + 1));
+        q->xdone = 0;
+        fl(q->ibuf, 64);
+        ring_push(&q->xin, PHYS(q->ibuf), 0, (uint32_t)q->mps, TRB_TYPE(TT_NORMAL) | (1UL << 5) | (1UL << 2));
+        wr(HC[h].x->db + d->slot * 4, (uint32_t)(q->ep * 2 + 1));
         break;
     }
 }
 
-static void start_in(void)
+static void start_in(int k)
 {
-    const Dev* d = &D[PadD];
-    OCur = 0;
-    switch (HC[Cur].type)
+    Pipe* q = &P[k];
+    const Dev* d = &D[q->dev];
+    int h = q->hc;
+    volatile uint32_t* e = PQ(h, k);
+    q->ocur = 0; q->tog = 0;
+    switch (HC[h].type)
     {
     case T_OHCI:
-        zero(o_tdi(0), 4);
-        EDI[0] = ED_SKIP | (uint32_t)d->addr | ((uint32_t)InEp << 7) | (2UL << 11) | (d->speed == SP_LS ? ED_LS : 0) | ((uint32_t)InMps << 16);
-        EDI[1] = PHYS(o_tdi(0));
-        EDI[2] = PHYS(o_tdi(0));
-        EDI[3] = 0;
-        EDI[0] &= ~ED_SKIP;
-        fl(EDI, 16); fl(TDI, 32);
-        break;
+        e[0] |= ED_SKIP;
+        fl(e, 16);
+        wait_us(1100);
+        zero(o_tdi(q, 0), 4);
+        e[0] = ED_SKIP | (uint32_t)d->addr | ((uint32_t)q->ep << 7) | (2UL << 11) | (d->speed == SP_LS ? ED_LS : 0) | ((uint32_t)q->mps << 16);
+        e[1] = PHYS(o_tdi(q, 0));
+        e[2] = PHYS(o_tdi(q, 0));                                 /* e[3]: next ED, set at reset */
+        fl(e, 16); fl(q->td, 32);
+        arm_in(k);
+        e[0] &= ~ED_SKIP;
+        fl(e, 16);
+        return;
     case T_EHCI:
-        ehci_sched(Cur, EC_PSE, 0);
-        zero(e_tdi(0), 32); e_tdi(0)[0] = e_tdi(0)[1] = LP_T;
-        zero(QHP, 24);
-        QHP[0] = LP_T;
-        QHP[1] = e_ch(d, InEp, InMps, 0, 0);
-        QHP[2] = e_caps(d, 0x01, 0x1C);                      /* start-split uframe 0, complete 2-4 */
-        QHP[4] = PHYS(e_tdi(0));
-        QHP[5] = LP_T;
-        fl(QHP, 96); fl(TDI, 128);
-        ehci_sched(Cur, EC_PSE, 1);
-        break;
+        zero(e_tdi(q, 0), 32); e_tdi(q, 0)[0] = e_tdi(q, 0)[1] = LP_T;
+        zero(e, 24);
+        e[0] = LP_T;
+        e[1] = e_ch(d, q->ep, q->mps, 0, 0);
+        e[2] = e_caps(d, 0x01, 0x1C);                            /* start-split uframe 0, complete 2-4 */
+        e[4] = PHYS(e_tdi(q, 0));
+        e[5] = LP_T;
+        fl(e, 96); fl(q->td, 128);
+        arm_in(k);
+        ehci_relink(h);
+        return;
     default:
-        break;
+        arm_in(k);
+        return;
     }
-    arm_in();
+}
+
+static void pipe_stop(int k)
+{
+    Pipe* q = &P[k];
+    int h = q->hc;
+    static const uint8_t none[8];
+    switch (HC[h].type)
+    {
+    case T_UHCI: PQ(h, k)[1] = LP_T; fl(PQ(h, k), 16); break;
+    case T_OHCI: PQ(h, k)[0] |= ED_SKIP; fl(PQ(h, k), 16); break;
+    case T_EHCI: q->used = 0; ehci_relink(h); break;
+    default:     break;                                           /* xHCI: the slot is disabled */
+    }
+    q->used = 0;
+    if (q->type == PT_PAD) memset((void*)&Pad[q->pad], 0, sizeof(Pad[0]));
+    else if (q->type == PT_KBD) { if (KbFn) KbFn(k, none); }       /* let go of every key it held */
+    else if (MsFn) MsFn(0, 0, 0, 0);
+    trace("-%s ", pipe_name(q));
+    snprintf(Desc, sizeof(Desc), "%s %04X:%04X unplugged", pipe_name(q), D[q->dev].vid, D[q->dev].pid);
+    devlist();
 }
 
 /* 0 = still waiting, >0 = bytes received (+1), -1 = error, -2 = stall */
-static int poll_in(void)
+static int poll_in(int k)
 {
-    switch (HC[Cur].type)
+    Pipe* q = &P[k];
+    int h = q->hc;
+    switch (HC[h].type)
     {
     case T_UHCI:
     {
         uint32_t cs;
         int len;
-        fl(TDI, 16);
-        cs = TDI[1];
+        fl(q->td, 16);
+        cs = q->td[1];
         if (cs & TD_ACTIVE) return 0;
-        fl(IBuf, 64);
+        fl(q->ibuf, 64);
         if (cs & TD_ERRMASK) return (cs & TD_STALL) ? -2 : -1;
         len = (int)((cs + 1) & 0x7FF);
         if (len == 0x800) len = 0;
-        InTog ^= 1;
+        q->tog ^= 1;
         return len + 1;
     }
     case T_OHCI:
     {
-        volatile uint32_t* t = o_tdi(OCur ^ 1);
+        volatile uint32_t* t = o_tdi(q, q->ocur ^ 1);
         uint32_t cc;
-        fl(TDI, 32);
+        fl(q->td, 32);
         cc = OTD_CC(t[0]);
         if (cc >= 0xE) return 0;
-        fl(IBuf, 64);
-        owr(Cur, O_INTSTS, 0x06);
-        if (cc) { EDI[2] = PHYS(o_tdi(OCur)); fl(EDI, 16); return cc == 4 ? -2 : -1; }
-        return (t[1] ? (int)(t[1] - PHYS(IBuf)) : InMps) + 1;
+        fl(q->ibuf, 64);
+        owr(h, O_INTSTS, 0x06);
+        if (cc) { PQ(h, k)[2] = PHYS(o_tdi(q, q->ocur)); fl(PQ(h, k), 16); return cc == 4 ? -2 : -1; }
+        return (t[1] ? (int)(t[1] - PHYS(q->ibuf)) : q->mps) + 1;
     }
     case T_EHCI:
     {
-        volatile uint32_t* t = e_tdi(OCur ^ 1);
+        volatile uint32_t* t = e_tdi(q, q->ocur ^ 1);
+        volatile uint32_t* e = PQ(h, k);
         uint32_t tk;
         fl(t, 64);
         tk = t[2];
         if (tk & QT_ACTIVE) return 0;
-        fl(IBuf, 64);
+        fl(q->ibuf, 64);
         if (tk & QT_HALT)
         {
             if (Light) return 0;                                      /* recovery: interrupt only */
-            ehci_sched(Cur, EC_PSE, 0);
-            QHP[3] = 0; QHP[4] = PHYS(e_tdi(OCur)); QHP[5] = LP_T; QHP[6] = 0;  /* clear halt and toggle */
-            fl(QHP, 96);
-            ehci_sched(Cur, EC_PSE, 1);
+            ehci_sched(h, EC_PSE, 0);
+            e[3] = 0; e[4] = PHYS(e_tdi(q, q->ocur)); e[5] = LP_T; e[6] = 0;  /* clear halt and toggle */
+            fl(e, 96);
+            ehci_sched(h, EC_PSE, 1);
             return (tk & QT_ERRS) ? -1 : -2;
         }
-        return InMps - (int)((tk >> 16) & 0x7FFF) + 1;
+        return q->mps - (int)((tk >> 16) & 0x7FFF) + 1;
     }
     default:
     {
         int cc;
-        x_events(Cur);
-        if (!XInDone) return 0;
-        cc = XInCC;
+        if (!q->xdone) return 0;
+        cc = q->xcc;
         if (cc != 1 && cc != 13 && Light) return 0;                 /* error: leave it for the interrupt */
-        XInDone = 0;
-        if (cc == 1 || cc == 13) { fl(IBuf, 64); return InMps - XInRes + 1; }
-        x_recover(D[PadD].slot, InEp * 2 + 1, &XIn);
+        q->xdone = 0;
+        if (cc == 1 || cc == 13) { fl(q->ibuf, 64); return q->mps - q->xres + 1; }
+        x_recover(h, D[q->dev].slot, q->ep * 2 + 1, &q->xin);
         return cc == 6 ? -2 : -1;
     }
     }
 }
 
-/* ================================================================== enumeration */
-static void pad_leds(void)
+/* ================================================================== reports */
+static void parse_pad(USBPAD_State* s, const uint8_t* r)
 {
-    if (Wireless)
+    s->buttons = (uint16_t)(r[2] | r[3] << 8);
+    s->lt = r[4]; s->rt = r[5];
+    s->lx = (int16_t)(r[6] | r[7] << 8);
+    s->ly = (int16_t)(r[8] | r[9] << 8);
+    s->rx = (int16_t)(r[10] | r[11] << 8);
+    s->ry = (int16_t)(r[12] | r[13] << 8);
+    ++s->reports;
+}
+static void clear_pad(USBPAD_State* s) { s->buttons = 0; s->lt = s->rt = 0; s->lx = s->ly = s->rx = s->ry = 0; }
+
+static void pad_leds(int k)
+{
+    Pipe* q = &P[k];
+    if (q->wireless)
     {
-        static const uint8_t led[12] = { 0x00, 0x00, 0x08, 0x40 + 6 };
-        send_out(led, 12);
+        uint8_t led[12] = { 0x00, 0x00, 0x08, 0x00 };
+        led[3] = (uint8_t)(0x40 + 6 + q->pad);
+        send_out(k, led, 12);
     }
     else
     {
-        static const uint8_t led[3] = { 0x01, 0x03, 0x06 };   /* ring: player 1 on */
-        send_out(led, 3);
+        uint8_t led[3] = { 0x01, 0x03, 0x06 };                /* ring: player n on */
+        led[2] = (uint8_t)(0x06 + q->pad);
+        send_out(k, led, 3);
     }
 }
 
-static const char* where(int di)
+static void pipe_poll(int k)
 {
-    static char w[48];
-    const Dev* d = &D[di];
-    int n = snprintf(w, sizeof(w), "%s %d port %d", tname(Cur), HC[Cur].idx, d->rootport + 1);
-    if (d->depth)
+    Pipe* q = &P[k];
+    int r = poll_in(k), len;
+    if (r == 0)
     {
-        int k, p[MAX_DEPTH + 1], c = di;
-        for (k = d->depth; k > 0; --k) { p[k] = D[c].pport; c = D[c].parent; }
-        n += snprintf(w + n, sizeof(w) - n, ", hub port");
-        for (k = 1; k <= d->depth && n < (int)sizeof(w) - 4; ++k) n += snprintf(w + n, sizeof(w) - n, "%s%d", k > 1 ? "." : " ", p[k]);
+        if (!Light && q->type == PT_PAD && !q->watched && !q->reports && !q->wireless && tsc() - q->since > us2c(2000000))
+        {
+            int h = q->hc;
+            q->watched = 1;                                             /* running, but nothing comes */
+            if (HC[h].type == T_OHCI)
+                trace("[no reports: ed %08lx %08lx %08lx td %08lx ctl%08lx sts%08lx fn%04lx] ",
+                    (unsigned long)PQ(h, k)[0], (unsigned long)PQ(h, k)[1], (unsigned long)PQ(h, k)[2],
+                    (unsigned long)o_tdi(q, q->ocur ^ 1)[0], (unsigned long)ord(h, O_CONTROL), (unsigned long)ord(h, O_INTSTS),
+                    (unsigned long)(ord(h, 0x3C) & 0xFFFF));
+            else if (HC[h].type == T_UHCI)
+                trace("[no reports: td %08lx %08lx qh %08lx cmd%04x sts%04x] ", (unsigned long)q->td[1], (unsigned long)q->td[2],
+                    (unsigned long)PQ(h, k)[1], inportw(HC[h].io + U_CMD), inportw(HC[h].io + U_STS));
+            else trace("[no reports] ");
+        }
+        return;
     }
-    return w;
+    if (r < 0)
+    {
+        if (Light) return;                                              /* recovery from the interrupt */
+        if (r == -2) control(q->dev, 0x02, 1, 0, (uint16_t)(0x80 | q->ep), 0); /* CLEAR_FEATURE halt */
+        q->tog = 0;
+        arm_in(k);
+        return;
+    }
+    len = r - 1;
+    ++q->reports;
+    switch (q->type)
+    {
+    case PT_PAD:
+    {
+        USBPAD_State* s = &Pad[q->pad];
+        if (!q->wireless)
+        {
+            if (len >= 14 && q->ibuf[0] == 0x00) parse_pad(s, q->ibuf);
+        }
+        else if (len >= 2)
+        {
+            if (q->ibuf[0] == 0x08)
+            {
+                int on = (q->ibuf[1] & 0x80) != 0;
+                if (on && !q->wlpresent) { q->wlpresent = 1; s->connected = 1; arm_in(k); if (!Light) pad_leds(k); return; }
+                if (!on) { q->wlpresent = 0; clear_pad(s); }
+                s->connected = q->wlpresent;
+            }
+            else if (len >= 18 && q->ibuf[0] == 0x00 && (q->ibuf[1] & 1))
+            {
+                if (!q->wlpresent) { q->wlpresent = 1; s->connected = 1; }
+                parse_pad(s, q->ibuf + 4);
+            }
+        }
+        break;
+    }
+    case PT_KBD:
+        /* boot report: modifiers, reserved, 6 keys; 01 in the key slots = too many keys (ignored) */
+        if (len >= 3 && q->ibuf[2] != 0x01)
+        {
+            uint8_t rep[8];
+            int i;
+            for (i = 0; i < 8; ++i) rep[i] = i < len ? q->ibuf[i] : 0;
+            if (memcmp(rep, q->prev, 8) && KbFn) KbFn(k, rep);
+            memcpy(q->prev, rep, 8);
+        }
+        break;
+    default:
+        if (len >= 3 && MsFn)
+            MsFn(q->ibuf[0] & 7, (int8_t)q->ibuf[1], (int8_t)q->ibuf[2], len >= 4 ? (int8_t)q->ibuf[3] : 0);
+        break;
+    }
+    arm_in(k);
 }
 
-/* make device di usable (address, descriptors, configuration):
- * 1 = pad running, 2 = hub ready, 0 = failed (retried), -1 = some other device */
+/* ================================================================== enumeration */
+typedef struct { int type, ifc, ep, mps, intv, outep, outmps, wl; } Fn;
+
+/* make device di usable (address, descriptors, configuration, its pads / keyboards / mice started):
+ * 1 = in use, 2 = hub ready, 0 = failed (retried), -1 = nothing usable there */
 static int enumerate(int di)
 {
     Dev* d = &D[di];
+    int h = d->hc;
     uint8_t* b = CBuf + 16;
-    int total, pos, cfgval, found = 0, ishub, p;
+    int total, pos, cfgval, ishub, p, nf = 0, cur = -1, k, i, used = 0, pads = 0, kbds = 0, mice = 0;
+    Fn f[MAX_PIPE];
     uint16_t vid, pid;
-    if (HC[Cur].type == T_XHCI)
+    if (HC[h].type == T_XHCI)
     {
         if (x_address(di) != 0) { trace("addr! "); return 0; }
         if (control(di, 0x80, 6, 0x0100, 0, 8) != 0) return 0;
@@ -1519,7 +1707,6 @@ static int enumerate(int di)
     }
     else
     {
-        int k;
         d->addr = 0;
         for (k = 0; k < 4; ++k)
         {
@@ -1529,13 +1716,23 @@ static int enumerate(int di)
         if (k == 4) { trace("desc8! "); return 0; }
         if (k) trace("desc8 try%d ", k + 1);
         d->mps0 = b[7] >= 8 && b[7] <= 64 ? b[7] : 8;
-        if (control(di, 0x00, 5, (uint16_t)NextAddr, 0, 0) != 0) return 0;
-        d->addr = NextAddr++;
-        if (NextAddr > 127) NextAddr = 1;
-        wait_us(5000);
+        if (control(di, 0x00, 5, (uint16_t)HC[h].nextaddr, 0, 0) != 0) return 0;
+        d->addr = HC[h].nextaddr++;
+        if (HC[h].nextaddr > 127) HC[h].nextaddr = 1;
+        /* Linux gives SET_ADDRESS 10 ms to settle; the wired 360 pad on a NEC OHCI did not answer at its new
+         * address after 5 ms (CC 5, USBTEST from the P5PE-VM): wait 20 ms and retry */
+        wait_us(20000);
     }
-    if (control(di, 0x80, 6, 0x0100, 0, 18) != 0) return 0;
+    for (k = 0; k < 4; ++k)
+    {
+        if (control(di, 0x80, 6, 0x0100, 0, 18) == 0) break;
+        if (HC[h].type == T_XHCI) return 0;
+        wait_us(30000);
+    }
+    if (k == 4) { trace("desc18! "); return 0; }
+    if (k) trace("desc18 try%d ", k + 1);
     vid = (uint16_t)(b[8] | b[9] << 8); pid = (uint16_t)(b[10] | b[11] << 8);
+    d->vid = vid; d->pid = pid;
     ishub = b[4] == 9;
     trace("%04x:%04x cls %02x mps %d ", vid, pid, b[4], d->mps0);
     if (control(di, 0x80, 6, 0x0200, 0, 9) != 0) return 0;
@@ -1543,21 +1740,32 @@ static int enumerate(int di)
     if (total > 400) total = 400;
     if (control(di, 0x80, 6, 0x0200, 0, (uint16_t)total) != 0) return 0;
     cfgval = b[5];
-    InEp = OutEp = 0; Wireless = 0;
+    /* what is in it: Xbox 360 pad interfaces (vendor FFh / 5Dh / 01h wired, 81h wireless receiver slot),
+     * HID boot keyboards (03h / 01h / 01h) and boot mice (03h / 01h / 02h), alternate setting 0 only */
     for (pos = 0; pos + 2 <= total && b[pos] >= 2; pos += b[pos])
     {
         uint8_t type = b[pos + 1];
-        if (type == 4)
+        if (type == 4 && pos + 8 < total)
         {
-            if (found) break;
-            if (b[pos + 5] == 9) ishub = 1;
-            if (b[pos + 5] == 0xFF && b[pos + 6] == 0x5D && (b[pos + 7] == 0x01 || b[pos + 7] == 0x81))
-            { found = 1; Wireless = b[pos + 7] == 0x81; }
+            int c = b[pos + 5], s = b[pos + 6], pr = b[pos + 7], t = -1;
+            cur = -1;
+            if (c == 9) ishub = 1;
+            if (b[pos + 3] != 0 || nf >= MAX_PIPE) continue;
+            if (c == 0xFF && s == 0x5D && (pr == 0x01 || pr == 0x81)) t = PT_PAD;
+            else if (c == 3 && s == 1 && pr == 1) t = PT_KBD;
+            else if (c == 3 && s == 1 && pr == 2) t = PT_MOUSE;
+            if (t < 0) continue;
+            cur = nf++;
+            memset(&f[cur], 0, sizeof(f[cur]));
+            f[cur].type = t; f[cur].ifc = b[pos + 2]; f[cur].wl = pr == 0x81;
         }
-        else if (type == 5 && found && (b[pos + 3] & 3) == 3)
+        else if (type == 5 && cur >= 0 && pos + 6 < total && (b[pos + 3] & 3) == 3)
         {
-            if (b[pos + 2] & 0x80) { if (!InEp) { InEp = b[pos + 2] & 0x0F; InMps = b[pos + 4]; InIntv = b[pos + 6] ? b[pos + 6] : 4; } }
-            else if (!OutEp) OutEp = b[pos + 2] & 0x0F;
+            Fn* x = &f[cur];
+            int mps = b[pos + 4] | (b[pos + 5] & 7) << 8;
+            if (mps < 1 || mps > 64) mps = mps > 64 ? 64 : 8;
+            if (b[pos + 2] & 0x80) { if (!x->ep) { x->ep = b[pos + 2] & 0x0F; x->mps = mps; x->intv = b[pos + 6] ? b[pos + 6] : 4; } }
+            else if (!x->outep) { x->outep = b[pos + 2] & 0x0F; x->outmps = mps; }
         }
     }
     if (ishub && d->depth < MAX_DEPTH)
@@ -1568,31 +1776,93 @@ static int enumerate(int di)
         d->hub = 1;
         d->nports = b[2] > 15 ? 15 : b[2];
         pwr = b[5] * 2;
-        if (HC[Cur].type == T_XHCI && x_hubinfo(di) != 0) return 0;
+        if (HC[h].type == T_XHCI && x_hubinfo(di) != 0) return 0;
         for (p = 1; p <= d->nports; ++p) control(di, 0x23, 3, 8, (uint16_t)p, 0);  /* SET_FEATURE PORT_POWER */
         wait_us((uint32_t)(pwr < 20 ? 20 : pwr > 200 ? 200 : pwr) * 1000 + 20000);
-        snprintf(Desc, sizeof(Desc), "USB hub %04X:%04X on %s, no pad behind it", vid, pid, where(di));
+        snprintf(Desc, sizeof(Desc), "USB hub %04X:%04X on %s", vid, pid, where(di));
         return 2;
     }
-    if (!found || !InEp)
+    /* keep the ones there is room for */
+    for (k = 0; k < MAX_PIPE; ++k)
+        if (P[k].used) { if (P[k].type == PT_PAD) ++pads; else if (P[k].type == PT_KBD) ++kbds; else ++mice; }
+    for (i = 0; i < nf; ++i)
     {
-        snprintf(Desc, sizeof(Desc), "USB device %04X:%04X on %s is not an Xbox 360 pad", vid, pid, where(di));
+        int ok = f[i].ep != 0;
+        if (f[i].type == PT_PAD) ok = ok && pads < USBPAD_PADS;
+        else if (f[i].type == PT_KBD) ok = ok && (Flags & USBPAD_F_KBD) && kbds < 2;
+        else ok = ok && (Flags & USBPAD_F_MOUSE) && mice < 2;
+        if (!ok) { f[i].type = -1; continue; }
+        if (f[i].type == PT_PAD) ++pads; else if (f[i].type == PT_KBD) ++kbds; else ++mice;
+        ++used;
+    }
+    if (!used)
+    {
+        snprintf(Desc, sizeof(Desc), "USB device %04X:%04X on %s: not used (no pad, keyboard or mouse)", vid, pid, where(di));
         return -1;
     }
-    if (InMps < 1 || InMps > 64) InMps = 32;
     if (control(di, 0x00, 9, (uint16_t)cfgval, 0, 0) != 0) return 0;
-    PadD = di;
-    if (HC[Cur].type == T_XHCI && x_pad_eps(di) != 0) { PadD = -1; return 0; }
-    InTog = OutTog = 0;
-    if (Wireless)
+    for (i = 0; i < nf; ++i)
     {
-        static const uint8_t inq[12] = { 0x08, 0x00, 0x0F, 0xC0 };
-        send_out(inq, 12);
-        WlPresent = 0;
+        Pipe* q;
+        if (f[i].type < 0) continue;
+        for (k = 0; k < MAX_PIPE && P[k].used; ++k) {}
+        if (k == MAX_PIPE) break;
+        q = &P[k];
+        memset(q, 0, sizeof(*q));
+        q->used = 1; q->type = f[i].type; q->dev = di; q->hc = h; q->ifc = f[i].ifc;
+        q->ep = f[i].ep; q->mps = f[i].mps; q->intv = f[i].intv; q->outep = f[i].outep; q->outmps = f[i].outmps ? f[i].outmps : 32;
+        q->wireless = f[i].wl;
+        q->td = (volatile uint32_t*)((uint8_t*)Mem.linearptr + M_PIPE + k * 0x800);
+        q->ibuf = (uint8_t*)Mem.linearptr + M_PIPE + k * 0x800 + 0x100;
+        q->obuf = q->ibuf + 0x40;
+        if (q->type == PT_PAD)
+        {
+            int n;
+            for (n = 0; n < USBPAD_PADS; ++n)
+            {
+                int j, taken = 0;
+                for (j = 0; j < MAX_PIPE; ++j) if (j != k && P[j].used && P[j].type == PT_PAD && P[j].pad == n) taken = 1;
+                if (!taken) break;
+            }
+            q->pad = n;
+            if (q->type == PT_PAD && q->mps < 20) q->mps = 32;
+        }
+        else
+        {
+            /* boot protocol (fixed report layout) and no repeats of unchanged reports */
+            if (control(di, 0x21, 0x0B, 0, (uint16_t)q->ifc, 0) != 0) trace("setproto! ");
+            control(di, 0x21, 0x0A, 0, (uint16_t)q->ifc, 0);
+            if (q->type == PT_KBD) LedsHave = -1;
+            q->outep = 0;
+        }
     }
-    else pad_leds();
-    snprintf(Desc, sizeof(Desc), "Xbox 360 %s %04X:%04X on %s", Wireless ? "wireless receiver" : "pad", vid, pid, where(di));
-    start_in();
+    if (HC[h].type == T_XHCI && x_conf_eps(di) != 0)
+    {
+        for (k = 0; k < MAX_PIPE; ++k) if (P[k].used && P[k].dev == di) P[k].used = 0;
+        return 0;
+    }
+    Desc[0] = 0;
+    for (k = 0; k < MAX_PIPE; ++k)
+    {
+        Pipe* q = &P[k];
+        if (!q->used || q->dev != di) continue;
+        if (q->type == PT_PAD)
+        {
+            USBPAD_State* s = &Pad[q->pad];
+            memset((void*)s, 0, sizeof(*s));
+            if (q->wireless)
+            {
+                static const uint8_t inq[12] = { 0x08, 0x00, 0x0F, 0xC0 };
+                send_out(k, inq, 12);
+            }
+            else { pad_leds(k); s->connected = 1; }
+        }
+        q->since = tsc();
+        start_in(k);
+        trace("+%s ", pipe_name(q));
+        if (!Desc[0]) snprintf(Desc, sizeof(Desc), "%s %04X:%04X on %s", pipe_name(q), vid, pid, where(di));
+    }
+    devlist();
     return 1;
 }
 
@@ -1610,8 +1880,6 @@ static int hub_port_enum(int hd, int port)
 {
     uint16_t st, chg;
     int n, di, sp, r;
-    control(hd, 0x23, 1, 16, (uint16_t)port, 0);                    /* CLEAR_FEATURE C_PORT_CONNECTION */
-    wait_us(100000);                                                /* debounce */
     if (hub_status(hd, port, &st, &chg) != 0 || !(st & 1)) return -2;
     if (control(hd, 0x23, 3, 4, (uint16_t)port, 0) != 0) return 0;  /* SET_FEATURE PORT_RESET */
     for (n = 0; n < 20; ++n)
@@ -1623,48 +1891,58 @@ static int hub_port_enum(int hd, int port)
     if (!(st & 2)) return 0;                                        /* not enabled */
     wait_us(20000);
     sp = (st & 0x200) ? SP_LS : (st & 0x400) ? SP_HS : SP_FS;
-    di = dev_new(hd, port, D[hd].rootport, sp);
+    di = dev_new(D[hd].hc, hd, port, D[hd].rootport, sp);
     if (di < 0) return -1;
     r = enumerate(di);
     if (r == 1 || r == 2) D[hd].child |= 1UL << port;
-    else dev_free(di);
+    else
+    {
+        dev_free(di);
+        control(hd, 0x23, 1, 1, (uint16_t)port, 0);                 /* CLEAR_FEATURE PORT_ENABLE: off address 0 */
+    }
     return r;
 }
 
-/* ================================================================== state machine */
-static void parse(const uint8_t* r)
+/* one hub port: plugged / unplugged? */
+static void hub_check(int hd, int k)
 {
-    St.buttons = (uint16_t)(r[2] | r[3] << 8);
-    St.lt = r[4]; St.rt = r[5];
-    St.lx = (int16_t)(r[6] | r[7] << 8);
-    St.ly = (int16_t)(r[8] | r[9] << 8);
-    St.rx = (int16_t)(r[10] | r[11] << 8);
-    St.ry = (int16_t)(r[12] | r[13] << 8);
-    ++St.reports;
-}
-
-static void clear_pad(void)
-{
-    St.connected = 0; St.buttons = 0; St.lt = St.rt = 0; St.lx = St.ly = St.rx = St.ry = 0;
-}
-
-static void drop_all(int ignore)
-{
-    int i;
-    QHI[1] = LP_T; QHC[1] = LP_T;
-    EDI[0] |= ED_SKIP; EDC[0] |= ED_SKIP;
-    if (Cur >= 0)
+    Dev* d = &D[hd];
+    uint32_t bit = 1UL << k;
+    uint16_t st, chg;
+    int r, c;
+    if (hub_status(hd, k, &st, &chg) != 0) return;
+    if (chg & 1) control(hd, 0x23, 1, 16, (uint16_t)k, 0);         /* CLEAR_FEATURE C_PORT_CONNECTION */
+    if (!(st & 1) || ((chg & 1) && (d->child & bit)))
     {
-        if (ignore == 2 || (ignore && ++Fails[Cur][CurPort] >= 3)) Ignore[Cur] |= 1UL << CurPort;
-        hc_run(Cur, 0);
-        for (i = 0; i < MAX_DEV; ++i) if (D[i].used && D[i].parent < 0) dev_free(i);
-        p_disable(Cur, CurPort);
+        if (d->child & bit)
+        {
+            for (c = 0; c < MAX_DEV; ++c) if (D[c].used && D[c].parent == hd && D[c].pport == k) dev_free(c);
+            HubBusy = 1;
+        }
+        d->child &= ~bit; d->ignore &= ~bit;
+        if (!(st & 1)) { d->pend &= ~bit; return; }
     }
-    memset(D, 0, sizeof(D));
-    PadD = -1;
-    clear_pad();
-    Cur = -1; S = S_SCAN;
-    NextScan = tsc() + us2c(200000);
+    if ((d->child | d->ignore) & bit) return;
+    HubBusy = 1;
+    if (!(d->pend & bit)) { d->pend |= bit; d->pendt[k] = tsc(); return; }    /* debounce: look again later */
+    if (tsc() - d->pendt[k] < us2c(100000)) return;
+    d->pend &= ~bit;
+    r = hub_port_enum(hd, k);
+    trace("h%d.%d:e%d ", hd, k, r);
+    if (r != 1 && r != 2 && r != -2) d->ignore |= bit;              /* nothing usable, or failed: until unplugged */
+}
+
+/* the next hub port, round-robin over every hub */
+static void hub_task(void)
+{
+    int n;
+    for (n = 0; n <= MAX_DEV; ++n)
+    {
+        Dev* d = &D[HubCur];
+        if (d->used && d->hub && HubPort < d->nports) { ++HubPort; hub_check(HubCur, HubPort); return; }
+        HubPort = 0;
+        if (++HubCur >= MAX_DEV) { HubCur = 0; if (!HubBusy) ++HubQuiet; else HubQuiet = 0; HubBusy = 0; }
+    }
 }
 
 /* EHCIs whose ports were handed to companions: a port that has come back to the EHCI (some chips, and
@@ -1680,210 +1958,144 @@ static void ehci_reclaim(void)
         {
             uint32_t v = erd(h, E_PORT + p * 4);
             if (v == 0xFFFFFFFFUL || (v & EP_PO) || !(v & EP_CCS)) continue;
-            ewr(h, E_CONFIG, 1);
+            /* Port Owner straight away first: CONFIGFLAG 0 -> 1 takes every port from the companions (QEMU),
+             * which unplugs whatever else is in use there */
             eport_set(h, p, EP_PO, EP_PE);
-            ewr(h, E_CONFIG, 0);
+            wait_us(1000);
+            if (!(erd(h, E_PORT + p * 4) & EP_PO))
+            {
+                ewr(h, E_CONFIG, 1);
+                eport_set(h, p, EP_PO, EP_PE);
+                ewr(h, E_CONFIG, 0);
+            }
             trace("EHCI port %d back to companion ", p + 1);
         }
     }
 }
 
-/* a root port worth looking at; hubs only when nothing else is there, round-robin between them */
-static int pick_root(int* ph, int* pp, int nonhub_only)
+/* a root port with something new on it */
+static int pick_root(int* ph, int* pp)
 {
-    int h, p, best = -1, bp = 0, bkey = 0x7FFFFFFF;
+    int h, p;
     if (EhciGiven) ehci_reclaim();
     for (h = 0; h < HCn; ++h)
         for (p = 0; p < HC[h].nports; ++p)
         {
-            int v, key;
-            if (p == 0 && HC[h].type == T_XHCI && h != Cur) x_events(h);   /* keep idle event rings drained */
+            uint32_t bit = 1UL << p;
+            int v;
+            if (HC[h].own & bit) continue;
             v = pstat(h, p);
             if (v & PS_GONE) continue;
-            if (!(v & PS_CCS)) { Ignore[h] &= ~(1UL << p); HubRoot[h] &= ~(1UL << p); Fails[h][p] = 0; continue; }
-            if (Ignore[h] & (1UL << p)) continue;
-            if (h == Cur && p == CurPort) continue;
-            if (HubRoot[h] & (1UL << p))
-            {
-                if (nonhub_only) continue;
-                key = 1000 + ((h * MAX_PORT + p) <= LastHubKey ? 1000 : 0) + h * MAX_PORT + p;
-            }
-            else key = h * MAX_PORT + p;
-            if (key < bkey) { bkey = key; best = h; bp = p; }
+            if (!(v & PS_CCS)) { HC[h].ignore &= ~bit; HC[h].fails[p] = 0; continue; }
+            if (HC[h].ignore & bit) continue;
+            *ph = h; *pp = p;
+            return 1;
         }
-    if (best < 0) return 0;
-    *ph = best; *pp = bp;
-    return 1;
+    return 0;
+}
+
+/* everything on root port p of controller h is gone */
+static void root_gone(int h, int p)
+{
+    int i;
+    for (i = 0; i < MAX_DEV; ++i) if (D[i].used && D[i].hc == h && D[i].parent < 0 && D[i].rootport == p) dev_free(i);
+    HC[h].own &= ~(1UL << p);
+    p_clear_change(h, p);
+    trace("%s%d.%d: gone ", tname(h), HC[h].idx, p + 1);
+}
+
+/* root port enumeration did not give anything usable */
+static void root_fail(int ignore)
+{
+    int i;
+    for (i = 0; i < MAX_DEV; ++i) if (D[i].used && D[i].hc == Cur && D[i].parent < 0 && D[i].rootport == CurPort) dev_free(i);
+    p_disable(Cur, CurPort);
+    if (ignore == 2 || (ignore && ++HC[Cur].fails[CurPort] >= 3)) HC[Cur].ignore |= 1UL << CurPort;
+    Cur = -1; S = S_SCAN;
+    NextScan = tsc() + us2c(200000);
+}
+
+static void set_leds(void)
+{
+    int k, l = LedsWant;
+    for (k = 0; k < MAX_PIPE; ++k)
+        if (P[k].used && P[k].type == PT_KBD)
+        {
+            CBuf[16] = (uint8_t)l;
+            control(P[k].dev, 0x21, 0x09, 0x0200, (uint16_t)P[k].ifc, 1);   /* SET_REPORT output: LEDs */
+        }
+    LedsHave = l;
 }
 
 static void step(void)
 {
-    uint64_t t = tsc();
+    uint64_t t;
+    int k, h, p;
+    for (h = 0; h < HCn; ++h)                                           /* xHCI: transfer events to the pipes */
+        if (HC[h].type == T_XHCI && HC[h].nports && (HC[h].own || !Light)) x_events(h);
+    for (k = 0; k < MAX_PIPE; ++k) if (P[k].used) pipe_poll(k);
+    if (Light) return;
+    t = tsc();
+    if (LedsWant != LedsHave) set_leds();
+    if (t >= NextMon)                                                   /* root ports in use: still there? */
+    {
+        NextMon = t + us2c(20000);
+        for (h = 0; h < HCn; ++h)
+            for (p = 0; p < HC[h].nports; ++p)
+                if (HC[h].own & (1UL << p))
+                {
+                    int v = pstat(h, p);
+                    if ((v & PS_GONE) || !(v & PS_CCS) || !(v & PS_PE)) { root_gone(h, p); HubQuiet = 0; }
+                }
+    }
     switch (S)
     {
     case S_SCAN:
-    {
-        int h, p;
+        if (t >= NextHub) { NextHub = t + us2c(Settling ? 2000 : 30000); hub_task(); }
         if (t < NextScan) return;
         NextScan = t + us2c(250000);
-        if (!pick_root(&h, &p, 0)) return;
+        if (!pick_root(&h, &p)) return;
         Cur = h; CurPort = p;
         trace("%s%d.%d:", tname(h), HC[h].idx, p + 1);
-        memset(D, 0, sizeof(D)); PadD = -1; NextAddr = 1;
         p_clear_change(h, p);
-        hc_run(h, 1);
         S = S_DEBOUNCE; Until = t + us2c(100000);
+        HubQuiet = 0;
         return;
-    }
     case S_DEBOUNCE:
     {
         int v;
         if (t < Until) return;
         v = pstat(Cur, CurPort);
-        if (!(v & PS_CCS)) { drop_all(0); return; }
-        if (HC[Cur].type == T_EHCI && (v & PS_LS)) { drop_all(2); return; }  /* low speed on a hub-only EHCI */
+        if (!(v & PS_CCS)) { root_fail(0); return; }
+        if (HC[Cur].type == T_EHCI && (v & PS_LS)) { root_fail(2); return; }  /* low speed on a hub-only EHCI */
         p_reset_start(Cur, CurPort);
         S = S_RESET; Until = t + us2c(55000);
         return;
     }
     case S_RESET:
     {
-        int v, di;
+        int v;
         if (t < Until) return;
-        if (!p_reset_end(Cur, CurPort)) { trace("noenable "); drop_all(HC[Cur].type == T_EHCI ? 2 : 1); return; }
+        if (!p_reset_end(Cur, CurPort)) { trace("noenable "); root_fail(HC[Cur].type == T_EHCI ? 2 : 1); return; }
         v = pstat(Cur, CurPort);
         trace("%s ", (v & PS_HS) ? "hs" : (v & PS_LS) ? "ls" : "fs");
-        di = dev_new(-1, 0, CurPort, (v & PS_HS) ? SP_HS : (v & PS_LS) ? SP_LS : SP_FS);
-        (void)di;
+        if (dev_new(Cur, -1, 0, CurPort, (v & PS_HS) ? SP_HS : (v & PS_LS) ? SP_LS : SP_FS) < 0) { root_fail(1); return; }
         S = S_RECOVER; Until = t + us2c(20000);
         return;
     }
     case S_RECOVER:
     {
-        int r;
+        int r, di;
         if (t < Until) return;
-        r = enumerate(0);
+        for (di = 0; di < MAX_DEV; ++di) if (D[di].used && D[di].hc == Cur && D[di].parent < 0 && D[di].rootport == CurPort) break;
+        if (di == MAX_DEV) { root_fail(1); return; }
+        r = enumerate(di);
         trace("e%d ", r);
-        if (r == 2)
-        {
-            HubRoot[Cur] |= 1UL << CurPort;
-            LastHubKey = Cur * MAX_PORT + CurPort;
-            Fails[Cur][CurPort] = 0;
-            S = S_HUB; NextScan = 0; HubSince = t;
-            return;
-        }
-        if (r <= 0) { drop_all(r < 0 ? 2 : 1); return; }
-        Fails[Cur][CurPort] = 0;
-        clear_pad();
-        St.connected = !Wireless;
-        S = S_RUN; NextScan = t + us2c(500000); RunSince = t; Watched = 0;
-        return;
-    }
-    case S_HUB:
-    {
-        int v, h, p, i, k;
-        if (t < NextScan) return;
-        NextScan = t + us2c(250000);
-        v = pstat(Cur, CurPort);
-        if ((v & PS_GONE) || !(v & PS_CCS) || !(v & PS_PE)) { drop_all(0); return; }
-        if (pick_root(&h, &p, 1)) { drop_all(0); return; }                 /* something new elsewhere */
-        for (i = 0; i < MAX_DEV; ++i)
-        {
-            if (!D[i].used || !D[i].hub) continue;
-            for (k = 1; k <= D[i].nports; ++k)
-            {
-                uint16_t st, chg;
-                int r;
-                if (hub_status(i, k, &st, &chg) != 0) { drop_all(0); return; }
-                if (!(st & 1))
-                {
-                    if (chg & 1) control(i, 0x23, 1, 16, (uint16_t)k, 0);
-                    D[i].ignore &= ~(1UL << k);
-                    if (D[i].child & (1UL << k))
-                    {
-                        int c;
-                        for (c = 0; c < MAX_DEV; ++c) if (D[c].used && D[c].parent == i && D[c].pport == k) dev_free(c);
-                        D[i].child &= ~(1UL << k);
-                    }
-                    continue;
-                }
-                if ((D[i].child | D[i].ignore) & (1UL << k)) continue;
-                r = hub_port_enum(i, k);
-                trace("h%d.%d:e%d ", i, k, r);
-                if (r == 1) { clear_pad(); St.connected = !Wireless; S = S_RUN; NextScan = tsc() + us2c(500000); return; }
-                if (r != 2 && r != -2) D[i].ignore |= 1UL << k;   /* not a pad, or failed: until unplugged */
-                return;                                                     /* one port per tick */
-            }
-        }
-        /* nothing behind this hub: after a while give another hub a turn */
-        if (t - HubSince > us2c(3000000) && pick_root(&h, &p, 0) && (HubRoot[h] & (1UL << p))) drop_all(0);
-        return;
-    }
-    case S_RUN:
-    {
-        int v, r;
-        if (!Light)                                                         /* (port checks: interrupt only) */
-        {
-            v = pstat(Cur, CurPort);
-            if ((v & PS_GONE) || !(v & PS_CCS) || !(v & PS_PE)) { drop_all(0); return; }
-        }
-        if (PadD < 0) { drop_all(0); return; }
-        if (!Light && D[PadD].depth && t >= NextScan)                                 /* behind a hub: still there? */
-        {
-            uint16_t st, chg;
-            NextScan = t + us2c(500000);
-            if (hub_status(D[PadD].parent, D[PadD].pport, &st, &chg) != 0 || !(st & 1)) { drop_all(0); return; }
-        }
-        r = poll_in();
-        if (r == 0)
-        {
-            if (!Light && !Watched && !St.reports && t - RunSince > us2c(2000000))   /* running, but nothing comes */
-            {
-                Watched = 1;
-                if (HC[Cur].type == T_OHCI)
-                    trace("[no reports: ed %08lx %08lx %08lx td %08lx %08lx %08lx %08lx ctl%08lx sts%08lx fn%04lx hcca0 %08lx] ",
-                        (unsigned long)EDI[0], (unsigned long)EDI[1], (unsigned long)EDI[2],
-                        (unsigned long)o_tdi(OCur ^ 1)[0], (unsigned long)o_tdi(OCur ^ 1)[1], (unsigned long)o_tdi(OCur ^ 1)[2],
-                        (unsigned long)o_tdi(OCur ^ 1)[3], (unsigned long)ord(Cur, O_CONTROL), (unsigned long)ord(Cur, O_INTSTS),
-                        (unsigned long)(ord(Cur, 0x3C) & 0xFFFF), (unsigned long)HCCA_OF(Cur)[0]);
-                else if (HC[Cur].type == T_UHCI)
-                    trace("[no reports: td %08lx %08lx qh %08lx cmd%04x sts%04x] ", (unsigned long)TDI[1], (unsigned long)TDI[2],
-                        (unsigned long)QHI[1], inportw(HC[Cur].io + U_CMD), inportw(HC[Cur].io + U_STS));
-                else trace("[no reports] ");
-            }
-            return;
-        }
-        if (r < 0 && Light) return;                                         /* recovery from the interrupt */
-        if (r < 0)
-        {
-            if (r == -2) control(PadD, 0x02, 1, 0, (uint16_t)(0x80 | InEp), 0); /* CLEAR_FEATURE halt */
-            InTog = 0;
-            arm_in();
-            return;
-        }
-        {
-            int len = r - 1;
-            if (!Wireless)
-            {
-                if (len >= 14 && IBuf[0] == 0x00) parse(IBuf);
-            }
-            else if (len >= 2)
-            {
-                if (IBuf[0] == 0x08)
-                {
-                    int on = (IBuf[1] & 0x80) != 0;
-                    if (on && !WlPresent) { WlPresent = 1; arm_in(); pad_leds(); return; }
-                    if (!on) { WlPresent = 0; clear_pad(); }
-                    St.connected = WlPresent;
-                }
-                else if (len >= 18 && IBuf[0] == 0x00 && (IBuf[1] & 1))
-                {
-                    if (!WlPresent) { WlPresent = 1; St.connected = 1; }
-                    parse(IBuf + 4);
-                }
-            }
-            arm_in();
-        }
+        if (r <= 0) { root_fail(r < 0 ? 2 : 1); return; }
+        HC[Cur].own |= 1UL << CurPort;
+        HC[Cur].fails[CurPort] = 0;
+        Cur = -1; S = S_SCAN; NextScan = tsc();                         /* look for more right away */
+        HubQuiet = 0;
         return;
     }
     }
@@ -1898,27 +2110,44 @@ void USBPAD_Poll(void)
     Busy = 0;
 }
 
-/* from a game's port 201h read: only pick up a finished report, never anything that can take time
+/* from a game's port 201h read: only pick up finished reports, never anything that can take time
  * (enumeration, hub checks, recovery), so the game's stick timing is not disturbed */
 void USBPAD_PollLight(void)
 {
-    if (!Inited || Busy || S != S_RUN) return;
+    if (!Inited || Busy) return;
     Busy = 1;
     Light = 1;
     step();
     Busy = 0;
 }
 
-const USBPAD_State* USBPAD_Get(void) { return &St; }
+const USBPAD_State* USBPAD_Get(void) { return &Pad[0]; }
+const USBPAD_State* USBPAD_GetPad(int n) { return &Pad[n > 0 ? 1 : 0]; }
 const char* USBPAD_Describe(void) { return Desc; }
+const char* USBPAD_Devices(void) { return DevList; }
+uint32_t USBPAD_Changes(void) { return Changes; }
+void USBPAD_SetHid(USBPAD_KbdFn kb, USBPAD_MouseFn ms) { KbFn = kb; MsFn = ms; }
+void USBPAD_SetLeds(int leds) { LedsWant = leds & 7; }
 
-int USBPAD_Init(uint64_t cps, int wait_ms, const char** msg)
+int USBPAD_Have(void)
+{
+    int k, r = 0;
+    for (k = 0; k < MAX_PIPE; ++k)
+        if (P[k].used)
+            r |= P[k].type == PT_KBD ? USBPAD_HAVE_KBD : P[k].type == PT_MOUSE ? USBPAD_HAVE_MOUSE
+                : P[k].pad ? USBPAD_HAVE_PAD2 : USBPAD_HAVE_PAD1;
+    return r;
+}
+
+int USBPAD_Init(uint64_t cps, int wait_ms, int flags, const char** msg)
 {
     int i, j, usable = 0;
     uint8_t* base;
-    static char m[200];
+    uint32_t size;
+    static char m[240];
     *msg = m;
     Cps = cps ? cps : 1000000000ULL;
+    Flags = flags;
     HCn = UhciN = OhciN = EhciN = XhciN = EhciGiven = 0;
     pci_scan(hc_found);
     if (!HCn)
@@ -1926,37 +2155,33 @@ int USBPAD_Init(uint64_t cps, int wait_ms, const char** msg)
         snprintf(m, sizeof(m), "no USB controller found");
         return 0;
     }
-    if (!pds_dpmi_xms_allocmem(&Mem, 0x3000))
+    size = M_HC + (uint32_t)HCn * 0x2000;
+    if (!pds_dpmi_xms_allocmem(&Mem, size))
     {
         snprintf(m, sizeof(m), "out of XMS memory");
         return 0;
     }
     base = (uint8_t*)Mem.linearptr;
     PBase = (uint32_t)(uintptr_t)Mem.physicalptr;
-    memset(base, 0, 0x3000);
-    FL    = (volatile uint32_t*)base;                    /* 4K-aligned */
-    HCCAS = (volatile uint32_t*)(base + 0x2000);         /* 256-aligned, MAX_HC x 256 bytes */
-    QHI   = (volatile uint32_t*)(base + 0x1200);
-    QHC   = (volatile uint32_t*)(base + 0x1210);
-    EDI   = (volatile uint32_t*)(base + 0x1220);
-    EDC   = (volatile uint32_t*)(base + 0x1230);
-    TDI   = (volatile uint32_t*)(base + 0x1240);         /* 128 bytes */
-    QHA   = (volatile uint32_t*)(base + 0x1300);         /* 32-aligned, 96 bytes */
-    QHP   = (volatile uint32_t*)(base + 0x1380);
-    TD    = (volatile uint32_t*)(base + 0x1400);         /* NTD x 32 bytes, to 0x1900 */
-    CBuf  = base + 0x1A00;
-    IBuf  = base + 0x1C00;
-    OBuf  = base + 0x1C40;
-    QHI[0] = PHYS(QHC) | LP_Q; QHI[1] = LP_T;
-    QHC[0] = LP_T;             QHC[1] = LP_T;
-    EDI[0] = EDC[0] = ED_SKIP;
-    QHA[0] = PHYS(QHA) | LP_Q; QHA[1] = 1UL << 15; QHA[4] = QHA[5] = LP_T;
+    memset(base, 0, size);
+    TD    = (volatile uint32_t*)(base + M_TD);
+    CBuf  = base + M_CBUF;
+    for (i = 0; i < HCn; ++i)
+    {
+        uint8_t* blk = base + M_HC + i * 0x2000;          /* 4K-aligned */
+        HC[i].fl  = (volatile uint32_t*)blk;
+        HC[i].ctl = (volatile uint32_t*)(blk + 0x1000);
+        HC[i].pq  = (volatile uint32_t*)(blk + 0x1080);
+        HC[i].nextaddr = 1;
+    }
+    memset(P, 0, sizeof(P)); memset(D, 0, sizeof(D)); memset((void*)Pad, 0, sizeof(Pad));
     cache_init();
-    fl(base, 0x3000);
+    fl(base, (int)size);
     trace("mem %08lx, clflush %d\n", (unsigned long)PBase, ClLine);
 
     /* xHCI first (it may take ports away from EHCI), then EHCI (hands ports to companions or keeps
-     * them), then the UHCI / OHCI companions. Controllers that fail to come up are dropped. */
+     * them), then the UHCI / OHCI companions. Controllers that fail to come up are dropped. Every one
+     * runs from here on, with its own schedule. */
     for (j = 0; j < 4; ++j)
     {
         static const int order[4] = { T_XHCI, T_EHCI, T_UHCI, T_OHCI };
@@ -1981,31 +2206,36 @@ int USBPAD_Init(uint64_t cps, int wait_ms, const char** msg)
         return 0;
     }
     wait_us(20000);
-    clear_pad();
-    strcpy(Desc, "no pad connected");
-    S = S_SCAN; Cur = -1; NextScan = 0;
-    memset(Ignore, 0, sizeof(Ignore)); memset(HubRoot, 0, sizeof(HubRoot)); memset(Fails, 0, sizeof(Fails));
-    memset(D, 0, sizeof(D)); PadD = -1;
+    strcpy(Desc, "nothing connected");
+    S = S_SCAN; Cur = -1; NextScan = NextMon = NextHub = 0;
+    HubCur = HubPort = HubQuiet = HubBusy = 0;
+    LedsHave = -1;
     Inited = 1;
+    /* set up what is plugged in now: until no root port is left to look at and every hub has had two quiet
+     * rounds (or nothing at all is plugged in after 0.3 s), at most wait_ms */
     {
         uint64_t t0 = tsc(), end = t0 + us2c((uint32_t)wait_ms * 1000);
         int hh, pp;
-        while (tsc() < end && !(S == S_RUN && (St.connected || Wireless)))
+        Settling = 1;
+        while (tsc() < end)
         {
             USBPAD_Poll();
-            /* nothing plugged in anywhere: no need to wait (SBEMU starts with this on by default) */
-            if (S == S_SCAN && tsc() - t0 > us2c(300000) && !pick_root(&hh, &pp, 0)) break;
+            if (S == S_SCAN && tsc() - t0 > us2c(300000) && HubQuiet >= 2 && !pick_root(&hh, &pp)) break;
         }
+        Settling = 0;
         end = tsc() + us2c(50000);
-        while (S == S_RUN && !St.reports && tsc() < end) USBPAD_Poll();
+        while (tsc() < end) USBPAD_Poll();                 /* first reports */
     }
     {
-        int n = 0;
+        int n = 0, have = USBPAD_Have();
         if (UhciN) n += snprintf(m + n, sizeof(m) - n, "%s%d UHCI", n ? " + " : "", UhciN);
         if (OhciN) n += snprintf(m + n, sizeof(m) - n, "%s%d OHCI", n ? " + " : "", OhciN);
         if (EhciN) n += snprintf(m + n, sizeof(m) - n, "%s%d EHCI", n ? " + " : "", EhciN);
         if (XhciN) n += snprintf(m + n, sizeof(m) - n, "%s%d xHCI", n ? " + " : "", XhciN);
-        snprintf(m + n, sizeof(m) - n, " controller(s)%s, %s", EhciGiven ? " (EHCI ports handed to companions)" : "", Desc);
+        n += snprintf(m + n, sizeof(m) - n, " controller(s)%s, ", EhciGiven ? " (EHCI ports handed to companions)" : "");
+        if (!have) snprintf(m + n, sizeof(m) - n, "nothing connected yet");
+        else snprintf(m + n, sizeof(m) - n, "found:%s%s%s%s", (have & USBPAD_HAVE_PAD1) ? " pad 1" : "",
+            (have & USBPAD_HAVE_PAD2) ? " pad 2" : "", (have & USBPAD_HAVE_KBD) ? " keyboard" : "", (have & USBPAD_HAVE_MOUSE) ? " mouse" : "");
     }
     return usable;
 }
@@ -2015,13 +2245,18 @@ void USBPAD_Shutdown(void)
     int i;
     if (!Inited) return;
     Inited = 0;
-    if (Cur >= 0) drop_all(0);
     for (i = 0; i < HCn; ++i)
     {
         if (!HC[i].nports) continue;
         switch (HC[i].type)
         {
-        case T_UHCI: hc_run(i, 0); break;
+        case T_UHCI:
+        {
+            int k;
+            outportw(HC[i].io + U_CMD, 0);
+            for (k = 0; k < 20 && !(inportw(HC[i].io + U_STS) & STS_HALT); ++k) wait_us(1000);
+            break;
+        }
         case T_OHCI: owr(i, O_CONTROL, 0); owr(i, O_HCCA, 0); break;
         case T_EHCI: ehci_sched(i, EC_PSE | EC_ASE, 0); ewr(i, E_CMD, erd(i, E_CMD) & ~EC_RS); break;
         default:

@@ -1,5 +1,7 @@
 /* Virtual gameport for SBEMU: port 201h answers like an analog PC joystick, with the position and
- * buttons of the USB Xbox 360 pad.
+ * buttons of the USB Xbox 360 pad(s). One pad: /JOYAX and /JOYBT give all four axes and buttons (joystick
+ * B = its right stick by default). Two pads: pad 1 is joystick A and pad 2 joystick B, each with the first
+ * two /JOYAX axes and the first two /JOYBT buttons. /JOYKEY works on either pad.
  *
  * How a game reads a gameport: it writes any value to 201h, which fires four one-shot timers (one per
  * axis); each axis bit (bits 0-3) reads 1 until its timer runs out, after a time that grows with the
@@ -16,7 +18,7 @@
 #include <stdlib.h>
 #include "vjoy.h"
 #include "usbpad.h"
-#include "untrapio.h"
+#include "vkbc.h"
 
 enum { A_NONE, A_LX, A_LY, A_RX, A_RY, A_LT, A_RT, A_TR };
 static const char* AxName[] = { "-", "LX", "LY", "RX", "RY", "LT", "RT", "TR" };
@@ -41,8 +43,6 @@ static int      Dz;
 static uint64_t Cps, T0, End[4], LastPoll;
 static int      Inited;
 
-/* key event queue (scan code bytes) */
-static uint8_t  Kq[64]; static int Kh, Kt;
 
 static inline uint64_t tsc(void) { uint32_t lo, hi; __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi)); return ((uint64_t)hi << 32) | lo; }
 
@@ -104,21 +104,29 @@ static void poll(int force)
     if (force) USBPAD_Poll(); else USBPAD_PollLight();
 }
 
+/* gameport axis / button i: which pad, and which /JOYAX / /JOYBT item */
+static const USBPAD_State* pad_for(int i, int* m)
+{
+    const USBPAD_State* p2 = USBPAD_GetPad(1);
+    if (p2->connected) { *m = i & 1; return i < 2 ? USBPAD_GetPad(0) : p2; }
+    *m = i;
+    return USBPAD_GetPad(0);
+}
+
 uint32_t VJOY_IOHandler(uint32_t port, uint32_t val, uint32_t out)
 {
-    const USBPAD_State* p;
+    int i, m;
     (void)port;
     if (!Inited) return out ? val : 0xFF;
     poll(0);
-    p = USBPAD_Get();
     if (out)
     {
-        int i;
         T0 = tsc();
         for (i = 0; i < 4; ++i)
         {
-            if (Ax[i] == A_NONE || !p->connected) { End[i] = ~0ULL; continue; } /* nothing connected: never times out */
-            End[i] = T0 + Cps * (24 + (uint64_t)axis(i, p) * 1100 / 65535) / 1000000ULL;
+            const USBPAD_State* p = pad_for(i, &m);
+            if (Ax[m] == A_NONE || !p->connected) { End[i] = ~0ULL; continue; } /* nothing connected: never times out */
+            End[i] = T0 + Cps * (24 + (uint64_t)axis(m, p) * 1100 / 65535) / 1000000ULL;
         }
         return val;
     }
@@ -126,41 +134,33 @@ uint32_t VJOY_IOHandler(uint32_t port, uint32_t val, uint32_t out)
     {
         uint64_t t = tsc();
         uint32_t r = 0xF0;
-        int i;
         for (i = 0; i < 4; ++i) if (t < End[i]) r |= 1u << i;
-        if (p->connected)
-            for (i = 0; i < 4; ++i) if (Bt[i] >= 0 && held(Bt[i], p)) r &= ~(0x10u << i);
+        for (i = 0; i < 4; ++i)
+        {
+            const USBPAD_State* p = pad_for(i, &m);
+            if (p->connected && Bt[m] >= 0 && held(Bt[m], p)) r &= ~(0x10u << i);
+        }
         return r;
     }
 }
 
-static void kq_push(uint8_t b) { int n = (Kh + 1) % (int)sizeof(Kq); if (n != Kt) { Kq[Kh] = b; Kh = n; } }
-
+/* sound interrupt: full USB poll, pad buttons -> keys, then the keyboard controller (vkbc.c) */
 void VJOY_Tick(void)
 {
-    const USBPAD_State* p;
+    const USBPAD_State* p1;
+    const USBPAD_State* p2;
     int i;
     if (!Inited) return;
     poll(1);
-    p = USBPAD_Get();
+    p1 = USBPAD_GetPad(0); p2 = USBPAD_GetPad(1);
     for (i = 0; i < Kn; ++i)
     {
-        int h = p->connected && held(Km[i].b, p), was = (KDown >> i) & 1;
+        int h = (p1->connected && held(Km[i].b, p1)) || (p2->connected && held(Km[i].b, p2)), was = (KDown >> i) & 1;
         if (h == was) continue;
         KDown ^= 1u << i;
-        if (Km[i].code > 0xFF) kq_push(0xE0);
-        kq_push((uint8_t)((Km[i].code & 0x7F) | (h ? 0 : 0x80)));
+        VKBC_Key(Km[i].code, h);
     }
-    /* one byte per interrupt, only when the keyboard controller is idle: a real key or touchpad byte
-     * is never overwritten (same method as the key player in vdiag.c: command D2h) */
-    if (Kt != Kh && (UntrappedIO_IN(0x64) & 3) == 0)
-    {
-        int n;
-        UntrappedIO_OUT(0x64, 0xD2);
-        for (n = 0; n < 2000 && (UntrappedIO_IN(0x64) & 2); ++n) {}
-        UntrappedIO_OUT(0x60, Kq[Kt]);
-        Kt = (Kt + 1) % (int)sizeof(Kq);
-    }
+    VKBC_Tick();
 }
 
 /* next comma-separated item */
@@ -225,7 +225,6 @@ int VJOY_Init(uint64_t cps, const char* axes, const char* btns, const char* keys
         Km[Kn].b = b; Km[Kn].code = (uint16_t)code; ++Kn;
     }
     for (i = 0; i < 4; ++i) End[i] = 0;
-    Kh = Kt = 0;
     Inited = 1;
     return 1;
 }

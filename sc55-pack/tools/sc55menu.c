@@ -361,8 +361,11 @@ static void build_menu(void)
     add(C_TESTS, "Joystick test (JOYTEST)", "Shows what games see on the gameport: the four axes and four buttons, live."
         " With the USB pad on (Settings > Joystick) move the sticks and press A/B/X/Y. Esc or Q quits.",
         IT_BAT, "JOYTEST.EXE", 1, 0, NULL);
-    add(C_TESTS, "USB pad finder (USBTEST)", "Looks for the USB Xbox 360 pad the way SBEMU /JOY does and shows every step:"
-        " the USB controllers, what is plugged into their ports, the pad's sticks and buttons live, and every plug / unplug."
+    add(C_TESTS, "Keyboard / mouse test (KMTEST)", "Shows the keys DOS gets (scan code, character) and the mouse driver's"
+        " position and buttons, live. Checks SBEMU's USB keyboard and mouse (load CTMOUSE / MOUSE.COM after SBEMU). Esc twice quits.",
+        IT_BAT, "KMTEST.EXE", 1, 0, NULL);
+    add(C_TESTS, "USB finder (USBTEST)", "Looks for USB pads, keyboards and mice the way SBEMU /JOY does and shows every step:"
+        " the USB controllers, what is plugged into their ports, both pads, keys and mouse live, and every plug / unplug."
         " Writes USBTEST.TXT for a bug report. Only while SBEMU is not loaded (restart the PC first).",
         IT_BAT, "USBTEST.EXE USBTEST.TXT", -1, 0, "USBTEST.TXT");
     snprintf(c, sizeof c, "CALL %s\\TEST.BAT", g_home);
