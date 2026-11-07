@@ -1085,19 +1085,51 @@ CONTENTS
  17. LICENCES AND CREDITS
 =============================================================================
 
-  SBEMU (Baron-von-Riedesel, crazii, others), Nuked-SC55 and this port:
-  GPL-2.0-or-later. Nuked-OPL3: LGPL-2.1+. TinySoundFont: MIT.
-  Munt libmt32emu 2.8.3 (MT-32 emulation, Dean Beeler, Jerome Fisher,
-  Sergey V. Mikayev and others): LGPL-2.1+ (C:\SC55\MUNT-LIC.TXT), source
-  at https://github.com/munt/munt.
-  The screen font Terminus (Dimitar Zhekov): SIL Open Font Licence 1.1.
-  USB joystick: written for this pack (GPL-2.0); xHCI bring-up after the DOS
-  tool of xhci98 (Yeo Kheng Meng, GPL-2.0); UHCI / OHCI handling after
-  USBDDOS (crazii, GPL-2.0), the pad's report layout after Linux xpad.c.
-  Xbox and Xbox 360 are trademarks of Microsoft.
-  HDPMI32i is part of HX (japheth). Jemm, JLoad and QPIEMU (japheth): see
-  JEMMLIC.TXT. uCDD: GPL-3.0 (UCDD-LIC.TXT).
-  XCDROM: GPL (source in FILES\XCDROM). SHSUCDX, VIDE-CDD, GSCDROM and
-  MSCDEX belong to their authors.
-  Roland, SC-55, MT-32 and CM-32L are trademarks of their owners. The ROM dumps are your
-  own; SoundFonts have their own licences.
+  NUKED SB-EMU stands on the work of many people. Thank you all.
+  The combined work is GPL-2.0-or-later (COPYING in the source).
+
+  BUILT INTO SBEMU.EXE
+  SBEMU ............ crazii and SBEMU's contributors, GPL-2.0+
+                     https://github.com/crazii/SBEMU
+  Sound-chip drivers  from MPXPlay, Attila Padar (PDSoft): open source,
+                     used with the author's permission
+  More chip drivers  ported from Linux ALSA by jiyunomegami
+  Nuked-SC55 ....... nukeykt (Nuke.YKT), GPL-2.0+
+                     https://github.com/nukeykt/Nuked-SC55
+                     backend fork used here: J.C. Moyer (jcmoyer), GPL-2.0+
+                     https://github.com/jcmoyer/Nuked-SC55
+                     with thanks to John McMaster (PCM chip decap),
+                     org / ogamespec (deroute tool), Wohlstand, mattw,
+                     HardWareMan, giulioz, Cloudschatze, NikitaLita,
+                     Karmeck, Falcosoft and Michael Mouton
+  Munt libmt32emu .. 2.8.3, Dean Beeler, Jerome Fisher, Sergey V. Mikayev
+                     and the Munt team, LGPL-2.1+ (C:\SC55\MUNT-LIC.TXT)
+                     https://github.com/munt/munt
+  Nuked-OPL3 ....... nukeykt, LGPL-2.1+; faster bit-exact fork
+                     Nuked-OPL3-fast by Tony Gies (tgies), LGPL-2.1+
+  DOSBox OPL and PC speaker: the DOSBox Team, GPL-2.0+; PC speaker port to
+                     SBEMU by andersrodrig
+  TinySoundFont .... Bernhard Schelling (after SFZero by Steve Folta), MIT
+  SoundFont MPU-401  in SBEMU: Cacodemon345 (VSBHDASF)
+  USB joystick ..... written for this pack, GPL-2.0; UHCI / OHCI after
+                     USBDDOS (crazii), xHCI bring-up after the DOS tool of
+                     xhci98 (Yeo Kheng Meng), pad layout after Linux xpad.c
+  Terminus font .... Dimitar Zhekov, SIL Open Font Licence 1.1
+
+  PROGRAMS IN THIS PACK
+  HDPMI32i ......... Japheth (HX); IOPL0 build by crazii
+  Jemm, JLoad, QPIEMU  Japheth: see JEMMLIC.TXT
+  uCDD ............. vorvek, GPL-3.0 (UCDD-LIC.TXT)
+  SHSUCDX .......... Jason Hood, from v1.4b by John McCoy
+  XCDROM ........... Jack R. Ellis, GPL (source in FILES\XCDROM)
+  Not included, belonging to their owners: MSCDEX (Microsoft), VIDE-CDD
+  (Acer / BenQ), GSCDROM (LG), QEMM (Quarterdeck).
+
+  BUILT AND TESTED WITH
+  DJGPP (DJ Delorie, via build-djgpp by andrewwutw), MinGW-w64, Open
+  Watcom 2, JWasm (Japheth), QEMU and usbredir.
+
+  Roland, SC-55, MT-32 and CM-32L are trademarks of Roland Corporation.
+  Sound Blaster is a trademark of Creative Technology. Xbox and Xbox 360
+  are trademarks of Microsoft. NUKED SB-EMU is not affiliated with any of
+  them. The ROM dumps are your own; SoundFonts have their own licences.
