@@ -906,7 +906,19 @@ static int u_run_tds(int n, uint32_t timeout_us)
             if (cs & TD_ERRMASK) { QHC[1] = LP_T; return -1; }
         }
         if (done) { QHC[1] = LP_T; return 0; }
-        if (tsc() > end) { QHC[1] = LP_T; wait_us(1000); trace("[u%08lx t] ", (unsigned long)tdn(0)[1]); return -1; }
+        if (tsc() > end)
+        {
+            uint16_t io = HC[Cur].io, f1 = inportw(io + U_FRNUM), f2;
+            wait_us(3000);
+            f2 = inportw(io + U_FRNUM);
+            trace("[u%08lx t cmd%04x sts%04x fr%03x>%03x fl%08lx/%08lx pci%04x leg%04x qh%08lx td%08lx %08lx] ",
+                (unsigned long)tdn(0)[1], inportw(io + U_CMD), inportw(io + U_STS), f1 & 0x7FF, f2 & 0x7FF,
+                (unsigned long)inportl(io + U_FLBASE), (unsigned long)PHYS(FL),
+                PCI_ReadWord(HC[Cur].bus, HC[Cur].dev, HC[Cur].func, 4), PCI_ReadWord(HC[Cur].bus, HC[Cur].dev, HC[Cur].func, UHCI_LEGSUP),
+                (unsigned long)QHC[1], (unsigned long)tdn(0)[2], (unsigned long)tdn(0)[3]);
+            QHC[1] = LP_T; wait_us(1000);
+            return -1;
+        }
     }
 }
 
