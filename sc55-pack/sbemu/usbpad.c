@@ -237,6 +237,7 @@ typedef struct
     uint32_t own;                       /* root ports with a device in use */
     uint32_t ignore;                    /* root ports: nothing usable there, skip until unplugged */
     uint8_t  fails[MAX_PORT];
+    int      run;                       /* UHCI: running (only while it has a device, as in beta.44) */
 } HCI;
 static HCI      HC[MAX_HC];
 static int      HCn, UhciN, OhciN, EhciN, XhciN, EhciGiven;
@@ -651,11 +652,32 @@ static void uhci_reset(int i)
     }
     for (k = 0; k < 1024; ++k) h->fl[k] = PHYS(PQ(i, 0)) | LP_Q;
     fl(h->fl, 4096); fl(h->ctl, 0x400);
-    outportw(io + U_FRNUM, 0);
-    outportl(io + U_FLBASE, PHYS(h->fl));
-    outportb(io + U_SOF, 0x40);
-    outportw(io + U_STS, 0x3F);
-    outportw(io + U_CMD, CMD_RS | CMD_CF | CMD_MAXP);
+    h->run = 0;                                   /* started by uhci_run() when a device needs it */
+}
+
+/* UHCI on / off. Only controllers with something on them run (four ICH6 controllers all running from the
+ * start crashed the D810 in beta.45; beta.44, which ran only the pad's, did not) */
+static void uhci_run(int i, int on)
+{
+    HCI* h = &HC[i];
+    uint16_t io = h->io;
+    int n;
+    if (h->type != T_UHCI || h->run == on) return;
+    h->run = on;
+    if (on)
+    {
+        outportw(io + U_INTR, 0);
+        outportw(io + U_FRNUM, 0);
+        outportl(io + U_FLBASE, PHYS(h->fl));
+        outportb(io + U_SOF, 0x40);
+        outportw(io + U_STS, 0x3F);
+        outportw(io + U_CMD, CMD_RS | CMD_CF | CMD_MAXP);
+    }
+    else
+    {
+        outportw(io + U_CMD, CMD_CF | CMD_MAXP);
+        for (n = 0; n < 20 && !(inportw(io + U_STS) & STS_HALT); ++n) wait_us(1000);
+    }
 }
 
 static void ohci_reset(int i)
@@ -1526,6 +1548,14 @@ static int poll_in(int k)
         fl(q->td, 16);
         cs = q->td[1];
         if (cs & TD_ACTIVE) return 0;
+        if (!(cs & TD_ERRMASK))
+        {
+            /* done - but the controller writes the TD's status first and moves the QH on (element = T) a
+             * moment later: re-arming before that lands gets the new TD overwritten with T, and the pipe
+             * stops for good (real hardware only: "inputs stop after a few moments" on the D810) */
+            fl(PQ(h, k), 16);
+            if (!(PQ(h, k)[1] & LP_T)) return 0;
+        }
         fl(q->ibuf, 64);
         if (cs & TD_ERRMASK) return (cs & TD_STALL) ? -2 : -1;
         len = (int)((cs + 1) & 0x7FF);
@@ -1615,7 +1645,7 @@ static void pipe_poll(int k)
     int r = poll_in(k), len;
     if (r == 0)
     {
-        if (!Light && q->type == PT_PAD && !q->watched && !q->reports && !q->wireless && tsc() - q->since > us2c(2000000))
+        if (!Light && q->type == PT_PAD && !q->watched && !Pad[q->pad].reports && !q->wireless && tsc() - q->since > us2c(2000000))
         {
             int h = q->hc;
             q->watched = 1;                                             /* running, but nothing comes */
@@ -2002,6 +2032,7 @@ static void root_gone(int h, int p)
     HC[h].own &= ~(1UL << p);
     p_clear_change(h, p);
     trace("%s%d.%d: gone ", tname(h), HC[h].idx, p + 1);
+    if (!HC[h].own && Cur != h) uhci_run(h, 0);
 }
 
 /* root port enumeration did not give anything usable */
@@ -2011,6 +2042,7 @@ static void root_fail(int ignore)
     for (i = 0; i < MAX_DEV; ++i) if (D[i].used && D[i].hc == Cur && D[i].parent < 0 && D[i].rootport == CurPort) dev_free(i);
     p_disable(Cur, CurPort);
     if (ignore == 2 || (ignore && ++HC[Cur].fails[CurPort] >= 3)) HC[Cur].ignore |= 1UL << CurPort;
+    if (!HC[Cur].own) uhci_run(Cur, 0);
     Cur = -1; S = S_SCAN;
     NextScan = tsc() + us2c(200000);
 }
@@ -2040,6 +2072,17 @@ static void step(void)
     if (t >= NextMon)                                                   /* root ports in use: still there? */
     {
         NextMon = t + us2c(20000);
+        for (h = 0; h < HCn; ++h)                                       /* UHCI stopped by an error: say so, restart */
+            if (HC[h].type == T_UHCI && HC[h].run)
+            {
+                uint16_t st = inportw(HC[h].io + U_STS);
+                if (st & 0x38)
+                {
+                    trace("[UHCI%d halted sts%04x cmd%04x fr%03x] ", HC[h].idx, st, inportw(HC[h].io + U_CMD), inportw(HC[h].io + U_FRNUM) & 0x7FF);
+                    outportw(HC[h].io + U_STS, 0x3F);
+                    outportw(HC[h].io + U_CMD, CMD_RS | CMD_CF | CMD_MAXP);
+                }
+            }
         for (h = 0; h < HCn; ++h)
             for (p = 0; p < HC[h].nports; ++p)
                 if (HC[h].own & (1UL << p))
@@ -2056,6 +2099,7 @@ static void step(void)
         NextScan = t + us2c(250000);
         if (!pick_root(&h, &p)) return;
         Cur = h; CurPort = p;
+        uhci_run(h, 1);
         trace("%s%d.%d:", tname(h), HC[h].idx, p + 1);
         p_clear_change(h, p);
         S = S_DEBOUNCE; Until = t + us2c(100000);
