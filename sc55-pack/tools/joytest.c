@@ -49,6 +49,35 @@ static int read_port(long us[4])
     return b;
 }
 
+/* Gravis GamePad Pro digital (GrIP) packet on button lines shift / shift+1, as Linux grip.c reads it:
+ * a bit at each falling clock edge, 24 bits, rotated until the sync pattern fits. -1 = none */
+static long grip_read(int shift)
+{
+    unsigned long d = 0;
+    int i = 0, t = 2000, u, v;
+    disable();
+    v = inportb(0x201) >> shift;
+    do
+    {
+        --t;
+        u = v; v = (inportb(0x201) >> shift) & 3;
+        if (~v & u & 1) { d |= (unsigned long)(v >> 1) << i++; t = 2000; }
+    } while (i < 24 && t > 0);
+    enable();
+    if (i < 24) return -1;
+    for (i = 0; i < 24 && ((d & 0xFE4210UL) ^ 0x7C0000UL); i++) d = (d >> 1) | (d & 1) << 23;
+    return i == 24 ? -1 : (long)d;
+}
+
+static void grip_text(char* s, long d)
+{
+    static const char* nm[] = { "Start", "Select", "R2", "Y", "", "L2", "A", "B", "X", "", "L1", "R1", "Up", "Down", "", "Right", "Left" };
+    int j, n = 0;
+    if (d < 0) { strcpy(s, "no GrIP pad"); return; }
+    for (j = 0; j < 17; ++j) if (nm[j][0] && (d >> j) & 1) n += sprintf(s + n, "%s ", nm[j]);
+    if (!n) strcpy(s, "-");
+}
+
 static void bar(char* s, long us)
 {
     int i, n = us < 0 ? -1 : (int)(us * 40 / 1150);
@@ -59,13 +88,14 @@ static void bar(char* s, long us)
 int main(int argc, char** argv)
 {
     long us[4];
-    int b, i, logn = 0;
+    int b, i, logn = 0, grip = 0;
     const char* logf = NULL;
     for (i = 1; i < argc; ++i)
     {
         if (!strncasecmp(argv[i], "/LOG:", 5)) logn = atoi(argv[i] + 5);
+        else if (!strcasecmp(argv[i], "/GRIP")) grip = 1;
         else if (argv[i][0] != '/') logf = argv[i];
-        else { printf("JOYTEST [/LOG:n FILE]\n"); return 1; }
+        else { printf("JOYTEST [/GRIP] [/LOG:n FILE]\n  /GRIP  Gravis GamePad Pro digital (GrIP) view: every button of pads 1 and 2\n"); return 1; }
     }
     calibrate();
     if (logn > 0)
@@ -73,7 +103,16 @@ int main(int argc, char** argv)
         FILE* f = logf ? fopen(logf, "w") : stdout;
         if (!f) { printf("Cannot write %s\n", logf); return 1; }
         fprintf(f, "JOYTEST log, CPU %lu MHz\n", (unsigned long)(cps / 1000000));
-        for (i = 0; i < logn; ++i)
+        for (i = 0; i < logn && grip; ++i)
+        {
+            unsigned long t = ticks();
+            char a[120], c[120];
+            grip_text(a, grip_read(4)); grip_text(c, grip_read(6));
+            fprintf(f, "%3d  pad 1: %s | pad 2: %s\n", i, a, c);
+            fflush(f);
+            while (ticks() - t < 4) {}
+        }
+        for (i = 0; i < logn && !grip; ++i)
         {
             unsigned long t = ticks();
             char keys[64]; int kn = 0;
@@ -93,6 +132,24 @@ int main(int argc, char** argv)
     cprintf("JOYTEST - what games see on the gameport (port 201h)       Esc or Q quits\r\n\r\n");
     cprintf("Axis times in microseconds: 24 = left/up, 575 = centre, 1124 = right/down,\r\n");
     cprintf("---- = nothing connected. Calibrate in each game's setup.\r\n");
+    if (grip)
+    {
+        gotoxy(1, 5); cprintf("GrIP view (Gravis GamePad Pro, digital mode; SBEMU /JOYMODE:3)");
+        for (;;)
+        {
+            char a[120];
+            for (i = 0; i < 2; ++i)
+            {
+                grip_text(a, grip_read(4 + i * 2));
+                gotoxy(1, 7 + i); clreol(); cprintf("Pad %d: %s", i + 1, a);
+            }
+            if (kbhit()) { int c = getch(); if (c == 27 || c == 'q' || c == 'Q') break; }
+            delay(30);
+        }
+        gotoxy(1, 14);
+        _setcursortype(_NORMALCURSOR);
+        return 0;
+    }
     for (;;)
     {
         char s[48];

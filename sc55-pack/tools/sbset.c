@@ -55,7 +55,7 @@ enum {
     /* Volume sub-menu (also shows the SC-55 gain and the CD audio volume) */
     F_VOL, F_SBVOL, F_OPLVOL, F_MIDIVOL,
     /* Joystick sub-menu (USB Xbox 360 pad on the gameport) */
-    F_JOY, F_JOYAX, F_JOYBT, F_JOYKEY, F_JOYDZ, F_USBKB, F_USBMS,
+    F_JOY, F_JOYMODE, F_JOYAX, F_JOYBT, F_JOYKEY, F_JOYDZ, F_USBKB, F_USBMS,
     NF };
 
 #define LV11 { "0", "10", "20", "30", "40", "50", "60", "70", "80", "90", "100" }, 11
@@ -117,7 +117,8 @@ static Field F[NF] = {
 
     /* Joystick */
     { "USB pad",         "/JOY",     { "1", "0" }, 2, 0, 0, "USB in DOS: Xbox 360 pads (2 = joystick B) + USB keyboard / mouse below. Off: SBEMU leaves USB to the BIOS.", {0}, 0 },
-    { "Sticks",          "/JOYAX",   { "LX,LY,RX,RY", "LX,LY,RX,TR", "LX,LY,TR,RY", "LX,LY,-,-" }, 4, 0, 0, "Which pad axes the game sees as joystick A X/Y and joystick B X/Y. D-pad also moves A.", {0}, 0 },
+    { "Stick type",      "/JOYMODE", { "0", "1", "2", "3", "4" }, 5, 0, 0, "Pick what the game is set up for. CH / Thrustmaster: D-pad = hat. GrIP: every button. Native: a real gameport.", {0}, 0 },
+    { "Sticks",          "/JOYAX",   { "LX,LY,RX,RY", "LX,LY,RX,TR", "LX,LY,TR,RY", "LX,LY,-,-", "LX,LY,RX,~RT" }, 5, 0, 0, "Which pad axes the game sees as joystick A X/Y and joystick B X/Y. D-pad also moves A.", {0}, 0 },
     { "Buttons 1-4",     "/JOYBT",   { "A,B,X,Y", "A,X,B,Y", "RT,A,B,X", "A,B,LB,RB" }, 4, 0, 0, "Pad buttons on gameport buttons 1-4 (button 1 is usually fire).", {0}, 0 },
     { "Keys",            "/JOYKEY",  { "ST:1C,BK:01", "ST:1C,BK:01,LB:39,RB:1D", "ST:1C,BK:01,DU:E048,DD:E050,DL:E04B,DR:E04D", "-" }, 4, 0, 0, "Pad buttons typed as keyboard keys, for menus and games without joystick support.", {0}, 0 },
     { "Dead zone",       "/JOYDZ",   { "10", "0", "5", "15", "20", "25" }, 6, 0, 0, "Stick movement ignored around the centre (stops drift).", {0}, 0 },
@@ -188,6 +189,10 @@ static void set_labels(void)
     onoff(F_JOY, "On (default)", "Off");
     F[F_JOYAX].labels[0] = "Left = A, right = B (default)"; F[F_JOYAX].labels[1] = "Left = A, right X + triggers = B";
     F[F_JOYAX].labels[2] = "Left = A, triggers + right Y = B"; F[F_JOYAX].labels[3] = "Left stick only (A)";
+    F[F_JOYAX].labels[4] = "Flight: right X = rudder, RT = throttle";
+    F[F_JOYMODE].labels[0] = "Standard joystick (default)"; F[F_JOYMODE].labels[1] = "CH Flightstick Pro (hat)";
+    F[F_JOYMODE].labels[2] = "Thrustmaster FCS (hat)"; F[F_JOYMODE].labels[3] = "Gravis GamePad Pro (GrIP)";
+    F[F_JOYMODE].labels[4] = "Native: real gameport (off)";
     F[F_JOYBT].labels[0] = "A B X Y (default)"; F[F_JOYBT].labels[1] = "A X B Y"; F[F_JOYBT].labels[2] = "RT A B X (trigger fires)"; F[F_JOYBT].labels[3] = "A B LB RB";
     F[F_JOYKEY].labels[0] = "Start=Enter, Back=Esc (default)"; F[F_JOYKEY].labels[1] = "+ LB=Space, RB=Ctrl";
     F[F_JOYKEY].labels[2] = "+ D-pad = arrow keys"; F[F_JOYKEY].labels[3] = "None";
@@ -857,7 +862,7 @@ static const MI M_ADV[] = { {-1, "Timing (game music tempo)"}, {F_AHEAD, 0}, {F_
                             {-1, "Sound"}, {F_OPL, 0}, {F_FM, 0}, {F_OUT, 0}, {F_FIXTC, 0}, {F_VCDA, 0},
                             {-1, "Games and cards"}, {F_PM, 0}, {F_RM, 0}, {F_SC, 0}, {F_SCFM, 0}, {F_SCMPU, 0}, {F_MCOM, 0}, {-2, 0} };
 static const MI M_JOY[] = { {-1, "USB: Xbox 360 pads, keyboard, mouse"}, {F_JOY, 0},
-                            {-1, "What the game sees (2 pads: pad 2 = joystick B)"}, {F_JOYAX, 0}, {F_JOYBT, 0}, {F_JOYDZ, 0},
+                            {-1, "What the game sees (2 pads: pad 2 = joystick B)"}, {F_JOYMODE, 0}, {F_JOYAX, 0}, {F_JOYBT, 0}, {F_JOYDZ, 0},
                             {-1, "Keyboard and mouse"}, {F_JOYKEY, 0}, {F_USBKB, 0}, {F_USBMS, 0}, {-2, 0} };
 
 static void sub_value(int f, char* v)

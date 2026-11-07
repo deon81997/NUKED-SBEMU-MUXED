@@ -535,6 +535,7 @@ struct MAIN_OPT
     "/JOYBT", "Pad -> gameport buttons 1-4: A B X Y LB RB LT RT ST BK LS RS GD DU DD DL DR or -", (uintptr_t)"A,B,X,Y", MAIN_SETCMD_STR,
     "/JOYKEY", "Pad buttons typed as keys, button:scan code (hex, E0xx extended), e.g. ST:1C,BK:01 (Start=Enter, Back=Esc)", (uintptr_t)"ST:1C,BK:01", MAIN_SETCMD_STR,
     "/JOYDZ", "Stick dead zone in percent (0-90)", 10, MAIN_SETCMD_BASE10,
+    "/JOYMODE", "Gameport stick type: 0=standard, 1=CH Flightstick Pro (D-pad = hat), 2=Thrustmaster FCS (D-pad = hat on axis 4), 3=Gravis GamePad Pro digital (GrIP, all buttons, 2 pads), 4=none (real gameport stays usable)", 0, MAIN_SETCMD_BASE10,
     "/USBKB", "USB keyboard typed through the PC's keyboard controller (1=on, 0=off; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
     "/USBMS", "USB mouse as a PS/2 mouse for a DOS mouse driver loaded after SBEMU (1=if one is plugged in at start, 2=always, 0=off; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
     NULL, NULL, 0,
@@ -601,6 +602,7 @@ enum EOption
     OPT_JOYBT,
     OPT_JOYKEY,
     OPT_JOYDZ,
+    OPT_JOYMODE,
     OPT_USBKB,
     OPT_USBMS,
     OPT_COUNT,
@@ -1835,7 +1837,7 @@ int main(int argc, char* argv[])
         const char* msg = "";
         MAIN_Step("USB joystick / keyboard / mouse (/JOY)");
         if(!VJOY_Init(MAIN_TCps, (const char*)MAIN_Options[OPT_JOYAX].value, (const char*)MAIN_Options[OPT_JOYBT].value,
-            (const char*)MAIN_Options[OPT_JOYKEY].value, MAIN_Options[OPT_JOYDZ].value, &bad))
+            (const char*)MAIN_Options[OPT_JOYKEY].value, MAIN_Options[OPT_JOYDZ].value, MAIN_Options[OPT_JOYMODE].value, &bad))
             MAIN_CPrintf(YELLOW, "Joystick: \"%s\" not understood in /JOYAX, /JOYBT or /JOYKEY, USB off.\n", bad ? bad : "?");
         else
         {
@@ -1847,10 +1849,17 @@ int main(int argc, char* argv[])
             else
             {
                 MAIN_JOY_On = TRUE;
-                if(enableRM) MAIN_JOY_RM = QEMM_Install_IOPortTrap(MAIN_JOY_IODT, 1, &MAIN_JOY_IOPT);
-                if(enablePM) MAIN_JOY_PM = HDPMIPT_Install_IOPortTrap(0x201, 0x201, MAIN_JOY_IODT, 1, &MAIN_JOY_IOPT_PM);
-                printf("Joystick (Port 201): ");
-                MAIN_Print_Enabled_Newline(MAIN_JOY_RM || MAIN_JOY_PM);
+                if(MAIN_Options[OPT_JOYMODE].value == 4)
+                    printf("Joystick (Port 201): left to the real gameport (/JOYMODE:4)\n");
+                else
+                {
+                    static const char* modes[] = { "", " as CH Flightstick Pro", " as Thrustmaster FCS", " as Gravis GamePad Pro (GrIP)" };
+                    int md = MAIN_Options[OPT_JOYMODE].value;
+                    if(enableRM) MAIN_JOY_RM = QEMM_Install_IOPortTrap(MAIN_JOY_IODT, 1, &MAIN_JOY_IOPT);
+                    if(enablePM) MAIN_JOY_PM = HDPMIPT_Install_IOPortTrap(0x201, 0x201, MAIN_JOY_IODT, 1, &MAIN_JOY_IOPT_PM);
+                    printf("Joystick (Port 201)%s: ", md >= 0 && md <= 3 ? modes[md] : "");
+                    MAIN_Print_Enabled_Newline(MAIN_JOY_RM || MAIN_JOY_PM);
+                }
                 MAIN_CPrintf(LIGHTGRAY, "  USB: %s.\n", msg);
                 if(MAIN_Options[OPT_USBMS].value == 2 || (MAIN_Options[OPT_USBMS].value == 1 && (USBPAD_Have() & USBPAD_HAVE_MOUSE)))
                 {
@@ -1867,6 +1876,7 @@ int main(int argc, char* argv[])
                         "  Not found? Run USBTEST.EXE (without SBEMU loaded) to see every USB step.\n");
             }
         }
+        MAIN_D("Joystick mode %d\n", MAIN_Options[OPT_JOYMODE].value);
         MAIN_D("Joystick: %s | axes %s buttons %s keys %s dz %d | kb %d ms %d | traps rm %d pm %d kbc %d %d%d\n", msg,
             (const char*)MAIN_Options[OPT_JOYAX].value, (const char*)MAIN_Options[OPT_JOYBT].value,
             (const char*)MAIN_Options[OPT_JOYKEY].value, MAIN_Options[OPT_JOYDZ].value, MAIN_Options[OPT_USBKB].value,
