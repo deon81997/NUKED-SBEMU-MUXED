@@ -18,6 +18,7 @@
  *
  * GPL-2.0-or-later. */
 #include <stdio.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -212,7 +213,9 @@ static void build_line(char* out)
             continue;
         }
         if (i == F_ROMSET) { if (F[i].cur == 0) continue; }   /* auto: SBEMU's own choice */
-        else if (F[i].cur == F[i].def) continue;              /* SBEMU's own default: leave it out */
+        else if (F[i].cur == F[i].def && i > 5) continue;     /* SBEMU's own default: leave it out */
+        /* (port, IRQ, DMA, 16-bit DMA, type and MPU-401 port are always written: when they are left out
+         *  SBEMU takes them from BLASTER, which may say something else than this screen showed) */
         sprintf(t, "%s%s:%s", out[0] ? " " : "", F[i].opt, F[i].vals[F[i].cur]);
         strcat(out, t);
     }
@@ -252,6 +255,23 @@ static void parse_tokens(char* s)
 static void load(void)
 {
     char path[200], line[512]; FILE* f; char* p;
+    {   /* what SBEMU uses when the settings do not say: BLASTER (the running SBEMU writes its own there) */
+        const char* b = getenv("BLASTER"); const char* c;
+        static const char* keys = "AIDHTP"; static const char* opts[6] = { "/A", "/I", "/D", "/H", "/T", "/P" };
+        if (b)
+            for (c = b; *c; c++)
+            {
+                const char* k = (c == b || c[-1] == ' ') ? strchr(keys, toupper((unsigned char)*c)) : NULL;
+                if (k && *k && isxdigit((unsigned char)c[1]))
+                {
+                    char tok[16]; int n = 0;
+                    const char* v = c + 1;
+                    while (n < 8 && isxdigit((unsigned char)v[n])) n++;
+                    snprintf(tok, sizeof tok, "%s:%.*s", opts[k - keys], n, v);
+                    parse_tokens(tok);
+                }
+            }
+    }
     sprintf(path, "%s\\SBOPTS.TXT", g_dir);
     if ((f = fopen(path, "r")) != NULL)
     {

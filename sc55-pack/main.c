@@ -786,6 +786,7 @@ static void MAIN_TimerReplay(uint64_t len)
     DIAG_TimerReplayed(n);
 }
 
+static void MAIN_CPrintf(int color, const char* fmt, ...);
 static void MAIN_SetBlasterEnv(struct MAIN_OPT* opt) //alter BLASTER env.
 {
     char buf[256];
@@ -794,7 +795,12 @@ static void MAIN_SetBlasterEnv(struct MAIN_OPT* opt) //alter BLASTER env.
     else
         sprintf(buf, "A%x I%x D%x T%x H%x P%x", opt[OPT_ADDR].value, opt[OPT_IRQ].value, opt[OPT_DMA].value, opt[OPT_TYPE].value, opt[OPT_HDMA].value, opt[OPT_MPUADDR].value);
     #ifdef DJGPP //makes vscode happy
-    setenv("BLASTER", buf, TRUE);
+    if(setenv("BLASTER", buf, TRUE) != 0)
+    {   /* utility.c's setenv writes COMMAND.COM's environment; it fails when that is full */
+        MAIN_CPrintf(YELLOW, "Warning: ");
+        printf("BLASTER could not be set to %s (DOS environment full: SHELL=...COMMAND.COM /E:1024 /P in CONFIG.SYS).\n"
+               "Games will read the old BLASTER: %s\n", buf, getenv("BLASTER") ? getenv("BLASTER") : "(none)");
+    }
     #endif
 }
 

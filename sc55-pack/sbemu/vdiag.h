@@ -28,6 +28,7 @@ void DIAG_BiosClock(uint64_t expected_milli, uint64_t got_milli); /* DOS clock v
 /* MPU-401 side channel: returns 1 if the command was a diagnostics command */
 int DIAG_Command(uint8_t cmd);
 /* returns 1 and the next byte while a snapshot is being read */
+int DIAG_ResetFlush(uint8_t cmd);
 int DIAG_ReadByte(uint8_t* b);
 
 #ifdef __cplusplus

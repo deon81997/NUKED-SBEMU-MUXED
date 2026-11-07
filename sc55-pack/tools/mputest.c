@@ -11,6 +11,7 @@
 #include <conio.h>
 #include <time.h>
 #include <dos.h>
+#include "mpuport.h"
 
 static int base = 0x330;
 
@@ -88,6 +89,7 @@ int main(int argc, char** argv)
         else if (!strcmp(argv[i], "/L") || !strcmp(argv[i], "/l")) loop = 1;
         else { puts("MPUTEST [/P:330] [/L]\nPlays a test tune through the MPU-401 (SBEMU + SC-55 must be loaded)."); return 2; }
     }
+    { int p = mpu_find(base); if (p) base = p; }   /* SBEMU's MPU-401 on whatever port it uses */
     printf("MPU-401 at port %Xh: ", base);
     if (!detect())
     {

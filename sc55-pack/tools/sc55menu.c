@@ -19,6 +19,7 @@
 #include <dir.h>
 #include "tui.h"
 #include "safewr.h"
+#include "mpuport.h"
 
 static int MPU = 0x330;          /* the MPU-401 port from the saved settings (/P) */
 #define NGAMES 4
@@ -53,11 +54,10 @@ static int g_n;
 /* ---------------------------------------------------------------- helpers */
 static int sbemu_present(void)
 {
-    long i;
-    outportb(MPU + 1, 0xFF);
-    for (i = 0; i < 200000L; ++i)
-        if (!(inportb(MPU + 1) & 0x80)) { if (inportb(MPU) == 0xFE) { outportb(MPU + 1, 0x3F); return 1; } break; }
-    return 0;
+    /* wherever SBEMU's MPU-401 is: the saved /P first, then BLASTER's P, then the other usual ports */
+    int p = mpu_find(MPU);
+    if (p) MPU = p;
+    return p != 0;
 }
 /* SC-55 / SoundFont render load from SBEMU (MPU command 0xB0, beta.34+), permille; -1 = not known */
 static int g_load = -1;
@@ -70,6 +70,7 @@ static void sbemu_load(void)
     g_load_tick = t ? t : 1;
     outportb(MPU + 1, 0xB0);
     for (i = 0; i < 150; i++) b[i] = (unsigned char)inportb(MPU);       /* the whole report, so nothing is left over */
+    mpu_drain(MPU);
     g_load = b[0] == 'L' ? b[3] | (b[4] << 8) : -1;
 }
 static void home_path(char* out, const char* name) { sprintf(out, "%s\\%s", g_home, name); }
@@ -309,7 +310,7 @@ static void build_menu(void)
     g_n = 0;
     /* Sound */
     snprintf(c, sizeof c, "CALL %s\\SC55.BAT", g_home);
-    add(C_SOUND, "Start SC-55 / SoundFont", "Loads SBEMU with your saved settings: a Sound Blaster plus an MPU-401 at port 330 played by the"
+    add(C_SOUND, "Start SC-55 / SoundFont", "Loads SBEMU with your saved settings: a Sound Blaster plus an MPU-401 (port 330 unless changed in Settings) played by the"
         " SC-55 emulation (or the SoundFont chosen in Settings). For protected-mode games (DOS4GW and the like): Duke 3D, Doom,"
         " most 90s games. Shows SBEMU's messages, then comes back here.", IT_BAT, c, -1, 1, NULL);
     if (home_exists("SC55JEM.BAT"))
@@ -349,7 +350,7 @@ static void build_menu(void)
     /* Tests */
     add(C_TESTS, "MIDI player (MIDPLAY)", "Browse your folders for .MID files and play them through the running SC-55 or"
         " SoundFont. A quick way to hear the synth without a game.", IT_BAT, "MIDPLAY.EXE /B", 1, 0, NULL);
-    add(C_TESTS, "Test tune (MPUTEST)", "Plays a short tune on the MPU-401 at port 330. If you hear it, General MIDI works.",
+    add(C_TESTS, "Test tune (MPUTEST)", "Plays a short tune on the MPU-401 (found on whatever port SBEMU uses). If you hear it, General MIDI works.",
         IT_BAT, "MPUTEST.EXE", 1, 1, NULL);
     snprintf(c, sizeof c, "CALL %s\\TEST.BAT", g_home);
     add(C_TESTS, "ROM + speed test", "Checks that your SC-55 ROMs boot and measures how fast this PC runs the emulation"
@@ -453,7 +454,19 @@ static void draw_status(void)
     if (mt[0] && strcmp(mt, "0") && strcasecmp(mt, "OFF")) tui_printf(61, 3, 0x07, "%s (Munt)", !strcasecmp(mt, "CM32L") ? "CM-32L" : "MT-32");
     else if (sf[0]) { const char* b = strrchr(sf, '\\'); tui_printf(61, 3, 0x07, "SF %.14s", b ? b + 1 : sf); }
     else tui_printf(61, 3, 0x07, "SC-55 %.11s", opt_val("/VSCSET", "auto"));
-    tui_printf(61, 4, 0x07, "SB %s I%s D%s", opt_val("/A", "220"), opt_val("/I", "7"), opt_val("/D", "1"));
+    if (g_running && getenv("BLASTER"))
+    {   /* what the running SBEMU really uses: it writes these to BLASTER */
+        const char* b = getenv("BLASTER"); char a[8] = "?", irq[4] = "?", d[4] = "?"; const char* s;
+        for (s = b; *s; s++)
+        {
+            if (s != b && s[-1] != ' ') continue;
+            if (*s == 'A' || *s == 'a') sscanf(s + 1, "%7[0-9A-Fa-f]", a);
+            if (*s == 'I' || *s == 'i') sscanf(s + 1, "%3[0-9]", irq);
+            if (*s == 'D' || *s == 'd') sscanf(s + 1, "%3[0-9]", d);
+        }
+        tui_printf(61, 4, 0x07, "SB%s I%s D%s P%X", a, irq, d, MPU);
+    }
+    else tui_printf(61, 4, 0x07, "SB%s I%s D%s P%s", opt_val("/A", "220"), opt_val("/I", "7"), opt_val("/D", "1"), opt_val("/P", "330"));
     (void)a;
 }
 
@@ -875,6 +888,12 @@ static int write_go(const ITEM* it, int saved_only)
     fprintf(f, "%c:\r\nCD %s\r\n", toupper((unsigned char)g_home[0]), g_home + 2);
     if (profile) /* back to the saved settings (defaults first, so the saved ones win) */
         fprintf(f, "%s\\SBEMU.EXE /VMPU /VSCROM:ROMS /VSCAHEAD:50 /VTIMER:1 /VSCFX:1 /VSCAUTO:1 %s > NUL\r\n", g_home, g_optfile);
+    else if (g_running && strstr(cmd, "SETTINGS.BAT"))
+        /* settings changed while SBEMU is loaded: the resident copy takes the saved ones over at once
+         * (port, IRQ, DMA, MPU-401 port, synth ...), so there is no need to restart the PC */
+        fprintf(f, "IF EXIST %s\\SBOPTS.TXT ECHO Applying the saved settings to the running SBEMU ...\r\n"
+                   "IF EXIST %s\\SBOPTS.TXT %s\\SBEMU.EXE /VMPU /VSCROM:ROMS @%s\\SBOPTS.TXT > %s\\SBAPPLY.TXT\r\n",
+                g_home, g_home, g_home, g_home, g_home);
     if (it->pause) fprintf(f, "ECHO.\r\nPAUSE\r\n");
     return sw_close(f, tmp, p);
 }
@@ -925,7 +944,7 @@ int main(int argc, char** argv)
 
     putenv("LFN=n");                       /* 8.3 names: the menu writes them into batch files for plain DOS */
     read_sbopts();
-    { const char* pv = opt_val("/P", "330"); long v = strtol(pv, NULL, 16); if (v == 0x300 || v == 0x330) MPU = (int)v; }
+    { const char* pv = opt_val("/P", "330"); long v = strtol(pv, NULL, 16); if (v >= 0x200 && v <= 0x3FF) MPU = (int)v; }
     g_running = sbemu_present();
     if (!g_running) read_lasterr();
     read_gametest_summary();

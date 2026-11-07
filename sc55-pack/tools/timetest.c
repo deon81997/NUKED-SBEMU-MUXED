@@ -20,6 +20,7 @@
 #include <go32.h>
 #include <sys/farptr.h>
 #include <crt0.h>
+#include "mpuport.h"
 
 int _crt0_startup_flags = _CRT0_FLAG_LOCK_MEMORY;
 
@@ -193,6 +194,7 @@ int main(int argc, char** argv)
     g_div = (unsigned)(1193182UL / hz);
     expect = 1193182.0 / g_div * secs;
 
+    { int p = mpu_find(g_port); if (p) g_port = p; }   /* SBEMU's MPU-401 on whatever port it uses */
     g_log = fopen("TIMETEST.TXT", "w");
     out("TIMETEST - timer interrupt at %u Hz, %d s per phase, MPU-401 at %X\n", hz, secs, g_port);
     out("(the game-style test: does IRQ 0 lose ticks while SBEMU plays music?)\n\n");

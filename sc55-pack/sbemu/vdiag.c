@@ -360,6 +360,19 @@ int DIAG_Command(uint8_t cmd)
     return 0;
 }
 
+/* MPU reset (0xFF) or UART mode (0x3F) on the command port: a report a program asked for and did not
+ * read to the end is thrown away, as a real MPU-401 empties its output on reset. Otherwise the next
+ * program's reset ACK would be a stale report byte ("SBEMU not loaded" in the menu, games finding no
+ * MPU-401). Returns 0 (nothing done) while a key script is being received: its bytes can be 0xFF. */
+int DIAG_ResetFlush(uint8_t cmd)
+{
+    if (K_Rx || D_WantSecs) return 0;
+    if (cmd != 0xFF && cmd != 0x3F) return 0;
+    D_BufPos = D_BufLen;
+    E_QPos = E_QLen;
+    return 1;
+}
+
 int DIAG_ReadByte(uint8_t* b)
 {
     if (E_QPos < E_QLen) { *b = E_Q[E_QPos++]; return 1; }   /* the answer to 0xAF comes first */

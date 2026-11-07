@@ -14,6 +14,7 @@
 #include <stdarg.h>
 #include <pc.h>
 #include <unistd.h>
+#include "mpuport.h"
 
 static int g_port = 0x330;
 static FILE* g_log;
@@ -92,6 +93,7 @@ int main(int argc, char** argv)
                "SBDIAG STOP    stop measuring\n");
         return 0;
     }
+    { int p = mpu_find(g_port); if (p) g_port = p; }
     if (!has_sbemu()) { printf("No MPU-401 at %X: run SC55 first.\n", g_port); return 1; }
     outportb(g_port + 1, 0x3F); /* back to UART mode */
 

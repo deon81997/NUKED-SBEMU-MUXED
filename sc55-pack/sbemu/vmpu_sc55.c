@@ -608,6 +608,8 @@ void VMPU_SBMidi_RawWrite(uint8_t value)
 
 uint32_t VMPU_MPU(uint32_t port, uint32_t val, uint32_t out)
 {
+    /* reset / UART mode: drop report bytes nobody read (see DIAG_ResetFlush) */
+    if (out && port == (uint32_t)VMPU_base + 1 && DIAG_ResetFlush((uint8_t)val)) Lcd_Pos = LCD_PKT;
     /* front panel + load report (any synth) */
     if (out && port == (uint32_t)VMPU_base + 1 && (val & 0xff) == 0xB0) { VMPU_PanelSnapshot(Lcd_Buf); Lcd_Pos = 0; return val; }
     if (!out && port == (uint32_t)VMPU_base && Lcd_Pos < LCD_PKT) { val &= ~0xff; return val | Lcd_Buf[Lcd_Pos++]; }

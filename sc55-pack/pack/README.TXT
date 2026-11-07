@@ -69,7 +69,8 @@ CONTENTS
    5. Check the PC is fast enough:           C:\SC55\TEST.BAT
    6. Start the emulation:                   C:\SC55\SC55.BAT
    7. Hear it:                               C:\SC55\MPUTEST.EXE
-   8. In your game choose General MIDI / MPU-401, port 330h.
+   8. In your game choose General MIDI / MPU-401, port 330h (or the
+      MPU-401 port you chose in SETTINGS; MENU shows it top right).
 
   Or do steps 5-7 (and everything else) from one screen: C:\SC55\MENU.BAT
 
@@ -402,7 +403,7 @@ CONTENTS
      save. Or only for one game: Games > Add / edit games > SBEMU options
      /VMT32:MT32. (Or by hand: SC55 /VMT32:MT32.)
   3. In the game's own setup choose "Roland MT-32" (or "LAPC-I" / "CM-32L"),
-     port 330.
+     port 330 (or the MPU-401 port you chose in SETTINGS).
 
   MT32 = the original MT-32 (what most early games expect), CM32L = the
   CM-32L / LAPC-I (more sound effects, used by later Sierra games), AUTO =
@@ -861,6 +862,15 @@ CONTENTS
       SC55                start SBEMU as usual
       GAMETEST            pick games, test length and SBEMU options, then Run
       GAMETEST /RUN       run the ticked tests right away, no questions
+  - Any Sound Blaster port / IRQ / DMA and any MPU-401 port work: before
+    each test GAMETEST sets the game's own sound setup to what SBEMU is
+    using (BLASTER and the port its MPU-401 answers at). Doom-engine games
+    (DEFAULT.CFG: snd_sbport, snd_sbirq, snd_sbdma, snd_mport) and Apogee /
+    Build games like Duke 3D (*.CFG: BlasterAddress, BlasterInterrupt,
+    BlasterDma8, BlasterDma16, MidiPort) are done automatically; only those
+    lines change, never the music or sound device chosen. The first time
+    a file is changed the original is kept as <name>.GTB. Other games: set
+    the values GAMETEST shows at the bottom in the game's own setup.
   - Doom / Doom II play their demo (-playdemo demo1) and quit by themselves.
   - Duke 3D runs unattended too: it plays its own built-in demos (with
     the level music), and when the test time is up SBEMU types the quit

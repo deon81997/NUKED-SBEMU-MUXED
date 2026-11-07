@@ -35,6 +35,7 @@ static int key_get(void) { return 0; }
 #include <time.h>
 #include <dos.h>
 #include <dir.h>
+#include "mpuport.h"
 static int base = 0x330;
 static uint64_t now_us(void) { return (uint64_t)uclock() * 1000000ULL / UCLOCKS_PER_SEC; }
 static void idle(void) {}
@@ -1205,6 +1206,7 @@ usage:
              "      S SC-55 front panel / channel table, - + choose the part shown, ESC quit.");
         return 2;
     }
+    { int p = mpu_find(base); if (p) base = p; }   /* SBEMU's MPU-401 on whatever port it uses */
     printf("MPU-401 at port %Xh: ", base);
     if (!mpu_detect())
     {

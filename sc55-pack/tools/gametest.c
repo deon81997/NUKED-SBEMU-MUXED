@@ -22,11 +22,12 @@
 #include <pc.h>
 #include "tui.h"
 #include "safewr.h"
+#include "mpuport.h"
 #include <unistd.h>
 #include <dir.h>
 #include <stdarg.h>
 
-#define MPU 0x330
+static int MPU = 0x330;   /* SBEMU's MPU-401: found at start (mpu_find), any port */
 #define NGAMES 4
 #define NOPTS 4
 
@@ -59,11 +60,114 @@ enum { F_MAGIC, F_VER, F_KHZ, F_MS, F_ISRN, F_ISRMS, F_ISRMAX, F_H1, F_H2, F_H5,
 static void mpu_cmd(int c) { outportb(MPU + 1, c); }
 static int sbemu_present(void)
 {
-    long i;
-    outportb(MPU + 1, 0xFF);
-    for (i = 0; i < 200000L; ++i)
-        if (!(inportb(MPU + 1) & 0x80)) { if (inportb(MPU) == 0xFE) { outportb(MPU + 1, 0x3F); return 1; } break; }
-    return 0;
+    int p = mpu_find(MPU);
+    if (p) MPU = p;
+    return p != 0;
+}
+
+/* ---------------------------------------------------------------- the game's own sound settings
+ * SBEMU's Sound Blaster can be at any port / IRQ / DMA and its MPU-401 at any port, so before each test
+ * the game's sound set-up is made to match what SBEMU is really using (BLASTER, which SBEMU writes,
+ * and the port the MPU-401 answered at). Only the port / IRQ / DMA lines already in the file are
+ * changed - the music and sound devices the game was set to stay as they are. The first time a file
+ * is changed the original is kept as <name>.GTB.
+ *   Doom engine (Doom, Doom II, Heretic, Hexen, Final Doom) DEFAULT.CFG: snd_sbport snd_sbirq snd_sbdma snd_mport
+ *   Apogee/Build (Duke Nukem 3D, Shadow Warrior, Blood ...) *.CFG: BlasterAddress BlasterInterrupt
+ *     BlasterDma8 BlasterDma16 MidiPort */
+static void appendf(const char* file, const char* fmt, ...);
+typedef struct { int a, i, d, h, p, ok; } SBVALS;
+static SBVALS sb_values(void)
+{
+    SBVALS v = { 0x220, 7, 1, 5, 0x330, 0 };
+    const char* b = getenv("BLASTER"); const char* s;
+    if (b)
+        for (s = b; *s; s++)
+        {
+            if (s != b && s[-1] != ' ') continue;
+            switch (toupper((unsigned char)*s))
+            {
+            case 'A': v.a = (int)strtol(s + 1, NULL, 16); v.ok = 1; break;
+            case 'I': v.i = atoi(s + 1); break;
+            case 'D': v.d = atoi(s + 1); break;
+            case 'H': v.h = atoi(s + 1); break;
+            }
+        }
+    v.p = MPU;
+    return v;
+}
+/* the new value written the way the old one was: "0x220", "220" (hex) or "544" (decimal) */
+static void fmt_like(char* out, const char* old, int val, int is_port)
+{
+    while (*old == ' ' || *old == '\t' || *old == '=') old++;
+    if (!is_port) sprintf(out, "%d", val);
+    else if (old[0] == '0' && (old[1] == 'x' || old[1] == 'X')) sprintf(out, "0x%X", val);
+    else if (atoi(old) >= 0x200) sprintf(out, "%d", val);        /* Doom writes ports in decimal: 544 */
+    else sprintf(out, "%X", val);
+}
+/* returns how many lines were changed (-1: could not write) */
+static int cfg_patch(const char* path, const SBVALS* v)
+{
+    static const struct { const char* key; int what; int port; } keys[] = {
+        { "snd_sbport", 'A', 1 }, { "snd_sbirq", 'I', 0 }, { "snd_sbdma", 'D', 0 }, { "snd_mport", 'P', 1 },
+        { "BlasterAddress", 'A', 1 }, { "BlasterInterrupt", 'I', 0 }, { "BlasterDma8", 'D', 0 },
+        { "BlasterDma16", 'H', 0 }, { "MidiPort", 'P', 1 },
+    };
+    static char lines[600][160];
+    char line[160], bak[300], tmp[310], val[24]; FILE* f; int n = 0, k, changed = 0, i;
+    if ((f = fopen(path, "r")) == NULL) return 0;
+    while (n < 600 && fgets(line, sizeof line, f)) { line[strcspn(line, "\r\n")] = 0; strcpy(lines[n++], line); }
+    fclose(f);
+    for (i = 0; i < n; i++)
+        for (k = 0; k < (int)(sizeof keys / sizeof keys[0]); k++)
+        {
+            size_t kl = strlen(keys[k].key);
+            const char* l = lines[i]; const char* rest;
+            while (*l == ' ' || *l == '\t') l++;
+            if (strncasecmp(l, keys[k].key, kl) || (l[kl] != ' ' && l[kl] != '\t' && l[kl] != '=')) continue;
+            rest = l + kl;
+            {
+                int want = keys[k].what == 'A' ? v->a : keys[k].what == 'I' ? v->i : keys[k].what == 'D' ? v->d
+                         : keys[k].what == 'H' ? v->h : v->p;
+                const char* vs = rest; char sep[16]; int sl;
+                while (*vs == ' ' || *vs == '\t' || *vs == '=') vs++;
+                sl = (int)(vs - rest); if (sl > 15) sl = 15;
+                memcpy(sep, rest, sl); sep[sl] = 0;
+                fmt_like(val, vs, want, keys[k].port);
+                if (!strcasecmp(vs, val)) break;
+                snprintf(line, sizeof line, "%.*s%s%s", (int)(l - lines[i]) + (int)kl, lines[i], sep, val);
+                strcpy(lines[i], line); changed++;
+            }
+            break;
+        }
+    if (!changed) return 0;
+    strcpy(bak, path); { char* dot = strrchr(bak, '.'); if (dot) strcpy(dot, ".GTB"); else strcat(bak, ".GTB"); }
+    if (access(bak, F_OK) != 0)
+    {
+        FILE* in = fopen(path, "rb"); FILE* out = in ? fopen(bak, "wb") : NULL; int c;
+        if (out) { while ((c = fgetc(in)) != EOF) fputc(c, out); fclose(out); }
+        if (in) fclose(in);
+    }
+    if ((f = sw_open(path, tmp, "w")) == NULL) return -1;
+    for (i = 0; i < n; i++) fprintf(f, "%s\n", lines[i]);
+    return sw_close(f, tmp, path) ? changed : -1;
+}
+/* every *.CFG in the game's folder; the summary goes to GTSTATE.TXT and *note */
+static void game_sound_setup(const GAME* g, char* note, int nlen)
+{
+    char dir[260], pat[280], p[300]; struct ffblk fb; int done, total = 0, files = 0; char* bs;
+    SBVALS v = sb_values();
+    note[0] = 0;
+    strcpy(dir, g->path); bs = strrchr(dir, '\\'); if (!bs) return; *bs = 0;
+    sprintf(pat, "%s\\*.CFG", dir);
+    for (done = findfirst(pat, &fb, 0); !done; done = findnext(&fb))
+    {
+        int c;
+        sprintf(p, "%s\\%s", dir, fb.ff_name);
+        c = cfg_patch(p, &v);
+        if (c > 0) { total += c; files++; appendf("GTSTATE.TXT", "STEP %s: sound set to SB %X I%d D%d H%d, MIDI %X (%d lines)\n", p, v.a, v.i, v.d, v.h, v.p, c); }
+        if (c < 0) appendf("GTSTATE.TXT", "STEP %s: could not be changed\n", p);
+    }
+    if (files) snprintf(note, nlen, "Game set to SB %X/%d/%d, MIDI %X (%s).", v.a, v.i, v.d, v.p, files == 1 ? "1 file" : "files");
 }
 static int read_report(unsigned long* d)
 {
@@ -361,7 +465,12 @@ static int run_one(int i, int n)
     draw_run(i, n, r, "Setting SBEMU options ...", NULL, NULL);
     set_sbemu(r->v);
     tui_invalidate();
-    if (!sbemu_present()) { draw_run(i, n, r, "SBEMU does not answer at 330: run SC55 first.", "Press a key.", NULL); tui_key(); return -1; }
+    if (!sbemu_present()) { draw_run(i, n, r, "SBEMU's MPU-401 does not answer: run SC55 first.", "Press a key.", NULL); tui_key(); return -1; }
+    {   /* the game's sound set-up matched to SBEMU's port / IRQ / DMA and MPU-401 port */
+        char note[100];
+        game_sound_setup(g, note, sizeof note);
+        if (note[0]) { draw_run(i, n, r, "Setting the game's sound ...", note, NULL); sleep(1); }
+    }
 
     if (!game_auto(g))
     {
@@ -635,7 +744,11 @@ static void draw_menu(int row, const int* col)
     tui_putw(4, 21, 37, row == 12 ? HL : 0x1F, " Full SBDIAG reports (GTFULL.TXT)");
     tui_putw(41, 20, 37, row == 13 ? HL : 0x1F, " Best settings per game");
     tui_putw(41, 21, 37, row == 14 ? HL : 0x1F, " Clear all results");
-    tui_put(5, 22, 0x13, "Set each game to General MIDI 330 + SB 220/7/1 in its own SETUP first.");
+    {   /* the values SBEMU is using now; Doom-engine and Apogee/Build games are set to them by GAMETEST */
+        SBVALS v = sb_values();
+        snprintf(buf, sizeof buf, "Games get SB %X/%d/%d + MIDI %X automatically (Doom, Duke 3D ...).", v.a, v.i, v.d, v.p);
+        tui_put(5, 22, 0x13, buf);
+    }
 
     tui_fill(1, 24, 80, 1, 0x10, ' ');
     tui_putw(2, 24, 78, 0x1E, g_hint[row]);
@@ -672,7 +785,7 @@ int main(int argc, char** argv)
         {
             int n = build_plan(0);
             if (n && sbemu_present()) run_plan(0, n);
-            else tui_message("GAMETEST", n ? "SBEMU does not answer at port 330: run SC55 first." : "No game selected (or no path set).");
+            else tui_message("GAMETEST", n ? "SBEMU's MPU-401 does not answer: run SC55 first." : "No game selected (or no path set).");
         }
 
     for (;;)
@@ -724,7 +837,7 @@ int main(int argc, char** argv)
             int n = build_plan(row == 10);
             save_cfg();
             if (!n) { tui_message("GAMETEST", "No game selected (or no path set)."); continue; }
-            if (!sbemu_present()) { tui_message("GAMETEST", "SBEMU does not answer at port 330: run SC55 first."); continue; }
+            if (!sbemu_present()) { tui_message("GAMETEST", "SBEMU's MPU-401 does not answer: run SC55 first."); continue; }
             sprintf(buf, "Run %d tests (about %d min)? Keep your hands off the keyboard.", n, (n * (g_secs + 20) + 59) / 60);
             if (tui_yesno(buf)) run_plan(0, n);
         }
