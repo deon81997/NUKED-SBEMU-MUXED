@@ -95,9 +95,9 @@ period-correct DOS sound setup. It's tuned on a **Dell Latitude D810**
 <summary><b>🎮 USB in DOS: pads, keyboard, mouse</b></summary>
 
 - Up to two wired Xbox 360 pads (Microsoft and compatible) as gameport joysticks A and B: two sticks, four buttons, Start/Back as Enter/Esc
-- USB keyboards and mice work in DOS programs and games
+- USB keyboards in DOS, and USB mice through your DOS mouse driver (CTMOUSE or MOUSE.COM)
 - Every USB controller kind: UHCI, OHCI, EHCI and xHCI, through hubs, hot-plugging
-- Axes, buttons, keys and dead zone adjustable; `JOYTEST` shows what games see, `USBTEST` shows each step of finding the pad and logs it for bug reports. [Details below](#-usb-joystick-xbox-360-pad)
+- Axes, buttons, keys and dead zone adjustable; `JOYTEST` shows what games see, `USBTEST` shows each step of finding the pad and logs it for bug reports. [Details below](#-usb-in-dos-xbox-360-pads-keyboard-mouse)
 </details>
 
 <details>
