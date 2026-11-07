@@ -350,7 +350,8 @@ static void build_menu(void)
     snprintf(c, sizeof c, "CALL %s\\SETTINGS.BAT /PAGE:JOY", g_home);
     add(C_SETTINGS, "Joystick (USB pad)", "A wired USB Xbox 360 pad (or compatible) as the PC gameport joystick at port 201h"
         " (/JOY): which sticks and buttons the game sees, a dead zone, and pad buttons typed as keys (Start = Enter,"
-        " Back = Esc). Works on every kind of USB controller (USB 1.1, 2.0 and 3), also behind a hub. Applies the next time SBEMU starts.",
+        " Back = Esc). Works on every kind of USB controller (USB 1.1, 2.0 and 3), also behind a hub. On by default; turn it off if"
+        " you use a USB keyboard or mouse in DOS (SBEMU takes the USB ports over). Applies the next time SBEMU starts.",
         IT_BAT, c, 0, 0, NULL);
     /* Tests */
     add(C_TESTS, "MIDI player (MIDPLAY)", "Browse your folders for .MID files and play them through the running SC-55 or"
@@ -360,8 +361,11 @@ static void build_menu(void)
     add(C_TESTS, "Joystick test (JOYTEST)", "Shows what games see on the gameport: the four axes and four buttons, live."
         " With the USB pad on (Settings > Joystick) move the sticks and press A/B/X/Y. Esc or Q quits.",
         IT_BAT, "JOYTEST.EXE", 1, 0, NULL);
-    add(C_TESTS, "USB pad finder (USBTEST)", "Looks for the USB Xbox 360 pad the way SBEMU /JOY does and shows every step:"
-        " the USB controllers, what is plugged into their ports, the pad's sticks and buttons live, and every plug / unplug."
+    add(C_TESTS, "Keyboard / mouse test (KMTEST)", "Shows the keys DOS gets (scan code, character) and the mouse driver's"
+        " position and buttons, live. Checks SBEMU's USB keyboard and mouse (load CTMOUSE / MOUSE.COM after SBEMU). Esc twice quits.",
+        IT_BAT, "KMTEST.EXE", 1, 0, NULL);
+    add(C_TESTS, "USB finder (USBTEST)", "Looks for USB pads, keyboards and mice the way SBEMU /JOY does and shows every step:"
+        " the USB controllers, what is plugged into their ports, both pads, keys and mouse live, and every plug / unplug."
         " Writes USBTEST.TXT for a bug report. Only while SBEMU is not loaded (restart the PC first).",
         IT_BAT, "USBTEST.EXE USBTEST.TXT", -1, 0, "USBTEST.TXT");
     snprintf(c, sizeof c, "CALL %s\\TEST.BAT", g_home);

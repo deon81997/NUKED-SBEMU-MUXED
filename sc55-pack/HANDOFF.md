@@ -1,6 +1,6 @@
 # SC-55 pack — handoff
 
-## Current state (SBEMU 1.0.0-beta.44-usb-sc55, branch usb-xpad)
+## Current state (SBEMU 1.0.0-beta.45-usb-sc55, branch usb-xpad)
 - SBEMU + Nuked-SC55 (SC-55/mkII), Munt MT-32/CM-32L (/VMT32), SoundFont (/VSF); MPU side channel 0xA5-0xB0 (stats, SBDIAG, key player, triple-Esc, front panel/LCD + CPU load).
 - Key player holds each typed key 500 ms (vdiag.c key_tick); Duke 3D quit default `ESC W3 Q W2 Y W3 Y W3 ESC W3 Q W2 Y W3 Y` — verified in QEMU with Duke 3D Atomic 1.5 from logo, title and demo (GAMETEST /RUN, 20 s and 40 s tests).
 - Tools: SC55MENU (game profiles GAMES.CFG, safe mode, CPU%, first-run auto setup), SBSET (/TUNE benchmark, MT-32 choice), GAMETEST (/RUN), MIDPLAY (live SC-55/MT-32 LCD panel), CDGUI (CUE checks/fix), Ctrl+Alt+F12 in-game LCD overlay (text + mode 13h).
@@ -44,8 +44,9 @@
 - Source from this repo. Attach: SC55PACK-HYBRID.zip (pack + ROMs + third-party DOS programs) and sc55-restore-1/2/3.zip (DJGPP in two parts, QEMU, FreeDOS boot files, JEMMEX; RESTORE.md inside).
 
 ## Next steps
-1. User: D810 works (USBTEST, beta.44 code). Still to confirm: NEC PCI card on the P5PE-VM with USBTEST, then SBEMU /JOY:1
-   + JOYTEST + a game on both machines.
+1. User (beta.45): NEC card on the P5PE-VM with USBTEST (pad answered SET_ADDRESS then went silent, CC5: now 20 ms
+   settle + retries); USB keyboard / mouse in SBEMU on real hardware (CTMOUSE after SBEMU, KMTEST); two pads in a game.
+   Watch: a real BIOS whose INT 15h C2 serves a USB mouse itself (SeaBIOS does when the mouse is there at POST).
 2. Possible next: CardBus slot bring-up (D810 PC Card), Xbox One pads (GIP init), INT 15h AH=84h BIOS joystick, Renesas
    firmware upload; check EHCI split transactions (pad behind an Intel 5/6-series built-in hub) on real hardware.
 3. Older: Automatic setup, MIDPLAY S panel, Ctrl+Alt+F12, MT-32 game, GAMETEST Duke run; SBDIAG if music is choppy.
@@ -55,13 +56,16 @@
 - tools/: sc55menu.c, sbset.c, gametest.c, midplay.c, cdgui.c, sbdiag.c, tui.h, theme.h, fontdata.h, safewr.h
 - third_party/mt32emu (Munt 2.8.3), upstream/Nuked-SC55
 - dosimg/ (test rig): mkdisk.py (FreeDOS FAT16 image), mkiso.py (ISO9660 + Duke IDF), vm.py (QEMU driver); QEMU built in work/qemu/b7 (configure: --python=/usr/bin/python3.12, tests/fp skipped, dtc/keycodemapdb from GitHub mirrors)
-- USB pad: sbemu/usbpad.c (polled UHCI host, EHCI handoff, 360 pad), sbemu/vjoy.c (port 201h, mapping, keys), main.c (/JOY*),
-  tools/joytest.c, tools/sbset.c (Joystick page), tools/sc55menu.c; testrig/fakepad.py (usbredir pad), joyrun.sh, joyrm.asm
+- USB: sbemu/usbpad.c (polled UHCI/OHCI/EHCI/xHCI host, hubs, pipes for 2 pads + keyboards + mice), sbemu/vjoy.c (port 201h,
+  2-pad mapping, pad keys), sbemu/vkbc.c (8042 injection D2/D3, HID->set 1, PS/2 mouse emulation on trapped 60h/64h),
+  main.c (/JOY*, /USBKB, /USBMS), tools/joytest.c, usbtest.c, kmtest.c, sbset.c (Joystick page), sc55menu.c;
+  testrig/fakepad.py (usbredir pad), joyrun.sh, joyrm.asm. Test scripts in work/joyvm: multi.sh (2 pads + usb-kbd/mouse,
+  LATE=1 adds kbd/mouse after POST so SeaBIOS doesn't serve INT 15h C2 itself), qmp.py (keys/mouse via QMP)
 - Build: DJGPP gcc 12.2 from github.com/andrewwutw/build-djgpp v3.4 (djgpp-linux64-gcc1220.tar.bz2);
   `export PATH=<djgpp>/bin:$PATH; make -j8` (delete output/*.o after header changes)
 
 ## Resume prompt
-"Continue NUKED SB-EMU from sc55-pack/HANDOFF.md (beta.44-usb): github.com/deon81997/NUKED-SBEMU-MUXED, branch usb-xpad. Rebuild with DJGPP, then continue from Next steps."
+"Continue NUKED SB-EMU from sc55-pack/HANDOFF.md (beta.45-usb): github.com/deon81997/NUKED-SBEMU-MUXED, branch usb-xpad. Rebuild with DJGPP, then continue from Next steps."
 
 ## 2026-11-06 (beta.37): SBEMU "Not loaded" on the D810 after SC55.BAT
 - SBEMU no longer quits when the real sound card uses the IRQ asked for (/I or BLASTER): it takes another of 7/5/9, warns, and updates BLASTER.
@@ -153,3 +157,17 @@
   "device not responding"), first descriptor read retried, register dumps in traces.
 - D810 USBTEST log: hub 413C:0058 (Dell) found, flash drive 13FE:3600 skipped, pad on UHCI3 port 2, ~2900 reports,
   all buttons and sticks.
+
+## 2026-11-07 (beta.45-usb): USB keyboard, USB mouse, two pads
+- usbpad.c reworked: every controller runs all the time with its own schedule (UHCI: FL -> 6 pipe QHs -> control QH;
+  OHCI: HCCA -> 6 pipe EDs; EHCI: periodic list relinked per pipe; xHCI: per-pipe rings); device table across
+  controllers; root ports enumerated one at a time (state machine), hubs checked one port per tick with 100 ms debounce.
+- HID boot keyboards / mice (SET_PROTOCOL boot, SET_IDLE 0, LEDs via SET_REPORT); composite receivers give one pipe each.
+- vkbc.c: keys as set 1 via 8042 D2 (repeat 500/33 ms), mouse as PS/2 via D3 with command emulation when 60h/64h trapped
+  (/USBMS auto = USB mouse present at start). No injection from inside the port 60h read trap: QPIEMU re-reads the port
+  after the handler and swallowed the injected byte (lost keys in QEMU).
+- EHCI reclaim sets Port Owner directly (toggling CONFIGFLAG unplugged everything on the companions in QEMU).
+- SET_ADDRESS settle 20 ms + 4 tries of the device descriptor (NEC OHCI log: pad silent after 5 ms).
+- QEMU: 2 pads + kbd + mouse on UHCI+hub, OHCI, NEC EHCI+2 OHCI, ICH EHCI+UHCI, xHCI(+hub); kbd hot-replug; SBEMU +
+  CTMOUSE + KMTEST (keys incl. shifted, mouse move + click), JOYTEST two-pad mapping.
+- Release zip: release/NUKED-SB-EMU-1.0.0-beta.45-usb.zip.

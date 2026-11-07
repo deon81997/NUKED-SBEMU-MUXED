@@ -7,7 +7,7 @@ pkill -f fakepad.py; sleep 0.3
 python3 "$HERE/fakepad.py" 4711 "${PAD:?set PAD=pad script}" &
 sleep 0.5
 rm -f mon.sock
-qemu-system-i386 -machine pc -cpu pentium3 -m 64 -drive file="$IMG",format=raw,if=ide,index=0 -boot c \
+qemu-system-i386 -machine pc -cpu core2duo -m 64 -drive file="$IMG",format=raw,if=ide,index=0 -boot c \
   -audiodev none,id=snd -device AC97,audiodev=snd -display none -vga std -monitor unix:mon.sock,server,nowait \
   -chardev socket,id=pad,host=127.0.0.1,port=4711 "$@" > qemu.log 2>&1 &
 QP=$!

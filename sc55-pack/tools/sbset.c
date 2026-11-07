@@ -55,7 +55,7 @@ enum {
     /* Volume sub-menu (also shows the SC-55 gain and the CD audio volume) */
     F_VOL, F_SBVOL, F_OPLVOL, F_MIDIVOL,
     /* Joystick sub-menu (USB Xbox 360 pad on the gameport) */
-    F_JOY, F_JOYAX, F_JOYBT, F_JOYKEY, F_JOYDZ,
+    F_JOY, F_JOYAX, F_JOYBT, F_JOYKEY, F_JOYDZ, F_USBKB, F_USBMS,
     NF };
 
 #define LV11 { "0", "10", "20", "30", "40", "50", "60", "70", "80", "90", "100" }, 11
@@ -116,11 +116,13 @@ static Field F[NF] = {
     { "MIDI music",      "/VMIDIVOL",{ "100", "50", "75", "125", "150", "200", "300", "400" }, 8, 0, 0, "General MIDI music (SC-55 or SoundFont). Over 100% makes it louder.", {0}, 0 },
 
     /* Joystick */
-    { "USB pad",         "/JOY",     { "0", "1" }, 2, 0, 0, "Wired Xbox 360 pad on any USB port (USB 1.1, 2.0 or 3, also behind a hub). Applies when SBEMU next starts.", {0}, 0 },
+    { "USB pad",         "/JOY",     { "1", "0" }, 2, 0, 0, "USB in DOS: Xbox 360 pads (2 = joystick B) + USB keyboard / mouse below. Off: SBEMU leaves USB to the BIOS.", {0}, 0 },
     { "Sticks",          "/JOYAX",   { "LX,LY,RX,RY", "LX,LY,RX,TR", "LX,LY,TR,RY", "LX,LY,-,-" }, 4, 0, 0, "Which pad axes the game sees as joystick A X/Y and joystick B X/Y. D-pad also moves A.", {0}, 0 },
     { "Buttons 1-4",     "/JOYBT",   { "A,B,X,Y", "A,X,B,Y", "RT,A,B,X", "A,B,LB,RB" }, 4, 0, 0, "Pad buttons on gameport buttons 1-4 (button 1 is usually fire).", {0}, 0 },
     { "Keys",            "/JOYKEY",  { "ST:1C,BK:01", "ST:1C,BK:01,LB:39,RB:1D", "ST:1C,BK:01,DU:E048,DD:E050,DL:E04B,DR:E04D", "-" }, 4, 0, 0, "Pad buttons typed as keyboard keys, for menus and games without joystick support.", {0}, 0 },
     { "Dead zone",       "/JOYDZ",   { "10", "0", "5", "15", "20", "25" }, 6, 0, 0, "Stick movement ignored around the centre (stops drift).", {0}, 0 },
+    { "USB keyboard",    "/USBKB",   { "1", "0" }, 2, 0, 0, "USB keyboard typed through the PC's keyboard controller (it stops working without this once SBEMU takes USB).", {0}, 0 },
+    { "USB mouse",       "/USBMS",   { "1", "2", "0" }, 3, 0, 0, "USB mouse as a PS/2 mouse. Load CTMOUSE / MOUSE.COM after SBEMU. Auto = only if plugged in when SBEMU starts.", {0}, 0 },
 };
 
 static char g_dir[160] = "C:\\SC55";
@@ -183,13 +185,15 @@ static void set_labels(void)
     onoff(F_OUT, "Speaker / S/PDIF (default)", "Headphone");
     onoff(F_FIXTC, "On (default)", "Off");
     { static const char* c[7] = { "Off (default)", "50%", "75%", "100%", "125%", "150%", "200%" }; for (i = 0; i < 7; i++) F[F_VCDA].labels[i] = c[i]; }
-    onoff(F_JOY, "Off (default)", "On");
+    onoff(F_JOY, "On (default)", "Off");
     F[F_JOYAX].labels[0] = "Left = A, right = B (default)"; F[F_JOYAX].labels[1] = "Left = A, right X + triggers = B";
     F[F_JOYAX].labels[2] = "Left = A, triggers + right Y = B"; F[F_JOYAX].labels[3] = "Left stick only (A)";
     F[F_JOYBT].labels[0] = "A B X Y (default)"; F[F_JOYBT].labels[1] = "A X B Y"; F[F_JOYBT].labels[2] = "RT A B X (trigger fires)"; F[F_JOYBT].labels[3] = "A B LB RB";
     F[F_JOYKEY].labels[0] = "Start=Enter, Back=Esc (default)"; F[F_JOYKEY].labels[1] = "+ LB=Space, RB=Ctrl";
     F[F_JOYKEY].labels[2] = "+ D-pad = arrow keys"; F[F_JOYKEY].labels[3] = "None";
     { static const char* d[6] = { "10% (default)", "Off", "5%", "15%", "20%", "25%" }; for (i = 0; i < 6; i++) F[F_JOYDZ].labels[i] = d[i]; }
+    onoff(F_USBKB, "On (default)", "Off");
+    F[F_USBMS].labels[0] = "Auto (default)"; F[F_USBMS].labels[1] = "Always"; F[F_USBMS].labels[2] = "Off";
     onoff(F_PM, "On (default)", "Off");
     onoff(F_RM, "On (default)", "Off");
     {
@@ -765,8 +769,8 @@ static void summary(int i, char* v)
                 F[F_OPLVOL].vals[F[F_OPLVOL].cur], F[F_MIDIVOL].vals[F[F_MIDIVOL].cur]);
     else if (i == F_JOYMENU)
     {
-        if (!F[F_JOY].cur) strcpy(v, "off");
-        else sprintf(v, "USB pad on, %.20s", show(&F[F_JOYBT]));
+        if (F[F_JOY].cur) strcpy(v, "off");
+        else sprintf(v, "USB on: pads%s%s", F[F_USBKB].cur ? "" : ", keyboard", F[F_USBMS].cur == 2 ? "" : ", mouse");
     }
     else
         sprintf(v, "ahead %s ms, give-back %s%s", F[F_AHEAD].vals[F[F_AHEAD].cur], F[F_VTIMER].cur ? "off" : "on",
@@ -852,9 +856,9 @@ static const MI M_VOL[] = { {-1, "Volume"}, {F_VOL, 0}, {F_SBVOL, 0}, {F_OPLVOL,
 static const MI M_ADV[] = { {-1, "Timing (game music tempo)"}, {F_AHEAD, 0}, {F_VTIMER, 0},
                             {-1, "Sound"}, {F_OPL, 0}, {F_FM, 0}, {F_OUT, 0}, {F_FIXTC, 0}, {F_VCDA, 0},
                             {-1, "Games and cards"}, {F_PM, 0}, {F_RM, 0}, {F_SC, 0}, {F_SCFM, 0}, {F_SCMPU, 0}, {F_MCOM, 0}, {-2, 0} };
-static const MI M_JOY[] = { {-1, "USB Xbox 360 pad as the gameport joystick"}, {F_JOY, 0},
-                            {-1, "What the game sees"}, {F_JOYAX, 0}, {F_JOYBT, 0}, {F_JOYDZ, 0},
-                            {-1, "Keyboard"}, {F_JOYKEY, 0}, {-2, 0} };
+static const MI M_JOY[] = { {-1, "USB: Xbox 360 pads, keyboard, mouse"}, {F_JOY, 0},
+                            {-1, "What the game sees (2 pads: pad 2 = joystick B)"}, {F_JOYAX, 0}, {F_JOYBT, 0}, {F_JOYDZ, 0},
+                            {-1, "Keyboard and mouse"}, {F_JOYKEY, 0}, {F_USBKB, 0}, {F_USBMS, 0}, {-2, 0} };
 
 static void sub_value(int f, char* v)
 {

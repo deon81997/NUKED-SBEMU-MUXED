@@ -32,7 +32,7 @@ period-correct DOS sound setup. It's tuned on a **Dell Latitude D810**
 | 🎚️ **SoundFont** | Any `.SF2` instead, with its own reverb and chorus |
 | 💿 **Virtual CD drive** | `.CUE/.BIN`, `.ISO` and multi-disc images on drive **M:**, with **CD-Audio mixed into the sound** |
 | 🖥️ **Menus for everything** | Start the synth, change settings, test games, play MIDI files, mount discs, with themes, fonts and display modes |
-| 🎮 **USB joystick** | A wired **Xbox 360 pad** answers on the gameport (port 201h), on any USB controller *(experimental)* |
+| 🎮 **USB in DOS** | Up to two wired **Xbox 360 pads** on the gameport (port 201h: joystick A and B), plus **USB keyboards and mice** for DOS programs *(experimental)* |
 | 🪟 **Windows 98 too** | The same SB / OPL3 / MPU-401 in DOS boxes, plus an **"NUKED SB-EMU" Windows MIDI device** |
 | 🐞 **Built-in diagnostics** | Start-up log, live load meter, timing tests and a one-key bug report |
 
@@ -92,9 +92,10 @@ period-correct DOS sound setup. It's tuned on a **Dell Latitude D810**
 </details>
 
 <details>
-<summary><b>🎮 USB joystick</b></summary>
+<summary><b>🎮 USB in DOS: pads, keyboard, mouse</b></summary>
 
-- Wired Xbox 360 pads (Microsoft and compatible) as an analog gameport joystick: two sticks, four buttons, Start/Back as Enter/Esc
+- Up to two wired Xbox 360 pads (Microsoft and compatible) as gameport joysticks A and B: two sticks, four buttons, Start/Back as Enter/Esc
+- USB keyboards and mice work in DOS programs and games
 - Every USB controller kind: UHCI, OHCI, EHCI and xHCI, through hubs, hot-plugging
 - Axes, buttons, keys and dead zone adjustable; `JOYTEST` shows what games see, `USBTEST` shows each step of finding the pad and logs it for bug reports. [Details below](#-usb-joystick-xbox-360-pad)
 </details>
@@ -176,16 +177,26 @@ MIDI synth replaces the MPU side, so you normally leave these off.
 
 ---
 
-## 🎮 USB joystick (Xbox 360 pad)
+## 🎮 USB in DOS: Xbox 360 pads, keyboard, mouse
 
 <img src="docs/joytest.png" width="560" alt="JOYTEST showing the pad's sticks and buttons">
 
-DOS games read an analog joystick on the gameport, port 201h. With `/JOY:1`
-(MENU > Settings > **Joystick**), SBEMU answers there itself with a USB
+DOS games read an analog joystick on the gameport, port 201h. SBEMU answers
+there itself (on by default, `/JOY:0` or MENU > Settings > **Joystick** turns it off) with a USB
 Xbox 360 pad: left stick = joystick A (the D-pad moves it too), right stick
 = joystick B, A/B/X/Y = buttons 1-4. Start and Back are typed as Enter and
 Esc so game menus work from the pad. Sticks, buttons, keys and the dead zone
-can be changed (`/JOYAX`, `/JOYBT`, `/JOYKEY`, `/JOYDZ`).
+can be changed (`/JOYAX`, `/JOYBT`, `/JOYKEY`, `/JOYDZ`). With **two pads**,
+pad 1 is joystick A and pad 2 joystick B (left stick, A and B each).
+
+- **USB keyboard** (`/USBKB:1`, default on): keys are typed through the PC's
+  8042 keyboard controller (set 1 scan codes, command D2h), with key repeat
+  and the lock LEDs following the BIOS, so DOS and games see a PS/2 keyboard.
+- **USB mouse** (`/USBMS:1` = when one is plugged in at start, `2` = always):
+  SBEMU traps ports 60h/64h, answers a DOS mouse driver's PS/2 mouse commands
+  itself (reset, ID, rates, IntelliMouse wheel knock) and sends the USB
+  mouse's movement as PS/2 packets (command D3h). Load CTMOUSE or MOUSE.COM
+  after SBEMU. `KMTEST.EXE` shows what DOS gets from both.
 
 - **Pads:** the wired Microsoft pad and wired pads that speak the same
   protocol (Hori, Mad Catz, Logitech, Saitek, ...). The PC wireless receiver
@@ -205,13 +216,16 @@ can be changed (`/JOYAX`, `/JOYBT`, `/JOYKEY`, `/JOYDZ`).
   are read from the sound interrupt and on every port 201h read; the port's
   one-shot timers are emulated with the CPU's time stamp counter
   (`sbemu/vjoy.c`). Hot-plugging works.
+- Every controller runs at once with its own schedule; each pad, keyboard
+  and mouse has its own interrupt pipe, on any mix of controllers and hubs.
 - While it runs, the BIOS's own USB keyboard/mouse support stops until the
-  next restart.
+  next restart (SBEMU's takes over).
 
 Tested in QEMU (UHCI; OHCI; EHCI with UHCI or OHCI companions, as on the D810
 and NEC cards; EHCI alone; QEMU's xHCI and its NEC µPD720200 model; hubs on
 UHCI, OHCI and xHCI; hot-plugging, also into a hub) with a pretend pad
-(`sc55-pack/testrig/fakepad.py`, usbredir); not yet on a real D810.
+(`sc55-pack/testrig/fakepad.py`, usbredir), two pads + QEMU's USB keyboard and
+mouse with CuteMouse; the single pad works on a real D810 (ICH6 UHCI).
 
 ---
 
@@ -241,7 +255,8 @@ UHCI, OHCI and xHCI; hot-plugging, also into a hub) with a pretend pad
 | `MIDPLAY.EXE` | MIDI player with a live SC-55 / MT-32 front panel |
 | `CDSET\GUI.BAT` → `CDGUI.EXE` | CD images: mount on M:, run a disc's installer, list its files, fix CUE files |
 | `JOYTEST.EXE` | Shows what games see on the gameport: four axes and four buttons, live |
-| `USBTEST.EXE` | Finds the USB pad with the same code as SBEMU and shows every step (controllers, ports, plug / unplug, live input); writes a log for bug reports |
+| `USBTEST.EXE` | Finds USB pads, keyboards and mice with the same code as SBEMU and shows every step (controllers, ports, plug / unplug, live input); writes a log for bug reports |
+| `KMTEST.EXE` | Keyboard / mouse test: keys DOS gets (scan code, character) and the mouse driver's position and buttons |
 | `SBDIAG`, `MPUTEST`, `TIMETEST`, `SC55WAV` | Diagnostics, test tune, timer checks, ROM check and speed benchmark |
 | `WIN98\SC55W.EXE` + `.VXD` + `SC55MIDI.DRV` | The Windows 98 part (tray program, virtual SB for DOS boxes, MIDI device) |
 

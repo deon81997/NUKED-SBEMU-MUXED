@@ -31,6 +31,7 @@
 #include <cdlink.h>
 #include "sbemu/usbpad.h"
 #include "sbemu/vjoy.h"
+#include "sbemu/vkbc.h"
 #include "qemm.h"
 #include "hdpmipt.h"
 #include "serial.h"
@@ -529,11 +530,13 @@ struct MAIN_OPT
     "/VSBVOL", "Sound effects (digital Sound Blaster) volume in percent (0-100), on top of the game's own mixer", 100, MAIN_SETCMD_BASE10,
     "/VOPLVOL", "FM (OPL / AdLib) music volume in percent (0-100), on top of the game's own mixer", 100, MAIN_SETCMD_BASE10,
     "/VMIDIVOL", "General MIDI music volume in percent (0-400; SC-55: multiplies /VSCGAIN; SoundFont: its master volume)", 100, MAIN_SETCMD_BASE10,
-    "/JOY", "USB Xbox 360 pad as a PC gameport joystick at port 201h (1=on, 0=off; any UHCI / OHCI / EHCI / xHCI USB port, hubs allowed)", 0, MAIN_SETCMD_BASE10,
+    "/JOY", "USB in DOS: up to two Xbox 360 pads as the PC gameport joystick at port 201h, plus USB keyboards / mice (1=on, 0=off; any UHCI / OHCI / EHCI / xHCI USB port, hubs allowed)", 1, MAIN_SETCMD_BASE10,
     "/JOYAX", "Pad -> gameport axes 1-4 (joystick A X,Y, joystick B X,Y): LX LY RX RY LT RT TR(RT minus LT) or - ; ~ in front inverts", (uintptr_t)"LX,LY,RX,RY", MAIN_SETCMD_STR,
     "/JOYBT", "Pad -> gameport buttons 1-4: A B X Y LB RB LT RT ST BK LS RS GD DU DD DL DR or -", (uintptr_t)"A,B,X,Y", MAIN_SETCMD_STR,
     "/JOYKEY", "Pad buttons typed as keys, button:scan code (hex, E0xx extended), e.g. ST:1C,BK:01 (Start=Enter, Back=Esc)", (uintptr_t)"ST:1C,BK:01", MAIN_SETCMD_STR,
     "/JOYDZ", "Stick dead zone in percent (0-90)", 10, MAIN_SETCMD_BASE10,
+    "/USBKB", "USB keyboard typed through the PC's keyboard controller (1=on, 0=off; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
+    "/USBMS", "USB mouse as a PS/2 mouse for a DOS mouse driver loaded after SBEMU (1=if one is plugged in at start, 2=always, 0=off; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
     NULL, NULL, 0,
 };
 enum EOption
@@ -598,6 +601,8 @@ enum EOption
     OPT_JOYBT,
     OPT_JOYKEY,
     OPT_JOYDZ,
+    OPT_USBKB,
+    OPT_USBMS,
     OPT_COUNT,
 };
 
@@ -996,6 +1001,10 @@ static BOOL OPLRMInstalled, OPLPMInstalled, MPURMInstalled, MPUPMInstalled;
 static QEMM_IODT MAIN_JOY_IODT[1] = { { 0x201, (void*)&VJOY_IOHandler } };
 static QEMM_IOPT MAIN_JOY_IOPT, MAIN_JOY_IOPT_PM;
 static BOOL MAIN_JOY_RM, MAIN_JOY_PM, MAIN_JOY_On;
+/* USB mouse -> PS/2 mouse commands answered by vkbc.c (/USBMS) */
+static QEMM_IODT MAIN_KBC_IODT[2] = { { 0x60, (void*)&VKBC_IOHandler }, { 0x64, (void*)&VKBC_IOHandler } };
+static QEMM_IOPT MAIN_KBC_IOPT, MAIN_KBC_IOPT_PM60, MAIN_KBC_IOPT_PM64;
+static BOOL MAIN_KBC_RM, MAIN_KBC_PM60, MAIN_KBC_PM64;
 static HDPMIPT_IRQRoutedHandle OldRoutedHandle = HDPMIPT_IRQRoutedHandle_Default;
 static HDPMIPT_IRQRoutedHandle OldRoutedHandle5 = HDPMIPT_IRQRoutedHandle_Default;
 static HDPMIPT_IRQRoutedHandle OldRoutedHandle7 = HDPMIPT_IRQRoutedHandle_Default;
@@ -1004,6 +1013,9 @@ static void MAIN_Cleanup()
 {
     if(MAIN_JOY_RM) { QEMM_Uninstall_IOPortTrap(&MAIN_JOY_IOPT); MAIN_JOY_RM = FALSE; }
     if(MAIN_JOY_PM) { HDPMIPT_Uninstall_IOPortTrap(&MAIN_JOY_IOPT_PM); MAIN_JOY_PM = FALSE; }
+    if(MAIN_KBC_RM) { QEMM_Uninstall_IOPortTrap(&MAIN_KBC_IOPT); MAIN_KBC_RM = FALSE; }
+    if(MAIN_KBC_PM60) { HDPMIPT_Uninstall_IOPortTrap(&MAIN_KBC_IOPT_PM60); MAIN_KBC_PM60 = FALSE; }
+    if(MAIN_KBC_PM64) { HDPMIPT_Uninstall_IOPortTrap(&MAIN_KBC_IOPT_PM64); MAIN_KBC_PM64 = FALSE; }
     if(MAIN_JOY_On) { MAIN_JOY_On = FALSE; USBPAD_Shutdown(); }
     if(OldRoutedHandle.valid)
         HDPMIPT_InstallIRQRoutedHandlerH(aui.card_irq, &OldRoutedHandle);
@@ -1821,27 +1833,45 @@ int main(int argc, char* argv[])
     {
         const char* bad = NULL;
         const char* msg = "";
-        MAIN_Step("USB joystick (/JOY)");
+        MAIN_Step("USB joystick / keyboard / mouse (/JOY)");
         if(!VJOY_Init(MAIN_TCps, (const char*)MAIN_Options[OPT_JOYAX].value, (const char*)MAIN_Options[OPT_JOYBT].value,
             (const char*)MAIN_Options[OPT_JOYKEY].value, MAIN_Options[OPT_JOYDZ].value, &bad))
-            MAIN_CPrintf(YELLOW, "Joystick: \"%s\" not understood in /JOYAX, /JOYBT or /JOYKEY, joystick off.\n", bad ? bad : "?");
-        else if(!USBPAD_Init(MAIN_TCps, 1500, &msg))
-            MAIN_CPrintf(YELLOW, "Joystick: %s, joystick off.\n", msg);
+            MAIN_CPrintf(YELLOW, "Joystick: \"%s\" not understood in /JOYAX, /JOYBT or /JOYKEY, USB off.\n", bad ? bad : "?");
         else
         {
-            MAIN_JOY_On = TRUE;
-            if(enableRM) MAIN_JOY_RM = QEMM_Install_IOPortTrap(MAIN_JOY_IODT, 1, &MAIN_JOY_IOPT);
-            if(enablePM) MAIN_JOY_PM = HDPMIPT_Install_IOPortTrap(0x201, 0x201, MAIN_JOY_IODT, 1, &MAIN_JOY_IOPT_PM);
-            printf("Joystick (Port 201): ");
-            MAIN_Print_Enabled_Newline(MAIN_JOY_RM || MAIN_JOY_PM);
-            MAIN_CPrintf(LIGHTGRAY, "  USB: %s.\n", msg);
-            if(!USBPAD_Get()->connected)
-                MAIN_CPrintf(LIGHTGRAY, "  Plug the pad in any time; it is picked up while games run.\n"
-                    "  Not found? Run USBTEST.EXE (without SBEMU loaded) to see every USB step.\n");
+            int flags = (MAIN_Options[OPT_USBKB].value ? USBPAD_F_KBD : 0) | (MAIN_Options[OPT_USBMS].value ? USBPAD_F_MOUSE : 0);
+            VKBC_Init(MAIN_TCps, 0);
+            USBPAD_SetHid(&VKBC_UsbKeys, &VKBC_UsbMouse);
+            if(!USBPAD_Init(MAIN_TCps, 3000, flags, &msg))
+                MAIN_CPrintf(YELLOW, "Joystick: %s, USB off.\n", msg);
+            else
+            {
+                MAIN_JOY_On = TRUE;
+                if(enableRM) MAIN_JOY_RM = QEMM_Install_IOPortTrap(MAIN_JOY_IODT, 1, &MAIN_JOY_IOPT);
+                if(enablePM) MAIN_JOY_PM = HDPMIPT_Install_IOPortTrap(0x201, 0x201, MAIN_JOY_IODT, 1, &MAIN_JOY_IOPT_PM);
+                printf("Joystick (Port 201): ");
+                MAIN_Print_Enabled_Newline(MAIN_JOY_RM || MAIN_JOY_PM);
+                MAIN_CPrintf(LIGHTGRAY, "  USB: %s.\n", msg);
+                if(MAIN_Options[OPT_USBMS].value == 2 || (MAIN_Options[OPT_USBMS].value == 1 && (USBPAD_Have() & USBPAD_HAVE_MOUSE)))
+                {
+                    VKBC_Init(MAIN_TCps, 1);
+                    if(enableRM) MAIN_KBC_RM = QEMM_Install_IOPortTrap(MAIN_KBC_IODT, 2, &MAIN_KBC_IOPT);
+                    if(enablePM) MAIN_KBC_PM60 = HDPMIPT_Install_IOPortTrap(0x60, 0x60, MAIN_KBC_IODT, 1, &MAIN_KBC_IOPT_PM60);
+                    if(enablePM) MAIN_KBC_PM64 = HDPMIPT_Install_IOPortTrap(0x64, 0x64, MAIN_KBC_IODT + 1, 1, &MAIN_KBC_IOPT_PM64);
+                    printf("USB mouse as PS/2 mouse (Ports 60,64): ");
+                    MAIN_Print_Enabled_Newline(MAIN_KBC_RM || MAIN_KBC_PM60);
+                    MAIN_CPrintf(LIGHTGRAY, "  Load the mouse driver (CTMOUSE, MOUSE.COM) after SBEMU.\n");
+                }
+                if(!(USBPAD_Have() & (USBPAD_HAVE_PAD1 | USBPAD_HAVE_PAD2)))
+                    MAIN_CPrintf(LIGHTGRAY, "  Plug a pad in any time; it is picked up while games run.\n"
+                        "  Not found? Run USBTEST.EXE (without SBEMU loaded) to see every USB step.\n");
+            }
         }
-        MAIN_D("Joystick: %s | axes %s buttons %s keys %s dz %d | traps rm %d pm %d\n", msg,
+        MAIN_D("Joystick: %s | axes %s buttons %s keys %s dz %d | kb %d ms %d | traps rm %d pm %d kbc %d %d%d\n", msg,
             (const char*)MAIN_Options[OPT_JOYAX].value, (const char*)MAIN_Options[OPT_JOYBT].value,
-            (const char*)MAIN_Options[OPT_JOYKEY].value, MAIN_Options[OPT_JOYDZ].value, MAIN_JOY_RM, MAIN_JOY_PM);
+            (const char*)MAIN_Options[OPT_JOYKEY].value, MAIN_Options[OPT_JOYDZ].value, MAIN_Options[OPT_USBKB].value,
+            MAIN_Options[OPT_USBMS].value, MAIN_JOY_RM, MAIN_JOY_PM, MAIN_KBC_RM, MAIN_KBC_PM60, MAIN_KBC_PM64);
+        MAIN_D("USB devices: %s\n", USBPAD_Devices());
         MAIN_D("USB steps: %s\n", USBPAD_Trace());
         USBPAD_TraceStop();
     }
