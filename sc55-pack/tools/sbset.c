@@ -116,7 +116,7 @@ static Field F[NF] = {
     { "MIDI music",      "/VMIDIVOL",{ "100", "50", "75", "125", "150", "200", "300", "400" }, 8, 0, 0, "General MIDI music (SC-55 or SoundFont). Over 100% makes it louder.", {0}, 0 },
 
     /* Joystick */
-    { "USB pad",         "/JOY",     { "0", "1" }, 2, 0, 0, "Wired Xbox 360 pad on any USB port (USB 1.1, 2.0 or 3, also behind a hub). Applies when SBEMU next starts.", {0}, 0 },
+    { "USB pad",         "/JOY",     { "1", "0" }, 2, 0, 0, "Wired Xbox 360 pad on any USB port. Off if you use a USB keyboard/mouse in DOS (SBEMU takes USB over).", {0}, 0 },
     { "Sticks",          "/JOYAX",   { "LX,LY,RX,RY", "LX,LY,RX,TR", "LX,LY,TR,RY", "LX,LY,-,-" }, 4, 0, 0, "Which pad axes the game sees as joystick A X/Y and joystick B X/Y. D-pad also moves A.", {0}, 0 },
     { "Buttons 1-4",     "/JOYBT",   { "A,B,X,Y", "A,X,B,Y", "RT,A,B,X", "A,B,LB,RB" }, 4, 0, 0, "Pad buttons on gameport buttons 1-4 (button 1 is usually fire).", {0}, 0 },
     { "Keys",            "/JOYKEY",  { "ST:1C,BK:01", "ST:1C,BK:01,LB:39,RB:1D", "ST:1C,BK:01,DU:E048,DD:E050,DL:E04B,DR:E04D", "-" }, 4, 0, 0, "Pad buttons typed as keyboard keys, for menus and games without joystick support.", {0}, 0 },
@@ -183,7 +183,7 @@ static void set_labels(void)
     onoff(F_OUT, "Speaker / S/PDIF (default)", "Headphone");
     onoff(F_FIXTC, "On (default)", "Off");
     { static const char* c[7] = { "Off (default)", "50%", "75%", "100%", "125%", "150%", "200%" }; for (i = 0; i < 7; i++) F[F_VCDA].labels[i] = c[i]; }
-    onoff(F_JOY, "Off (default)", "On");
+    onoff(F_JOY, "On (default)", "Off");
     F[F_JOYAX].labels[0] = "Left = A, right = B (default)"; F[F_JOYAX].labels[1] = "Left = A, right X + triggers = B";
     F[F_JOYAX].labels[2] = "Left = A, triggers + right Y = B"; F[F_JOYAX].labels[3] = "Left stick only (A)";
     F[F_JOYBT].labels[0] = "A B X Y (default)"; F[F_JOYBT].labels[1] = "A X B Y"; F[F_JOYBT].labels[2] = "RT A B X (trigger fires)"; F[F_JOYBT].labels[3] = "A B LB RB";
@@ -765,7 +765,7 @@ static void summary(int i, char* v)
                 F[F_OPLVOL].vals[F[F_OPLVOL].cur], F[F_MIDIVOL].vals[F[F_MIDIVOL].cur]);
     else if (i == F_JOYMENU)
     {
-        if (!F[F_JOY].cur) strcpy(v, "off");
+        if (F[F_JOY].cur) strcpy(v, "off");
         else sprintf(v, "USB pad on, %.20s", show(&F[F_JOYBT]));
     }
     else

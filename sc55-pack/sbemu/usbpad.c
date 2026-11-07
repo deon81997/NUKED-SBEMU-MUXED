@@ -1988,8 +1988,14 @@ int USBPAD_Init(uint64_t cps, int wait_ms, const char** msg)
     memset(D, 0, sizeof(D)); PadD = -1;
     Inited = 1;
     {
-        uint64_t end = tsc() + us2c((uint32_t)wait_ms * 1000);
-        while (tsc() < end && !(S == S_RUN && (St.connected || Wireless))) USBPAD_Poll();
+        uint64_t t0 = tsc(), end = t0 + us2c((uint32_t)wait_ms * 1000);
+        int hh, pp;
+        while (tsc() < end && !(S == S_RUN && (St.connected || Wireless)))
+        {
+            USBPAD_Poll();
+            /* nothing plugged in anywhere: no need to wait (SBEMU starts with this on by default) */
+            if (S == S_SCAN && tsc() - t0 > us2c(300000) && !pick_root(&hh, &pp, 0)) break;
+        }
         end = tsc() + us2c(50000);
         while (S == S_RUN && !St.reports && tsc() < end) USBPAD_Poll();
     }

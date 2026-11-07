@@ -508,7 +508,8 @@ CONTENTS
 
   Joystick (section 10b)
      /JOY:0|1              USB Xbox 360 pad as the gameport joystick at port
-                           201h (default off)
+                           201h (default on; 0 if you use a USB keyboard or
+                           mouse in DOS)
      /JOYAX:a,a,a,a        pad axes for joystick A X, A Y, B X, B Y: LX LY
                            RX RY LT RT TR (RT minus LT) or -; ~ in front
                            inverts (default LX,LY,RX,RY)
@@ -714,8 +715,10 @@ CONTENTS
   Laptops such as the D810 have no gameport, so SBEMU can answer on port
   201h itself, with the sticks and buttons of a USB Xbox 360 pad.
 
-  Turn it on:  MENU > Settings > Joystick (USB pad): USB pad = On, Save.
-  It takes effect the next time SBEMU starts (SC55.BAT, SC55JEM.BAT ...).
+  It is on by default: every start of SBEMU (SC55.BAT, SC55JEM.BAT ...)
+  looks for the pad, and with nothing plugged into USB it costs no time.
+  To turn it off (you use a USB keyboard or mouse in DOS - SBEMU takes the
+  USB ports over): MENU > Settings > Joystick: USB pad = Off, Save.
   SBEMU then prints a line like
          Joystick (Port 201): enabled
            USB: 4 UHCI + 0 OHCI controller(s) (EHCI ports handed over),

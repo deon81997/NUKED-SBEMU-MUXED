@@ -101,8 +101,8 @@ MIDI synth replaces the MPU side, so you normally leave these off.
 
 <img src="docs/joytest.png" width="560" alt="JOYTEST showing the pad's sticks and buttons">
 
-DOS games read an analog joystick on the gameport, port 201h. With `/JOY:1`
-(MENU > Settings > **Joystick**), SBEMU answers there itself with a USB
+DOS games read an analog joystick on the gameport, port 201h. SBEMU answers
+there itself (on by default, `/JOY:0` or MENU > Settings > **Joystick** turns it off) with a USB
 Xbox 360 pad: left stick = joystick A (the D-pad moves it too), right stick
 = joystick B, A/B/X/Y = buttons 1-4. Start and Back are typed as Enter and
 Esc so game menus work from the pad. Sticks, buttons, keys and the dead zone
