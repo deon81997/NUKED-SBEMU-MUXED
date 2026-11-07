@@ -1,6 +1,6 @@
 # SC-55 pack — handoff
 
-## Current state (SBEMU 1.0.0-beta.46-usb-sc55, branch usb-xpad)
+## Current state (SBEMU 1.0.0-beta.47-usb-sc55, branch usb-xpad)
 - SBEMU + Nuked-SC55 (SC-55/mkII), Munt MT-32/CM-32L (/VMT32), SoundFont (/VSF); MPU side channel 0xA5-0xB0 (stats, SBDIAG, key player, triple-Esc, front panel/LCD + CPU load).
 - Key player holds each typed key 500 ms (vdiag.c key_tick); Duke 3D quit default `ESC W3 Q W2 Y W3 Y W3 ESC W3 Q W2 Y W3 Y` — verified in QEMU with Duke 3D Atomic 1.5 from logo, title and demo (GAMETEST /RUN, 20 s and 40 s tests).
 - Tools: SC55MENU (game profiles GAMES.CFG, safe mode, CPU%, first-run auto setup), SBSET (/TUNE benchmark, MT-32 choice), GAMETEST (/RUN), MIDPLAY (live SC-55/MT-32 LCD panel), CDGUI (CUE checks/fix), Ctrl+Alt+F12 in-game LCD overlay (text + mode 13h).
@@ -66,7 +66,7 @@
   `export PATH=<djgpp>/bin:$PATH; make -j8` (delete output/*.o after header changes)
 
 ## Resume prompt
-"Continue NUKED SB-EMU from sc55-pack/HANDOFF.md (beta.46-usb): github.com/deon81997/NUKED-SBEMU-MUXED, branch usb-xpad. Rebuild with DJGPP, then continue from Next steps."
+"Continue NUKED SB-EMU from sc55-pack/HANDOFF.md (beta.47-usb): github.com/deon81997/NUKED-SBEMU-MUXED, branch usb-xpad. Rebuild with DJGPP, then continue from Next steps."
 
 ## 2026-11-06 (beta.37): SBEMU "Not loaded" on the D810 after SC55.BAT
 - SBEMU no longer quits when the real sound card uses the IRQ asked for (/I or BLASTER): it takes another of 7/5/9, warns, and updates BLASTER.
@@ -179,3 +179,11 @@
   201h trap). From Linux analog.c / grip.c. JOYTEST /GRIP decodes like grip.c. SBSET "Stick type" + flight Sticks preset.
 - QEMU checked: CH / FCS hat directions + button in live JOYTEST; GrIP all buttons on 2 pads (JOYTEST /GRIP /LOG).
 - Note: JOYTEST /LOG with a pad plugged in after JOYTEST starts logs -1 in QEMU (live view is fine) - harness quirk.
+
+## 2026-11-07 (beta.47-usb): D810 regression fixes (beta.45/46: inputs stop after moments in SBEMU, USBTEST crash)
+- UHCI: poll_in waits for the QH element to become T before re-arming (the HC writes TD status first, QH a moment
+  later; re-arming in between got the new TD overwritten -> pipe dead). Only on real hardware.
+- UHCI controllers run only while they have a device (uhci_run on pick, off when own==0), as beta.44 did; beta.45 ran
+  all four ICH6 UHCIs from the start (suspected cause of the USBTEST crash/reboot on the D810).
+- Watchdog: a running UHCI halted by an error (STS 0x38) is traced and restarted. "no reports" diag now = no pad input.
+- Next: user retests USBTEST + SBEMU/JOYTEST on the D810.
