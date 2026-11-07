@@ -193,7 +193,7 @@ enum { TT_NORMAL = 1, TT_SETUP = 2, TT_DATA = 3, TT_STATUS = 4, TT_LINK = 6, TT_
 #define XEVT_TRBS 128
 #define XRING_TRBS 32
 
-#define MAX_HC    8
+#define MAX_HC    16
 #define MAX_PORT  32
 #define MAX_DEV   8
 #define MAX_DEPTH 4
@@ -215,7 +215,7 @@ typedef struct
     int evcyc;
 } XHC;
 
-typedef struct { int type, idx, nports, ncc; uint16_t io; uint32_t mmio, op; uint8_t bus, dev, func; XHC* x; } HCI;
+typedef struct { int type, idx, nports, ncc, given; uint16_t io; uint32_t mmio, op; uint8_t bus, dev, func; XHC* x; } HCI;
 static HCI      HC[MAX_HC];
 static int      HCn, UhciN, OhciN, EhciN, XhciN, EhciGiven;
 
@@ -264,14 +264,15 @@ static Ring      XEp0[MAX_DEV];
 static volatile int XCmdDone, XCtlDone, XInDone, XOutDone;
 static uint32_t  XCmdPh; static int XCmdCC, XCmdSlot, XCtlCC, XInCC, XInRes, XOutCC;
 static volatile int Busy;
-static int       Inited;
+static int       Inited, Light;
 
 /* short trace of what happened (start-up report / SBDETAIL), oldest first, stops when full */
-static char      Trace[768]; static int TraceN;
+static char      Trace[4096]; static int TraceN, TraceOff;
+void USBPAD_TraceStop(void) { TraceOff = 1; }   /* SBEMU: no libc formatting inside its interrupt */
 static void trace(const char* f, ...)
 {
     va_list a;
-    if (TraceN >= (int)sizeof(Trace) - 2) return;
+    if (TraceOff || TraceN >= (int)sizeof(Trace) - 2) return;
     va_start(a, f);
     TraceN += vsnprintf(Trace + TraceN, sizeof(Trace) - TraceN, f, a);
     va_end(a);
@@ -427,13 +428,22 @@ static void pci_scan(void (*fn)(uint8_t, uint8_t, uint8_t, uint32_t))
         }
 }
 
+/* map MMIO at any physical address: DPMI maps whole pages, so map the page(s) around it and
+ * return the linear address of the byte asked for (EHCI BARs are only 256- or 1K-aligned) */
+static uint32_t map_mmio(uint32_t phys, uint32_t size)
+{
+    uint32_t off = phys & 0xFFF, lin;
+    lin = DPMI_MapMemory(phys - off, (size + off + 0xFFF) & ~0xFFFUL);
+    return lin ? lin + off : 0;
+}
+
 /* a memory BAR below 4 GB, or 0 */
 static uint32_t mem_bar(uint8_t b, uint8_t d, uint8_t f, uint8_t reg)
 {
     uint32_t bar = PCI_ReadDWord(b, d, f, reg);
     if (bar & 1) return 0;
     if (((bar >> 1) & 3) == 2 && PCI_ReadDWord(b, d, f, (uint8_t)(reg + 4)) != 0) return 0; /* above 4 GB */
-    PCI_WriteWord(b, d, f, 0x04, (uint16_t)(PCI_ReadWord(b, d, f, 0x04) | 0x06)); /* memory + bus master */
+    PCI_WriteWord(b, d, f, 0x04, (uint16_t)(PCI_ReadWord(b, d, f, 0x04) | 0x0406)); /* memory, bus master, INTx off */
     return bar & ~0xFUL;
 }
 
@@ -450,13 +460,14 @@ static void hc_found(uint8_t b, uint8_t d, uint8_t f, uint32_t cls)
         bar = PCI_ReadDWord(b, d, f, 0x20);
         if (!(bar & 1) || !(bar & 0xFFE0)) return;
         h->type = T_UHCI; h->io = (uint16_t)(bar & 0xFFE0); h->nports = 2;
+        bar &= 0xFFE0;
     }
     else if (cls == 0x0C0310 || cls == 0x0C0320 || cls == 0x0C0330)
     {
         bar = mem_bar(b, d, f, 0x10);
         if (!bar) return;
-        h->mmio = DPMI_MapMemory(bar, cls == 0x0C0330 ? 0x10000 : 0x1000);
-        if (!h->mmio) return;
+        h->mmio = map_mmio(bar, cls == 0x0C0330 ? 0x10000 : 0x1000);
+        if (!h->mmio) { trace("map %08lx failed ", (unsigned long)bar); return; }
         h->type = cls == 0x0C0310 ? T_OHCI : cls == 0x0C0320 ? T_EHCI : T_XHCI;
         if (h->type == T_XHCI)
         {
@@ -464,13 +475,15 @@ static void hc_found(uint8_t b, uint8_t d, uint8_t f, uint32_t cls)
             if ((rd(h->mmio + 0x18) & ~0x1FUL) > need) need = rd(h->mmio + 0x18) & ~0x1FUL;
             if (need + 0x1000 > 0x10000)
             {
-                DPMI_UnmappMemory(h->mmio);
-                h->mmio = DPMI_MapMemory(bar, (need + 0x2000 + 0xFFF) & ~0xFFFUL);
+                h->mmio = map_mmio(bar, (need + 0x2000 + 0xFFF) & ~0xFFFUL);   /* the small mapping stays: harmless */
                 if (!h->mmio) return;
             }
         }
     }
     else return;
+    trace("%02x:%02x.%x %04x:%04x %s %s%08lx\n", b, d, f, PCI_ReadWord(b, d, f, 0), PCI_ReadWord(b, d, f, 2),
+        cls == 0x0C0300 ? "UHCI" : cls == 0x0C0310 ? "OHCI" : cls == 0x0C0320 ? "EHCI" : "xHCI",
+        cls == 0x0C0300 ? "io " : "mem ", (unsigned long)bar);
     ++HCn;
 }
 
@@ -508,9 +521,21 @@ static int ehci_setup(int i)
     ewr(i, E_CMD, erd(i, E_CMD) & ~(EC_RS | EC_PSE | EC_ASE));
     for (n = 0; n < 50 && !(erd(i, E_STS) & ES_HALT); ++n) wait_us(1000);
     ewr(i, E_INTR, 0);
+    trace("EHCI %02x:%02x.%x: %d ports, %d companions, cap %02lx -> %s\n", h->bus, h->dev, h->func, h->nports, h->ncc,
+        (unsigned long)(rd(h->mmio) & 0xFF), h->ncc ? "ports to companions" : "driven directly");
     if (h->ncc)
     {
-        ewr(i, E_CONFIG, 0);                          /* all ports to the companions */
+        /* all ports to the companions. CONFIGFLAG=0 alone does it on paper, but give every port away
+         * explicitly too (Port Owner, which is only writable while CONFIGFLAG=1) and power it: an empty port
+         * can otherwise stay with the halted EHCI, so a pad plugged in later is never seen, and on a card
+         * no BIOS has set up the port power can still be off */
+        ewr(i, E_CONFIG, 1);
+        wait_us(1000);
+        for (p = 0; p < h->nports; ++p) eport_set(i, p, EP_PO | ((hcs & 0x10) ? EP_PP : 0), EP_PE);
+        wait_us(5000);
+        ewr(i, E_CONFIG, 0);
+        wait_us(20000);
+        h->given = h->nports;                         /* watched in pick_root(), see ehci_reclaim() */
         ++EhciGiven;
         return 0;
     }
@@ -574,6 +599,8 @@ static void ohci_reset(int i)
     if (HC[i].nports > MAX_PORT) HC[i].nports = MAX_PORT;
     owr(i, O_RHSTS, 1UL << 16);
     for (p = 0; p < HC[i].nports; ++p) owr(i, O_PORT + p * 4, OP_PPS);
+    trace("OHCI %02x:%02x.%x: rev %02lx, %d ports, rhda %08lx\n", HC[i].bus, HC[i].dev, HC[i].func,
+        (unsigned long)(ord(i, 0) & 0xFF), HC[i].nports, (unsigned long)rha);
     w = (rha >> 24) * 2;
     if (w < 20) w = 20;
     if (w > 100) w = 100;
@@ -727,7 +754,7 @@ static int xhci_setup(int i)
     wr(x->op + X_USBCMD, (rd(x->op + X_USBCMD) & 0xFFFE1070UL) | XC_HCRST);
     wait_us(1000);
     for (n = 0; n < 1000 && ((rd(x->op + X_USBCMD) & XC_HCRST) || (rd(x->op + X_USBSTS) & XS_CNR)); ++n) wait_us(1000);
-    if (rd(x->op + X_USBCMD) & XC_HCRST) return 0;
+    if (rd(x->op + X_USBCMD) & XC_HCRST) { trace("xHCI reset stuck\n"); return 0; }
     /* program, interrupts off, run */
     wr(x->op + X_CONFIG, (rd(x->op + X_CONFIG) & 0xFFFFFC00UL) | (uint32_t)x->maxslots);
     wr(x->op + X_DNCTRL, rd(x->op + X_DNCTRL) & 0xFFFF0000UL);
@@ -745,6 +772,8 @@ static int xhci_setup(int i)
             if (x->usb2 & (1UL << p)) xpsc_set(i, p, PSC_PP);
     wait_us(50000);
     x_events(i);
+    trace("xHCI %02x:%02x.%x: %d ports (USB 2: %08lx), %d slots, ctx %d, %d scratchpads, %s\n", h->bus, h->dev, h->func,
+        h->nports, (unsigned long)x->usb2, x->maxslots, x->ctxsz, x->nsp, (rd(x->op + X_USBSTS) & XS_HCH) ? "HALTED" : "running");
     return 1;
 }
 
@@ -877,7 +906,7 @@ static int u_run_tds(int n, uint32_t timeout_us)
             if (cs & TD_ERRMASK) { QHC[1] = LP_T; return -1; }
         }
         if (done) { QHC[1] = LP_T; return 0; }
-        if (tsc() > end) { QHC[1] = LP_T; wait_us(1000); return -1; }
+        if (tsc() > end) { QHC[1] = LP_T; wait_us(1000); trace("[u%08lx t] ", (unsigned long)tdn(0)[1]); return -1; }
     }
 }
 
@@ -936,6 +965,8 @@ static int o_run_tds(const Dev* d, int ep, int mps, int n, uint32_t timeout_us)
     EDC[0] |= ED_SKIP;
     wait_us(1100);
     EDC[2] = PHYS(tail);
+    owr(Cur, O_INTSTS, 0x06);                                 /* WDH, SF: let the done queue be written back */
+    if (r) trace("[o%08lx ed%08lx] ", (unsigned long)tdn(0)[0], (unsigned long)EDC[2]);
     return r;
 }
 
@@ -1035,6 +1066,7 @@ static int x_control(int di, int len, int in)
     end = tsc() + us2c(300000);
     while (!XCtlDone && tsc() < end) x_events(Cur);
     if (XCtlDone && (XCtlCC == 1 || XCtlCC == 13)) return 0;
+    trace("[x cc%d] ", XCtlDone ? XCtlCC : -1);
     x_recover(d->slot, 1, r);
     return -1;
 }
@@ -1289,6 +1321,7 @@ static int poll_in(void)
         volatile uint32_t* t = o_tdi(OCur ^ 1);
         uint32_t cc = OTD_CC(t[0]);
         if (cc >= 0xE) return 0;
+        owr(Cur, O_INTSTS, 0x06);
         if (cc) { EDI[2] = PHYS(o_tdi(OCur)); return cc == 4 ? -2 : -1; }
         return (t[1] ? (int)(t[1] - PHYS(IBuf)) : InMps) + 1;
     }
@@ -1299,6 +1332,7 @@ static int poll_in(void)
         if (tk & QT_ACTIVE) return 0;
         if (tk & QT_HALT)
         {
+            if (Light) return 0;                                      /* recovery: interrupt only */
             ehci_sched(Cur, EC_PSE, 0);
             QHP[3] = 0; QHP[4] = PHYS(e_tdi(OCur)); QHP[5] = LP_T; QHP[6] = 0;  /* clear halt and toggle */
             ehci_sched(Cur, EC_PSE, 1);
@@ -1311,8 +1345,9 @@ static int poll_in(void)
         int cc;
         x_events(Cur);
         if (!XInDone) return 0;
-        XInDone = 0;
         cc = XInCC;
+        if (cc != 1 && cc != 13 && Light) return 0;                 /* error: leave it for the interrupt */
+        XInDone = 0;
         if (cc == 1 || cc == 13) return InMps - XInRes + 1;
         x_recover(D[PadD].slot, InEp * 2 + 1, &XIn);
         return cc == 6 ? -2 : -1;
@@ -1377,6 +1412,7 @@ static int enumerate(int di)
     if (control(di, 0x80, 6, 0x0100, 0, 18) != 0) return 0;
     vid = (uint16_t)(b[8] | b[9] << 8); pid = (uint16_t)(b[10] | b[11] << 8);
     ishub = b[4] == 9;
+    trace("%04x:%04x cls %02x mps %d ", vid, pid, b[4], d->mps0);
     if (control(di, 0x80, 6, 0x0200, 0, 9) != 0) return 0;
     total = b[2] | b[3] << 8;
     if (total > 400) total = 400;
@@ -1506,10 +1542,32 @@ static void drop_all(int ignore)
     NextScan = tsc() + us2c(200000);
 }
 
+/* EHCIs whose ports were handed to companions: a port that has come back to the EHCI (some chips, and
+ * QEMU, return a port to the EHCI on disconnect even with CONFIGFLAG=0) and has a device on it is given to
+ * the companion again, so plugging in after an unplug works */
+static void ehci_reclaim(void)
+{
+    int h, p;
+    for (h = 0; h < HCn; ++h)
+    {
+        if (HC[h].type != T_EHCI || !HC[h].given) continue;
+        for (p = 0; p < HC[h].given; ++p)
+        {
+            uint32_t v = erd(h, E_PORT + p * 4);
+            if (v == 0xFFFFFFFFUL || (v & EP_PO) || !(v & EP_CCS)) continue;
+            ewr(h, E_CONFIG, 1);
+            eport_set(h, p, EP_PO, EP_PE);
+            ewr(h, E_CONFIG, 0);
+            trace("EHCI port %d back to companion ", p + 1);
+        }
+    }
+}
+
 /* a root port worth looking at; hubs only when nothing else is there, round-robin between them */
 static int pick_root(int* ph, int* pp, int nonhub_only)
 {
     int h, p, best = -1, bp = 0, bkey = 0x7FFFFFFF;
+    if (EhciGiven) ehci_reclaim();
     for (h = 0; h < HCn; ++h)
         for (p = 0; p < HC[h].nports; ++p)
         {
@@ -1638,10 +1696,14 @@ static void step(void)
     }
     case S_RUN:
     {
-        int v = pstat(Cur, CurPort), r;
-        if ((v & PS_GONE) || !(v & PS_CCS) || !(v & PS_PE)) { drop_all(0); return; }
+        int v, r;
+        if (!Light)                                                         /* (port checks: interrupt only) */
+        {
+            v = pstat(Cur, CurPort);
+            if ((v & PS_GONE) || !(v & PS_CCS) || !(v & PS_PE)) { drop_all(0); return; }
+        }
         if (PadD < 0) { drop_all(0); return; }
-        if (D[PadD].depth && t >= NextScan)                                 /* behind a hub: still there? */
+        if (!Light && D[PadD].depth && t >= NextScan)                                 /* behind a hub: still there? */
         {
             uint16_t st, chg;
             NextScan = t + us2c(500000);
@@ -1649,6 +1711,7 @@ static void step(void)
         }
         r = poll_in();
         if (r == 0) return;
+        if (r < 0 && Light) return;                                         /* recovery from the interrupt */
         if (r < 0)
         {
             if (r == -2) control(PadD, 0x02, 1, 0, (uint16_t)(0x80 | InEp), 0); /* CLEAR_FEATURE halt */
@@ -1688,6 +1751,18 @@ void USBPAD_Poll(void)
 {
     if (!Inited || Busy) return;
     Busy = 1;
+    Light = 0;
+    step();
+    Busy = 0;
+}
+
+/* from a game's port 201h read: only pick up a finished report, never anything that can take time
+ * (enumeration, hub checks, recovery), so the game's stick timing is not disturbed */
+void USBPAD_PollLight(void)
+{
+    if (!Inited || Busy || S != S_RUN) return;
+    Busy = 1;
+    Light = 1;
     step();
     Busy = 0;
 }

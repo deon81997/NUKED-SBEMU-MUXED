@@ -770,8 +770,13 @@ CONTENTS
        tight loop sees slightly coarser steps than with a real joystick;
        calibration takes care of it.
      * Not under Windows 98: Windows has its own driver for the pad.
-     * If the pad is not found, MENU > Files > Make a bug report: the
-       "Joystick:" and "USB steps:" lines in it show how far it got.
+     * If the pad is not found: restart the PC (without SBEMU) and run
+       USBTEST.EXE from C:\SC55 (or MENU > Tests > USB pad finder). It
+       uses the same USB code as SBEMU and shows every step: which USB
+       controllers it found and what it did with each, what is plugged in,
+       then the pad live and every plug / unplug. USBTEST USBTEST.TXT also
+       writes it all to USBTEST.TXT - send that with a bug report. (Esc
+       quits; a USB keyboard stops working while it runs, use a PS/2 one.)
 
 
 =============================================================================
@@ -1052,7 +1057,8 @@ CONTENTS
      README.TXT       this guide
      FILES\SC55       SBEMU.EXE, SBSET.EXE, SC55WAV.EXE, SC55LOG.EXE,
                       MPUTEST.EXE, MIDPLAY.EXE, CPUMHZ.EXE, SC55MENU.EXE,
-                      SBDIAG.EXE, GAMETEST.EXE, TIMETEST.EXE, JOYTEST.EXE
+                      SBDIAG.EXE, GAMETEST.EXE, TIMETEST.EXE, JOYTEST.EXE,
+                      USBTEST.EXE
      FILES\ROMS       ROM dumps (yours)
      FILES\HDPMI      HDPMI32I.EXE
      FILES\CDSET      uCDD, SHSUCDX, CDGUI, CDPLAY, GUI/CDIMG/CDON/CDDIAG

@@ -360,6 +360,10 @@ static void build_menu(void)
     add(C_TESTS, "Joystick test (JOYTEST)", "Shows what games see on the gameport: the four axes and four buttons, live."
         " With the USB pad on (Settings > Joystick) move the sticks and press A/B/X/Y. Esc or Q quits.",
         IT_BAT, "JOYTEST.EXE", 1, 0, NULL);
+    add(C_TESTS, "USB pad finder (USBTEST)", "Looks for the USB Xbox 360 pad the way SBEMU /JOY does and shows every step:"
+        " the USB controllers, what is plugged into their ports, the pad's sticks and buttons live, and every plug / unplug."
+        " Writes USBTEST.TXT for a bug report. Only while SBEMU is not loaded (restart the PC first).",
+        IT_BAT, "USBTEST.EXE USBTEST.TXT", -1, 0, "USBTEST.TXT");
     snprintf(c, sizeof c, "CALL %s\\TEST.BAT", g_home);
     add(C_TESTS, "ROM + speed test", "Checks that your SC-55 ROMs boot and measures how fast this PC runs the emulation"
         " (written to SC55LOG.TXT). Under 1.5x real time is too slow for the SC-55.", IT_BAT, c, 0, 1, NULL);

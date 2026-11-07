@@ -101,7 +101,7 @@ static void poll(int force)
     uint64_t t = tsc();
     if (!force && t - LastPoll < Cps / 2000) return;   /* every 0.5 ms at most from port reads */
     LastPoll = t;
-    USBPAD_Poll();
+    if (force) USBPAD_Poll(); else USBPAD_PollLight();
 }
 
 uint32_t VJOY_IOHandler(uint32_t port, uint32_t val, uint32_t out)

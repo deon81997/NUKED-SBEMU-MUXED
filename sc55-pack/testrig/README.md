@@ -33,3 +33,5 @@ QEMU 8.2.2 built with `--target-list=i386-softmmu`, `--python=/usr/bin/python3.1
   device to a companion-less EHCI and has no high-speed hub, so split transactions are untested), hot-plug at the
   root and into a hub. Note: `joyrun.sh` runs `pkill -f fakepad.py`; don't start it from a shell whose own command
   line contains that name.
+- beta.43: `USBTEST.EXE C:\UT.TXT /T:75` as the only program (after HDPMI) gives a full step log; `hotg.sh`-style
+  runs (pad added at 30 s, removed at 45 s, added again at 52 s via `device_add` / `device_del`) on every layout.

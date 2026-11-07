@@ -162,6 +162,7 @@ UHCI, OHCI and xHCI; hot-plugging, also into a hub) with a pretend pad
 | `MIDPLAY.EXE` | MIDI player with a live SC-55 / MT-32 front panel |
 | `CDSET\GUI.BAT` → `CDGUI.EXE` | CD images: mount on M:, run a disc's installer, list its files, fix CUE files |
 | `JOYTEST.EXE` | Shows what games see on the gameport: four axes and four buttons, live |
+| `USBTEST.EXE` | Finds the USB pad with the same code as SBEMU and shows every step (controllers, ports, plug / unplug, live input); writes a log for bug reports |
 | `SBDIAG`, `MPUTEST`, `TIMETEST`, `SC55WAV` | Diagnostics, test tune, timer checks, ROM check and speed benchmark |
 | `WIN98\SC55W.EXE` + `.VXD` + `SC55MIDI.DRV` | The Windows 98 part (tray program, virtual SB for DOS boxes, MIDI device) |
 
