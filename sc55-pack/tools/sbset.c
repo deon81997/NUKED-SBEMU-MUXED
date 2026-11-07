@@ -116,7 +116,7 @@ static Field F[NF] = {
     { "MIDI music",      "/VMIDIVOL",{ "100", "50", "75", "125", "150", "200", "300", "400" }, 8, 0, 0, "General MIDI music (SC-55 or SoundFont). Over 100% makes it louder.", {0}, 0 },
 
     /* Joystick */
-    { "USB pad",         "/JOY",     { "0", "1" }, 2, 0, 0, "Xbox 360 pad (wired) on a UHCI USB port. Takes effect when SBEMU next starts. Test: JOYTEST.", {0}, 0 },
+    { "USB pad",         "/JOY",     { "0", "1" }, 2, 0, 0, "Wired Xbox 360 pad on a UHCI or OHCI USB port (board or NEC PCI card). Applies when SBEMU next starts.", {0}, 0 },
     { "Sticks",          "/JOYAX",   { "LX,LY,RX,RY", "LX,LY,RX,TR", "LX,LY,TR,RY", "LX,LY,-,-" }, 4, 0, 0, "Which pad axes the game sees as joystick A X/Y and joystick B X/Y. D-pad also moves A.", {0}, 0 },
     { "Buttons 1-4",     "/JOYBT",   { "A,B,X,Y", "A,X,B,Y", "RT,A,B,X", "A,B,LB,RB" }, 4, 0, 0, "Pad buttons on gameport buttons 1-4 (button 1 is usually fire).", {0}, 0 },
     { "Keys",            "/JOYKEY",  { "ST:1C,BK:01", "ST:1C,BK:01,LB:39,RB:1D", "ST:1C,BK:01,DU:E048,DD:E050,DL:E04B,DR:E04D", "-" }, 4, 0, 0, "Pad buttons typed as keyboard keys, for menus and games without joystick support.", {0}, 0 },

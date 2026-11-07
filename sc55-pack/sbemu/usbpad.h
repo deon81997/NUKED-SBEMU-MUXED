@@ -1,6 +1,6 @@
 #ifndef SBEMU_USBPAD_H
 #define SBEMU_USBPAD_H
-/* USB Xbox 360 controller for SBEMU (polled UHCI host, no USB interrupt used).
+/* USB Xbox 360 controller for SBEMU (polled UHCI / OHCI host, no USB interrupt used).
  * See usbpad.c for how it works. */
 #include <stdint.h>
 
@@ -30,13 +30,13 @@ typedef struct
     volatile uint32_t reports;     /* input reports received */
 } USBPAD_State;
 
-/* Finds the USB controllers, takes them over from the BIOS (EHCI ports handed to the UHCI companions)
- * and waits up to wait_ms for a pad. cps = TSC cycles per second. Returns the number of UHCI
+/* Finds the USB controllers, takes them over from the BIOS (EHCI ports handed to the UHCI / OHCI companions)
+ * and waits up to wait_ms for a pad. cps = TSC cycles per second. Returns the number of UHCI / OHCI
  * controllers found (0 = nothing usable). Messages go to *msg (a static string). */
 int  USBPAD_Init(uint64_t cps, int wait_ms, const char** msg);
 void USBPAD_Poll(void);            /* cheap; call often (sound interrupt, port 201h reads) */
 void USBPAD_Shutdown(void);
 const USBPAD_State* USBPAD_Get(void);
-const char* USBPAD_Describe(void); /* "VID:PID wired on UHCI 2 port 1" etc. */
+const char* USBPAD_Describe(void); /* "... 045E:028E on OHCI 2 port 1" etc. */
 
 #endif

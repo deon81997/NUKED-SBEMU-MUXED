@@ -111,9 +111,10 @@ can be changed (`/JOYAX`, `/JOYBT`, `/JOYKEY`, `/JOYDZ`).
 - **Pads:** the wired Microsoft pad and wired pads that speak the same
   protocol (Hori, Mad Catz, Logitech, Saitek, ...). The PC wireless receiver
   may work (first pad, untested). Not Xbox One / Series pads, not through a hub.
-- **USB controllers:** UHCI (Intel ICH / VIA). The EHCI (USB 2.0) part is
-  taken over from the BIOS and every port handed to UHCI. OHCI boards (SiS,
-  ALi, nVidia, AMD) and xHCI are not supported yet.
+- **USB controllers:** UHCI (Intel ICH / VIA, e.g. the D810) and OHCI (NEC
+  µPD720100/720101 PCI cards, SiS, ALi, nVidia, AMD). The EHCI (USB 2.0) part
+  is taken over from the BIOS and every port handed to its UHCI / OHCI
+  companions. Not xHCI, not CardBus cards (the BIOS leaves the slot off in DOS).
 - **How:** a small polled USB host inside SBEMU (`sbemu/usbpad.c`): no USB
   interrupt is used, so it never fights the sound chip for an IRQ. Reports
   are read from the sound interrupt and on every port 201h read; the port's
@@ -122,7 +123,8 @@ can be changed (`/JOYAX`, `/JOYBT`, `/JOYKEY`, `/JOYDZ`).
 - While it runs, the BIOS's own USB keyboard/mouse support stops until the
   next restart.
 
-Tested in QEMU (UHCI, and ICH9 EHCI with UHCI companions) with a pretend pad
+Tested in QEMU (UHCI, OHCI, EHCI with UHCI companions, and EHCI with two OHCI
+companions like a NEC card) with a pretend pad
 (`sc55-pack/testrig/fakepad.py`, usbredir); not yet on a real D810.
 
 ---
@@ -322,6 +324,6 @@ Combined work: **GPL-2.0-or-later** ([`COPYING`](sc55-pack/COPYING)).
 &nbsp;•&nbsp; **Nuked OPL3**: nukeykt (LGPL-2.1+) &nbsp;•&nbsp; **DOSBox OPL**: the DOSBox team
 &nbsp;•&nbsp; **TinySoundFont**: Bernhard Schelling (MIT)
 &nbsp;•&nbsp; **Terminus font**: Dimitar Zhekov (OFL)
-&nbsp;•&nbsp; **USB joystick**: UHCI handling after [USBDDOS](https://github.com/crazii/USBDDOS) (crazii, GPL-2.0), pad report layout after Linux `xpad.c`
+&nbsp;•&nbsp; **USB joystick**: UHCI / OHCI handling after [USBDDOS](https://github.com/crazii/USBDDOS) (crazii, GPL-2.0), pad report layout after Linux `xpad.c`
 
 <sub>Roland, SC-55, MT-32 and CM-32L are trademarks of Roland Corporation. Xbox is a trademark of Microsoft. Not affiliated with either.</sub>

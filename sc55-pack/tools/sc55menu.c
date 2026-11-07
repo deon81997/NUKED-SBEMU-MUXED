@@ -350,7 +350,7 @@ static void build_menu(void)
     snprintf(c, sizeof c, "CALL %s\\SETTINGS.BAT /PAGE:JOY", g_home);
     add(C_SETTINGS, "Joystick (USB pad)", "A wired USB Xbox 360 pad (or compatible) as the PC gameport joystick at port 201h"
         " (/JOY): which sticks and buttons the game sees, a dead zone, and pad buttons typed as keys (Start = Enter,"
-        " Back = Esc). Needs a UHCI USB controller (Intel / VIA chipsets). Applies the next time SBEMU starts.",
+        " Back = Esc). Works on UHCI and OHCI USB (Intel, VIA, NEC PCI cards, SiS, ALi, nVidia, AMD). Applies the next time SBEMU starts.",
         IT_BAT, c, 0, 0, NULL);
     /* Tests */
     add(C_TESTS, "MIDI player (MIDPLAY)", "Browse your folders for .MID files and play them through the running SC-55 or"

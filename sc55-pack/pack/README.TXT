@@ -718,7 +718,7 @@ CONTENTS
   It takes effect the next time SBEMU starts (SC55.BAT, SC55JEM.BAT ...).
   SBEMU then prints a line like
          Joystick (Port 201): enabled
-           USB: 4 UHCI controller(s) (EHCI ports handed over),
+           USB: 4 UHCI + 0 OHCI controller(s) (EHCI ports handed over),
                 Xbox 360 pad 045E:028E on UHCI 2 port 1.
   The pad's ring lights up "player 1". You can also plug it in later: it
   is found within a second, also while a game runs, and unplugging is fine.
@@ -745,10 +745,13 @@ CONTENTS
   pads in the Windows 98 x360c driver). The wireless receiver for PC may
   work (first pad only; not tested). Not: Xbox One / Series pads, other
   USB joysticks, pads plugged into a USB hub.
-  Needs a UHCI USB controller: Intel (ICH, ICH2-ICH10, the D810's ICH6)
-  and VIA chipsets. Their USB 2.0 (EHCI) part is taken from the BIOS and
-  every port is handed to the UHCI part, which serves the pad. SiS, ALi,
-  nVidia and AMD boards use OHCI and are not supported yet.
+  USB controllers: UHCI - Intel (ICH, ICH2-ICH10, the D810's ICH6) and VIA
+  chipsets - and OHCI - NEC uPD720100 / uPD720101 USB 2.0 PCI cards, SiS,
+  ALi, nVidia and AMD chipsets. Their USB 2.0 (EHCI) part is taken from the
+  BIOS and every port is handed to the UHCI / OHCI part, which serves the
+  pad. A NEC card works next to the board's own USB: the pad can go in any
+  port of either. Not supported: USB 3 (xHCI) and CardBus cards (the BIOS
+  leaves the PC Card slot switched off in DOS).
 
   Good to know
      * While SBEMU runs with the joystick on, it owns the USB controllers:
@@ -1080,7 +1083,7 @@ CONTENTS
   Sergey V. Mikayev and others): LGPL-2.1+ (C:\SC55\MUNT-LIC.TXT), source
   at https://github.com/munt/munt.
   The screen font Terminus (Dimitar Zhekov): SIL Open Font Licence 1.1.
-  USB joystick: written for this pack (GPL-2.0); UHCI handling after
+  USB joystick: written for this pack (GPL-2.0); UHCI / OHCI handling after
   USBDDOS (crazii, GPL-2.0), the pad's report layout after Linux xpad.c.
   Xbox and Xbox 360 are trademarks of Microsoft.
   HDPMI32i is part of HX (japheth). Jemm, JLoad and QPIEMU (japheth): see

@@ -24,4 +24,6 @@ QEMU 8.2.2 built with `--target-list=i386-softmmu`, `--python=/usr/bin/python3.1
   or ICH9 EHCI with UHCI companions (`ich9-usb-ehci1` + `ich9-usb-uhci1..3,masterbus=ehci.0`, pad on `bus=ehci.0`).
 - Tested (Nov 2026, QEMU 8.2 from Ubuntu, which has usbredir built in): enumeration, LED, sticks / D-pad /
   triggers / buttons through PM and RM traps, Start -> Enter key, EHCI handover, pad + USB keyboard on one
-  controller, unplug / replug while JOYTEST runs.
+  controller, unplug / replug while JOYTEST runs. OHCI (beta.41): `-device pci-ohci,id=ohci` alone, next to a UHCI,
+  and as NEC-style companions of an EHCI: `-device ich9-usb-ehci1,id=ehci -device pci-ohci,masterbus=ehci.0,firstport=0,num-ports=3
+  -device pci-ohci,masterbus=ehci.0,firstport=3,num-ports=3`, pad on `bus=ehci.0` (QEMU's plain `usb-ehci` takes no companions).
