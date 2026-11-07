@@ -361,6 +361,9 @@ static void build_menu(void)
     add(C_TESTS, "Joystick test (JOYTEST)", "Shows what games see on the gameport: the four axes and four buttons, live."
         " With the USB pad on (Settings > Joystick) move the sticks and press A/B/X/Y. Esc or Q quits.",
         IT_BAT, "JOYTEST.EXE", 1, 0, NULL);
+    add(C_TESTS, "GrIP pad test (JOYTEST /GRIP)", "Every button of up to two Gravis GamePad Pro (GrIP) pads, as games with"
+        " GrIP support read them. Needs Settings > Joystick > Stick type = Gravis GamePad Pro. Esc or Q quits.",
+        IT_BAT, "JOYTEST.EXE /GRIP", 1, 0, NULL);
     add(C_TESTS, "Keyboard / mouse test (KMTEST)", "Shows the keys DOS gets (scan code, character) and the mouse driver's"
         " position and buttons, live. Checks SBEMU's USB keyboard and mouse (load CTMOUSE / MOUSE.COM after SBEMU). Esc twice quits.",
         IT_BAT, "KMTEST.EXE", 1, 0, NULL);

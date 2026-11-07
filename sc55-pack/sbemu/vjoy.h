@@ -8,7 +8,7 @@
  * keys:  pad buttons typed as keyboard keys, e.g. "ST:1C,BK:01" (set-1 scan codes, E0xx = extended)
  * dz:    stick dead zone in percent
  * Returns 0 if a name was not understood (*bad points at it). */
-int  VJOY_Init(uint64_t cps, const char* axes, const char* btns, const char* keys, int dz, const char** bad);
+int  VJOY_Init(uint64_t cps, const char* axes, const char* btns, const char* keys, int dz, int mode, const char** bad); /* mode: 0 standard, 1 CH Flightstick Pro, 2 Thrustmaster FCS */
 uint32_t VJOY_IOHandler(uint32_t port, uint32_t val, uint32_t out);
 void VJOY_Tick(void);   /* from the sound interrupt: USB poll + key presses */
 const char* VJOY_Names(void); /* list of the names for the help text */

@@ -755,6 +755,20 @@ CONTENTS
                   (flight games: throttle / rudder), or only joystick A
      Buttons 1-4  A B X Y; or A X B Y; or RT A B X (trigger fires); or
                   A B LB RB. Button 1 is the usual fire button.
+     Stick type   what the game is set up for (/JOYMODE):
+                  Standard joystick (default)
+                  CH Flightstick Pro - D-pad = 4-way hat, 4 buttons
+                  Thrustmaster FCS   - D-pad = hat (on axis 4), 4 buttons
+                     (flight sims, Descent, Wing Commander, X-Wing ...;
+                      pick the same stick in the game's setup)
+                  Gravis GamePad Pro (GrIP) - the digital mode: every
+                     button (A B X Y, LB RB, LT RT, Start, Back, D-pad or
+                     left stick), two pads; for games with GrIP support
+                  Native - SBEMU leaves port 201h alone, so a real
+                     gameport (sound card, Gravis / CH stick) works; USB
+                     keyboard / mouse and pad keys stay on
+                  Flight preset for Sticks: right X = rudder, RT = throttle.
+                  JOYTEST /GRIP shows the GrIP buttons.
      Two pads     pad 1 = joystick A, pad 2 = joystick B, each with the
                   first two Sticks axes and the first two Buttons below
                   (left stick, A + B by default). One pad: all four.

@@ -109,6 +109,12 @@ Esc so game menus work from the pad. Sticks, buttons, keys and the dead zone
 can be changed (`/JOYAX`, `/JOYBT`, `/JOYKEY`, `/JOYDZ`). With **two pads**,
 pad 1 is joystick A and pad 2 joystick B (left stick, A and B each).
 
+**Stick type** (`/JOYMODE`): standard joystick, **CH Flightstick Pro** or **Thrustmaster FCS**
+(D-pad = hat, for flight sims and Descent), **Gravis GamePad Pro** in digital GrIP mode (every
+button, two pads; the GrIP bit stream is clocked one step per port read, so trap speed doesn't
+matter), or **native** (port 201h left to a real gameport). Encodings follow Linux
+`analog.c` / `grip.c`; `JOYTEST /GRIP` decodes GrIP like Linux does.
+
 - **USB keyboard** (`/USBKB:1`, default on): keys are typed through the PC's
   8042 keyboard controller (set 1 scan codes, command D2h), with key repeat
   and the lock LEDs following the BIOS, so DOS and games see a PS/2 keyboard.
