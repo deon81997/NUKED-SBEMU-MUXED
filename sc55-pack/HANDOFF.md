@@ -47,7 +47,7 @@
 1. User (beta.45): NEC card on the P5PE-VM with USBTEST (pad answered SET_ADDRESS then went silent, CC5: now 20 ms
    settle + retries); USB keyboard / mouse in SBEMU on real hardware (CTMOUSE after SBEMU, KMTEST); two pads in a game.
    Watch: a real BIOS whose INT 15h C2 serves a USB mouse itself (SeaBIOS does when the mouse is there at POST).
-   /JOYMODE 1 CH / 2 FCS / 3 GrIP in a real game (user offered to test; suggested Descent 1 shareware, GrIP game TBD).
+   /JOYMODE 1 CH and 2 FCS verified in Descent 1 (QEMU, see below); GrIP still needs a game with GrIP support.
 2. Possible next: CardBus slot bring-up (D810 PC Card), Xbox One pads (GIP init), INT 15h AH=84h BIOS joystick, Renesas
    firmware upload; check EHCI split transactions (pad behind an Intel 5/6-series built-in hub) on real hardware.
 3. Older: Automatic setup, MIDPLAY S panel, Ctrl+Alt+F12, MT-32 game, GAMETEST Duke run; SBDIAG if music is choppy.
@@ -187,3 +187,11 @@
   all four ICH6 UHCIs from the start (suspected cause of the USBTEST crash/reboot on the D810).
 - Watchdog: a running UHCI halted by an error (STS 0x38) is traced and restarted. "no reports" diag now = no pad input.
 - Next: user retests USBTEST + SBEMU/JOYTEST on the D810.
+
+## 2026-11-07: real game test - Descent 1 (user's D-Fend ISO, registered 1.5) in QEMU with SBEMU
+- /JOYMODE:1 + Descent "CH Flightstick Pro": detected, 3-step calibration with pad A, customize screen reads
+  HAT up/right + CH buttons, in flight: stick turns, A fires (energy drops), hat slides. Works.
+- /JOYMODE:2 + Descent "Thrustmaster FCS": detected, calibrated, customize screen reads HAT up/down/left. Works.
+- Descent II demo (user's d2demo10.zip): no GrIP (supports CH/TM/Gravis analog/SideWinder) - not needed for coverage.
+- Harness: testrig/fakepad.py "live:FILE" script = pad state read from FILE whenever it changes (manual driving);
+  game VM scripts in work: /home/claude/games/dvm (start.sh, m.sh shot|key|pad|cmd). QEMU needs -device AC97 for SBEMU.
