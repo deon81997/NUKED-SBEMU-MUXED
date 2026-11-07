@@ -743,6 +743,11 @@ CONTENTS
   too, for drivers that ask). Auto = only when a USB mouse is plugged in
   as SBEMU starts (a real PS/2 mouse is then not used); 2 = always; 0 =
   off. Test with MENU > Tests > Keyboard / mouse test (KMTEST).
+  The mouse driver is loaded for you: SC55.BAT runs C:\SC55\MOUSE\MOUSE.BAT
+  after SBEMU, which loads CuteMouse 2.1b4 (included, GPL). To use the
+  Microsoft MOUSE.COM 8.20 instead, put it in C:\SC55\MOUSE and change the
+  GOTO line in MOUSE.BAT to GOTO MS; GOTO NONE loads no driver. See
+  C:\SC55\MOUSE\README.TXT.
 
   Test without a game:  MENU > Tests > Joystick test (JOYTEST), or run
   JOYTEST.EXE. Move the sticks: about 24 = left/up, 575 = centre and 1124
@@ -1159,7 +1164,10 @@ CONTENTS
   uCDD ............. vorvek, GPL-3.0 (UCDD-LIC.TXT)
   SHSUCDX .......... Jason Hood, from v1.4b by John McCoy
   XCDROM ........... Jack R. Ellis, GPL (source in FILES\XCDROM)
-  Not included, belonging to their owners: MSCDEX (Microsoft), VIDE-CDD
+  CuteMouse 2.1b4 .. Nagy Daniel, Arkady V. Belousov, Eric Auer and
+                     others, GPL-2.0 (source in FILES\MOUSE\CTM21B4.ZIP)
+  Not included, belonging to their owners: MSCDEX and MOUSE.COM
+  (Microsoft), VIDE-CDD
   (Acer / BenQ), GSCDROM (LG), QEMM (Quarterdeck).
 
   BUILT AND TESTED WITH

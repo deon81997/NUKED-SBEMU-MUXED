@@ -95,7 +95,7 @@ period-correct DOS sound setup. It's tuned on a **Dell Latitude D810**
 <summary><b>🎮 USB in DOS: pads, keyboard, mouse</b></summary>
 
 - Up to two wired Xbox 360 pads (Microsoft and compatible) as gameport joysticks A and B: two sticks, four buttons, Start/Back as Enter/Esc
-- USB keyboards in DOS, and USB mice through your DOS mouse driver (CTMOUSE or MOUSE.COM)
+- USB keyboards in DOS, and USB mice through a DOS mouse driver: CuteMouse is included and loaded after SBEMU automatically (or use your own MOUSE.COM)
 - Every USB controller kind: UHCI, OHCI, EHCI and xHCI, through hubs, hot-plugging
 - Axes, buttons, keys and dead zone adjustable; `JOYTEST` shows what games see, `USBTEST` shows each step of finding the pad and logs it for bug reports. [Details below](#-usb-in-dos-xbox-360-pads-keyboard-mouse)
 </details>
@@ -195,8 +195,9 @@ pad 1 is joystick A and pad 2 joystick B (left stick, A and B each).
 - **USB mouse** (`/USBMS:1` = when one is plugged in at start, `2` = always):
   SBEMU traps ports 60h/64h, answers a DOS mouse driver's PS/2 mouse commands
   itself (reset, ID, rates, IntelliMouse wheel knock) and sends the USB
-  mouse's movement as PS/2 packets (command D3h). Load CTMOUSE or MOUSE.COM
-  after SBEMU. `KMTEST.EXE` shows what DOS gets from both.
+  mouse's movement as PS/2 packets (command D3h). SC55.BAT loads the
+  included CuteMouse after SBEMU for you (`C:\SC55\MOUSE\MOUSE.BAT` can switch
+  to Microsoft's MOUSE.COM or turn it off). `KMTEST.EXE` shows what DOS gets from both.
 
 - **Pads:** the wired Microsoft pad and wired pads that speak the same
   protocol (Hori, Mad Catz, Logitech, Saitek, ...). The PC wireless receiver
@@ -451,8 +452,9 @@ Combined work: **GPL-2.0-or-later** ([`COPYING`](sc55-pack/COPYING)).
 | μCDD | **[vorvek](https://github.com/vorvek/uCDD)** | GPL-3.0 |
 | SHSUCDX | **Jason Hood** ([shsucd](https://github.com/adoxa/shsucd)), from v1.4b by **John McCoy** | freeware, source available |
 | XCDROM | **Jack R. Ellis** | GPL, source in the zip |
+| [CuteMouse](https://cutemouse.sourceforge.net/) 2.1b4 | **Nagy Daniel**, **Arkady V. Belousov**, 2.1 betas by **Eric Auer**, and contributors | GPL-2.0, source in the zip |
 
-Not shipped, belonging to their owners: MSCDEX (Microsoft), VIDE-CDD (Acer / BenQ), GSCDROM (LG), QEMM (Quarterdeck).
+Not shipped, belonging to their owners: MSCDEX and MOUSE.COM (Microsoft), VIDE-CDD (Acer / BenQ), GSCDROM (LG), QEMM (Quarterdeck).
 
 ### Tools used to build and test it
 

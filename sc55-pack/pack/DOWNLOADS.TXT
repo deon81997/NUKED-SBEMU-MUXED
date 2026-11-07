@@ -40,12 +40,19 @@ is optional. Put each file where it says and run SETUP / CDINST again.
       Commercial, no longer sold; only for SC55QMM.BAT. Not needed: JEMMEX
       with QPIEMU (included) does the same job (SC55JEM.BAT).
 
+  MOUSE.COM 8.20  (Microsoft)        -> FILES\MOUSE
+      Only if you prefer it to CuteMouse (included); then change the GOTO
+      line in C:\SC55\MOUSE\MOUSE.BAT to GOTO MS.
+
 -----------------------------------------------------------------------------
  INCLUDED THIRD-PARTY PROGRAMS (their own licences, sources here)
 -----------------------------------------------------------------------------
 
   HDPMI32I.EXE                 HX DOS extender, Japheth
                                https://github.com/Baron-von-Riedesel/HX
+  CTMOUSE.EXE                  CuteMouse 2.1b4, Nagy Daniel, Eric Auer and
+                               others; source in FILES\MOUSE\CTM21B4.ZIP
+                               https://cutemouse.sourceforge.net/
   JEMMEX, JEMM386, JLOAD,      Jemm, Japheth
   QPIEMU.DLL                   https://github.com/Baron-von-Riedesel/Jemm
   UCDD.EXE (0.9.5-a2)          uCDD, Vorvek - GPL-3.0 (FILES\CDSET\UCDD-LIC.TXT)
