@@ -18,7 +18,9 @@
  *             on Intel 7/8/9-series the shared ports are switched over from EHCI (XUSB2PR)
  *   - USB hubs (any depth up to 4): the pad may be behind one, as it always is on hub-only EHCIs.
  *   - one controller carries the pad at a time. UHCI: frame list -> interrupt QH -> control QH.
- *     OHCI: HCCA interrupt table -> interrupt ED, plus a control ED. EHCI: periodic frame list ->
+ *     OHCI: its own HCCA (set once at reset: real chips such as NEC's read HcHCCA only when they start,
+ *     so it is never changed while running), whose interrupt table points at the interrupt ED only
+ *     while that controller has the pad, plus a control ED. EHCI: periodic frame list ->
  *     interrupt QH, async list = one control QH. xHCI: command ring, one event ring, a transfer ring
  *     per endpoint. Controllers without the pad stay running with empty schedules, so their root
  *     hubs keep reporting plug-ins.
@@ -118,6 +120,7 @@ extern void PCI_WriteDWord(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg, 
 #define OP_PPS    (1UL << 8)
 #define OP_LSDA   (1UL << 9)
 #define OP_CHG    0x001F0000UL
+#define OP_PRSC   (1UL << 20)
 #define ED_SKIP   (1UL << 14)
 #define ED_LS     (1UL << 13)
 #define ED_HALT   1UL
@@ -230,8 +233,8 @@ static int       NextAddr, PadD = -1;
 
 static xmsmem_t Mem;
 static volatile uint32_t* FL;           /* UHCI / EHCI frame list, 1024 entries */
-static volatile uint32_t* HCCA;         /* OHCI communication area of the controller with the pad */
-static volatile uint32_t* HCCA0;        /* empty one for the other OHCI controllers */
+static volatile uint32_t* HCCAS;        /* OHCI communication areas, 256 bytes per controller (by HC index) */
+#define HCCA_OF(i) (HCCAS + (i) * 64)
 static volatile uint32_t* QHI;          /* UHCI interrupt QH */
 static volatile uint32_t* QHC;          /* UHCI control QH */
 static volatile uint32_t* EDI;          /* OHCI interrupt ED */
@@ -265,6 +268,7 @@ static volatile int XCmdDone, XCtlDone, XInDone, XOutDone;
 static uint32_t  XCmdPh; static int XCmdCC, XCmdSlot, XCtlCC, XInCC, XInRes, XOutCC;
 static volatile int Busy;
 static int       Inited, Light;
+static uint64_t  RunSince; static int Watched;
 
 /* short trace of what happened (start-up report / SBDETAIL), oldest first, stops when full */
 static char      Trace[4096]; static int TraceN, TraceOff;
@@ -283,6 +287,32 @@ const char* USBPAD_Trace(void) { return Trace; }
 static inline uint64_t tsc(void) { uint32_t lo, hi; __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi)); return ((uint64_t)hi << 32) | lo; }
 static uint64_t us2c(uint32_t us) { return Cps * us / 1000000ULL; }
 static void wait_us(uint32_t us) { uint64_t e = tsc() + us2c(us); while (tsc() < e) {} }
+
+/* CPU cache vs. the USB controller's DMA. The controller should see memory coherently (it snoops),
+ * but on the D810 (ICH6 UHCI) it acted on descriptors the CPU had written and the CPU kept seeing its own
+ * old copy. So descriptors are flushed out of the cache (CLFLUSH: Pentium 4 / Pentium M and later) before
+ * the controller is pointed at them, and flushed again before the CPU reads what the controller wrote. */
+static int ClLine;                      /* CLFLUSH line size, 0 = no CLFLUSH */
+static void cache_init(void)
+{
+    uint32_t a = 1, b, c, d;
+    __asm__ __volatile__("pushfl; popl %%eax; movl %%eax, %%ecx; xorl $0x200000, %%eax; pushl %%eax; popfl;"
+                         "pushfl; popl %%eax; xorl %%ecx, %%eax" : "=a"(a) : : "ecx");
+    if (!(a & 0x200000)) { ClLine = 0; return; }                 /* no CPUID */
+    __asm__ __volatile__("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "a"(1));
+    ClLine = (d & (1UL << 19)) ? (int)(((b >> 8) & 0xFF) * 8) : 0;
+    if (ClLine && ClLine < 32) ClLine = 32;
+}
+static void fl(const volatile void* p, int bytes)
+{
+    const volatile uint8_t* q;
+    const volatile uint8_t* e = (const volatile uint8_t*)p + bytes;
+    if (!ClLine) return;
+    __asm__ __volatile__("lock; orl $0, (%%esp)" ::: "memory");
+    for (q = (const volatile uint8_t*)((uintptr_t)p & ~(uintptr_t)(ClLine - 1)); q < e; q += ClLine)
+        __asm__ __volatile__("clflush %0" : : "m"(*(const volatile char*)q) : "memory");
+    __asm__ __volatile__("lock; orl $0, (%%esp)" ::: "memory");
+}
 
 static uint32_t rd(uint32_t a) { return DPMI_LoadD(a); }
 static void wr(uint32_t a, uint32_t v) { DPMI_StoreD(a, v); }
@@ -382,10 +412,20 @@ static int p_reset_end(int h, int p)                  /* 1 = port enabled */
         port_set(h, p, P_CSC | P_PEC, 0);
         break;
     case T_OHCI:
-        for (n = 0; n < 50 && (ord(h, O_PORT + p * 4) & OP_PRS); ++n) wait_us(1000);
+    {
+        /* the root hub's own reset is only ~10 ms; USB 2.0 asks 50 ms for a root port (Linux repeats it
+         * too): some devices, the Xbox 360 pad among them it seems, stay silent after a short one */
+        int k;
+        for (k = 0; k < 5; ++k)
+        {
+            for (n = 0; n < 30 && (ord(h, O_PORT + p * 4) & OP_PRS); ++n) wait_us(1000);
+            owr(h, O_PORT + p * 4, OP_PRSC);
+            if (k < 4) owr(h, O_PORT + p * 4, OP_PRS);
+        }
         owr(h, O_PORT + p * 4, OP_CHG);
         for (n = 0; n < 20 && !(ord(h, O_PORT + p * 4) & OP_PES); ++n) { owr(h, O_PORT + p * 4, OP_PES); wait_us(500); }
         break;
+    }
     case T_EHCI:                                      /* enabled after reset = high speed; else full/low speed, */
         eport_set(h, p, 0, EP_PR | EP_PE);            /* which a companion-less EHCI cannot serve */
         for (n = 0; n < 20 && (erd(h, E_PORT + p * 4) & EP_PR); ++n) wait_us(500);
@@ -589,7 +629,8 @@ static void ohci_reset(int i)
     owr(i, O_FMINT, ((ord(i, O_FMINT) & 0x80000000UL) ^ 0x80000000UL) | (((fi - 210) * 6 / 7) << 16) | fi);
     owr(i, O_PERSTART, fi * 9 / 10);
     owr(i, O_LSTHRESH, 0x628);
-    owr(i, O_HCCA, PHYS(HCCA0));
+    zero(HCCA_OF(i), 64);
+    owr(i, O_HCCA, PHYS(HCCA_OF(i)));                         /* for good: never changed while running */
     owr(i, O_CTLHEAD, 0); owr(i, O_CTLCUR, 0);
     owr(i, O_BLKHEAD, 0); owr(i, O_BLKCUR, 0);
     owr(i, O_INTSTS, 0xFFFFFFFFUL);
@@ -621,10 +662,12 @@ static uint32_t ring_push(Ring* r, uint32_t p0, uint32_t p1, uint32_t st, uint32
     uint32_t ph = r->ph + r->enq * 16;
     t[0] = p0; t[1] = p1; t[2] = st;
     t[3] = ctl | (r->cyc ? TRB_C : 0);
+    fl(t, 16);
     if (++r->enq == r->n - 1)
     {
         volatile uint32_t* l = r->t + (r->n - 1) * 4;
         l[3] = TRB_TYPE(TT_LINK) | 2 | (r->cyc ? TRB_C : 0);
+        fl(l, 16);
         r->cyc ^= 1;
         r->enq = 0;
     }
@@ -640,7 +683,9 @@ static void x_events(int h)
     for (;;)
     {
         volatile uint32_t* e = x->ev.t + x->ev.enq * 4;
-        uint32_t ctl = e[3];
+        uint32_t ctl;
+        fl(e, 16);
+        ctl = e[3];
         int type, cc, slot, ep;
         if ((ctl & 1) != (uint32_t)x->evcyc || guard++ > XEVT_TRBS) break;
         type = (int)TRB_GTYPE(ctl); cc = (int)(e[2] >> 24); slot = (int)(ctl >> 24); ep = (int)((ctl >> 16) & 0x1F);
@@ -665,6 +710,7 @@ static int x_cmd(int h, uint32_t p0, uint32_t ctl, int* slot)
     XHC* x = HC[h].x;
     uint64_t end = tsc() + us2c(500000);
     XCmdDone = 0;
+    fl(x->inctx, 33 * 64);                                      /* input context, if the command uses one */
     XCmdPh = ring_push(&x->cmd, p0, 0, 0, ctl);
     wr(x->db, 0);
     while (!XCmdDone && tsc() < end) x_events(h);
@@ -764,6 +810,8 @@ static int xhci_setup(int i)
     wr(x->rt + 0x28, (rd(x->rt + 0x28) & 0xFFFF0000UL) | 1);      /* ERSTSZ */
     wr(x->rt + 0x38, x->ev.ph); wr(x->rt + 0x3C, 0);              /* ERDP */
     wr(x->rt + 0x30, (rd(x->rt + 0x30) & 0x3FUL) | (x->pbase + 0x400)); wr(x->rt + 0x34, 0); /* ERSTBA */
+    fl(m, 0x9000);
+    if (x->nsp) fl(x->sp.linearptr, x->nsp * 4096);
     wr(x->op + X_USBCMD, (rd(x->op + X_USBCMD) & ~(1UL << 2)) | XC_RUN);
     for (n = 0; n < 100 && (rd(x->op + X_USBSTS) & XS_HCH); ++n) wait_us(1000);
     /* power the USB 2 ports only (USB 3 ones stay off: devices fall back to their USB 2 side) */
@@ -798,6 +846,7 @@ static void hc_run(int i, int on)
         if (on)
         {
             for (k = 0; k < 1024; ++k) FL[k] = PHYS(QHI) | LP_Q;
+            fl(FL, 4096); fl(QHI, 32);
             outportw(io + U_INTR, 0);
             outportw(io + U_FRNUM, 0);
             outportl(io + U_FLBASE, PHYS(FL));
@@ -816,16 +865,21 @@ static void hc_run(int i, int on)
         EDI[0] |= ED_SKIP; EDC[0] |= ED_SKIP;
         if (on)
         {
-            owr(i, O_HCCA, PHYS(HCCA));
+            for (k = 0; k < 32; ++k) HCCA_OF(i)[k] = PHYS(EDI);  /* every interrupt slot: the pad's ED */
+            fl(HCCA_OF(i), 256); fl(EDI, 32);
             owr(i, O_CTLHEAD, PHYS(EDC)); owr(i, O_CTLCUR, 0);
             owr(i, O_CONTROL, (ord(i, O_CONTROL) & ~(OC_PLE | OC_CLE | OC_BLE)) | OC_PLE | OC_CLE);
+            trace("[on ctl%08lx hcca%08lx/%08lx fi%08lx ps%04lx] ", (unsigned long)ord(i, O_CONTROL),
+                (unsigned long)ord(i, O_HCCA), (unsigned long)PHYS(HCCA_OF(i)), (unsigned long)ord(i, O_FMINT),
+                (unsigned long)ord(i, O_PERSTART));
         }
         else
         {
             owr(i, O_CONTROL, ord(i, O_CONTROL) & ~(OC_PLE | OC_CLE | OC_BLE));
             wait_us(2000);
             owr(i, O_CTLHEAD, 0); owr(i, O_CTLCUR, 0);
-            owr(i, O_HCCA, PHYS(HCCA0));
+            for (k = 0; k < 32; ++k) HCCA_OF(i)[k] = 0;
+            fl(HCCA_OF(i), 256);
         }
         break;
     case T_EHCI:
@@ -835,6 +889,7 @@ static void hc_run(int i, int on)
             zero(QHP, 24);
             QHP[0] = LP_T; QHP[4] = LP_T; QHP[5] = LP_T;              /* idle interrupt QH */
             for (k = 0; k < 1024; ++k) FL[k] = PHYS(QHP) | LP_Q;
+            fl(FL, 4096); fl(QHP, 96);
             ewr(i, E_PERIOD, PHYS(FL));
             ewr(i, E_ASYNC, PHYS(QHA));
             ehci_sched(i, EC_PSE, 1);
@@ -895,10 +950,13 @@ static int u_run_tds(int n, uint32_t timeout_us)
 {
     uint64_t end = tsc() + us2c(timeout_us);
     int i;
+    fl(TD, n * 32); fl(CBuf, 512);
     QHC[1] = PHYS(tdn(0));
+    fl(QHC, 16);
     for (;;)
     {
         int done = 1;
+        fl(TD, n * 32);
         for (i = 0; i < n; ++i)
         {
             uint32_t cs = tdn(i)[1];
@@ -906,7 +964,24 @@ static int u_run_tds(int n, uint32_t timeout_us)
             if (cs & TD_ERRMASK) { QHC[1] = LP_T; return -1; }
         }
         if (done) { QHC[1] = LP_T; return 0; }
-        if (tsc() > end) { QHC[1] = LP_T; wait_us(1000); trace("[u%08lx t] ", (unsigned long)tdn(0)[1]); return -1; }
+        if (tsc() > end)
+        {
+            uint16_t io = HC[Cur].io, f1 = inportw(io + U_FRNUM), f2;
+            static uint32_t alt;                                 /* same memory through a second mapping */
+            uint32_t ph = PHYS(tdn(0)) & ~0xFFFUL;
+            wait_us(3000);
+            f2 = inportw(io + U_FRNUM);
+            if (!alt) alt = DPMI_MapMemory(ph, 0x1000);
+            if (alt) trace("[alt td %08lx qh %08lx, cl%d] ", (unsigned long)rd(alt + (PHYS(tdn(0)) & 0xFFF) + 4),
+                (unsigned long)rd(alt + (PHYS(QHC) - ph) + 4), ClLine);
+            trace("[u%08lx t cmd%04x sts%04x fr%03x>%03x fl%08lx/%08lx pci%04x leg%04x qh%08lx td%08lx %08lx] ",
+                (unsigned long)tdn(0)[1], inportw(io + U_CMD), inportw(io + U_STS), f1 & 0x7FF, f2 & 0x7FF,
+                (unsigned long)inportl(io + U_FLBASE), (unsigned long)PHYS(FL),
+                PCI_ReadWord(HC[Cur].bus, HC[Cur].dev, HC[Cur].func, 4), PCI_ReadWord(HC[Cur].bus, HC[Cur].dev, HC[Cur].func, UHCI_LEGSUP),
+                (unsigned long)QHC[1], (unsigned long)tdn(0)[2], (unsigned long)tdn(0)[3]);
+            QHC[1] = LP_T; wait_us(1000);
+            return -1;
+        }
     }
 }
 
@@ -945,12 +1020,15 @@ static int o_run_tds(const Dev* d, int ep, int mps, int n, uint32_t timeout_us)
     EDC[1] = PHYS(tail);
     EDC[2] = PHYS(tdn(0));
     EDC[3] = 0;
+    fl(TD, (n + 1) * 32); fl(CBuf, 512); fl(OBuf, 64);
     EDC[0] &= ~ED_SKIP;
+    fl(EDC, 16);
     owr(Cur, O_CMDSTS, OS_CLF);
     end = tsc() + us2c(timeout_us);
     for (;;)
     {
         int done = 1, err = 0;
+        fl(TD, n * 32); fl(EDC, 16);
         for (i = 0; i < n; ++i)
         {
             uint32_t cc = OTD_CC(tdn(i)[0]);
@@ -962,11 +1040,21 @@ static int o_run_tds(const Dev* d, int ep, int mps, int n, uint32_t timeout_us)
         if (tsc() > end) break;
         owr(Cur, O_CMDSTS, OS_CLF);
     }
+    if (r)
+    {
+        uint32_t f1 = ord(Cur, 0x3C) & 0xFFFF;
+        wait_us(2000);
+        trace("[o%08lx/%08lx ed%08lx %08lx ctl%08lx cs%08lx cur%08lx head%08lx/%08lx fn%04lx>%04lx] ",
+            (unsigned long)tdn(0)[0], (unsigned long)tdn(n - 1)[0], (unsigned long)EDC[0], (unsigned long)EDC[2],
+            (unsigned long)ord(Cur, O_CONTROL), (unsigned long)ord(Cur, O_CMDSTS), (unsigned long)ord(Cur, O_CTLCUR),
+            (unsigned long)ord(Cur, O_CTLHEAD), (unsigned long)PHYS(EDC), (unsigned long)f1, (unsigned long)(ord(Cur, 0x3C) & 0xFFFF));
+    }
     EDC[0] |= ED_SKIP;
+    fl(EDC, 16);
     wait_us(1100);
     EDC[2] = PHYS(tail);
+    fl(EDC, 16);
     owr(Cur, O_INTSTS, 0x06);                                 /* WDH, SF: let the done queue be written back */
-    if (r) trace("[o%08lx ed%08lx] ", (unsigned long)tdn(0)[0], (unsigned long)EDC[2]);
     return r;
 }
 
@@ -1016,11 +1104,13 @@ static int e_run(const Dev* d, int ep, int mps, int n, uint32_t timeout_us)
     QHA[2] = e_caps(d, 0, 0);
     QHA[4] = PHYS(qtdn(0));
     QHA[5] = LP_T;
+    fl(TD, n * 64); fl(QHA, 96); fl(CBuf, 512); fl(OBuf, 64);
     ehci_sched(Cur, EC_ASE, 1);
     end = tsc() + us2c(timeout_us);
     for (;;)
     {
         int done = 1, err = 0;
+        fl(TD, n * 64);
         for (i = 0; i < n; ++i)
         {
             uint32_t t = qtdn(i)[2];
@@ -1093,6 +1183,7 @@ static int x_address(int di)
     d->slot = slot;
     zero(x_out(di), 512);
     x->dcbaa[slot * 2] = x_outph(di); x->dcbaa[slot * 2 + 1] = 0;
+    fl(x->dcbaa + slot * 2, 8); fl(x_out(di), 2048);
     ring_init(&XEp0[di], (volatile uint32_t*)((uint8_t*)x->mem.linearptr + 0x1600 + di * 512), x->pbase + 0x1600 + di * 512, XRING_TRBS);
     zero(ic, 33 * 16);
     ic[1] = 3;                                                   /* add slot + EP0 */
@@ -1101,6 +1192,7 @@ static int x_address(int di)
     ep0[1] = (3UL << 1) | (4UL << 3) | ((uint32_t)d->mps0 << 16);
     ep0[2] = XEp0[di].ph | 1; ep0[3] = 0; ep0[4] = 8;
     if (x_cmd(Cur, x->pbase + 0x3000, TRB_TYPE(TT_ADDR) | ((uint32_t)slot << 24), NULL) != 1) return -1;
+    fl(x_out(di), 64);
     d->addr = (int)(x_out(di)[3] & 0xFF);
     return 0;
 }
@@ -1178,12 +1270,18 @@ static int control(int di, uint8_t rt, uint8_t req, uint16_t val, uint16_t idx, 
     int in = (rt & 0x80) != 0;
     s[0] = rt; s[1] = req; s[2] = (uint8_t)val; s[3] = (uint8_t)(val >> 8);
     s[4] = (uint8_t)idx; s[5] = (uint8_t)(idx >> 8); s[6] = (uint8_t)len; s[7] = (uint8_t)(len >> 8);
-    switch (HC[Cur].type)
+    fl(CBuf, 512);
     {
-    case T_UHCI: return u_control(d, len, in);
-    case T_OHCI: return o_control(d, len, in);
-    case T_EHCI: return e_control(d, len, in);
-    default:     return x_control(di, len, in);
+        int r;
+        switch (HC[Cur].type)
+        {
+        case T_UHCI: r = u_control(d, len, in); break;
+        case T_OHCI: r = o_control(d, len, in); break;
+        case T_EHCI: r = e_control(d, len, in); break;
+        default:     r = x_control(di, len, in); break;
+        }
+        fl(CBuf, 512);                                            /* read what the device sent, not a cached copy */
+        return r;
     }
 }
 
@@ -1194,6 +1292,7 @@ static int send_out(const uint8_t* data, int len)
     if (!OutEp || PadD < 0) return -1;
     d = &D[PadD];
     memcpy(OBuf, data, len);
+    fl(OBuf, 64);
     switch (HC[Cur].type)
     {
     case T_UHCI:
@@ -1241,14 +1340,18 @@ static void arm_in(void)
         TDI[1] = td_cs(d);
         TDI[2] = td_tok(PID_IN, d->addr, InEp, InTog, InMps);
         TDI[3] = PHYS(IBuf);
+        fl(TDI, 16); fl(IBuf, 64);
         QHI[1] = PHYS(TDI);
+        fl(QHI, 16);
         break;
     case T_OHCI:
     {
         volatile uint32_t* nt = o_tdi(OCur ^ 1);
         zero(nt, 4);
         otd(o_tdi(OCur), OTD_IN | OTD_R, PHYS(IBuf), InMps, nt);
+        fl(TDI, 32); fl(IBuf, 64);
         EDI[1] = PHYS(nt);
+        fl(EDI, 16);
         OCur ^= 1;
         break;
     }
@@ -1257,12 +1360,15 @@ static void arm_in(void)
         volatile uint32_t* t = e_tdi(OCur);
         volatile uint32_t* nt = e_tdi(OCur ^ 1);
         zero(nt, 16); nt[0] = LP_T; nt[1] = LP_T;           /* inactive: the controller waits on it */
+        fl(nt, 64);
         qtd(t, 1, 0, PHYS(IBuf), InMps, nt);                  /* written active last (token) */
+        fl(t, 64); fl(IBuf, 64);
         OCur ^= 1;
         break;
     }
     default:
         XInDone = 0;
+        fl(IBuf, 64);
         ring_push(&XIn, PHYS(IBuf), 0, (uint32_t)InMps, TRB_TYPE(TT_NORMAL) | (1UL << 5) | (1UL << 2));
         wr(HC[Cur].x->db + d->slot * 4, (uint32_t)(InEp * 2 + 1));
         break;
@@ -1282,6 +1388,7 @@ static void start_in(void)
         EDI[2] = PHYS(o_tdi(0));
         EDI[3] = 0;
         EDI[0] &= ~ED_SKIP;
+        fl(EDI, 16); fl(TDI, 32);
         break;
     case T_EHCI:
         ehci_sched(Cur, EC_PSE, 0);
@@ -1292,6 +1399,7 @@ static void start_in(void)
         QHP[2] = e_caps(d, 0x01, 0x1C);                      /* start-split uframe 0, complete 2-4 */
         QHP[4] = PHYS(e_tdi(0));
         QHP[5] = LP_T;
+        fl(QHP, 96); fl(TDI, 128);
         ehci_sched(Cur, EC_PSE, 1);
         break;
     default:
@@ -1307,9 +1415,12 @@ static int poll_in(void)
     {
     case T_UHCI:
     {
-        uint32_t cs = TDI[1];
+        uint32_t cs;
         int len;
+        fl(TDI, 16);
+        cs = TDI[1];
         if (cs & TD_ACTIVE) return 0;
+        fl(IBuf, 64);
         if (cs & TD_ERRMASK) return (cs & TD_STALL) ? -2 : -1;
         len = (int)((cs + 1) & 0x7FF);
         if (len == 0x800) len = 0;
@@ -1319,22 +1430,29 @@ static int poll_in(void)
     case T_OHCI:
     {
         volatile uint32_t* t = o_tdi(OCur ^ 1);
-        uint32_t cc = OTD_CC(t[0]);
+        uint32_t cc;
+        fl(TDI, 32);
+        cc = OTD_CC(t[0]);
         if (cc >= 0xE) return 0;
+        fl(IBuf, 64);
         owr(Cur, O_INTSTS, 0x06);
-        if (cc) { EDI[2] = PHYS(o_tdi(OCur)); return cc == 4 ? -2 : -1; }
+        if (cc) { EDI[2] = PHYS(o_tdi(OCur)); fl(EDI, 16); return cc == 4 ? -2 : -1; }
         return (t[1] ? (int)(t[1] - PHYS(IBuf)) : InMps) + 1;
     }
     case T_EHCI:
     {
         volatile uint32_t* t = e_tdi(OCur ^ 1);
-        uint32_t tk = t[2];
+        uint32_t tk;
+        fl(t, 64);
+        tk = t[2];
         if (tk & QT_ACTIVE) return 0;
+        fl(IBuf, 64);
         if (tk & QT_HALT)
         {
             if (Light) return 0;                                      /* recovery: interrupt only */
             ehci_sched(Cur, EC_PSE, 0);
             QHP[3] = 0; QHP[4] = PHYS(e_tdi(OCur)); QHP[5] = LP_T; QHP[6] = 0;  /* clear halt and toggle */
+            fl(QHP, 96);
             ehci_sched(Cur, EC_PSE, 1);
             return (tk & QT_ERRS) ? -1 : -2;
         }
@@ -1348,7 +1466,7 @@ static int poll_in(void)
         cc = XInCC;
         if (cc != 1 && cc != 13 && Light) return 0;                 /* error: leave it for the interrupt */
         XInDone = 0;
-        if (cc == 1 || cc == 13) return InMps - XInRes + 1;
+        if (cc == 1 || cc == 13) { fl(IBuf, 64); return InMps - XInRes + 1; }
         x_recover(D[PadD].slot, InEp * 2 + 1, &XIn);
         return cc == 6 ? -2 : -1;
     }
@@ -1401,8 +1519,15 @@ static int enumerate(int di)
     }
     else
     {
+        int k;
         d->addr = 0;
-        if (control(di, 0x80, 6, 0x0100, 0, 8) != 0) { trace("desc8! "); return 0; }
+        for (k = 0; k < 4; ++k)
+        {
+            if (control(di, 0x80, 6, 0x0100, 0, 8) == 0) break;
+            wait_us(50000);
+        }
+        if (k == 4) { trace("desc8! "); return 0; }
+        if (k) trace("desc8 try%d ", k + 1);
         d->mps0 = b[7] >= 8 && b[7] <= 64 ? b[7] : 8;
         if (control(di, 0x00, 5, (uint16_t)NextAddr, 0, 0) != 0) return 0;
         d->addr = NextAddr++;
@@ -1651,7 +1776,7 @@ static void step(void)
         Fails[Cur][CurPort] = 0;
         clear_pad();
         St.connected = !Wireless;
-        S = S_RUN; NextScan = t + us2c(500000);
+        S = S_RUN; NextScan = t + us2c(500000); RunSince = t; Watched = 0;
         return;
     }
     case S_HUB:
@@ -1710,7 +1835,24 @@ static void step(void)
             if (hub_status(D[PadD].parent, D[PadD].pport, &st, &chg) != 0 || !(st & 1)) { drop_all(0); return; }
         }
         r = poll_in();
-        if (r == 0) return;
+        if (r == 0)
+        {
+            if (!Light && !Watched && !St.reports && t - RunSince > us2c(2000000))   /* running, but nothing comes */
+            {
+                Watched = 1;
+                if (HC[Cur].type == T_OHCI)
+                    trace("[no reports: ed %08lx %08lx %08lx td %08lx %08lx %08lx %08lx ctl%08lx sts%08lx fn%04lx hcca0 %08lx] ",
+                        (unsigned long)EDI[0], (unsigned long)EDI[1], (unsigned long)EDI[2],
+                        (unsigned long)o_tdi(OCur ^ 1)[0], (unsigned long)o_tdi(OCur ^ 1)[1], (unsigned long)o_tdi(OCur ^ 1)[2],
+                        (unsigned long)o_tdi(OCur ^ 1)[3], (unsigned long)ord(Cur, O_CONTROL), (unsigned long)ord(Cur, O_INTSTS),
+                        (unsigned long)(ord(Cur, 0x3C) & 0xFFFF), (unsigned long)HCCA_OF(Cur)[0]);
+                else if (HC[Cur].type == T_UHCI)
+                    trace("[no reports: td %08lx %08lx qh %08lx cmd%04x sts%04x] ", (unsigned long)TDI[1], (unsigned long)TDI[2],
+                        (unsigned long)QHI[1], inportw(HC[Cur].io + U_CMD), inportw(HC[Cur].io + U_STS));
+                else trace("[no reports] ");
+            }
+            return;
+        }
         if (r < 0 && Light) return;                                         /* recovery from the interrupt */
         if (r < 0)
         {
@@ -1784,17 +1926,16 @@ int USBPAD_Init(uint64_t cps, int wait_ms, const char** msg)
         snprintf(m, sizeof(m), "no USB controller found");
         return 0;
     }
-    if (!pds_dpmi_xms_allocmem(&Mem, 8192))
+    if (!pds_dpmi_xms_allocmem(&Mem, 0x3000))
     {
         snprintf(m, sizeof(m), "out of XMS memory");
         return 0;
     }
     base = (uint8_t*)Mem.linearptr;
     PBase = (uint32_t)(uintptr_t)Mem.physicalptr;
-    memset(base, 0, 8192);
+    memset(base, 0, 0x3000);
     FL    = (volatile uint32_t*)base;                    /* 4K-aligned */
-    HCCA  = (volatile uint32_t*)(base + 0x1000);         /* 256-aligned */
-    HCCA0 = (volatile uint32_t*)(base + 0x1100);
+    HCCAS = (volatile uint32_t*)(base + 0x2000);         /* 256-aligned, MAX_HC x 256 bytes */
     QHI   = (volatile uint32_t*)(base + 0x1200);
     QHC   = (volatile uint32_t*)(base + 0x1210);
     EDI   = (volatile uint32_t*)(base + 0x1220);
@@ -1809,8 +1950,10 @@ int USBPAD_Init(uint64_t cps, int wait_ms, const char** msg)
     QHI[0] = PHYS(QHC) | LP_Q; QHI[1] = LP_T;
     QHC[0] = LP_T;             QHC[1] = LP_T;
     EDI[0] = EDC[0] = ED_SKIP;
-    for (i = 0; i < 32; ++i) HCCA[i] = PHYS(EDI);
     QHA[0] = PHYS(QHA) | LP_Q; QHA[1] = 1UL << 15; QHA[4] = QHA[5] = LP_T;
+    cache_init();
+    fl(base, 0x3000);
+    trace("mem %08lx, clflush %d\n", (unsigned long)PBase, ClLine);
 
     /* xHCI first (it may take ports away from EHCI), then EHCI (hands ports to companions or keeps
      * them), then the UHCI / OHCI companions. Controllers that fail to come up are dropped. */
