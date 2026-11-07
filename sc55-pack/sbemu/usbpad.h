@@ -34,10 +34,12 @@ typedef struct
  * and waits up to wait_ms for a pad. cps = TSC cycles per second. Returns the number of usable
  * controllers (0 = nothing usable). Messages go to *msg (a static string). */
 int  USBPAD_Init(uint64_t cps, int wait_ms, const char** msg);
-void USBPAD_Poll(void);            /* cheap; call often (sound interrupt, port 201h reads) */
+void USBPAD_Poll(void);
+void USBPAD_PollLight(void);       /* only collects reports: safe inside a game's port read */            /* cheap; call often (sound interrupt, port 201h reads) */
 void USBPAD_Shutdown(void);
 const USBPAD_State* USBPAD_Get(void);
-const char* USBPAD_Trace(void);    /* short log of the USB steps, for reports */
+const char* USBPAD_Trace(void);
+void USBPAD_TraceStop(void);       /* stop adding to it (SBEMU, once resident) */    /* short log of the USB steps, for reports */
 const char* USBPAD_Describe(void); /* "... 045E:028E on OHCI 2 port 1" etc. */
 
 #endif

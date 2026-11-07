@@ -1,6 +1,6 @@
 # SC-55 pack — handoff
 
-## Current state (SBEMU 1.0.0-beta.42-usb-sc55, branch usb-xpad)
+## Current state (SBEMU 1.0.0-beta.43-usb-sc55, branch usb-xpad)
 - SBEMU + Nuked-SC55 (SC-55/mkII), Munt MT-32/CM-32L (/VMT32), SoundFont (/VSF); MPU side channel 0xA5-0xB0 (stats, SBDIAG, key player, triple-Esc, front panel/LCD + CPU load).
 - Key player holds each typed key 500 ms (vdiag.c key_tick); Duke 3D quit default `ESC W3 Q W2 Y W3 Y W3 ESC W3 Q W2 Y W3 Y` — verified in QEMU with Duke 3D Atomic 1.5 from logo, title and demo (GAMETEST /RUN, 20 s and 40 s tests).
 - Tools: SC55MENU (game profiles GAMES.CFG, safe mode, CPU%, first-run auto setup), SBSET (/TUNE benchmark, MT-32 choice), GAMETEST (/RUN), MIDPLAY (live SC-55/MT-32 LCD panel), CDGUI (CUE checks/fix), Ctrl+Alt+F12 in-game LCD overlay (text + mode 13h).
@@ -44,8 +44,8 @@
 - Source from this repo. Attach: SC55PACK-HYBRID.zip (pack + ROMs + third-party DOS programs) and sc55-restore-1/2/3.zip (DJGPP in two parts, QEMU, FreeDOS boot files, JEMMEX; RESTORE.md inside).
 
 ## Next steps
-1. User (D810): Settings > Joystick > USB pad On, start SC55.BAT, check the "Joystick (Port 201)" lines, JOYTEST, then a game
-   (calibrate in its setup). If the pad isn't found: SBDETAIL "Joystick:" line + BUGREP.
+1. User: NEC PCI card (P5PE-VM, ICH5) pad not found on beta.4x - get USBTEST.TXT (USBTEST USBTEST.TXT, SBEMU not loaded)
+   from the card and from the board's own ports; then SC55 with /JOY:1, JOYTEST, a game.
 2. Possible next: CardBus slot bring-up (D810 PC Card), Xbox One pads (GIP init), INT 15h AH=84h BIOS joystick, Renesas
    firmware upload; check EHCI split transactions (pad behind an Intel 5/6-series built-in hub) on real hardware.
 3. Older: Automatic setup, MIDPLAY S panel, Ctrl+Alt+F12, MT-32 game, GAMETEST Duke run; SBDIAG if music is choppy.
@@ -61,7 +61,7 @@
   `export PATH=<djgpp>/bin:$PATH; make -j8` (delete output/*.o after header changes)
 
 ## Resume prompt
-"Continue NUKED SB-EMU from sc55-pack/HANDOFF.md (beta.42-usb): github.com/deon81997/NUKED-SBEMU-MUXED, branch usb-xpad. Rebuild with DJGPP, then continue from Next steps."
+"Continue NUKED SB-EMU from sc55-pack/HANDOFF.md (beta.43-usb): github.com/deon81997/NUKED-SBEMU-MUXED, branch usb-xpad. Rebuild with DJGPP, then continue from Next steps."
 
 ## 2026-11-06 (beta.37): SBEMU "Not loaded" on the D810 after SC55.BAT
 - SBEMU no longer quits when the real sound card uses the IRQ asked for (/I or BLASTER): it takes another of 7/5/9, warns, and updates BLASTER.
@@ -129,3 +129,17 @@
   take turns (3 s). USB steps trace in SBDETAIL ("USB steps:").
 - QEMU passed: UHCI, OHCI, ICH9 EHCI+UHCI, EHCI+2 OHCI, EHCI alone (high-speed pretend pad), qemu-xhci, nec-usb-xhci,
   hubs on UHCI/OHCI/xHCI, two hubs, mixed UHCI+xHCI, hot-plug at root and in a hub. Not testable in QEMU: split.
+
+## 2026-11-06 (beta.43-usb): review for real hardware, hot-plug fixes, USBTEST
+- MMIO mapped page-aligned + offset (EHCI BARs can be 256-byte/1K aligned; a host rounding them would make the EHCI
+  look companion-less and steal the NEC card's ports). MAX_HC 16 (ICH5 + NEC card = exactly the old 8).
+- EHCI with companions: ports handed over explicitly (CONFIGFLAG=1, Port Owner + Port Power on every port,
+  CONFIGFLAG=0) and ports that come back to the EHCI with a device on them are re-handed while scanning
+  (QEMU did this on unplug: the replug was never seen on EHCI+companion layouts).
+- OHCI: WDH/SF cleared after completions. PCI INTx disabled on MMIO controllers.
+- Game reads of 201h only collect reports (USBPAD_PollLight); enumeration, hub checks, recovery stay in the sound
+  interrupt. Trace stops once SBEMU is resident (no libc formatting in the ISR).
+- USBTEST.EXE (tools/usbtest.c, same usbpad.c): PCI list, per-controller setup, steps, live input, plug/unplug log,
+  /T:n auto-exit. MENU > Tests > USB pad finder.
+- QEMU hot-plug (plug, unplug, replug) passes on: ICH EHCI+UHCI, UHCI, OHCI, NEC-style EHCI+2 OHCI, qemu-xhci,
+  nec-usb-xhci, hubs on xHCI/OHCI/UHCI; SBEMU+JOYTEST end to end on ICH, NEC and xHCI+hub.

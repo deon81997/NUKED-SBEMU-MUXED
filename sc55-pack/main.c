@@ -1836,12 +1836,14 @@ int main(int argc, char* argv[])
             MAIN_Print_Enabled_Newline(MAIN_JOY_RM || MAIN_JOY_PM);
             MAIN_CPrintf(LIGHTGRAY, "  USB: %s.\n", msg);
             if(!USBPAD_Get()->connected)
-                MAIN_CPrintf(LIGHTGRAY, "  Plug the pad in any time; it is picked up while games run.\n");
+                MAIN_CPrintf(LIGHTGRAY, "  Plug the pad in any time; it is picked up while games run.\n"
+                    "  Not found? Run USBTEST.EXE (without SBEMU loaded) to see every USB step.\n");
         }
         MAIN_D("Joystick: %s | axes %s buttons %s keys %s dz %d | traps rm %d pm %d\n", msg,
             (const char*)MAIN_Options[OPT_JOYAX].value, (const char*)MAIN_Options[OPT_JOYBT].value,
             (const char*)MAIN_Options[OPT_JOYKEY].value, MAIN_Options[OPT_JOYDZ].value, MAIN_JOY_RM, MAIN_JOY_PM);
         MAIN_D("USB steps: %s\n", USBPAD_Trace());
+        USBPAD_TraceStop();
     }
 
     MAIN_LogCommit();
