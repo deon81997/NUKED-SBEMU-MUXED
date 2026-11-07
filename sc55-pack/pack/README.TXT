@@ -1148,7 +1148,7 @@ CONTENTS
                      SBEMU by andersrodrig
   TinySoundFont .... Bernhard Schelling (after SFZero by Steve Folta), MIT
   SoundFont MPU-401  in SBEMU: Cacodemon345 (VSBHDASF)
-  USB joystick ..... written for this pack, GPL-2.0; UHCI / OHCI after
+  USB pads, keyboard, mouse  written for this pack, GPL-2.0; UHCI / OHCI after
                      USBDDOS (crazii), xHCI bring-up after the DOS tool of
                      xhci98 (Yeo Kheng Meng), pad layout after Linux xpad.c
   Terminus font .... Dimitar Zhekov, SIL Open Font Licence 1.1
