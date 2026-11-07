@@ -27,3 +27,9 @@ QEMU 8.2.2 built with `--target-list=i386-softmmu`, `--python=/usr/bin/python3.1
   controller, unplug / replug while JOYTEST runs. OHCI (beta.41): `-device pci-ohci,id=ohci` alone, next to a UHCI,
   and as NEC-style companions of an EHCI: `-device ich9-usb-ehci1,id=ehci -device pci-ohci,masterbus=ehci.0,firstport=0,num-ports=3
   -device pci-ohci,masterbus=ehci.0,firstport=3,num-ports=3`, pad on `bus=ehci.0` (QEMU's plain `usb-ehci` takes no companions).
+- beta.42 (all controllers + hubs): `qemu-xhci` and `nec-usb-xhci` (fakepad advertises 64-bit ids, 32-bit bulk
+  lengths and bulk streams, which QEMU's xHCI requires), `usb-hub` on UHCI / OHCI / xHCI (pad at `port=N.M`), two
+  hubs (the empty one is given up after 3 s), EHCI alone with `FAKEPAD_SPEED=high` (QEMU attaches no full-speed
+  device to a companion-less EHCI and has no high-speed hub, so split transactions are untested), hot-plug at the
+  root and into a hub. Note: `joyrun.sh` runs `pkill -f fakepad.py`; don't start it from a shell whose own command
+  line contains that name.

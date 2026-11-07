@@ -23,6 +23,10 @@ body = IF0 + IF1
 CFG = bytes([9, 2]) + struct.pack('<H', 9 + len(body)) + bytes([2, 1, 0, 0xA0, 0xFA]) + body
 STR = {0: bytes([4, 3, 0x09, 0x04]), 1: 'Microsoft'.encode('utf-16-le'), 2: 'Controller'.encode('utf-16-le'), 3: '08B3C5A'.encode('utf-16-le')}
 
+HIGH = os.environ.get('FAKEPAD_SPEED') == 'high'   # test only: announce a high-speed device
+if HIGH:
+    DEV = DEV[:7] + bytes([64]) + DEV[8:]
+
 def strdesc(i):
     s = STR.get(i, b'')
     return s if i == 0 else bytes([2 + len(s), 3]) + s
@@ -61,10 +65,24 @@ def main():
         c.close()
 
 def session(c, pad):
+    # usbredir: 32-bit packet ids until both hellos are exchanged, 64-bit after that when both sides
+    # have the capability (QEMU's xHCI insists on 64-bit ids, 32-bit bulk lengths, ep max packet size)
+    wide = [False]
     def send(typ, pid, hdr, data=b''):
-        c.sendall(struct.pack('<III', typ, len(hdr) + len(data), pid) + hdr + data)
-    caps = (1 << 1) | (1 << 4)          # connect_device_version, ep_info_max_packet_size
+        h = struct.pack('<IIQ' if wide[0] else '<III', typ, len(hdr) + len(data), pid)
+        c.sendall(h + hdr + data)
+    caps = (1 << 0) | (1 << 1) | (1 << 4) | (1 << 5) | (1 << 6)
     send(0, 0, b'fakepad 1.0'.ljust(64, b'\0') + struct.pack('<I', caps))
+    buf = b''
+    while True:                         # wait for QEMU's hello
+        buf += c.recv(65536)
+        if len(buf) >= 12:
+            typ, ln, pid = struct.unpack('<III', buf[:12])
+            if len(buf) >= 12 + ln: break
+    peer = struct.unpack('<I', buf[12 + 64:12 + 68])[0] if ln >= 68 else 0
+    log('hello from qemu', buf[12:12 + 64].rstrip(b'\0'), 'caps %x' % peer)
+    buf = buf[12 + ln:]
+    wide[0] = bool(peer & (1 << 5))
     def device_info():
         n = 2
         ifs = bytes([0, 1] + [0] * 30) + bytes([0xFF, 0xFF] + [0] * 30) + bytes([0x5D, 0x5D] + [0] * 30) + bytes([1, 3] + [0] * 30)
@@ -72,23 +90,24 @@ def session(c, pad):
         typ = [255] * 32; itv = [0] * 32; itf = [0] * 32; mps = [0] * 32
         def ep(addr, t, i, intf, m):
             k = ((addr & 0x80) >> 3) | (addr & 0x0F); typ[k] = t; itv[k] = i; itf[k] = intf; mps[k] = m
-        ep(0x00, 0, 0, 0, 8); ep(0x80, 0, 0, 0, 8)
+        ep(0x00, 0, 0, 0, 64 if HIGH else 8); ep(0x80, 0, 0, 0, 64 if HIGH else 8)
         ep(0x81, 3, 4, 0, 32); ep(0x01, 3, 8, 0, 32); ep(0x82, 3, 2, 1, 32); ep(0x02, 3, 4, 1, 32)
-        send(5, 0, bytes(typ) + bytes(itv) + bytes(itf) + struct.pack('<32H', *mps))
+        send(5, 0, bytes(typ) + bytes(itv) + bytes(itf) + struct.pack('<32H', *mps) + bytes(32 * 4))  # + max_streams
     device_info()
-    send(1, 0, struct.pack('<BBBBHHH', 1, 0xFF, 0xFF, 0xFF, 0x045E, 0x028E, 0x0114))
+    send(1, 0, struct.pack('<BBBBHHH', 2 if HIGH else 1, 0xFF, 0xFF, 0xFF, 0x045E, 0x028E, 0x0114))
     log('device connect sent')
-    buf = b''; irq_on = False; cfg = 0; last = 0; nid = 1
+    irq_on = False; cfg = 0; last = 0; nid = 1
+    hl = 16 if wide[0] else 12
     while True:
         r, _, _ = select.select([c], [], [], 0.004)
         if r:
             d = c.recv(65536)
             if not d: log('qemu closed'); return
             buf += d
-        while len(buf) >= 12:
-            typ, ln, pid = struct.unpack('<III', buf[:12])
-            if len(buf) < 12 + ln: break
-            p = buf[12:12 + ln]; buf = buf[12 + ln:]
+        while len(buf) >= hl:
+            typ, ln, pid = struct.unpack('<IIQ' if hl == 16 else '<III', buf[:hl])
+            if len(buf) < hl + ln: break
+            p = buf[hl:hl + ln]; buf = buf[hl + ln:]
             if typ == 0: log('hello from qemu', p[:64].rstrip(b'\0'))
             elif typ == 3: log('reset')
             elif typ == 6:

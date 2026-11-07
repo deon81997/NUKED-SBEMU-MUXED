@@ -744,14 +744,20 @@ CONTENTS
   same protocol (Hori, Mad Catz, Logitech ChillStream, Saitek ... the
   pads in the Windows 98 x360c driver). The wireless receiver for PC may
   work (first pad only; not tested). Not: Xbox One / Series pads, other
-  USB joysticks, pads plugged into a USB hub.
-  USB controllers: UHCI - Intel (ICH, ICH2-ICH10, the D810's ICH6) and VIA
-  chipsets - and OHCI - NEC uPD720100 / uPD720101 USB 2.0 PCI cards, SiS,
-  ALi, nVidia and AMD chipsets. Their USB 2.0 (EHCI) part is taken from the
-  BIOS and every port is handed to the UHCI / OHCI part, which serves the
-  pad. A NEC card works next to the board's own USB: the pad can go in any
-  port of either. Not supported: USB 3 (xHCI) and CardBus cards (the BIOS
-  leaves the PC Card slot switched off in DOS).
+  USB joysticks. A USB hub in between is fine (up to four deep).
+  USB controllers - all PC kinds; the pad can go in any port of any of them:
+     UHCI  Intel (ICH - ICH10, the D810's ICH6) and VIA chipsets
+     OHCI  NEC uPD720100 / uPD720101 USB 2.0 PCI cards, SiS, ALi, nVidia
+           and AMD chipsets
+     EHCI  (USB 2.0) with UHCI / OHCI companions: every port is handed to
+           them. Without (Intel 5-series and later, a hub built into each
+           port): driven directly, the pad reached through that hub.
+     xHCI  (USB 3) Intel 7-series and later, NEC/Renesas uPD720200/201/202
+           cards, ASMedia, VIA, Fresco, AMD: its USB 2 ports are used (USB 3
+           ones are left off), and Intel's shared ports are moved over from
+           the EHCI part.
+  Not supported: CardBus cards (the BIOS leaves the PC Card slot switched
+  off in DOS) and Renesas uPD720201/202 cards without their firmware ROM.
 
   Good to know
      * While SBEMU runs with the joystick on, it owns the USB controllers:
@@ -764,6 +770,8 @@ CONTENTS
        tight loop sees slightly coarser steps than with a real joystick;
        calibration takes care of it.
      * Not under Windows 98: Windows has its own driver for the pad.
+     * If the pad is not found, MENU > Files > Make a bug report: the
+       "Joystick:" and "USB steps:" lines in it show how far it got.
 
 
 =============================================================================
@@ -1083,7 +1091,8 @@ CONTENTS
   Sergey V. Mikayev and others): LGPL-2.1+ (C:\SC55\MUNT-LIC.TXT), source
   at https://github.com/munt/munt.
   The screen font Terminus (Dimitar Zhekov): SIL Open Font Licence 1.1.
-  USB joystick: written for this pack (GPL-2.0); UHCI / OHCI handling after
+  USB joystick: written for this pack (GPL-2.0); xHCI bring-up after the DOS
+  tool of xhci98 (Yeo Kheng Meng, GPL-2.0); UHCI / OHCI handling after
   USBDDOS (crazii, GPL-2.0), the pad's report layout after Linux xpad.c.
   Xbox and Xbox 360 are trademarks of Microsoft.
   HDPMI32i is part of HX (japheth). Jemm, JLoad and QPIEMU (japheth): see

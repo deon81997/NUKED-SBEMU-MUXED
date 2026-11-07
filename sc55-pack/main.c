@@ -529,7 +529,7 @@ struct MAIN_OPT
     "/VSBVOL", "Sound effects (digital Sound Blaster) volume in percent (0-100), on top of the game's own mixer", 100, MAIN_SETCMD_BASE10,
     "/VOPLVOL", "FM (OPL / AdLib) music volume in percent (0-100), on top of the game's own mixer", 100, MAIN_SETCMD_BASE10,
     "/VMIDIVOL", "General MIDI music volume in percent (0-400; SC-55: multiplies /VSCGAIN; SoundFont: its master volume)", 100, MAIN_SETCMD_BASE10,
-    "/JOY", "USB Xbox 360 pad as a PC gameport joystick at port 201h (1=on, 0=off; UHCI or OHCI USB, e.g. NEC PCI cards)", 0, MAIN_SETCMD_BASE10,
+    "/JOY", "USB Xbox 360 pad as a PC gameport joystick at port 201h (1=on, 0=off; any UHCI / OHCI / EHCI / xHCI USB port, hubs allowed)", 0, MAIN_SETCMD_BASE10,
     "/JOYAX", "Pad -> gameport axes 1-4 (joystick A X,Y, joystick B X,Y): LX LY RX RY LT RT TR(RT minus LT) or - ; ~ in front inverts", (uintptr_t)"LX,LY,RX,RY", MAIN_SETCMD_STR,
     "/JOYBT", "Pad -> gameport buttons 1-4: A B X Y LB RB LT RT ST BK LS RS GD DU DD DL DR or -", (uintptr_t)"A,B,X,Y", MAIN_SETCMD_STR,
     "/JOYKEY", "Pad buttons typed as keys, button:scan code (hex, E0xx extended), e.g. ST:1C,BK:01 (Start=Enter, Back=Esc)", (uintptr_t)"ST:1C,BK:01", MAIN_SETCMD_STR,
@@ -1841,6 +1841,7 @@ int main(int argc, char* argv[])
         MAIN_D("Joystick: %s | axes %s buttons %s keys %s dz %d | traps rm %d pm %d\n", msg,
             (const char*)MAIN_Options[OPT_JOYAX].value, (const char*)MAIN_Options[OPT_JOYBT].value,
             (const char*)MAIN_Options[OPT_JOYKEY].value, MAIN_Options[OPT_JOYDZ].value, MAIN_JOY_RM, MAIN_JOY_PM);
+        MAIN_D("USB steps: %s\n", USBPAD_Trace());
     }
 
     MAIN_LogCommit();

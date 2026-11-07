@@ -110,11 +110,17 @@ can be changed (`/JOYAX`, `/JOYBT`, `/JOYKEY`, `/JOYDZ`).
 
 - **Pads:** the wired Microsoft pad and wired pads that speak the same
   protocol (Hori, Mad Catz, Logitech, Saitek, ...). The PC wireless receiver
-  may work (first pad, untested). Not Xbox One / Series pads, not through a hub.
-- **USB controllers:** UHCI (Intel ICH / VIA, e.g. the D810) and OHCI (NEC
-  µPD720100/720101 PCI cards, SiS, ALi, nVidia, AMD). The EHCI (USB 2.0) part
-  is taken over from the BIOS and every port handed to its UHCI / OHCI
-  companions. Not xHCI, not CardBus cards (the BIOS leaves the slot off in DOS).
+  may work (first pad, untested). Not Xbox One / Series pads. Hubs are fine
+  (up to four deep).
+- **USB controllers: all PC kinds.** UHCI (Intel ICH / VIA, e.g. the D810),
+  OHCI (NEC µPD720100/720101 PCI cards, SiS, ALi, nVidia, AMD), EHCI (USB 2.0:
+  with companions every port is handed to them; without, as on Intel
+  5-series and later, it is driven directly and the pad reached through the
+  built-in hub's transaction translator) and xHCI (USB 3: Intel 7-series and
+  later, NEC/Renesas µPD720200/201/202, ASMedia, VIA, Fresco, AMD; only its
+  USB 2 ports are used, and Intel's shared ports are switched over from
+  EHCI). Not CardBus cards (the BIOS leaves the slot off in DOS), not
+  Renesas µPD720201/202 cards without their firmware ROM.
 - **How:** a small polled USB host inside SBEMU (`sbemu/usbpad.c`): no USB
   interrupt is used, so it never fights the sound chip for an IRQ. Reports
   are read from the sound interrupt and on every port 201h read; the port's
@@ -123,8 +129,9 @@ can be changed (`/JOYAX`, `/JOYBT`, `/JOYKEY`, `/JOYDZ`).
 - While it runs, the BIOS's own USB keyboard/mouse support stops until the
   next restart.
 
-Tested in QEMU (UHCI, OHCI, EHCI with UHCI companions, and EHCI with two OHCI
-companions like a NEC card) with a pretend pad
+Tested in QEMU (UHCI; OHCI; EHCI with UHCI or OHCI companions, as on the D810
+and NEC cards; EHCI alone; QEMU's xHCI and its NEC µPD720200 model; hubs on
+UHCI, OHCI and xHCI; hot-plugging, also into a hub) with a pretend pad
 (`sc55-pack/testrig/fakepad.py`, usbredir); not yet on a real D810.
 
 ---
@@ -324,6 +331,6 @@ Combined work: **GPL-2.0-or-later** ([`COPYING`](sc55-pack/COPYING)).
 &nbsp;•&nbsp; **Nuked OPL3**: nukeykt (LGPL-2.1+) &nbsp;•&nbsp; **DOSBox OPL**: the DOSBox team
 &nbsp;•&nbsp; **TinySoundFont**: Bernhard Schelling (MIT)
 &nbsp;•&nbsp; **Terminus font**: Dimitar Zhekov (OFL)
-&nbsp;•&nbsp; **USB joystick**: UHCI / OHCI handling after [USBDDOS](https://github.com/crazii/USBDDOS) (crazii, GPL-2.0), pad report layout after Linux `xpad.c`
+&nbsp;•&nbsp; **USB joystick**: UHCI / OHCI handling after [USBDDOS](https://github.com/crazii/USBDDOS) (crazii, GPL-2.0), xHCI bring-up after [xhci98](https://github.com/yeokm1/xhci98)'s DOS tool (Yeo Kheng Meng, GPL-2.0), pad report layout after Linux `xpad.c`
 
 <sub>Roland, SC-55, MT-32 and CM-32L are trademarks of Roland Corporation. Xbox is a trademark of Microsoft. Not affiliated with either.</sub>

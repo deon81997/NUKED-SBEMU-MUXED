@@ -1,6 +1,6 @@
 # SC-55 pack — handoff
 
-## Current state (SBEMU 1.0.0-beta.41-usb-sc55, branch usb-xpad)
+## Current state (SBEMU 1.0.0-beta.42-usb-sc55, branch usb-xpad)
 - SBEMU + Nuked-SC55 (SC-55/mkII), Munt MT-32/CM-32L (/VMT32), SoundFont (/VSF); MPU side channel 0xA5-0xB0 (stats, SBDIAG, key player, triple-Esc, front panel/LCD + CPU load).
 - Key player holds each typed key 500 ms (vdiag.c key_tick); Duke 3D quit default `ESC W3 Q W2 Y W3 Y W3 ESC W3 Q W2 Y W3 Y` — verified in QEMU with Duke 3D Atomic 1.5 from logo, title and demo (GAMETEST /RUN, 20 s and 40 s tests).
 - Tools: SC55MENU (game profiles GAMES.CFG, safe mode, CPU%, first-run auto setup), SBSET (/TUNE benchmark, MT-32 choice), GAMETEST (/RUN), MIDPLAY (live SC-55/MT-32 LCD panel), CDGUI (CUE checks/fix), Ctrl+Alt+F12 in-game LCD overlay (text + mode 13h).
@@ -46,7 +46,8 @@
 ## Next steps
 1. User (D810): Settings > Joystick > USB pad On, start SC55.BAT, check the "Joystick (Port 201)" lines, JOYTEST, then a game
    (calibrate in its setup). If the pad isn't found: SBDETAIL "Joystick:" line + BUGREP.
-2. Possible next: CardBus slot bring-up (D810 PC Card), Xbox One pads (GIP init), INT 15h AH=84h BIOS joystick, rumble off.
+2. Possible next: CardBus slot bring-up (D810 PC Card), Xbox One pads (GIP init), INT 15h AH=84h BIOS joystick, Renesas
+   firmware upload; check EHCI split transactions (pad behind an Intel 5/6-series built-in hub) on real hardware.
 3. Older: Automatic setup, MIDPLAY S panel, Ctrl+Alt+F12, MT-32 game, GAMETEST Duke run; SBDIAG if music is choppy.
 
 ## Files
@@ -60,7 +61,7 @@
   `export PATH=<djgpp>/bin:$PATH; make -j8` (delete output/*.o after header changes)
 
 ## Resume prompt
-"Continue NUKED SB-EMU from sc55-pack/HANDOFF.md (beta.41-usb): github.com/deon81997/NUKED-SBEMU-MUXED, branch usb-xpad. Rebuild with DJGPP, then continue from Next steps."
+"Continue NUKED SB-EMU from sc55-pack/HANDOFF.md (beta.42-usb): github.com/deon81997/NUKED-SBEMU-MUXED, branch usb-xpad. Rebuild with DJGPP, then continue from Next steps."
 
 ## 2026-11-06 (beta.37): SBEMU "Not loaded" on the D810 after SC55.BAT
 - SBEMU no longer quits when the real sound card uses the IRQ asked for (/I or BLASTER): it takes another of 7/5/9, warns, and updates BLASTER.
@@ -114,3 +115,17 @@
   Inactive OHCIs stay operational with an empty HCCA so their ports still report plug-ins.
 - QEMU passed: plain OHCI, UHCI + OHCI card (pad next to usb-kbd), ICH9 EHCI + 2 OHCI companions (NEC layout),
   OHCI hot-plug; UHCI and EHCI+UHCI re-tested. Release zip: NUKED-SB-EMU-1.0.0-beta.41-usb.zip.
+
+## 2026-11-06 (beta.42-usb): every controller kind + hubs
+- usbpad.c rewritten around a device table (parent hub, route string, TT hub/port) and per-controller ops.
+- xHCI: BIOS handoff, protocol caps (only USB 2 ports powered/used), Intel XUSB2PR switch, HCRST order and PORTSC
+  safe-write mask from xhci98's xhciqual (GPL-2.0); scratchpads, polled event ring (IMAN off), enable slot /
+  address device / evaluate context / configure endpoint (pad endpoints; hub flag + ports), stall recovery
+  (reset EP + set TR dequeue), disable slot on unplug.
+- EHCI without companions: driven directly (async control QH, periodic interrupt QH, two qTDs in turn, split
+  transaction hub address/port + S/C masks for full-speed devices behind a high-speed hub). EHCI with companions:
+  handed over as before.
+- Hubs (depth 4) on every controller: power, port status/reset via class requests, polled every 250 ms; several hubs
+  take turns (3 s). USB steps trace in SBDETAIL ("USB steps:").
+- QEMU passed: UHCI, OHCI, ICH9 EHCI+UHCI, EHCI+2 OHCI, EHCI alone (high-speed pretend pad), qemu-xhci, nec-usb-xhci,
+  hubs on UHCI/OHCI/xHCI, two hubs, mixed UHCI+xHCI, hot-plug at root and in a hub. Not testable in QEMU: split.
