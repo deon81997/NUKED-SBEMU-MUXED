@@ -45,6 +45,14 @@
 #define K_STAB  0x10F
 #define K_ESC   27
 #define K_ENTER 13
+#define K_MOUSE 0x1F0   /* left click; the cell is tui_mx, tui_my (1-based, 80x25 like everything else) */
+#define K_RCLICK 0x1F1  /* right click: "back" in dialogs and viewers */
+
+/* ------------------------------------------------------------------ mouse (INT 33h, any mouse driver; with SBEMU's
+ * USB mouse too). Its range is set to 640x200 so a cell is 8x8 mickey-pixels in every display mode; the pointer is
+ * drawn by tui_flush itself (an inverted cell), so it works in the tweaked, VESA text and graphics modes as well.
+ * Left click = K_MOUSE, right click = K_RCLICK, wheel = Up / Down. */
+static int tui_mouse = -1, tui_mx = 40, tui_my = 13, tui_mbtn, tui_mshow;
 
 static uint16_t tui_scr[TUI_H][TUI_W], tui_shown[TUI_H][TUI_W];
 static void (*tui_anim)(unsigned long tick);  /* called ~9 times a second while waiting for a key (Groovy) */
@@ -592,13 +600,54 @@ TUI_FN void tui_flush(void)
 {
     int r, any = 0;
     long i;
+    uint16_t keep = 0;
+    int mx = tui_mx - 1, my = tui_my - 1, ptr = tui_mshow && mx >= 0 && mx < TUI_W && my >= 0 && my < TUI_H;
+    if (ptr)
+    {   /* the mouse pointer: the cell's colours swapped, only while it is copied to the screen */
+        uint16_t c = keep = tui_scr[my][mx];
+        tui_scr[my][mx] = (uint16_t)((c & 0x00FF) | ((c & 0x0F00) << 4) | ((c & 0xF000) >> 4) | (((c >> 12) == ((c >> 8) & 15)) ? 0x7000 : 0));
+    }
     for (r = 0; r < TUI_H && !any; ++r) any = memcmp(tui_scr[r], tui_shown[r], sizeof tui_scr[r]) != 0;
-    if (!any) return;
-    /* wait for the start of a vertical retrace (bounded, in case the port does not exist) */
-    for (i = 0; i < 100000L && (inportb(0x3DA) & 8); ++i) {}
-    for (i = 0; i < 100000L && !(inportb(0x3DA) & 8); ++i) {}
-    tui_flush_now();
+    if (any)
+    {   /* wait for the start of a vertical retrace (bounded, in case the port does not exist) */
+        for (i = 0; i < 100000L && (inportb(0x3DA) & 8); ++i) {}
+        for (i = 0; i < 100000L && !(inportb(0x3DA) & 8); ++i) {}
+        tui_flush_now();
+    }
+    if (ptr) tui_scr[my][mx] = keep;
 }
+TUI_FN void tui_mouse_init(void)
+{
+    __dpmi_regs r;
+    if (tui_mouse >= 0) return;
+    memset(&r, 0, sizeof r); r.x.ax = 0; __dpmi_int(0x33, &r);
+    tui_mouse = r.x.ax == 0xFFFF;
+    if (!tui_mouse) return;
+    memset(&r, 0, sizeof r); r.x.ax = 7; r.x.cx = 0; r.x.dx = 639; __dpmi_int(0x33, &r);
+    memset(&r, 0, sizeof r); r.x.ax = 8; r.x.cx = 0; r.x.dx = 199; __dpmi_int(0x33, &r);
+    memset(&r, 0, sizeof r); r.x.ax = 4; r.x.cx = (tui_mx - 1) * 8; r.x.dx = (tui_my - 1) * 8; __dpmi_int(0x33, &r);
+}
+/* a key made from the mouse, or 0; moves the pointer (shown once the mouse has moved) */
+TUI_FN int tui_mouse_poll(void)
+{
+    __dpmi_regs r;
+    int b, x, y, w, k = 0;
+    if (tui_mouse < 0) tui_mouse_init();
+    if (!tui_mouse) return 0;
+    memset(&r, 0, sizeof r); r.x.ax = 3; __dpmi_int(0x33, &r);
+    b = r.x.bx & 7; w = (signed char)r.h.bh;        /* wheel (CuteMouse): + = towards the user */
+    x = r.x.cx / 8 + 1; y = r.x.dx / 8 + 1;
+    if (x > TUI_W) x = TUI_W;
+    if (y > TUI_H) y = TUI_H;
+    if (x != tui_mx || y != tui_my) { tui_mx = x; tui_my = y; tui_mshow = 1; }
+    if ((b & 1) && !(tui_mbtn & 1)) { k = K_MOUSE; tui_mshow = 1; }
+    else if ((b & 2) && !(tui_mbtn & 2)) k = K_RCLICK;
+    else if (w) k = w > 0 ? K_DOWN : K_UP;
+    tui_mbtn = b;
+    return k;
+}
+/* 1 if the last click was inside x..x+w-1, y..y+h-1 */
+TUI_FN int tui_hit(int x, int y, int w, int h) { return tui_mx >= x && tui_mx < x + w && tui_my >= y && tui_my < y + h; }
 
 TUI_FN unsigned long tui_ticks(void) { return _farpeekl(_dos_ds, 0x46C); } /* BIOS clock, 18.2 per second */
 
@@ -607,14 +656,18 @@ TUI_FN int tui_key(void)
     int c;
     tui_flush();
     if (tui_fade_pending) { tui_fade_pending = 0; tui_fade(1); }
-    if (tui_anim && TUI_FANCY && tui_animate)
     {
         unsigned long last = tui_ticks();
+        int anim = tui_anim && TUI_FANCY && tui_animate;
         while (!kbhit())
         {
             unsigned long t = tui_ticks();
-            if (t != last && (t & 1) == 0) { last = t; tui_anim(t >> 1); tui_flush(); }
+            int ox = tui_mx, oy = tui_my, m = tui_mouse_poll();
+            if (m) { tui_flush(); return m; }
+            if (anim && t != last && (t & 1) == 0) { last = t; tui_anim(t >> 1); tui_flush(); }
             else if (t != last) last = t;
+            if (ox != tui_mx || oy != tui_my) tui_flush();
+            __dpmi_yield();
         }
     }
     c = getch();
@@ -642,9 +695,11 @@ TUI_FN int tui_yesno(const char* q)
         tui_put(x + w / 2 + 2, 12 + lines + 1, sel == 1 ? 0x2F : 0x47, "  No   ");
         c = tui_key();
         if (c == 'y' || c == 'Y') { sel = 0; break; }
-        if (c == 'n' || c == 'N' || c == K_ESC) { sel = 1; break; }
+        if (c == 'n' || c == 'N' || c == K_ESC || c == K_RCLICK) { sel = 1; break; }
         if (c == K_LEFT || c == K_RIGHT || c == K_TAB) sel ^= 1;
         if (c == K_ENTER) break;
+        if (c == K_MOUSE && tui_hit(x + w / 2 - 9, 12 + lines + 1, 7, 1)) { sel = 0; break; }
+        if (c == K_MOUSE && tui_hit(x + w / 2 + 2, 12 + lines + 1, 7, 1)) { sel = 1; break; }
     }
     memcpy(tui_scr, save, sizeof save);
     return sel == 0;
@@ -720,7 +775,9 @@ TUI_FN void tui_pick_mode(const char* home)
         tui_put(16, 7 + rows, 0x1B, "Enter: switch   Esc: back");
         tui_put(16, 8 + rows, 0x13, "\x07 = now.  Text modes: the menu stays 80x25, centred.");
         c = tui_key();
-        if (c == K_ESC) break;
+        if (c == K_MOUSE && tui_hit(16, 6, 48, rows))                     /* click: choose, again: switch */
+        { int s2 = top + tui_my - 6; if (s2 < n) { if (s2 == sel) c = K_ENTER; else sel = s2; } }
+        if (c == K_ESC || c == K_RCLICK) break;
         if (c == K_UP && sel > 0) sel--;
         if (c == K_DOWN && sel < n - 1) sel++;
         if (c == K_HOME) sel = 0;
@@ -804,7 +861,7 @@ TUI_FN void tui_view_file(const char* path, int (*colour)(const char*))
         if (left) tui_printf(66, 25, 0x30, "col %d", left + 1);
         if (n > 23) { tui_fill(80, 2, 1, 23, 0x08, 0xB0); tui_cell(80, 2 + (int)((long)top * 22 / (n - 23)), 0x0F, 0xDB); }
         c = tui_key();
-        if (c == K_ESC || c == K_ENTER) break;
+        if (c == K_ESC || c == K_ENTER || c == K_RCLICK) break;
         if (c == K_UP && top) --top;
         if (c == K_DOWN && top + 23 < n) ++top;
         if (c == K_PGUP) top = top > 23 ? top - 23 : 0;

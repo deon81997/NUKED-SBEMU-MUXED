@@ -431,6 +431,13 @@ static void m3_knob3d(M3V c, float r, float d, float rot, float press)
 static const uint32_t m3_catcol[NCAT] = { 0x2E7DFF, 0xB050FF, 0x20C080, 0xFF6040, 0xE0B020, 0x40B8D8 };
 static const char* m3_stylename[] = { "Panels", "Carousel", "Module", "Voodoo" };
 #define M3_STYLES 3
+/* mouse: what is under the pointer, collected while drawing (last added wins). kind: 1 menu, 2 item, 3 = the
+ * chosen item (run it), 4 previous item, 5 next item */
+typedef struct { short x, y, w, h, kind, val; } M3HIT;
+static M3HIT m3_hits[64]; static int m3_nhits;
+static void m3_hit(int x, int y, int w, int h, int kind, int val)
+{ if (m3_nhits < 64) { M3HIT* t = &m3_hits[m3_nhits++]; t->x = x; t->y = y; t->w = w; t->h = h; t->kind = kind; t->val = val; } }
+static int m3_mouse = -1, m3_mx = 320, m3_my = 240, m3_mb, m3_mseen;
 static M3SURF m3_cards[80];          /* card textures of the current category (by item number) */
 static int    m3_cards_cat = -1;
 static M3SURF m3_floor, m3_floor_solid, m3_panel;   /* floor_solid: the floor already blended over the sky */
@@ -495,6 +502,7 @@ static void m3_overlay(int cat, int sel, int sb)
         m3_rect(&m3_scr, x + 300, 44, w, 22, on ? m3_catcol[i] : 0x101830, on ? 230 : 170);
         m3_bevel(&m3_scr, x + 300, 44, w, 22, 2, on, 180);
         m3_text(&m3_scr, x + 308, 47, 0, g_catname[i], on ? 0xFFFFFF : 0x90A0C0, 256);
+        m3_hit(x + 300, 44, w, 22, 1, i);
         x += w + 4;
         if (x + 300 > M3W - 40) break;
     }
@@ -571,6 +579,7 @@ static void m3_draw_panels(int cat, int sel, float selanim)
         m3_vgrad(&m3_scr, 14 + on * 2, yy + on * 2, 150, 38, on ? m3_mul(m3_catcol[i], 300) : 0x485878, on ? m3_mul(m3_catcol[i], 120) : 0x283048, 256);
         m3_bevel(&m3_scr, 14 + on * 2, yy + on * 2, 150, 38, 3, on, 220);
         m3_text_sh(&m3_scr, 28 + on * 2, yy + 9 + on * 2, 1, g_catname[i], 0xFFFFFF);
+        m3_hit(14, yy, 152, 40, 1, i);
     }
     n = cat_items(cat, k);
     /* items */
@@ -596,6 +605,7 @@ static void m3_draw_panels(int cat, int sel, float selanim)
             m3_bevel(&m3_scr, 188 + on, yy + on, M3W - 212, 34, 2, on, 220);
             { char num[4]; snprintf(num, sizeof num, "%d", i + 1); if (i < 9) m3_text(&m3_scr, 198 + on, yy + 7 + on, 1, num, 0xC0D0F0, 256); }
             m3_text_sh(&m3_scr, 224 + on, yy + 7 + on, 1, t2->label, ok ? 0xFFFFFF : 0x8890A0);
+            m3_hit(188, yy, M3W - 212, 36, on ? 3 : 2, k[i]);
         }
     }
     /* description */
@@ -657,6 +667,7 @@ static void m3_draw_carousel(int cat, int sel, double t)
     }
     m3_boxback = 0;
     m3_upscale();
+    m3_hit(0, 70, 170, 295, 4, 0); m3_hit(470, 70, 170, 295, 5, 0); m3_hit(170, 70, 300, 295, 3, 0);
     m3_overlay(cat, sel, g_running);
 }
 
@@ -727,6 +738,7 @@ static void m3_draw_module(int cat, int sel, double t)
     /* the knob: one notch per item */
     m3_knob3d(m3_v(-W + (440 / 512.0f) * 2 * W, H - (56 / 128.0f) * 2 * H, -D - 0.16f), 0.34f, 0.16f, m3_knob, 0);
     m3_upscale();
+    m3_hit(0, 70, 170, 295, 4, 0); m3_hit(470, 70, 170, 295, 5, 0); m3_hit(170, 70, 300, 295, 3, 0);
     m3_overlay(cat, sel, g_running);
 }
 
@@ -762,6 +774,57 @@ static int m3_open(void)
 }
 
 /* returns 0: leave the menu (MENUGO.BAT written, or Esc), 1: go to the text menu, 2: no VESA mode (text menu) */
+/* the mouse in the 640x480 screen: INT 33h with its range set to the screen, the pointer drawn here */
+static void m3_mouse_setup(void)
+{
+    __dpmi_regs r;
+    if (m3_mouse < 0) { memset(&r, 0, sizeof r); r.x.ax = 0; __dpmi_int(0x33, &r); m3_mouse = r.x.ax == 0xFFFF; }
+    if (!m3_mouse) return;
+    memset(&r, 0, sizeof r); r.x.ax = 7; r.x.cx = 0; r.x.dx = M3W - 1; __dpmi_int(0x33, &r);
+    memset(&r, 0, sizeof r); r.x.ax = 8; r.x.cx = 0; r.x.dx = M3H - 1; __dpmi_int(0x33, &r);
+    memset(&r, 0, sizeof r); r.x.ax = 4; r.x.cx = m3_mx; r.x.dx = m3_my; __dpmi_int(0x33, &r);
+    tui_mouse = -1;                                   /* the text screens set their own range again */
+}
+static int m3_mval;
+/* a key from the mouse: 0x1F2 = open menu m3_mval, 0x1F3 = choose item m3_mval, or Enter / Up / Down */
+static int m3_mouse_key(void)
+{
+    __dpmi_regs r;
+    int b, w, i, k = 0;
+    if (m3_mouse <= 0) return 0;
+    memset(&r, 0, sizeof r); r.x.ax = 3; __dpmi_int(0x33, &r);
+    b = r.x.bx & 7; w = (signed char)r.h.bh;
+    if (r.x.cx != m3_mx || r.x.dx != m3_my) { m3_mx = r.x.cx; m3_my = r.x.dx; m3_mseen = 1; }
+    if ((b & 1) && !(m3_mb & 1))
+    {
+        m3_mseen = 1;
+        for (i = m3_nhits - 1; i >= 0; i--)
+        {
+            const M3HIT* h = &m3_hits[i];
+            if (m3_mx < h->x || m3_mx >= h->x + h->w || m3_my < h->y || m3_my >= h->y + h->h) continue;
+            m3_mval = h->val;
+            k = h->kind == 1 ? 0x1F2 : h->kind == 2 ? 0x1F3 : h->kind == 3 ? K_ENTER : h->kind == 4 ? K_UP : K_DOWN;
+            break;
+        }
+    }
+    else if (w) k = w > 0 ? K_DOWN : K_UP;
+    m3_mb = b;
+    return k;
+}
+static void m3_pointer(void)
+{
+    static const char* const a[] = { "X", "XX", "X.X", "X..X", "X...X", "X....X", "X.....X", "X......X", "X.......X",
+        "X........X", "X.....XXXX", "X..X..X", "X.X X..X", "XX  X..X", "X    X..X", "     X..X", "      XX" };
+    int y, x;
+    if (m3_mouse <= 0 || !m3_mseen) return;
+    for (y = 0; y < 17; y++)
+        for (x = 0; a[y][x]; x++)
+        {
+            int px = m3_mx + x, py = m3_my + y;
+            if (px >= M3W || py >= M3H || a[y][x] == ' ') continue;
+            m3_fb[py * M3W + px] = a[y][x] == 'X' ? 0x000000 : 0xFFFFFF;
+        }
+}
 static int m3_main(void)
 {
     double last, t; int c, k[80], n;
@@ -772,6 +835,7 @@ static int m3_main(void)
     last = fps_t = m3_now();
     m3_half = m3_quality == 2; m3_rw = m3_half ? M3W / 2 : M3W; m3_rh = m3_half ? M3H / 2 : M3H;
     m3_cards_cat = -1; m3_catanim = 1;
+    m3_mouse_setup();
     for (;;)
     {
         int si = 0, i; float dt;
@@ -785,9 +849,11 @@ static int m3_main(void)
         m3_knob += (-si * 0.5f - m3_knob) * (1 - expf(-dt * 10));
         for (i = 0; i < NCAT; i++) m3_btnpress[i] *= expf(-dt * 8);
         m3_bgphase = (float)t;
+        m3_nhits = 0;
         if (m3_style == 0) m3_draw_panels(g_cat, g_sel, selanim);
         else if (m3_style == 1) m3_draw_carousel(g_cat, g_sel, t);
         else m3_draw_module(g_cat, g_sel, t);
+        m3_pointer();
         m3_present();
         if (++frames, t - fps_t >= 1.0)
         {   /* frames a second; auto quality drops to half resolution once if the PC is too slow */
@@ -797,7 +863,7 @@ static int m3_main(void)
             if (m3_quality == 0 && !m3_half && m3_style != 0 && t > 2.5 && m3_fps < 15)
             { m3_half = 1; m3_rw = M3W / 2; m3_rh = M3H / 2; m3_note_until = t + 5; }
         }
-        while ((c = m3_key()) != 0)
+        while ((c = m3_key()) != 0 || (c = m3_mouse_key()) != 0)
         {
             int oc = g_cat;
             if (c == K_ESC) { save_sel(&g_it[g_sel]); m3_vbe_close(); return 0; }
@@ -811,7 +877,9 @@ static int m3_main(void)
                 m3_cfg_save(); m3_note_until = m3_now() + 5;
                 continue;
             }
-            if (c == K_UP) g_sel = move_in(g_cat, g_sel, -1);
+            if (c == 0x1F2) { if (m3_mval != g_cat) { g_cat = m3_mval; g_sel = first_in(g_cat); } }       /* mouse: a menu */
+            else if (c == 0x1F3) g_sel = m3_mval;                                                   /* mouse: an item */
+            else if (c == K_UP) g_sel = move_in(g_cat, g_sel, -1);
             else if (c == K_DOWN) g_sel = move_in(g_cat, g_sel, 1);
             else if (c == K_LEFT || c == K_STAB || c == K_PGUP) { g_cat = next_cat(g_cat, -1); g_sel = first_in(g_cat); }
             else if (c == K_RIGHT || c == K_TAB || c == K_PGDN) { g_cat = next_cat(g_cat, 1); g_sel = first_in(g_cat); }
@@ -839,6 +907,7 @@ static int m3_main(void)
                     }
                     tui_done();
                     if (!m3_vbe_open()) return 2;
+                    m3_mouse_setup();
                     last = m3_now();
                     continue;
                 }

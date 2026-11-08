@@ -1022,6 +1022,21 @@ int main(int argc, char** argv)
         g_reveal = 99; shown_cat = g_cat;
         draw(g_cat, g_sel);
         c = tui_key();
+        if (c == K_MOUSE)
+        {   /* click a menu to open it, an item to choose it, the chosen item again to run it */
+            int k[80], n, i;
+            for (i = 0; i < NCAT; i++)
+                if (tui_hit(3, 9 + i, 15, 1) && cat_items(i, k)) { g_cat = i; g_sel = first_in(i); }
+            n = cat_items(g_cat, k);
+            if (tui_hit(22, 9, 56, 6) && g_itop + tui_my - 9 < n)
+            {
+                int s2 = k[g_itop + tui_my - 9];
+                if (s2 == g_sel) c = K_ENTER; else g_sel = s2;
+            }
+            if (tui_hit(78, 8, 1, 1)) g_sel = move_in(g_cat, g_sel, -1);
+            if (tui_hit(78, 15, 1, 1)) g_sel = move_in(g_cat, g_sel, 1);
+            if (c != K_ENTER) continue;
+        }
         if (c == K_ESC) break;
         if (c == K_UP) g_sel = move_in(g_cat, g_sel, -1);
         else if (c == K_DOWN) g_sel = move_in(g_cat, g_sel, 1);

@@ -191,6 +191,13 @@ CONTENTS
       programs also its display mode; F4 there changes it). With their
       output redirected (e.g. TIMETEST > FILE) the test programs write plain
       text instead.
+      MOUSE (with a DOS mouse driver such as CTMOUSE loaded; a USB mouse
+      through SBEMU works too): click a menu to open it, an item to choose
+      it, the chosen item again to run it; the wheel moves up and down; a
+      right click is "back" in questions, the file viewer and the display
+      modes. In the 3D menu: click the menu tabs (and in Panels the items);
+      in Carousel and Module click the middle to run the chosen item, the
+      left or right side for the previous or next one.
       Nothing runs by itself. The menu writes your choice to MENUGO.BAT and
       exits; MENU.BAT runs it from plain DOS (SBEMU stays resident, so it
       must not be started from inside another program), then shows the
