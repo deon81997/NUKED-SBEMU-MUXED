@@ -955,7 +955,7 @@ static int jump_letter(int sel, int c)
 
 int main(int argc, char** argv)
 {
-    int c;
+    int c, firstrun;
     char* s; const char* v;
     if (argc > 1) snprintf(g_home, sizeof g_home, "%s", argv[1]);
     else
@@ -978,7 +978,9 @@ int main(int argc, char** argv)
     g_sel = load_sel();
     g_cat = g_it[g_sel].cat;
     tui_theme_load(g_home);
-    if (m3_cfg_load() && !(_farpeekb(_dos_ds, 0x417) & 3) && !(v = getenv("MENUVIEW"), v && *v))
+    /* the first-run offer of the automatic setup is a text-menu question: on that start, no 3D */
+    firstrun = !g_running && !home_exists("SBOPTS.TXT") && !home_exists("TUNED.FLG") && !(_farpeekb(_dos_ds, 0x417) & 3);
+    if (!firstrun && m3_cfg_load() && !(_farpeekb(_dos_ds, 0x417) & 3) && !(v = getenv("MENUVIEW"), v && *v))
     {
         int r = m3_main();
         if (r == 0) return 0;
@@ -987,7 +989,7 @@ int main(int argc, char** argv)
     tui_init();
     tui_anim = anim;
     /* first run: offer the automatic setup once (TUNED.FLG remembers it was offered) */
-    if (!g_running && !home_exists("SBOPTS.TXT") && !home_exists("TUNED.FLG") && !tui_safe)
+    if (firstrun && !tui_safe)
     {
         int k;
         draw(g_cat, g_sel);
