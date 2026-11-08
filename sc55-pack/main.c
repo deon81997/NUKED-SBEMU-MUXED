@@ -1608,7 +1608,7 @@ int main(int argc, char* argv[])
             else
             {
                 #if SBEMU_VSC55
-                MAIN_CPrintf(YELLOW, "VMPU warning: %s emulation not available: %s\nThe MPU-401 will accept MIDI but stay silent.\n", MAIN_USE_MT32 ? "MT-32" : "SC-55", VMPU_LastError());
+                MAIN_CPrintf(YELLOW, "VMPU warning: %s emulation not available: %s\r\nThe MPU-401 will accept MIDI but stay silent.\r\n", MAIN_USE_MT32 ? "MT-32" : "SC-55", VMPU_LastError());
                 #else
                 MAIN_CPrintf(YELLOW, "VMPU warning: sound font file not found: %s, functions disabled.\n", fullpath);
                 #if MAIN_VMPU_HDPMI_MEMFIX
@@ -2665,6 +2665,9 @@ static void MAIN_TSR_Interrupt()
                 VDMA_Virtualize(old_opt[OPT_DMA].value, FALSE);
                 VDMA_Virtualize(MAIN_Options[OPT_DMA].value, TRUE);
             }
+            if((OPT_CHANGED(OPT_JOYMODE) || OPT_CHANGED(OPT_JOYDZ)) && MAIN_Options[OPT_JOY].value
+                && old_opt[OPT_JOYMODE].value != 4 && MAIN_Options[OPT_JOYMODE].value != 4)
+                VJOY_SetLive(MAIN_Options[OPT_JOYDZ].value, MAIN_Options[OPT_JOYMODE].value);
             if(OPT_CHANGED(OPT_FMCORE))
             {
                 OPL3EMU_SetCore(MAIN_Options[OPT_FMCORE].value);

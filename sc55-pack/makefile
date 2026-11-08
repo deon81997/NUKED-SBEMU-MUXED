@@ -7,7 +7,7 @@ DEBUG ?= 0
 # 0: original SBEMU build with the TinySoundFont SoundFont synth
 VSC55 ?= 1
 
-VERSION ?= 1.0.0-beta.48-usb-sc55
+VERSION ?= 1.0.0-beta.49-usb-sc55
 
 INCLUDES := -I./mpxplay -I./sbemu -I./drivers/include -I./sc55 -I./third_party/nuked-opl3-fast
 DEFINES := -D__DOS__ -DSBEMU -DDEBUG=$(DEBUG) -DSBEMU_VSC55=$(VSC55) -DMAIN_SBEMU_VER=\"$(VERSION)\"
@@ -143,6 +143,8 @@ CORE_DIR := upstream/Nuked-SC55/src/backend
 CORE_CXXFLAGS := -std=gnu++20 -O3 -march=i686 -mtune=pentium-m -fomit-frame-pointer -fno-rtti -DNDEBUG \
 	-I./sc55/shim -I./sc55/config -I./sc55 -I./$(CORE_DIR) -include ./sc55/shim/sc55_compat.h
 CORE_CFLAGS := -O3 -march=i686 -mtune=pentium-m -fomit-frame-pointer -DNDEBUG
+# Nuked OPL3 runs for every game (SB FM), so it must run on any Pentium-class CPU: i586 (no CMOV).
+OPL_CFLAGS := -O3 -march=i586 -mtune=pentium-m -fomit-frame-pointer -DNDEBUG
 SC55_SRC :=
 SC55_OBJS :=
 ifeq ($(VSC55),1)
@@ -181,7 +183,7 @@ $(TARGET): $(OBJS)
 $(NUKEDOPL_OBJ): output/%.o: %.c
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
-	$(SILENTCMD)$(CC) $(CORE_CFLAGS) -I./third_party/nuked-opl3-fast -c $< -o $@
+	$(SILENTCMD)$(CC) $(OPL_CFLAGS) -I./third_party/nuked-opl3-fast -c $< -o $@
 
 ifeq ($(VSC55),1)
 output/tools/sc55wav.o: tools/sc55wav.cpp sc55/sc55synth.h

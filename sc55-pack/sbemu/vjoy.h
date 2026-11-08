@@ -9,6 +9,7 @@
  * dz:    stick dead zone in percent
  * Returns 0 if a name was not understood (*bad points at it). */
 int  VJOY_Init(uint64_t cps, const char* axes, const char* btns, const char* keys, int dz, int mode, const char** bad); /* mode: 0 standard, 1 CH Flightstick Pro, 2 Thrustmaster FCS */
+void VJOY_SetLive(int dz, int mode); /* resident copy: new /JOYDZ, /JOYMODE (0-3) */
 uint32_t VJOY_IOHandler(uint32_t port, uint32_t val, uint32_t out);
 uint32_t VJOY_InfoHandler(uint32_t port, uint32_t val, uint32_t out);   /* port 206h, real mode: for SBEMU16 */
 void VJOY_Tick(void);   /* from the sound interrupt: USB poll + key presses */

@@ -272,6 +272,15 @@ static const char* item(const char* s, int* n)
     return e;
 }
 
+/* A second SBEMU run changed /JOYMODE or /JOYDZ: the resident copy takes them (not to or from 4, which
+   changes the port traps; main.c checks that). */
+void VJOY_SetLive(int dzp, int mode)
+{
+    Dz = dzp < 0 ? 0 : dzp > 90 ? 90 : dzp;
+    Mode = mode >= 1 && mode <= 4 ? mode : 0;
+    GripN = 0; GripF[0] = GripF[1] = 0;
+}
+
 int VJOY_Init(uint64_t cps, const char* axes, const char* btns, const char* keys, int dzp, int mode, const char** bad)
 {
     static char badbuf[24];
