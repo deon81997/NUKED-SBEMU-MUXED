@@ -135,6 +135,9 @@ static uint8_t MAIN_InINT;
 SBEMU_EXTFUNS MAIN_SbemuExtFun;
 
 static void MAIN_Interrupt();
+static volatile uint32_t MAIN_CardIrqs;
+extern uint16_t PCI_ReadWord(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg);
+extern uint32_t PCI_ReadDWord(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg);
 static int MAIN_DiagFrames; //frames produced by the last sound card interrupt (SBDIAG)
 static void MAIN_InterruptPM();
 static void MAIN_InterruptRM();
@@ -1552,6 +1555,18 @@ int main(int argc, char* argv[])
         MAIN_SetBlasterEnv(MAIN_Options);
     }
     pcibios_enable_interrupt(aui.card_pci_dev);
+    if(aui.card_pci_dev && aui.card_irq >= 3 && aui.card_irq <= 15)
+    {
+        /* a PCI interrupt is level-triggered: the PIC must have the IRQ in level mode (ELCR, ports 4D0h/4D1h).
+         * The BIOS does that for the IRQs it hands out at boot; an IRQ routed after Windows 98 (above) may still be
+         * edge mode, and then the card's interrupts never arrive: no sound, and no USB pad (polled from them). */
+        uint16_t port = aui.card_irq < 8 ? 0x4D0 : 0x4D1;
+        uint8_t bit = (uint8_t)(1 << (aui.card_irq & 7)), e0 = inportb(0x4D0), e1 = inportb(0x4D1);
+        if(!(inportb(port) & bit)) outportb(port, inportb(port) | bit);
+        MAIN_D("ELCR (level IRQs) %02x%02x -> %02x%02x\n", e1, e0, inportb(0x4D1), inportb(0x4D0));
+        if(PCI_ReadWord(0, 0x1F, 0, 0) == 0x8086)   /* Intel ICH: PIRQ A-H routing registers in the LPC bridge */
+            MAIN_D("ICH PIRQ routing A-D %08lx E-H %08lx\n", (unsigned long)PCI_ReadDWord(0, 0x1F, 0, 0x60), (unsigned long)PCI_ReadDWord(0, 0x1F, 0, 0x68));
+    }
     MAIN_Step("OPL3 / MPU-401 setup");
 
     printf("Real mode support: ");
@@ -1957,6 +1972,17 @@ int main(int argc, char* argv[])
         QEMMInstalledVDMA, QEMMInstalledVIRQ, QEMMInstalledSB, HDPMIInstalledVDMA1, HDPMIInstalledVDMA2, HDPMIInstalledVDMA3,
         HDPMIInstalledVHDMA1, HDPMIInstalledVHDMA2, HDPMIInstalledVHDMA3, HDPMIInstalledVIRQ1, HDPMIInstalledVIRQ2, HDPMIInstalledSB,
         PM_ISR, RM_ISR, TSR_ISR);
+    {   /* the card has been playing since AU_start (USB init alone waits up to 3 s): no interrupt yet means the
+         * IRQ does not reach the PIC - SBEMU would load but stay silent */
+        uint32_t t0 = _farpeekl(_dos_ds, 0x46C);
+        while(!MAIN_CardIrqs && _farpeekl(_dos_ds, 0x46C) - t0 < 10) {}
+        MAIN_D("Sound card interrupts so far: %lu (IRQ %d)\n", (unsigned long)MAIN_CardIrqs, aui.card_irq);
+        if(!MAIN_CardIrqs)
+        {
+            MAIN_CPrintf(RED, "Warning: no interrupts from the sound card on IRQ %d - no sound, no USB pad.\n", aui.card_irq);
+            printf("Please send C:\\SC55\\SBDETAIL.TXT. Booting straight into DOS avoids it.\n");
+        }
+    }
     MAIN_Step("going resident");
     MAIN_DetClose(PM_ISR && RM_ISR && TSR_ISR && QEMMInstalledVDMA && QEMMInstalledVIRQ && QEMMInstalledSB && HDPMIInstalledSB
         ? "start-up finished, going resident" : "a trap or handler failed (see Traps above)");
@@ -2100,6 +2126,7 @@ static void MAIN_InterruptRM()
 
 static void MAIN_Interrupt()
 {
+    ++MAIN_CardIrqs;
     if(MAIN_JOY_On) VJOY_Tick();
     if(!(aui.card_infobits&AUINFOS_CARDINFOBIT_PLAYING))
         return;

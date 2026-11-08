@@ -284,3 +284,12 @@
   power/volume before, codec id and power after).
 - QEMU AC97 rig (rig98/t53.img, /tmp/qrun.sh, ACZAP = Windows-like state: 26h=FF00, master mute, cmd 0, BARs 0, IRQ 0):
   plays after ACZAP (QEMU ignores the codec power-down bits, so the D810 is the real test).
+
+## beta.54-usb (2026-11-08): D810 after Windows 98 still silent and the USB pad dead in JOYTEST (USBTEST fine)
+- USBTEST polls USB itself; SBEMU polls it from the sound card interrupt (VJOY_Tick in MAIN_Interrupt; port 201h
+  reads only do a light poll, no enumeration/recovery). Silence + dead pad = card interrupts not arriving.
+- main.c: card IRQ set to level mode in the ELCR (4D0h/4D1h) - an IRQ routed after Windows may be edge mode;
+  SBDETAIL logs ELCR before/after, ICH PIRQ A-H routing (LPC 00:1f.0 60h/68h), and "Sound card interrupts so far"
+  (MAIN_CardIrqs, waited up to 0.5 s before going resident); zero -> red warning on screen.
+- Neither QEMU (AC97) nor 86Box (ES1371) loses interrupts with ELCR cleared, so not reproduced; waiting for the D810's
+  SBDETAIL. 86Box has no Intel ICH AC'97; QEMU's AC97 (82801AA) is the only emulated ICH sound for sc_ich.c tests.
