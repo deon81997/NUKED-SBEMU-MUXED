@@ -186,7 +186,7 @@ CONTENTS
       left it in 3D (MENU3D.CFG); hold Shift while MENU starts for the text
       menu. Without a 640x480 VESA mode (no VESA BIOS / UNIVBE) MENU says
       so and stays in text.
-      THE TEST PROGRAMS (JOYTEST, KMTEST, MPUTEST, USBTEST, TIMETEST) and
+      THE TEST PROGRAMS (JOYTEST, KMTEST, MPUTEST, USBTEST, TIMETEST, SBDIAG) and
       MIDPLAY use the same style, letters and safe mode as MENU (the test
       programs also its display mode; F4 there changes it). With their
       output redirected (e.g. TIMETEST > FILE) the test programs write plain

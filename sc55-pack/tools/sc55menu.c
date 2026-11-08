@@ -382,9 +382,9 @@ static void build_menu(void)
         " music timing. Unattended: the games quit by themselves. Remembers the best settings for each game, which Play uses.",
         IT_BAT, "GAMETEST.EXE", 1, 0, NULL);
     add(C_TESTS, "SBDIAG: start measuring", "Starts SBEMU's self-measurement. Then play a game for a minute, quit it, and pick"
-        " 'SBDIAG: report' to see why music would play too slow.", IT_BAT, "SBDIAG.EXE START", 1, 1, NULL);
+        " 'SBDIAG: report' to see why music would play too slow.", IT_BAT, "SBDIAG.EXE START", 1, 0, NULL);
     add(C_TESTS, "SBDIAG: report", "Reads the last measurement: lost timer ticks, how long SBEMU's sound interrupt takes,"
-        " synth load, and what would fix it. Also saved to SBDIAG.TXT.", IT_BAT, "SBDIAG.EXE > NUL", 1, 0, "SBDIAG.TXT");
+        " synth load, and what would fix it. Also saved to SBDIAG.TXT.", IT_BAT, "SBDIAG.EXE", 1, 0, NULL);
     /* Games */
     add_games();
     /* CD-ROM */

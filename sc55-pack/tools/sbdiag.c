@@ -15,14 +15,23 @@
 #include <pc.h>
 #include <unistd.h>
 #include "mpuport.h"
+#include "toolui.h"
 
 static int g_port = 0x330;
 static FILE* g_log;
+static const char* g_file = "SBDIAG.TXT";
+static int g_ui;                    /* on the screen: the report as a full screen (plain text when redirected) */
+static char g_rep[12000];           /* the report text, for the screen */
 
 static void out(const char* fmt, ...)
 {
     va_list ap;
-    va_start(ap, fmt); vprintf(fmt, ap); va_end(ap);
+    if (g_ui)
+    {
+        size_t n = strlen(g_rep);
+        va_start(ap, fmt); vsnprintf(g_rep + n, sizeof g_rep - n, fmt, ap); va_end(ap);
+    }
+    else { va_start(ap, fmt); vprintf(fmt, ap); va_end(ap); }
     if (!isatty(fileno(stdout))) { fflush(stdout); fsync(fileno(stdout)); } /* redirected to a file (GTFULL.TXT): commit each line */
     if (g_log) { va_start(ap, fmt); vfprintf(g_log, fmt, ap); va_end(ap); fflush(g_log); fsync(fileno(g_log)); } /* keep what is written if the PC hangs */
 }
@@ -76,6 +85,93 @@ static int has_sbemu(void)
     return 0;
 }
 
+/* a short message: a window on the full screen when shown on the screen, plain text otherwise */
+static int say(const char* argv0, const char* title, const char* msg, int rc)
+{
+    if (!g_ui) { printf("%s\n", msg); return rc; }
+    tu_start(argv0);
+    tu_head("SBDIAG", "why game music plays too slow", NULL);
+    tu_foot(NULL, "any key: back");
+    tui_message(title, msg);
+    tu_end();
+    return rc;
+}
+
+/* the report screen: the numbers that matter as bars, the reasons, V for the whole text */
+typedef struct { double secs, mhz, hz, lostpct, clock, isr_share, isr_avg, isr_max, run_max, period, load, silence; int synth, reasons; } SUM;
+static const char* section(const char* name, char* buf, int size)
+{
+    const char* a = strstr(g_rep, name), *b;
+    int n;
+    if (!a) { buf[0] = 0; return buf; }
+    a += strlen(name);
+    while (*a == '\n') ++a;
+    b = strstr(a, "\n\nWHAT WOULD");
+    n = b ? (int)(b - a) : (int)strlen(a);
+    if (n > size - 1) n = size - 1;
+    {   /* the report's lines are broken for 80 columns: join each reason's lines, a new reason on a new line */
+        int i, k = 0;
+        for (i = 0; i < n && k < size - 1; ++i)
+        {
+            if (a[i] == '\n')
+            {
+                int j = i + 1;
+                while (j < n && a[j] == ' ') ++j;
+                if (j < n && a[j] >= '0' && a[j] <= '9') { buf[k++] = '\n'; i = j - 1; }
+                else { buf[k++] = ' '; i = j - 1; }
+            }
+            else buf[k++] = a[i];
+        }
+        buf[k] = 0;
+    }
+    return buf;
+}
+static void bar_line(int x, int y, const char* label, double v, double full, int bad, const char* text)
+{
+    int a = bad ? 0x1C : 0x1A;
+    tui_put(x, y, 0x17, label);
+    tui_bar(x + 22, y, 30, (long)(v * 100), (long)(full * 100), bad ? 0x1C : 0x1A, 0x18);
+    tui_put(x + 54, y, a, text);
+}
+static void show(const char* argv0, const SUM* m)
+{
+    char t[80], r[4000];
+    int c;
+    tu_start(argv0);
+    for (;;)
+    {
+        tu_head("SBDIAG", "why game music plays too slow", NULL);
+        tui_panel(2, 3, 77, 4, 1, 0x1E, "Measurement");
+        snprintf(t, sizeof t, "%.0f s on a %.0f MHz CPU, synth %s", m->secs, m->mhz, m->synth == 2 ? "MT-32" : m->synth ? "SoundFont" : "SC-55");
+        tui_put(4, 4, 0x1F, t);
+        snprintf(t, sizeof t, m->reasons == 1 ? "1 reason found" : "%d reasons found", m->reasons);
+        tu_state(4, 5, m->reasons ? -1 : 1, m->reasons ? t : "no problem found");
+        tui_panel(2, 7, 77, 8, 1, 0x1E, "The numbers");
+        if (m->hz > 0 && m->hz < 1000)
+        {
+            snprintf(t, sizeof t, "%.1f%%  (timer %.0f Hz)", m->lostpct, m->hz);
+            bar_line(4, 8, "Timer ticks lost", m->lostpct, 10, m->lostpct >= 1, t);
+        }
+        else tui_put(4, 8, 0x17, "Timer ticks lost      the game left the timer at 18.2 Hz");
+        if (m->clock > 0) { snprintf(t, sizeof t, "%.1f%% of real time", m->clock); bar_line(4, 9, "Game clock speed", m->clock, 100, m->clock < 99, t); }
+        snprintf(t, sizeof t, "%.0f%% of the CPU", m->isr_share);
+        bar_line(4, 10, "Sound interrupt", m->isr_share, 100, m->isr_share >= 60, t);
+        snprintf(t, sizeof t, "%.2f ms (tick %.2f)", m->run_max, m->period);
+        bar_line(4, 11, "Longest block", m->run_max, m->period > 0 ? m->period * 2 : 10, m->period > 0 && m->run_max > m->period, t);
+        snprintf(t, sizeof t, "%.0f%% of real time", m->load);
+        bar_line(4, 12, "Synth load", m->load, 100, m->load >= 50, t);
+        snprintf(t, sizeof t, "%.2f s", m->silence);
+        bar_line(4, 13, "Dropouts (silence)", m->silence, 1, m->silence > 0.05, t);
+        tui_panel(2, 15, 77, 8, 1, 0x1E, "Reasons, most important first");
+        tu_text(4, 16, 73, 6, 0x17, section("REASONS, MOST IMPORTANT FIRST", r, sizeof r));
+        tu_foot(!strcmp(g_file, "SBDIAG.TXT") ? "Saved to SBDIAG.TXT. V shows the whole report with what would fix it." : "A made-up example (SBDIAG DEMO). V shows its whole report.", "V whole report   Esc quit   F4 screen");
+        c = tu_wait_key();
+        if (c == 27 || c == 'q' || c == 'Q' || c == K_RCLICK) break;
+        if (c == 'v' || c == 'V' || c == 13 || c == K_MOUSE) { tui_view_file(g_file, NULL); tui_invalidate(); }
+    }
+    tu_end();
+}
+
 int main(int argc, char** argv)
 {
     unsigned long d[F_COUNT];
@@ -93,32 +189,40 @@ int main(int argc, char** argv)
                "SBDIAG STOP    stop measuring\n");
         return 0;
     }
+    g_ui = isatty(fileno(stdout));
+    if (!stricmp(cmd, "DEMO"))
+    {   /* made-up numbers (a 140 Hz game losing ticks on a slow PC), to see the report without a game */
+        static const unsigned long demo[F_COUNT] = { 0x47444253UL, 5, 400000, 60000, 6000, 21000, 9200, 900, 420, 60, 0, 11800, 0,
+            8522, 8522, 0, 1260000, 6000, 15600, 4100, 1323000, 22050, 0, 3000, 2100, 3100, 2000, 9000, 1000, 400, 300, 200, 90000, 0,
+            2, 1, 0, 512, 8522, 8400000, 300, 5000, 0, 1092, 1015 };
+        memcpy(d, demo, sizeof d);
+        goto report;
+    }
     { int p = mpu_find(g_port); if (p) g_port = p; }
-    if (!has_sbemu()) { printf("No MPU-401 at %X: run SC55 first.\n", g_port); return 1; }
+    if (!has_sbemu())
+    {
+        char m[120]; snprintf(m, sizeof m, "No MPU-401 at %X: run SC55 first (SBEMU must be loaded).", g_port);
+        return say(argv[0], "SBDIAG", m, 1);
+    }
     outportb(g_port + 1, 0x3F); /* back to UART mode */
 
     if (!stricmp(cmd, "START"))
     {
         outportb(g_port + 1, 0xA7);
         if (!read_report(d))
-        {
-            printf("This SBEMU cannot measure itself: SBDIAG needs SBEMU 1.0.0-beta.16-sc55 or newer (beta.17 for everything).\n");
-            return 1;
-        }
-        printf("Measuring. Now start the game and play for a minute or two with music on.\n"
-               "Quit the game, then type SBDIAG for the report.\n");
-        return 0;
+            return say(argv[0], "SBDIAG", "This SBEMU cannot measure itself: SBDIAG needs SBEMU 1.0.0-beta.16-sc55 or newer (beta.17 for everything).", 1);
+        return say(argv[0], "Measuring", "Measuring. Now start the game and play for a minute or two with music on. "
+                   "Quit the game, then pick SBDIAG: report (or type SBDIAG) for the result.", 0);
     }
-    if (!stricmp(cmd, "STOP")) { outportb(g_port + 1, 0xA8); printf("Measuring stopped.\n"); return 0; }
+    if (!stricmp(cmd, "STOP")) { outportb(g_port + 1, 0xA8); return say(argv[0], "SBDIAG", "Measuring stopped.", 0); }
 
     if (!read_report(d))
-    {
-        printf("This SBEMU cannot measure itself: SBDIAG needs SBEMU 1.0.0-beta.16-sc55 or newer (beta.17 for everything).\n");
-        return 1;
-    }
+        return say(argv[0], "SBDIAG", "This SBEMU cannot measure itself: SBDIAG needs SBEMU 1.0.0-beta.16-sc55 or newer (beta.17 for everything).", 1);
+report:
     cps = d[F_KHZ] * 1000.0;
     trapcost = 0; /* the in-program measurement was unreliable (always ~0) and touched port 0x80: dropped */
-    g_log = fopen("SBDIAG.TXT", "w");
+    g_file = stricmp(cmd, "DEMO") ? "SBDIAG.TXT" : "SBDEMO.TXT";
+    g_log = fopen(g_file, "w");
 
     secs = d[F_MS] / 1000.0;
     out("SBDIAG - why the MIDI music is not at full speed\n");
@@ -127,6 +231,8 @@ int main(int argc, char** argv)
     {
         out("Nothing measured yet. Run SBDIAG START, play the game with music, quit, then run SBDIAG.\n");
         if (g_log) fclose(g_log);
+        if (g_ui) return say(argv[0], "SBDIAG", "Nothing measured yet. Pick SBDIAG: start measuring (SBDIAG START), play the game "
+                             "with music for a minute, quit it, then look here again.", 0);
         return 0;
     }
     isr_ms = d[F_ISRMS]; ren_ms = d[F_RENMS]; virq_ms = d[F_VIRQMS];
@@ -256,5 +362,16 @@ int main(int argc, char** argv)
         "  fewer voices (/VSFVOICES:24). Lower the SoundFont output rate (SETTINGS) if it is above 22050 Hz.\n");
     out("\nSaved to SBDIAG.TXT\n");
     if (g_log) fclose(g_log);
+    if (g_ui)
+    {
+        SUM m;
+        memset(&m, 0, sizeof m);
+        m.secs = secs; m.mhz = cps / 1e6; m.synth = (int)d[F_SYNTH]; m.reasons = reasons;
+        m.hz = d[F_PITDIV] && d[F_PITDIV] < 65000 ? hz : 0; m.lostpct = lostpct; m.period = period_ms;
+        m.clock = d[F_VER] >= 5 && d[F_BEXP] > 20 ? 100.0 * d[F_BGOT] / d[F_BEXP] : 0;
+        m.isr_share = isr_share; m.run_max = d[F_STRMAX] / 1000.0; m.load = load;
+        m.silence = d[F_VER] >= 3 && d[F_FREQ] ? (double)d[F_UNDER] / d[F_FREQ] : 0;
+        show(argv[0], &m);
+    }
     return 0;
 }

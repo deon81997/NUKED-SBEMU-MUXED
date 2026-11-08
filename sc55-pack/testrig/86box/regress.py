@@ -171,6 +171,16 @@ def vm1_tests(vm, R, only):
         R.check('TIMETEST measures', 'RESULT:' in t)
         R.check('TIMETEST finds the MPU-401 (known 86Box issue)', 'No MPU-401' not in t)
 
+    if want('sbdiag'):
+        vm.run('sbdiag demo', 4000)
+        s = vm.screen(); vm.shot('sbdiag')
+        R.check('SBDIAG report screen (demo)', 'reasons found' in s and 'Timer ticks lost' in s)
+        vm.key(0x2f, 2500)
+        R.check('SBDIAG whole report (V)', 'SBDEMO.TXT' in vm.screen())
+        vm.key(ESC, 1500); vm.key(ESC, 1500)
+        vm.run('sbdiag > d.txt', 3000)
+        R.check('SBDIAG plain text when redirected', 'SBDIAG' in vm.get('D.TXT') or 'MPU' in vm.get('D.TXT'))
+
     if want('midplay'):
         vm.run('midplay t.mid', 6000)
         s = vm.screen(); vm.shot('midplay')
@@ -231,7 +241,7 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     only = set(x for x in a.only.lower().split(',') if x)
     R = Report(a.out)
-    progs = ['sbemu', 'sc55menu', 'joytest', 'kmtest', 'mputest', 'timetest', 'usbtest', 'midplay']
+    progs = ['sbemu', 'sc55menu', 'joytest', 'kmtest', 'mputest', 'timetest', 'usbtest', 'midplay', 'sbdiag']
     for d in (a.vm1, a.vm2):
         vm = VM(d, a.out)
         vm.stop()
@@ -240,7 +250,7 @@ def main():
         vm.put(os.path.join(PACK, 'upstream', 'Nuked-SC55', 'test', 'integration', 'avmidi', '27.mid'), 'T.MID')
         # a known start: text menu, first-run offer already answered, no old results (the disk is only
         # changed while the VM is off: DOS caches it)
-        for f in ('MENU3D.CFG', 'U.TXT', 'M.TXT', 'T.TXT'): vm.rm(f)
+        for f in ('MENU3D.CFG', 'U.TXT', 'M.TXT', 'T.TXT', 'D.TXT'): vm.rm(f)
         flg = os.path.join(a.out, 'TUNED.FLG')
         with open(flg, 'w') as f: f.write('declined\n')
         vm.put(flg, 'TUNED.FLG')
