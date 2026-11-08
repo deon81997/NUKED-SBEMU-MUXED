@@ -53,6 +53,7 @@ period-correct DOS sound setup. It's tuned on a **Dell Latitude D810**
 - OPL3 FM: [Nuked-OPL3-fast](https://github.com/tgies/Nuked-OPL3-fast) (cycle-accurate) or DOSBox's fast core; hardware FM pass-through on cards that have it
 - PC speaker sound mixed into the output
 - Protected-mode games out of the box (HDPMI32i); real-mode games with JEMMEX + QPIEMU (included) or QEMM
+- 16-bit protected-mode games (Borland Pascal / C++ DPMI, e.g. Jazz Jackrabbit) with SBEMU16 + HDPMI16I (`SC55J16.BAT`)
 </details>
 
 <details>
@@ -301,7 +302,7 @@ The release leaves out what it may not legally share. Only the ROMs are needed f
 
 | Program | Project | Licence |
 |---|---|---|
-| HDPMI32I | [HX DOS extender](https://github.com/Baron-von-Riedesel/HX), Japheth | freeware, source available |
+| HDPMI32I, HDPMI16I | [HX DOS extender](https://github.com/Baron-von-Riedesel/HX), Japheth; port-trap builds from [crazii/HX](https://github.com/crazii/HX) | freeware, source available |
 | JEMMEX, JEMM386, JLOAD, QPIEMU | [Jemm](https://github.com/Baron-von-Riedesel/Jemm), Japheth | freeware, source available |
 | UCDD 0.9.5-a2 | [uCDD](https://github.com/vorvek/uCDD), Vorvek | GPL-3.0 |
 | SHSUCDX | [SHSUCD suite](https://github.com/adoxa/shsucd), Jason Hood | freeware, source available |
@@ -453,7 +454,7 @@ Combined work: **GPL-2.0-or-later** ([`COPYING`](sc55-pack/COPYING)).
 
 | Program | Authors | Licence |
 |---|---|---|
-| HDPMI32i | **Japheth** ([HX](https://github.com/Baron-von-Riedesel/HX)), IOPL0 build by **crazii** ([crazii/HX](https://github.com/crazii/HX)) | freeware, source available |
+| HDPMI32i, HDPMI16I | **Japheth (Andreas Grech)** ([HX](https://github.com/Baron-von-Riedesel/HX)); port-trap API and IOPL0 build by **crazii** ([crazii/HX](https://github.com/crazii/HX)); HDPMI16I built for this pack from crazii/HX with a two-line patch ([notes](sc55-pack/third_party/hdpmi16/README.TXT)) | freeware, source available |
 | JEMMEX, JEMM386, JLOAD, QPIEMU | **Japheth** ([Jemm](https://github.com/Baron-von-Riedesel/Jemm)) | see `JEMMLIC.TXT` |
 | μCDD | **[vorvek](https://github.com/vorvek/uCDD)** | GPL-3.0 |
 | SHSUCDX | **Jason Hood** ([shsucd](https://github.com/adoxa/shsucd)), from v1.4b by **John McCoy** | freeware, source available |

@@ -1209,6 +1209,9 @@ CONTENTS
 
   PROGRAMS IN THIS PACK
   HDPMI32i ......... Japheth (HX); IOPL0 build by crazii
+  HDPMI16I ......... Japheth (HX); built for this pack from crazii's HX
+                     fork (port traps) with a two-line patch
+  SBEMU16.COM ...... written for this pack, GPL-2.0
   Jemm, JLoad, QPIEMU  Japheth: see JEMMLIC.TXT
   uCDD ............. vorvek, GPL-3.0 (UCDD-LIC.TXT)
   SHSUCDX .......... Jason Hood, from v1.4b by John McCoy
