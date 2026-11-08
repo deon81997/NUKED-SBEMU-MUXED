@@ -217,6 +217,33 @@ uint32_t VJOY_IOHandler(uint32_t port, uint32_t val, uint32_t out)
     }
 }
 
+/* Port 206h (real mode only), for SBEMU16 (16-bit protected-mode games): there every access costs a trip
+ * down to real mode, longer than a whole stick time-out, so after the game's write to 201h SBEMU16 asks here
+ * each axis' time-out (from that write) and times the reads itself, from when the answer gets back to it.
+ * Write: snapshot; then 10 reads: 4 x time-out in us (16-bit, FFFFh = never: nothing connected), flags (bit 0:
+ * every read must come here - GrIP), A5h. */
+static uint8_t  Info[10];
+static int      InfoN = 10;
+uint32_t VJOY_InfoHandler(uint32_t port, uint32_t val, uint32_t out)
+{
+    (void)port;
+    if (out)
+    {
+        int i;
+        for (i = 0; i < 4; ++i)
+        {
+            uint32_t us = End[i] == ~0ULL ? 0xFFFF : End[i] <= T0 ? 0 : (uint32_t)((End[i] - T0) * 1000000ULL / Cps);
+            if (us > 0xFFFE && End[i] != ~0ULL) us = 0xFFFE;
+            Info[i * 2] = (uint8_t)us; Info[i * 2 + 1] = (uint8_t)(us >> 8);
+        }
+        Info[8] = (uint8_t)(Mode == 3 ? 1 : 0);
+        Info[9] = 0xA5;
+        InfoN = 0;
+        return val;
+    }
+    return InfoN < 10 ? Info[InfoN++] : 0xFF;
+}
+
 /* sound interrupt: full USB poll, pad buttons -> keys, then the keyboard controller (vkbc.c) */
 void VJOY_Tick(void)
 {

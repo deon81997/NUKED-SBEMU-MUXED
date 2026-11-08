@@ -7,7 +7,7 @@ DEBUG ?= 0
 # 0: original SBEMU build with the TinySoundFont SoundFont synth
 VSC55 ?= 1
 
-VERSION ?= 1.0.0-beta.47-usb-sc55
+VERSION ?= 1.0.0-beta.48-usb-sc55
 
 INCLUDES := -I./mpxplay -I./sbemu -I./drivers/include -I./sc55 -I./third_party/nuked-opl3-fast
 DEFINES := -D__DOS__ -DSBEMU -DDEBUG=$(DEBUG) -DSBEMU_VSC55=$(VSC55) -DMAIN_SBEMU_VER=\"$(VERSION)\"
@@ -38,7 +38,7 @@ MIDPLAY := output/midplay.exe
 CDGUI := output/cdgui.exe
 SBSET := output/sbset.exe
 ifeq ($(VSC55),1)
-all: $(TARGET) $(SC55WAV) $(SC55LOG) $(MPUTEST) $(MIDPLAY) $(CDGUI) $(SBSET) output/sc55menu.exe output/gametest.exe output/sbdiag.exe output/timetest.exe output/joytest.exe output/usbtest.exe output/kmtest.exe
+all: $(TARGET) $(SC55WAV) $(SC55LOG) $(MPUTEST) $(MIDPLAY) $(CDGUI) $(SBSET) output/sc55menu.exe output/gametest.exe output/sbdiag.exe output/timetest.exe output/joytest.exe output/usbtest.exe output/kmtest.exe output/sbemu16.com
 else
 all: $(TARGET)
 endif
@@ -211,6 +211,11 @@ output/usbtest.exe: $(USBTEST_SRC) sbemu/usbpad.h
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
 	$(SILENTCMD)$(CC) -O2 -march=i386 -fcommon -D__DOS__ -DSBEMU -DDEBUG=0 -DNDEBUG -I./mpxplay -I./sbemu -I./drivers/include -o $@ $(USBTEST_SRC) -s
+
+output/sbemu16.com: tools/sbemu16.asm
+	@mkdir -p $(dir $@)
+	$(SILENTMSG) "NASM\t$@\n"
+	$(SILENTCMD)nasm -f bin -o $@ $<
 
 output/kmtest.exe: tools/kmtest.c
 	@mkdir -p $(dir $@)

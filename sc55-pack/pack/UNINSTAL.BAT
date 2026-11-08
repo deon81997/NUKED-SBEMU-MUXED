@@ -9,7 +9,7 @@ REM     the backups those made (the same as C:\RESET.BAT). If that fails, NOTHIN
 REM  2. Asks whether to keep your own files: ROM dumps and SoundFonts (moved to C:\SC55SAVE), settings
 REM     (SBOPTS.TXT, THEME.CFG, GAMES.CFG ..., copied there too) and disc images (left in C:\CDIMAGES). Or delete them as well.
 REM  3. Removes   C:\SC55   C:\CDSET   C:\MOUNT.BAT   C:\RESET.BAT
-REM               C:\HDPMI\HDPMI32I.EXE  and the LG driver files in C:\GSCDROM  (each folder only if
+REM               C:\HDPMI\HDPMI32I.EXE, HDPMI16I.EXE  and the LG driver files in C:\GSCDROM  (each folder only if
 REM               nothing else is left in it)   the test disc in C:\CDIMAGES
 REM               leftovers of old versions of the pack (the list CLEANUP.BAT uses)
 REM  It never deletes CONFIG.SYS, AUTOEXEC.BAT or backups it did not make. The pack folder you
@@ -30,6 +30,7 @@ IF EXIST %DRV%:\SC55\NUL ECHO    folder  %DRV%:\SC55        SBEMU, SC-55 tools, 
 IF EXIST %DRV%:\CDSET\NUL ECHO    folder  %DRV%:\CDSET       virtual CD drive and disc menu
 IF EXIST %DRV%:\CDIMAGES\TEST.CUE ECHO    files   %DRV%:\CDIMAGES\TEST.CUE / TEST.BIN   (the pack's test disc)
 IF EXIST %DRV%:\HDPMI\HDPMI32I.EXE ECHO    file    %DRV%:\HDPMI\HDPMI32I.EXE
+IF EXIST %DRV%:\HDPMI\HDPMI16I.EXE ECHO    file    %DRV%:\HDPMI\HDPMI16I.EXE
 IF EXIST %DRV%:\GSCDROM\GSCDROM.SYS ECHO    files   %DRV%:\GSCDROM\ (LG CD-ROM driver)
 IF EXIST %DRV%:\MOUNT.BAT ECHO    file    %DRV%:\MOUNT.BAT
 IF EXIST C:\RESET.BAT ECHO    file    C:\RESET.BAT
@@ -159,6 +160,7 @@ IF NOT EXIST %DRV%:\GSCDROM\NUL GOTO GSDONE
 IF NOT EXIST %DRV%:\GSCDROM\*.* RD %DRV%:\GSCDROM
 :GSDONE
 IF EXIST %DRV%:\HDPMI\HDPMI32I.EXE DEL %DRV%:\HDPMI\HDPMI32I.EXE
+IF EXIST %DRV%:\HDPMI\HDPMI16I.EXE DEL %DRV%:\HDPMI\HDPMI16I.EXE
 IF NOT EXIST %DRV%:\HDPMI\NUL GOTO HDDONE
 IF NOT EXIST %DRV%:\HDPMI\*.* RD %DRV%:\HDPMI
 :HDDONE
