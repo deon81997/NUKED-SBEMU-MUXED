@@ -339,3 +339,12 @@
   if left on, trace "keyboard emulation xxx off" - a left-on emulation traps ports 60h/64h.
 - USBTEST: Esc also read straight from the KBC (port 60h scancode 01h) and closes by itself after 2 minutes with no
   key, so a dead keyboard no longer forces a restart.
+
+## beta.60-usb (2026-11-08): beta.58 USBTEST log from the P5PE-VM NEC card
+- try 3 (second ED + split SET_ADDRESS) got the official wired 360 pad addressed and enumerated: SETUP and status
+  stage queued together never moved it off address 0, 2 ms apart works. (Logitech receiver fine either way.)
+- But "reports 0", same as on the D810 UHCI; and the PS/2 keyboard was dead in USBTEST (beta.59: HceControl off).
+- 360 wired pads now get Linux xpad_start_xbox_360's vendor read (C1h/01h/0100h, 20 bytes) before the LED command;
+  trace "init" / "init-stall". QEMU fakepad answers it and still reports.
+- TODO if the NEC still shows no reports: periodic EDs are rewritten in place (start_in); the NEC may cache them -
+  alternate two ED slots per pipe or toggle PLE around the change.

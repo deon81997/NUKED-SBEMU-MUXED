@@ -2203,7 +2203,14 @@ static int enumerate_(int di)
                 static const uint8_t inq[12] = { 0x08, 0x00, 0x0F, 0xC0 };
                 send_out(k, inq, 12);
             }
-            else { pad_leds(k); s->connected = 1; }
+            else
+            {   /* Linux xpad_start_xbox_360: a vendor read (C1h / 01h / 0100h, 20 bytes) as Windows' driver does
+                 * first; some 360 pads send no input reports until they get it. Both real pads tested here (D810
+                 * UHCI, P5PE-VM NEC OHCI) enumerated but sent "reports 0". A STALL from pads that don't need it
+                 * is fine. */
+                trace(control(di, 0xC1, 0x01, 0x0100, 0, 20) == 0 ? "init " : "init-stall ");
+                pad_leds(k); s->connected = 1;
+            }
         }
         q->since = tsc();
         start_in(k);
