@@ -234,3 +234,12 @@
   latest Munt and Nuked-SC55.
 - opl3.h changed size of opl3_chip: a stale output/sbemu/opl3emu.o crashed programs after FM output.
   makefile now rebuilds every object when any project header changes.
+
+## beta.51-usb (2026-11-08)
+- D810 froze in SC55.BAT only after Windows 98 -> Restart in MS-DOS mode (cold DOS boot fine). SBDETAIL: AC'97 00:1e.2
+  had IRQ line 0, cmd 0000, BAR0/1 = 1 (Windows switched the chip off). AU_init assigns BARs (0xF000 hack) but took
+  IRQ line 0 as the card IRQ -> handler on the timer vector -> freeze at "installing the sound card interrupt handlers".
+- main.c: IRQ 0/1/2/8/13 (and >15) are invalid -> pcibios_AssignIRQ (PCI BIOS routing). pcibios.c: a linked device's
+  line of 0 etc. is not taken as a shared IRQ. SBDETAIL logs the card's PCI cmd/BARs/IRQ after init and USB controllers.
+- Reproduced in 86Box with PCIZAP (line register -> 0): beta.50 hangs, beta.51 routes IRQ 11; SBQ (8-bit DMA through
+  SBEMU, DMA count must move) passes zapped and normal.

@@ -911,7 +911,7 @@ static void MAIN_DetSystem(int argc, char* argv[])
             ++any;
             uint32_t cls = MAIN_PCIRead(bus, dev, fn, 8);
             uint32_t hdr = MAIN_PCIRead(bus, dev, fn, 0x0C);
-            if((cls >> 24) == 0x04)
+            if((cls >> 24) == 0x04 || (cls >> 16) == 0x0C03)   /* sound chips, and USB controllers */
             {
                 uint32_t irq = MAIN_PCIRead(bus, dev, fn, 0x3C), cmd = MAIN_PCIRead(bus, dev, fn, 4);
                 MAIN_D("PCI %02x:%02x.%d  %04lx:%04lx  class %02lx.%02lx  IRQ line %lu pin %c  cmd %04lx  BAR0 %08lx BAR1 %08lx\n",
@@ -922,7 +922,7 @@ static void MAIN_DetSystem(int argc, char* argv[])
             }
             if(fn == 0 && !(hdr & 0x00800000UL)) break;   /* not multi-function */
         }
-        MAIN_D("PCI: %d devices, %d sound device(s)\n", any, n);
+        MAIN_D("PCI: %d devices, %d sound/USB device(s)\n", any, n);
     }
     {   /* which IRQs the PICs have unmasked now */
         unsigned m = inportb(0x21) | (inportb(0xA1) << 8);
@@ -1472,20 +1472,32 @@ int main(int argc, char* argv[])
     atexit(&MAIN_Cleanup);
 
     MAIN_Step("checking the sound card IRQ");
-    if(aui.card_irq > 15) //UEFI with CSM may have APIC enabled (16-31) - but we need read APIC, not implemented for now.
+    if(aui.card_pci_dev)
+        MAIN_D("Card PCI after init: cmd %04x, BAR0 %08lx BAR1 %08lx, IRQ line %d\n",
+            pcibios_ReadConfig_Word(aui.card_pci_dev, 4),
+            (unsigned long)pcibios_ReadConfig_Dword(aui.card_pci_dev, 0x10), (unsigned long)pcibios_ReadConfig_Dword(aui.card_pci_dev, 0x14),
+            aui.card_irq);
+    /* UEFI with CSM may have APIC enabled (16-31) - but we need read APIC, not implemented for now.
+     * 0, 1, 2, 8 and 13 are never a PCI card's IRQ (timer, keyboard, cascade, clock, FPU): Windows 98 leaves the
+     * line register at 0 when it switches the sound chip off on its way to MS-DOS mode, and a handler on IRQ 0
+     * froze the PC. Ask the PCI BIOS to route a real IRQ to the chip instead. */
+    if(aui.card_irq > 15 || aui.card_irq == 0 || aui.card_irq == 1 || aui.card_irq == 2 || aui.card_irq == 8 || aui.card_irq == 13)
     {
         printf("Invalid Sound card IRQ: ");
         MAIN_CPrintf(RED, "%d", aui.card_irq);
         printf(", Trying to assign a valid IRQ...\n");
         aui.card_irq = pcibios_AssignIRQ(aui.card_pci_dev);
-        if(aui.card_irq == 0xFF)
+        if(aui.card_irq == 0xFF || aui.card_irq < 3)
         {
+            MAIN_D("PCI BIOS could not route an IRQ to the sound card\n");
             MAIN_CPrintf(RED, "Failed to assign a valid IRQ for sound card, abort.\n");
+            printf("If you came from Windows 98, restart the PC and boot straight into DOS instead.\n");
             return 1;
         }
         printf("Sound card IRQ assigned: ");
         MAIN_CPrintf(LIGHTGREEN, "%d", aui.card_irq);
         printf(".\n");
+        MAIN_D("PCI BIOS routed IRQ %d to the sound card\n", aui.card_irq);
     }
     if(aui.card_irq == MAIN_Options[OPT_IRQ].value)
     {

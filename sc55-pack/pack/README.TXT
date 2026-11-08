@@ -58,6 +58,9 @@ CONTENTS
     (on a Pentium, Pentium MMX, K6 or Cyrix SBEMU says so and keeps the MPU
     silent; Sound Blaster, OPL3 FM, USB and the joystick work on any Pentium).
   * It runs in plain DOS. Windows 98 must be restarted in MS-DOS mode.
+    (Since beta.51 this also works on PCs where Windows 98 switches the
+    sound chip off on the way out, such as the Dell D810: SBEMU asks the
+    PCI BIOS for the chip's IRQ again instead of freezing.)
   * SBEMU cannot be unloaded. To stop it, restart the PC.
   * SETUP, CDINST and CLEANUP never edit CONFIG.SYS or AUTOEXEC.BAT. Nothing
     starts by itself. Only the optional BOOTCFG.BAT (section 13) changes boot

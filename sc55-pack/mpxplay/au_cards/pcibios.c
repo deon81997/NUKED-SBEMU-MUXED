@@ -715,6 +715,8 @@ uint8_t  pcibios_AssignIRQ(pci_config_s* ppkey)
                     if(intpin-1 == j)
                     {
                         linkedIRQ = pcibios_ReadConfig_Byte(&cfg, PCIR_INTR_LN);
+                        if(linkedIRQ < 3 || linkedIRQ > 15 || linkedIRQ == 8 || linkedIRQ == 13) //not routed (0 after Windows 98 switched the device off)
+                            linkedIRQ = 0xFF;
                         assert(linkedIRQ == 0xFF || ((1<<linkedIRQ)&table[i].intpins[j].map) != 0);
                         if(linkedIRQ != 0xFF)
                         {
