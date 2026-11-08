@@ -236,3 +236,7 @@
   keyboard, drum lamps, Enter replays; menu no longer pauses after it), USBTEST (pads, USB keys/mouse, result, last
   step), TIMETEST (phases, log, result) now full-screen; redirected output (not a tty) keeps the old plain text.
   MIDPLAY uses the MENU style palette and font. SBDIAG stays a report (viewed in MENU). All checked in 86Box.
+- TIMETEST "No MPU-401" in 86Box (SBEMU without SC-55 ROMs, upstream MPU handler): not fixed. Findings: MPUTEST's exact
+  detect() code fails when linked into TIMETEST and succeeds in MPUTEST and in small test programs; small code changes
+  (an extra store, a delay) flip it. EAX..EBP are preserved across traps (checked). Suspect the HDPMI port-trap path
+  (I2FHDPMI.ASM InOutExcHandler) or SBEMU's trap state; needs SBEMU /MDBG serial log or an SC-55 ROM set in the VM.
