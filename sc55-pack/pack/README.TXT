@@ -175,22 +175,23 @@ CONTENTS
         Esc                           back to DOS
       3D MENU (optional; the text menu stays the normal one): F8, or
       Settings > 3D menu. A 640x480 VESA graphics version of the same menu,
-      drawn in 3D by the CPU (no 3D card needed). F3 there picks the look: Panels (raised buttons), Carousel
-      (a ring of cards) or Module (a rack sound module with an LCD, buttons
-      and a knob). The keys are the same as in the text menu; F8 goes back
-      to the text menu, Esc to DOS. F4 sets the speed: auto (the 3D scene
-      at half resolution when the PC draws fewer than 15 pictures a
-      second), full or half; the top right corner shows the frame rate for
-      a few seconds. On a Pentium (not II) the 3D menu is slow even at half
-      resolution: the text menu is the better choice there. MENU starts in 3D the next time if you
-      left it in 3D (MENU3D.CFG); hold Shift while MENU starts for the text
-      menu. Without a 640x480 VESA mode (no VESA BIOS / UNIVBE) MENU says
-      so and stays in text.
-      THE TEST PROGRAMS (JOYTEST, KMTEST, MPUTEST, USBTEST, TIMETEST, SBDIAG) and
-      MIDPLAY use the same style, letters and safe mode as MENU (the test
-      programs also its display mode; F4 there changes it). With their
-      output redirected (e.g. TIMETEST > FILE) the test programs write plain
-      text instead.
+      drawn in 3D by the CPU (no 3D card needed). F3 there picks the look:
+      Panels (raised buttons), Carousel (a ring of cards) or Module (a rack
+      sound module with an LCD, buttons and a knob). The keys are the same
+      as in the text menu; F8 goes back to the text menu, Esc to DOS. F4
+      sets the speed: auto (the 3D scene at half resolution when the PC
+      draws fewer than 15 pictures a second), full or half; the top right
+      corner shows the frame rate for a few seconds. On a Pentium (not II)
+      the 3D menu is slow even at half resolution: the text menu is the
+      better choice there. MENU starts in 3D the next time if you left it in
+      3D (MENU3D.CFG); hold Shift while MENU starts for the text menu.
+      Without a 640x480 VESA mode (no VESA BIOS / UNIVBE) MENU says so and
+      stays in text.
+      THE TEST PROGRAMS (JOYTEST, KMTEST, MPUTEST, USBTEST, TIMETEST,
+      SBDIAG) and MIDPLAY use the same style, letters and safe mode as MENU
+      (the test programs also its display mode; F4 there changes it). With
+      their output redirected (e.g. TIMETEST > FILE) the test programs write
+      plain text instead.
       MOUSE (with a DOS mouse driver such as CTMOUSE loaded; a USB mouse
       through SBEMU works too): click a menu to open it, an item to choose
       it, the chosen item again to run it; the wheel moves up and down; a

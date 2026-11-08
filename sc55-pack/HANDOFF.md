@@ -1,6 +1,6 @@
 # SC-55 pack — handoff
 
-## Current state (SBEMU 1.0.0-beta.50-usb-sc55, branch usb-xpad)
+## Current state (SBEMU 1.0.0-beta.51-usb-sc55, branch usb-xpad)
 - SBEMU + Nuked-SC55 (SC-55/mkII), Munt MT-32/CM-32L (/VMT32), SoundFont (/VSF); MPU side channel 0xA5-0xB0 (stats, SBDIAG, key player, triple-Esc, front panel/LCD + CPU load).
 - Key player holds each typed key 500 ms (vdiag.c key_tick); Duke 3D quit default `ESC W3 Q W2 Y W3 Y W3 ESC W3 Q W2 Y W3 Y` — verified in QEMU with Duke 3D Atomic 1.5 from logo, title and demo (GAMETEST /RUN, 20 s and 40 s tests).
 - Tools: SC55MENU (game profiles GAMES.CFG, safe mode, CPU%, first-run auto setup), SBSET (/TUNE benchmark, MT-32 choice), GAMETEST (/RUN), MIDPLAY (live SC-55/MT-32 LCD panel), CDGUI (CUE checks/fix), Ctrl+Alt+F12 in-game LCD overlay (text + mode 13h).
@@ -52,7 +52,8 @@
    firmware upload; check EHCI split transactions (pad behind an Intel 5/6-series built-in hub) on real hardware.
 3. User (beta.48): SC55J16.BAT + Jazz Jackrabbit on the D810 (sound gaps seen only in QEMU HDA?, joystick calibration,
    key response). Possible: SBEMU16 local 61h/DMA-count handling to cut real-mode trips; other 16-bit DPMI games.
-5. User (beta.50): 3D menu (F8) on real VESA cards (D810), speed on slow CPUs; themed test programs.
+5. User (beta.51): NEC card again with USBTEST (OHCI fix below); Xbox One / HID pads on real hardware; INT 15h joystick
+   game; mouse in the menus with CTMOUSE; 3D menu (F8, F4 speed) on real VESA cards (D810); themed test programs.
    Open: TIMETEST reports "No MPU-401 answered" with SBEMU loaded (86Box; MPUTEST finds it) - predates beta.50.
    Voodoo/Glide 3D style dropped for now (user: not needed).
 4. Older: Automatic setup, MIDPLAY S panel, Ctrl+Alt+F12, MT-32 game, GAMETEST Duke run; SBDIAG if music is choppy.
@@ -71,13 +72,13 @@
   port 206h with a per-read virtual clock; saves FS/GS), third_party/hdpmi16 (HDPMI16I patch + build.sh, crazii/HX
   43182b4, JWasm/JWlink built from GitHub in /home/claude/dl), SETUP makes SC55J16.BAT. testrig/sbt.asm (SB DMA+IRQ
   test, 'SBT P' from 16-bit DPMI), joy16.asm. Jazz VM: /home/claude/games/jvm (starthda.sh = HDA + wav capture).
-- 86Box rig: testrig/86box (README.md; build in /home/claude/86box/86box, ROMs /home/claude/86box/roms, VMs
+- 86Box rig: testrig/86box (regress.py = full regression run, README.md; build in /home/claude/86box/86box, ROMs /home/claude/86box/roms, VMs
   /home/claude/86vm/{p2b,u1,u2}); emulated 360 pad usb_xpad.c with hot-plug via automation.
 - Build: DJGPP gcc 12.2 from github.com/andrewwutw/build-djgpp v3.4 (djgpp-linux64-gcc1220.tar.bz2);
   `export PATH=<djgpp>/bin:$PATH; make -j8` (delete output/*.o after header changes)
 
 ## Resume prompt
-"Continue NUKED SB-EMU from sc55-pack/HANDOFF.md (beta.50-usb): github.com/deon81997/NUKED-SBEMU-MUXED, branch usb-xpad. Rebuild with DJGPP, then continue from Next steps."
+"Continue NUKED SB-EMU from sc55-pack/HANDOFF.md (beta.51-usb): github.com/deon81997/NUKED-SBEMU-MUXED, branch usb-xpad. Rebuild with DJGPP, then continue from Next steps."
 
 ## 2026-11-06 (beta.37): SBEMU "Not loaded" on the D810 after SC55.BAT
 - SBEMU no longer quits when the real sound card uses the IRQ asked for (/I or BLASTER): it takes another of 7/5/9, warns, and updates BLASTER.
@@ -240,3 +241,18 @@
   detect() code fails when linked into TIMETEST and succeeds in MPUTEST and in small test programs; small code changes
   (an extra store, a delay) flip it. EAX..EBP are preserved across traps (checked). Suspect the HDPMI port-trap path
   (I2FHDPMI.ASM InOutExcHandler) or SBEMU's trap state; needs SBEMU /MDBG serial log or an SC-55 ROM set in the VM.
+
+## 2026-11-08 (beta.51-usb): NEC OHCI fix, regression run, 3D speed, mouse, more pads, BIOS joystick, SBDIAG screen
+- USBTEST from the user's NEC card (uPD720101, 3.2 GHz): wired 360 pad "desc18!" (DNR right after SET_ADDRESS) and the
+  Logitech receiver dropping out. Cause found: o_run_tds / poll_in treated a TD's error code as final while the HC
+  still retried it (ErrorCount < 3, ED not halted) and pulled the TD. Now only a halted ED is an error. Also: re-reset
+  before SET_ADDRESS on later tries, SET_ADDRESS resent if the device stayed at address 0 (86Box USB_IGNADDR hook),
+  OHCI UnrecoverableError / not-operational -> reset + re-enumerate, "gone" trace shows PortStatus / IntStatus.
+- testrig/86box/regress.py: 27 checks on 2 VMs (P2-400 UHCI+OHCI, P133 OHCI), ~10 min; keys 80 ms apart.
+- First-run auto-setup offer comes before the 3D menu. 3D: 16-px fixed-point spans, 4 floor quads, cached panel,
+  half resolution (auto <15 fps), F4 speed, fps note. 86Box P2-400: 7-8 fps full, 15-16 half; P133 2-3 / 5-6.
+- Mouse (INT 33h) in tui.h (pointer drawn by tui_flush, K_MOUSE / K_RCLICK / wheel) and the 3D menu (hit regions).
+- usbpad.c: Xbox One (GIP: power-on + S-init, guide packet ack) and HID gamepads (report descriptor parser: X Y Z Rx Ry
+  Rz, hat, buttons 1-13). 86Box usb_xpad XPAD_KIND=one|hid. INT 15h AH=84h via a real-mode stub (/JOYBIOS, default on;
+  testrig/j15). SBDIAG full screen (SBDIAG DEMO). TIMETEST MPU detection still open (see above).
+
