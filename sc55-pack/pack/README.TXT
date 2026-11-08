@@ -740,6 +740,9 @@ CONTENTS
   lines; mount with CDIMG or GUI (they pass a full path). While DOS itself
   is busy the track keeps playing from a 1.5-second buffer. If the PC hangs
   when a track starts, remove /VCDA from HYBRID.BAT.
+  Since beta.58 the BIN file is read outside the sound card's interrupt
+  (before, a PC whose card uses IRQ 9-11 could hang when a track started)
+  and also while DOS waits at the prompt, so CDPLAY works there too.
 
 
 =============================================================================

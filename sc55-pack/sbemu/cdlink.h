@@ -61,6 +61,12 @@ int CDLINK_Mix(CDLINK_Engine* e, CDLINK_Box* box, int16_t* pcm, int frames, int 
 
 /* Pure helpers (host-tested) */
 /* Find the FILE "name" of a CUE sheet. Returns 1 and copies the name (no quotes) into out. */
+/* the DOS side of the engine (open / close / read), outside the sound interrupt */
+void CDLINK_EngineSetInlineIO(CDLINK_Engine* e, int on);   /* 1 (default): Mix does it itself (host tests) */
+int CDLINK_EngineNeedsService(const CDLINK_Engine* e);
+int CDLINK_EngineState(const CDLINK_Engine* e);   /* 1 open, 2 open failed, 4 read some */
+void CDLINK_EngineService(CDLINK_Engine* e, int max_sectors);
+
 int CDLINK_ParseCueFile(const char* text, int len, char* out, int outsz);
 /* Directory part of a DOS path including the trailing backslash, then the name appended. */
 void CDLINK_JoinPath(const char* cuepath, const char* name, char* out, int outsz);
@@ -71,6 +77,8 @@ int CDLINK_Init(int gain_percent);   /* 1 if the driver mailbox was found and th
 int CDLINK_IsActive(void);
 /* Mix into the block that is about to be output. Safe to call every interrupt. */
 void CDLINK_MixInto(int16_t* pcm, int frames, int rate);
+int CDLINK_NeedsService(void);
+void CDLINK_Service(int idle);   /* 0: after the card's EOI (InDOS must be 0); 1: from INT 28h (InDOS 1) */
 void CDLINK_Shutdown(void);
 #endif
 

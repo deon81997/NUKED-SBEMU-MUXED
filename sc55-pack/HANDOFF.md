@@ -317,3 +317,17 @@
 - QEMU: tries 2/3 forced (-DOFORCE=n) enumerate kbd + fakepad; the split try aborts QEMU with usb-redir (QEMU limit),
   fine with usb-kbd.
 - Asked the user for: pad and Logitech receiver swapped on the NEC card; pad on the P5PE-VM's own ports.
+
+## beta.58-usb (2026-11-08): CD-Audio (HYBRID /VCDA) actually plays now
+- Found in 86Box (ES1371, IRQ 10, TEST.CUE): the image was read with DOS calls inside the card ISR before EOI; a
+  BIOS disk read waiting for IRQ 14 (lower priority than IRQ 10 on the slave PIC) hung the PC; at the prompt
+  (InDOS 1) reads never ran, the open gave up after 600 ticks. Nothing had ever been mixed.
+- cdlink.c: Mix (ISR) only consumes the ring and handles commands; CDLINK_EngineService does open/close/refill with
+  interrupts on (shared fields under irq_save/irq_restore, session counter drops stale work). main.c: MAIN_CDService
+  after the card's EOI (card IRQ masked, STI, 4 sectors, InDOS 0) and an INT 28h hook (InDOS 1, 16 sectors).
+  Host tests use inline I/O (CDLINK_EngineSetInlineIO default 1): tests/cdlink_test.c passes.
+- Mailbox flags bits for diagnostics: 02 service wanted, 04 DOS free, 08 open, 10 open failed, 20 read, 40 mixed,
+  80 read error. /tmp/t/cdq.c "CDQ M B" prints the box.
+- 86Box: while a program runs (CDQ busy-wait) tracks 2/3/4 come out both/left/right in order, pos advances at real
+  time; at the prompt CDPLAY 3 = left only, CDPLAY 2/4 run to the end (pos, flag 40; the WAV capture missed some).
+- CDPLAY.COM play-range patch (EDX clobber) shipped since beta.51.

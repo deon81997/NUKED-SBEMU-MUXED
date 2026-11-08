@@ -25,6 +25,16 @@ struct CDLINK_Engine
     int open_tries;
     int fill_done;
     int primed;
+    /* I/O (DOS file calls) is done by CDLINK_EngineService, outside the sound interrupt: before beta.58 it ran
+     * inside it, where a BIOS disk read waiting for IRQ 14 (blocked by the card's in-service IRQ) hung the PC,
+     * and at the DOS prompt (InDOS 1) it never ran at all. Mix (interrupt) and Service (interrupts on) share
+     * these fields: Service changes them with interrupts off, and drops its work if the session changed. */
+    volatile uint32_t sess;     /* bumped by every begin/stop */
+    volatile int want_close;    /* the image handle should be closed (Service) */
+    volatile int open_failed;   /* Service: the image cannot be opened */
+    volatile int busy;
+    int inline_io;              /* host tests: Mix calls Service itself */
+    const CDLINK_Box* box;      /* the box the open is for (inline_io) */
 };
 
 CDLINK_Engine* CDLINK_EngineCreate(const CDLINK_IO* io, int gain_percent)
@@ -35,6 +45,7 @@ CDLINK_Engine* CDLINK_EngineCreate(const CDLINK_IO* io, int gain_percent)
     if (!e->ring) { free(e); return NULL; }
     e->io = *io;
     e->gain = gain_percent;
+    e->inline_io = 1;
     return e;
 }
 
@@ -46,9 +57,23 @@ void CDLINK_EngineDestroy(CDLINK_Engine* e)
     free(e);
 }
 
+/* interrupts off around shared-field updates; the flags go to a local (a bare pushf/popf pair in two asm
+ * statements moves esp under the compiler's feet, and -O2 addresses locals from esp) */
+#if defined(__DJGPP__) && !defined(CDLINK_HOSTTEST)
+static inline uint32_t irq_save(void) { uint32_t f; __asm__ __volatile__("pushfl; popl %0; cli" : "=r"(f) :: "memory"); return f; }
+static inline void irq_restore(uint32_t f) { if (f & 0x200) __asm__ __volatile__("sti" ::: "memory"); }
+#define IRQ_OFF() (irqf = irq_save())
+#define IRQ_RESTORE() irq_restore(irqf)
+#else
+#define IRQ_OFF() ((void)irqf)
+#define IRQ_RESTORE() ((void)irqf)
+#endif
+
 static void stop_session(CDLINK_Engine* e)
 {
-    if (e->opened && e->io.close) e->io.close(e->io.user);
+    if (e->opened) e->want_close = 1;
+    e->sess++;
+    e->open_failed = 0;
     e->opened = 0;
     e->pending_open = 0;
     e->session = 0;
@@ -72,35 +97,92 @@ static void begin_session(CDLINK_Engine* e, const CDLINK_Box* box)
     if (e->end <= e->start) e->fill_done = 1;
 }
 
-static void refill(CDLINK_Engine* e)
+/* Service side: one chunk of up to `max` sectors into the ring (interrupts on; Mix may run meanwhile) */
+static void refill(CDLINK_Engine* e, int max)
 {
+    uint32_t irqf = 0;
     int done = 0;
-    while (done < CDLINK_REFILL_SECTORS && !e->fill_done)
+    while (done < max)
     {
-        uint32_t free_bytes = RING_BYTES - e->avail;
-        uint32_t room_sectors = free_bytes / CDLINK_SECTOR;
-        uint32_t contiguous = (RING_BYTES - e->wpos) / CDLINK_SECTOR;
-        uint32_t chunk = CDLINK_REFILL_SECTORS - done;
+        uint32_t sid, wpos, fill, room, contiguous, chunk;
         int r;
-        if (e->fill_sector >= e->end) { e->fill_done = 1; break; }
-        if (chunk > room_sectors) chunk = room_sectors;
+        IRQ_OFF();
+        sid = e->sess; wpos = e->wpos; fill = e->fill_sector;
+        if (e->fill_done || !e->opened || fill >= e->end) { if (e->opened && fill >= e->end) e->fill_done = 1; IRQ_RESTORE(); break; }
+        room = (RING_BYTES - e->avail) / CDLINK_SECTOR;
+        contiguous = (RING_BYTES - wpos) / CDLINK_SECTOR;
+        chunk = (uint32_t)(max - done);
+        if (chunk > room) chunk = room;
         if (chunk > contiguous) chunk = contiguous;
-        if (chunk > e->end - e->fill_sector) chunk = e->end - e->fill_sector;
+        if (chunk > e->end - fill) chunk = e->end - fill;
+        IRQ_RESTORE();
         if (chunk == 0) break;      /* ring full */
-        r = e->io.read(e->io.user, e->fill_sector, e->ring + e->wpos, (int)chunk);
-        if (r < 0) break;           /* DOS busy: next tick */
-        if (r == 0) { e->fill_done = 1; break; }
-        e->fill_sector += (uint32_t)r;
-        e->wpos = (e->wpos + (uint32_t)r * CDLINK_SECTOR) % RING_BYTES;
+        r = e->io.read(e->io.user, fill, e->ring + wpos, (int)chunk);   /* free part of the ring: Mix never reads it */
+        IRQ_OFF();
+        if (e->sess != sid) { IRQ_RESTORE(); break; }    /* stopped / new play meanwhile */
+        if (r < 0) { IRQ_RESTORE(); break; }             /* DOS busy: next time */
+        if (r == 0) { e->fill_done = 1; IRQ_RESTORE(); break; }
+        e->fill_sector = fill + (uint32_t)r;
+        e->wpos = (wpos + (uint32_t)r * CDLINK_SECTOR) % RING_BYTES;
         e->avail += (uint32_t)r * CDLINK_SECTOR;
-        done += r;
         if (e->fill_sector >= e->end) e->fill_done = 1;
+        IRQ_RESTORE();
+        done += r;
     }
+}
+
+void CDLINK_EngineSetInlineIO(CDLINK_Engine* e, int on) { e->inline_io = on; }
+int CDLINK_EngineState(const CDLINK_Engine* e) { return (e->opened ? 1 : 0) | (e->open_failed ? 2 : 0) | (e->fill_sector > e->start ? 4 : 0); }
+
+int CDLINK_EngineNeedsService(const CDLINK_Engine* e)
+{
+    return e->want_close || (e->session && !e->paused && (e->pending_open ||
+        (e->opened && !e->fill_done && RING_BYTES - e->avail >= CDLINK_REFILL_SECTORS * CDLINK_SECTOR / 2)));
+}
+
+/* opens / closes the image and refills the ring; the caller has checked that DOS can be called */
+void CDLINK_EngineService(CDLINK_Engine* e, int max_sectors)
+{
+    uint32_t irqf = 0;
+    uint32_t sid;
+    int r;
+    IRQ_OFF();
+    if (e->busy) { IRQ_RESTORE(); return; }
+    e->busy = 1;
+    IRQ_RESTORE();
+    if (e->want_close)
+    {
+        e->want_close = 0;
+        if (e->io.close) e->io.close(e->io.user);
+    }
+    IRQ_OFF();
+    sid = e->sess;
+    r = e->session && e->pending_open && !e->open_failed;
+    IRQ_RESTORE();
+    if (r)
+    {
+        r = e->io.open(e->io.user, e->box);
+        IRQ_OFF();
+        if (e->sess != sid) { if (r == 0) e->want_close = 1; }
+        else if (r == 0) { e->opened = 1; e->pending_open = 0; }
+        else if (r > 0) e->open_failed = 1;
+        IRQ_RESTORE();
+        if (e->want_close && e->io.close) { e->want_close = 0; e->io.close(e->io.user); }
+    }
+    refill(e, max_sectors);
+    e->busy = 0;
 }
 
 static inline int sat16(int v) { return v > 32767 ? 32767 : (v < -32768 ? -32768 : v); }
 
+static int mix_(CDLINK_Engine* e, CDLINK_Box* box, int16_t* pcm, int frames, int rate);
 int CDLINK_Mix(CDLINK_Engine* e, CDLINK_Box* box, int16_t* pcm, int frames, int rate)
+{
+    int r = mix_(e, box, pcm, frames, rate);
+    if (e->inline_io && e->want_close) CDLINK_EngineService(e, 0);
+    return r;
+}
+static int mix_(CDLINK_Engine* e, CDLINK_Box* box, int16_t* pcm, int frames, int rate)
 {
     int i, mixed = 0, gl, gr;
     uint32_t step;
@@ -122,20 +204,16 @@ int CDLINK_Mix(CDLINK_Engine* e, CDLINK_Box* box, int16_t* pcm, int frames, int 
         stop_session(e);
     if (!e->session || e->paused || rate <= 0) return 0;
 
+    if (e->inline_io) { e->box = box; CDLINK_EngineService(e, CDLINK_REFILL_SECTORS); }
     if (e->pending_open)
     {
-        int r = e->io.open(e->io.user, box);
-        if (r == 0) { e->opened = 1; e->pending_open = 0; }
-        else if (r > 0 || ++e->open_tries > 600)
+        if (e->open_failed || ++e->open_tries > 6000)   /* bad image, or DOS never free for the open */
         {
             stop_session(e);
             box->state = 0;
-            return 0;
         }
-        else return 0;
+        return 0;
     }
-
-    refill(e);
     if (!e->primed)
     {
         if (e->avail >= CDLINK_PREBUFFER_SECTORS * CDLINK_SECTOR || e->fill_done) e->primed = 1;
@@ -260,10 +338,12 @@ static uint16_t g_own_psp;
 static uint16_t g_handle = 0xFFFF;
 static int g_pos_valid;
 static int g_ready;
+static int g_lasterr;
 
-static int dos_safe(void)
+/* idle: called from INT 28h, where DOS is inside a character call (InDOS 1) and file calls are allowed */
+static int dos_ok(int idle)
 {
-    return DPMI_LoadB(g_indos_lin) == 0 && DPMI_LoadB(g_indos_lin - 1) == 0;
+    return DPMI_LoadB(g_indos_lin) == (idle ? 1 : 0) && DPMI_LoadB(g_indos_lin - 1) == 0;
 }
 
 static uint16_t dos_get_psp(void)
@@ -323,14 +403,14 @@ static int dos_seek_read(uint16_t h, uint32_t byteoff, uint32_t dstlin, int byte
     r.w.bx = h;
     r.w.cx = (uint16_t)(byteoff >> 16);
     r.w.dx = (uint16_t)byteoff;
-    if (dos_int21(&r) != 0 || (r.w.flags & 1)) return -1;
+    if (dos_int21(&r) != 0 || (r.w.flags & 1)) { g_lasterr = 0x40 | (r.w.ax & 0x3F); return -1; }
     memset(&r, 0, sizeof r);
     r.h.ah = 0x3F;
     r.w.bx = h;
     r.w.cx = (uint16_t)bytes;
     r.w.ds = g_dosbuf_seg;
     r.w.dx = 0;
-    if (dos_int21(&r) != 0 || (r.w.flags & 1)) return -1;
+    if (dos_int21(&r) != 0 || (r.w.flags & 1)) { g_lasterr = 0x80 | (r.w.ax & 0x3F); return -1; }
     if (r.w.ax) DPMI_LMemcpy(dstlin, g_dosbuf_lin, r.w.ax);
     return r.w.ax;
 }
@@ -339,8 +419,9 @@ static int io_open(void* user, const CDLINK_Box* box)
 {
     char path[130], bin[260], text[1100];
     int n, h, got;
+    CDLINK_Box live;
     (void)user;
-    if (!dos_safe()) return -1;
+    if (!box) { DPMI_LMemcpy(DPMI_PTR2L(&live), g_box_lin, sizeof live); box = &live; }
     DPMI_LMemcpy(DPMI_PTR2L(path), g_seg * 16 + box->unitp + 26, 128);
     path[128] = 0;
     n = (int)strlen(path);
@@ -376,22 +457,22 @@ static void io_close(void* user)
     (void)user;
     if (g_handle != 0xFFFF)
     {
-        if (dos_safe()) dos_close_handle(g_handle);
+        dos_close_handle(g_handle);
         g_handle = 0xFFFF;
     }
 }
 
+static void flag(uint8_t b);
 static int io_read(void* user, uint32_t sector, uint8_t* dst, int n)
 {
     int total = 0;
     (void)user;
-    if (g_handle == 0xFFFF) return 0;
-    if (!dos_safe()) return -1;
+    if (g_handle == 0xFFFF) { flag(0x80); return 0; }
     while (n > 0)
     {
         int c = n > DOSBUF_SECTORS ? DOSBUF_SECTORS : n;
         int got = dos_seek_read(g_handle, sector * CDLINK_SECTOR, DPMI_PTR2L(dst), c * CDLINK_SECTOR);
-        if (got < 0) return total ? total : 0;
+        if (got < 0) { flag(0x80); return total ? total : 0; }
         got /= CDLINK_SECTOR;
         if (got == 0) break;
         total += got; n -= got; sector += (uint32_t)got; dst += got * CDLINK_SECTOR;
@@ -462,6 +543,7 @@ int CDLINK_Init(int gain_percent)
     io.open = io_open; io.close = io_close; io.read = io_read; io.user = NULL;
     g_eng = CDLINK_EngineCreate(&io, gain_percent);
     if (!g_eng) return 0;
+    CDLINK_EngineSetInlineIO(g_eng, 0);
     DPMI_StoreB(g_box_lin + CDLINK_BOX_FLAGS, (uint8_t)(DPMI_LoadB(g_box_lin + CDLINK_BOX_FLAGS) | 1));
     g_ready = 1;
     return 1;
@@ -469,13 +551,32 @@ int CDLINK_Init(int gain_percent)
 
 int CDLINK_IsActive(void) { return g_ready; }
 
+int CDLINK_NeedsService(void) { return g_ready && CDLINK_EngineNeedsService(g_eng); }
+
+/* progress bits in the mailbox's flags byte (bit 0 = attached), for CDQ / CDPLAY diagnostics:
+ * 02 service wanted, 04 DOS was free for it, 08 image open, 10 open failed, 20 sectors read, 40 audio mixed,
+ * 80 a read failed (g_lasterr: 40|DOS error = seek, 80|DOS error = read) */
+static void flag(uint8_t b) { uint8_t f = DPMI_LoadB(g_box_lin + CDLINK_BOX_FLAGS); if (!(f & b)) DPMI_StoreB(g_box_lin + CDLINK_BOX_FLAGS, (uint8_t)(f | b)); }
+
+void CDLINK_Service(int idle)
+{
+    if (!g_ready || !CDLINK_EngineNeedsService(g_eng)) return;
+    flag(0x02);
+    if (!dos_ok(idle)) return;
+    flag(0x04);
+    CDLINK_EngineService(g_eng, idle ? CDLINK_REFILL_SECTORS : 4);
+    if (CDLINK_EngineState(g_eng) & 1) flag(0x08);
+    if (CDLINK_EngineState(g_eng) & 2) flag(0x10);
+    if (CDLINK_EngineState(g_eng) & 4) flag(0x20);
+}
+
 void CDLINK_MixInto(int16_t* pcm, int frames, int rate)
 {
     CDLINK_Box box, before;
     if (!g_ready) return;
     DPMI_LMemcpy(DPMI_PTR2L(&box), g_box_lin, sizeof box);
     before = box;
-    CDLINK_Mix(g_eng, &box, pcm, frames, rate);
+    if (CDLINK_Mix(g_eng, &box, pcm, frames, rate)) flag(0x40);
     if (box.pos != before.pos) DPMI_StoreD(g_box_lin + CDLINK_BOX_POS, box.pos);
     if (box.state != before.state && DPMI_LoadW(g_box_lin + 24) == before.gen)
         DPMI_StoreB(g_box_lin + CDLINK_BOX_STATE, box.state);

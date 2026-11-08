@@ -144,6 +144,11 @@ static void MAIN_InterruptRM();
 
 static DPMI_ISR_HANDLE MAIN_TSRIntHandle;
 static DPMI_REG MAIN_TSRREG;
+static DPMI_ISR_HANDLE MAIN_Int28Handle;   /* DOS idle (prompt, keyboard waits): CD-Audio file reads */
+static DPMI_REG MAIN_Int28REG;
+static BOOL MAIN_Int28On;
+static void MAIN_Int28();
+static void MAIN_CDService();
 /* BIOS joystick: INT 15h AH=84h answered from the USB pad. A small real-mode stub sends only AH=84h to SBEMU
  * (INT 15h also carries the keyboard intercept AH=4Fh on every key, block moves etc.: those go on directly) */
 static DPMI_REG MAIN_I15REG;
@@ -1072,6 +1077,7 @@ static void MAIN_Cleanup()
     if(OldRoutedHandle9.valid)
         HDPMIPT_InstallIRQRoutedHandlerH(9, &OldRoutedHandle9);
 
+    if(MAIN_Int28On) { DPMI_UninstallISR(&MAIN_Int28Handle); MAIN_Int28On = FALSE; }
     CDLINK_Shutdown();
     AU_stop(&aui);
     AU_close(&aui, &fm_aui, &mpu401_aui);
@@ -1870,7 +1876,13 @@ int main(int argc, char* argv[])
     if(MAIN_Options[OPT_VCDA].value)
     {
         if(CDLINK_Init(MAIN_Options[OPT_VCDA].value))
+        {
             MAIN_CPrintf(LIGHTGRAY, "CD-Audio: uCDD link found, audio tracks of mounted CUE/BIN images play through this sound card.\n");
+            /* the image is read with DOS file calls: after the card's interrupt (when DOS is free) and from
+             * INT 28h, which DOS calls while it waits for a key (the prompt, PAUSE) */
+            MAIN_Int28On = DPMI_InstallRealModeISR(0x28, MAIN_Int28, &MAIN_Int28REG, &MAIN_Int28Handle, FALSE) == 0;
+            MAIN_D("CD-Audio: INT 28h idle hook %s\n", MAIN_Int28On ? "installed" : "FAILED");
+        }
         else
             MAIN_CPrintf(YELLOW, "CD-Audio: the uCDD driver (built with --sbemu-link) is not loaded, /VCDA ignored.\n");
     }
@@ -2074,6 +2086,7 @@ static void MAIN_InterruptPM()
         PIC_SendEOIWithIRQ(aui.card_irq); //some BIOS driver doesn't works well if not sending EOI, there's extra check for EOI in DPMI_RMISR_ChainedWrapper
         DIAG_IsrEnd(MAIN_DiagFrames);
         MAIN_TimerReplay(DIAG_Tsc() - isr_t0);
+        MAIN_CDService();
     }
     #if !MAIN_ISR_CHAINED
     else
@@ -2111,6 +2124,7 @@ static void MAIN_InterruptRM()
         PIC_SendEOIWithIRQ(aui.card_irq); //some BIOS driver doesn't works well if not sending EOI, there's extra check for EOI in DPMI_RMISR_ChainedWrapper
         DIAG_IsrEnd(MAIN_DiagFrames);
         MAIN_TimerReplay(DIAG_Tsc() - isr_t0);
+        MAIN_CDService();
     }
     #if !MAIN_ISR_CHAINED
     else
@@ -2122,6 +2136,28 @@ static void MAIN_InterruptRM()
     #endif
     //DBG_Log("INTRME %d\n", MAIN_InINT);
     MAIN_InINT &= ~MAIN_ININT_RM;
+}
+
+/* CD-Audio image reads, after the card's EOI: inside the interrupt (before EOI) a BIOS disk read waiting for
+ * IRQ 14 never got it when the card's IRQ was 9-11 (86Box ES1371 IRQ 10: hung). The card's IRQ is masked
+ * meanwhile, so it cannot come back in here; a few sectors at a time keep it short. */
+static void MAIN_CDService()
+{
+    static volatile int busy;
+    if(busy || !CDLINK_NeedsService()) return;
+    busy = 1;
+    PIC_MaskIRQ(aui.card_irq);
+    SETIF();
+    CDLINK_Service(0);
+    RESETIF();
+    PIC_UnmaskIRQ(aui.card_irq);
+    busy = 0;
+}
+
+static void MAIN_Int28()
+{
+    CDLINK_Service(1);
+    DPMI_CallRealModeOldISR(&MAIN_Int28Handle, &MAIN_Int28REG);
 }
 
 static void MAIN_Interrupt()
