@@ -100,7 +100,14 @@ static void draw(int busy)
     tu_foot(NULL, Log ? "Esc quit (PS/2 or USB keyboard)   every step is also in the log file" : "Esc quit (PS/2 or USB keyboard)");
 }
 
-static int KeySeen;
+static int KeySeen, dumped5, dumped20;
+static void out(const char* fmt, ...);
+static void dump(const char* when)
+{
+    static char b[2048];
+    USBPAD_Dump(b, sizeof b);
+    out("\n-- pipes (%s):\n%s", when, b);
+}
 int main(int argc, char** argv)
 {
     unsigned long long cps, a, t, start;
@@ -134,7 +141,7 @@ int main(int argc, char** argv)
         if (Ui) { Result = "Nothing usable: no USB controller with a pad, keyboard or mouse. The log has every step."; draw(0); tu_wait_key(); tu_end(); }
         return 1;
     }
-    out("\nLive view - plug / unplug, move the sticks, type, move the mouse. Esc quits\n(closes by itself after 2 minutes without a key).\n");
+    out("\nLive view - plug / unplug, move the sticks, type, move the mouse. Esc quits\n(closes by itself after 2 minutes without a key). D: pipe state, R: restart pipes.\n");
     {
         int shown = (int)strlen(USBPAD_Trace());
         t = start = tsc();
@@ -159,7 +166,9 @@ int main(int argc, char** argv)
                 t = tsc();
                 Result = USBPAD_Devices()[0] ? USBPAD_Devices() : "(nothing in use)";
                 draw(0);
-                { int k = tu_poll(); if (k) KeySeen = 1; if (k == 27) break; }
+                { int k = tu_poll(); if (k) KeySeen = 1; if (k == 27) break;
+                  if (k == 'd' || k == 'D') dump("key D");
+                  if (k == 'r' || k == 'R') { dump("before R"); USBPAD_Rearm(); out("\n-- R: every pipe restarted\n"); } }
                 for (i = 0; i < USBPAD_PADS; ++i)
                 {
                     const USBPAD_State* p = USBPAD_GetPad(i);
@@ -198,6 +207,8 @@ int main(int argc, char** argv)
                     out("\nmouse x %ld y %ld wheel %ld buttons %d\n", MX, MY, MW, MBt);
                 }
             }
+            if (!dumped5 && tsc() - start > cps * 5ULL) { dumped5 = 1; dump("5 s"); }
+            if (!dumped20 && tsc() - start > cps * 20ULL) { dumped20 = 1; dump("20 s"); }
             if (KEsc) break;
             /* way out when the PS/2 keyboard's interrupts do not reach the BIOS: Esc straight from the
              * keyboard controller, and closing by itself after 2 minutes without a key */

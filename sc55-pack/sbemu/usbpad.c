@@ -2661,3 +2661,37 @@ void USBPAD_Shutdown(void)
     }
     pds_dpmi_xms_freemem(&Mem);
 }
+
+/* USBTEST diagnostics (NEC uPD720101: one report per pipe, then nothing): every IN pipe's state as the
+ * controller sees it. OHCI: ED info / TailP / HeadP (bit 0 halted, bit 1 toggle) and both TDs' dword 0 (CC in
+ * bits 28-31: F = not done yet, 0 = done). */
+void USBPAD_Dump(char* out, int size)
+{
+    int k, n = 0;
+    out[0] = 0;
+    for (k = 0; k < MAX_PIPE && n < size - 160; ++k)
+    {
+        Pipe* q = &P[k];
+        int h;
+        if (!q->used) continue;
+        h = q->hc;
+        if (HC[h].type == T_OHCI)
+        {
+            volatile uint32_t* e = PQ(h, k);
+            fl(e, 16); fl(q->td, 32);
+            n += snprintf(out + n, size - n, "%s: ed %08lx tail %08lx head %08lx | td0 %08lx %08lx td1 %08lx %08lx | cur td%d | fn %04lx %s\n",
+                pipe_name(q), (unsigned long)e[0], (unsigned long)e[1], (unsigned long)e[2],
+                (unsigned long)o_tdi(q, 0)[0], (unsigned long)PHYS(o_tdi(q, 0)), (unsigned long)o_tdi(q, 1)[0], (unsigned long)PHYS(o_tdi(q, 1)),
+                q->ocur ^ 1, (unsigned long)(ord(h, 0x3C) & 0xFFFF),
+                (e[1] == (e[2] & ~0xFUL)) ? "EMPTY" : (e[2] & 1) ? "HALTED" : "waiting");
+        }
+        else n += snprintf(out + n, size - n, "%s: hc type %d\n", pipe_name(q), HC[h].type);
+    }
+}
+
+/* USBTEST 'R': start every IN pipe again from scratch (ED rewritten) - does input come back? */
+void USBPAD_Rearm(void)
+{
+    int k;
+    for (k = 0; k < MAX_PIPE; ++k) if (P[k].used) start_in(k);
+}

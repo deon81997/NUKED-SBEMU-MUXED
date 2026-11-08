@@ -60,6 +60,8 @@ void USBPAD_Shutdown(void);
 const USBPAD_State* USBPAD_Get(void);       /* pad 1 */
 const USBPAD_State* USBPAD_GetPad(int n);   /* 0 = pad 1, 1 = pad 2 */
 int  USBPAD_Have(void);            /* USBPAD_HAVE_* of what is connected now */
+void USBPAD_Dump(char* out, int size);   /* USBTEST: IN pipes as the controller sees them */
+void USBPAD_Rearm(void);                 /* USBTEST: restart every IN pipe */
 const char* USBPAD_Trace(void);    /* short log of the USB steps, for reports */
 void USBPAD_TraceStop(void);       /* stop adding to it (SBEMU, once resident) */
 const char* USBPAD_Describe(void); /* last plug-in / unplug, e.g. "Xbox 360 pad 045E:028E on OHCI 2 port 1" */

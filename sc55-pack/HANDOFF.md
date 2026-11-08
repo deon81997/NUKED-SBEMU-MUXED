@@ -354,3 +354,9 @@
   past SBEMU's 3 s window. Now try 1 on an OHCI = second ED + split SET_ADDRESS, try 2 plain, try 3 Windows order.
   QEMU's OHCI (vendor 106B) keeps the old order (split + usb-redir aborts QEMU).
 - Still waiting for a beta.60+ USBTEST.TXT from the NEC (init / handoff / emulation traces, reports).
+
+## beta.62-usb (2026-11-08): beta.61 USBTEST on the NEC: pad on try 1 (split), "keyboard emulation 1ff off" (it
+## WAS left on by the BIOS), init-stall (official pad doesn't need it), but reports 1 then nothing; Logitech nothing.
+- One TD per IN pipe completes, the tail-appended next one apparently never does. USBTEST now dumps every IN pipe
+  (USBPAD_Dump: ED info/tail/head, both TDs, EMPTY/HALTED/waiting) at 5 s and 20 s and on D; R restarts every pipe
+  with a full ED rewrite (USBPAD_Rearm -> start_in). Next step depends on that dump.
