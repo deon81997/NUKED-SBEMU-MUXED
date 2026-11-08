@@ -694,8 +694,18 @@ static void ohci_reset(int i)
     int n, p, k;
     if (ord(i, O_CONTROL) & OC_IR)                            /* the BIOS's SMM code owns it */
     {
+        /* as Linux does: enable the OwnershipChange interrupt first - some BIOSes only get their SMI from it */
+        owr(i, 0x10, (1UL << 30));
         owr(i, O_CMDSTS, OS_OCR);
         for (n = 0; n < 1000 && (ord(i, O_CONTROL) & OC_IR); ++n) wait_us(1000);
+        trace("OHCI %02x:%02x.%x: BIOS handoff %s ", h->bus, h->dev, h->func, (ord(i, O_CONTROL) & OC_IR) ? "FAILED" : "ok");
+    }
+    /* legacy keyboard emulation (HceControl, OHCI 1.0a appendix B): with the BIOS gone, an emulation left on
+     * keeps catching ports 60h/64h and the PS/2 keyboard goes dead (P5PE-VM + NEC card, beta.57 USBTEST) */
+    if (ord(i, 0) & 0x100)
+    {
+        uint32_t hce = ord(i, 0x100);
+        if (hce & 0x1FF) { owr(i, 0x100, 0); trace("OHCI %02x:%02x.%x: keyboard emulation %03lx off ", h->bus, h->dev, h->func, (unsigned long)(hce & 0x1FF)); }
     }
     owr(i, O_INTDIS, 0xC000007FUL);
     fi = ord(i, O_FMINT) & 0x3FFF;

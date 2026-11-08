@@ -331,3 +331,11 @@
 - 86Box: while a program runs (CDQ busy-wait) tracks 2/3/4 come out both/left/right in order, pos advances at real
   time; at the prompt CDPLAY 3 = left only, CDPLAY 2/4 run to the end (pos, flag 40; the WAV capture missed some).
 - CDPLAY.COM play-range patch (EDX clobber) shipped since beta.51.
+
+## beta.59-usb (2026-11-08): P5PE-VM + NEC: beta.57/58 USBTEST found the pad and receiver but no input, and the PS/2
+## keyboard went dead inside USBTEST (Esc did nothing, restart needed). Log not received yet.
+- ohci_reset: OwnershipChange interrupt enabled before OCR (Linux pci-quirks does this; some BIOSes need it for the
+  SMI), trace "BIOS handoff ok/FAILED"; legacy keyboard emulation (HcRevision bit 8 -> HceControl 100h) switched off
+  if left on, trace "keyboard emulation xxx off" - a left-on emulation traps ports 60h/64h.
+- USBTEST: Esc also read straight from the KBC (port 60h scancode 01h) and closes by itself after 2 minutes with no
+  key, so a dead keyboard no longer forces a restart.

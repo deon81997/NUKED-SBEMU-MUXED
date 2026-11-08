@@ -1,3 +1,4 @@
+#include <pc.h>
 /* USBTEST - finds USB pads, keyboards and mice the same way SBEMU /JOY does, and shows every step.
  *   USBTEST            USB controllers found, what was done with each, what is on their ports, then live:
  *                      both pads (sticks, triggers, buttons), USB keys pressed, mouse movement, every plug /
@@ -99,6 +100,7 @@ static void draw(int busy)
     tu_foot(NULL, Log ? "Esc quit (PS/2 or USB keyboard)   every step is also in the log file" : "Esc quit (PS/2 or USB keyboard)");
 }
 
+static int KeySeen;
 int main(int argc, char** argv)
 {
     unsigned long long cps, a, t, start;
@@ -132,7 +134,7 @@ int main(int argc, char** argv)
         if (Ui) { Result = "Nothing usable: no USB controller with a pad, keyboard or mouse. The log has every step."; draw(0); tu_wait_key(); tu_end(); }
         return 1;
     }
-    out("\nLive view - plug / unplug, move the sticks, type, move the mouse. Esc quits.\n");
+    out("\nLive view - plug / unplug, move the sticks, type, move the mouse. Esc quits\n(closes by itself after 2 minutes without a key).\n");
     {
         int shown = (int)strlen(USBPAD_Trace());
         t = start = tsc();
@@ -149,7 +151,7 @@ int main(int argc, char** argv)
             }
             if (KNew)
             {
-                KNew = 0;
+                KNew = 0; KeySeen = 1;
                 out("\nUSB keys: mod %02X keys %02X %02X %02X %02X %02X %02X", KRep[0], KRep[2], KRep[3], KRep[4], KRep[5], KRep[6], KRep[7]);
             }
             if (Ui && tsc() - t > cps / 30)
@@ -157,7 +159,7 @@ int main(int argc, char** argv)
                 t = tsc();
                 Result = USBPAD_Devices()[0] ? USBPAD_Devices() : "(nothing in use)";
                 draw(0);
-                if (tu_poll() == 27) break;
+                { int k = tu_poll(); if (k) KeySeen = 1; if (k == 27) break; }
                 for (i = 0; i < USBPAD_PADS; ++i)
                 {
                     const USBPAD_State* p = USBPAD_GetPad(i);
@@ -197,6 +199,10 @@ int main(int argc, char** argv)
                 }
             }
             if (KEsc) break;
+            /* way out when the PS/2 keyboard's interrupts do not reach the BIOS: Esc straight from the
+             * keyboard controller, and closing by itself after 2 minutes without a key */
+            if ((inportb(0x64) & 0x21) == 0x01 && inportb(0x60) == 0x01) break;
+            if (!secs && tsc() - start > cps * 120ULL && !KeySeen) { out("\nNo key for 2 minutes: closing by itself.\n"); break; }
             if (!Ui && kbhit() && getch() == 27) break;
             if (secs && tsc() - start > cps * (unsigned long long)secs) break;
         }
