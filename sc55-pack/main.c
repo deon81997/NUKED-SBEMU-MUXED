@@ -141,6 +141,42 @@ static void MAIN_InterruptRM();
 
 static DPMI_ISR_HANDLE MAIN_TSRIntHandle;
 static DPMI_REG MAIN_TSRREG;
+/* BIOS joystick: INT 15h AH=84h answered from the USB pad. A small real-mode stub sends only AH=84h to SBEMU
+ * (INT 15h also carries the keyboard intercept AH=4Fh on every key, block moves etc.: those go on directly) */
+static DPMI_REG MAIN_I15REG;
+static void MAIN_Int15(void)
+{
+    DPMI_REG* r = &MAIN_I15REG;
+    if(r->w.dx == 0) { r->h.al = VJOY_BiosButtons(); r->w.flags &= ~1; }
+    else if(r->w.dx == 1)
+    {
+        uint16_t a[4];
+        VJOY_BiosAxes(a);
+        r->w.ax = a[0]; r->w.bx = a[1]; r->w.cx = a[2]; r->w.dx = a[3]; r->w.flags &= ~1;
+    }
+    else r->w.flags |= 1;
+}
+static BOOL MAIN_HookInt15(void)
+{
+    /* cmp ah,84h / jne old / cmp dx,1 / ja old (other subfunctions: the BIOS) / clear CF in the caller's flags
+     * (the callback returns with the flags the INT pushed) / jmp far callback / old: jmp far old vector */
+    static const uint8_t stub[28] = { 0x80, 0xFC, 0x84, 0x75, 0x12, 0x83, 0xFA, 0x01, 0x77, 0x0D, 0x55, 0x89, 0xE5,
+        0x80, 0x66, 0x06, 0xFE, 0x5D, 0xEA, 0, 0, 0, 0, 0xEA, 0, 0, 0, 0 };
+    uint32_t cb = DPMI_AllocateRMCB_IRET(&MAIN_Int15, &MAIN_I15REG), mem;
+    uint8_t code[28];
+    uint16_t seg, old_off, old_seg;
+    if(!cb || (mem = DPMI_HighMalloc(2, TRUE)) == 0) return FALSE;
+    seg = (uint16_t)mem;
+    memcpy(code, stub, sizeof code);
+    old_off = DPMI_LoadW(0x15 * 4); old_seg = DPMI_LoadW(0x15 * 4 + 2);
+    code[19] = (uint8_t)cb; code[20] = (uint8_t)(cb >> 8); code[21] = (uint8_t)(cb >> 16); code[22] = (uint8_t)(cb >> 24);
+    memcpy(code + 24, &old_off, 2); memcpy(code + 26, &old_seg, 2);
+    DPMI_LMemcpy(DPMI_SEGOFF2L(seg, 0), DPMI_PTR2L(code), sizeof(code));
+    CLIS();
+    DPMI_StoreW(0x15 * 4, 0); DPMI_StoreW(0x15 * 4 + 2, seg);
+    STIL();
+    return TRUE;
+}
 static uint32_t MAIN_TSR_INT_FNO = MAIN_TSR_INTSTART_ID;
 static uint32_t MAIN_ISR_DOSID;
 static const char MAIN_ISR_DOSID_String[] = "Crazii  SBEMU   Sound Blaster emulation on AC97"; //8:8:asciiz
@@ -530,7 +566,7 @@ struct MAIN_OPT
     "/VSBVOL", "Sound effects (digital Sound Blaster) volume in percent (0-100), on top of the game's own mixer", 100, MAIN_SETCMD_BASE10,
     "/VOPLVOL", "FM (OPL / AdLib) music volume in percent (0-100), on top of the game's own mixer", 100, MAIN_SETCMD_BASE10,
     "/VMIDIVOL", "General MIDI music volume in percent (0-400; SC-55: multiplies /VSCGAIN; SoundFont: its master volume)", 100, MAIN_SETCMD_BASE10,
-    "/JOY", "USB in DOS: up to two Xbox 360 pads as the PC gameport joystick at port 201h, plus USB keyboards / mice (1=on, 0=off; any UHCI / OHCI / EHCI / xHCI USB port, hubs allowed)", 1, MAIN_SETCMD_BASE10,
+    "/JOY", "USB in DOS: up to two USB pads (Xbox 360, Xbox One, HID gamepads) as the PC gameport joystick at port 201h, plus USB keyboards / mice (1=on, 0=off; any UHCI / OHCI / EHCI / xHCI USB port, hubs allowed)", 1, MAIN_SETCMD_BASE10,
     "/JOYAX", "Pad -> gameport axes 1-4 (joystick A X,Y, joystick B X,Y): LX LY RX RY LT RT TR(RT minus LT) or - ; ~ in front inverts", (uintptr_t)"LX,LY,RX,RY", MAIN_SETCMD_STR,
     "/JOYBT", "Pad -> gameport buttons 1-4: A B X Y LB RB LT RT ST BK LS RS GD DU DD DL DR or -", (uintptr_t)"A,B,X,Y", MAIN_SETCMD_STR,
     "/JOYKEY", "Pad buttons typed as keys, button:scan code (hex, E0xx extended), e.g. ST:1C,BK:01 (Start=Enter, Back=Esc)", (uintptr_t)"ST:1C,BK:01", MAIN_SETCMD_STR,
@@ -538,6 +574,7 @@ struct MAIN_OPT
     "/JOYMODE", "Gameport stick type: 0=standard, 1=CH Flightstick Pro (D-pad = hat), 2=Thrustmaster FCS (D-pad = hat on axis 4), 3=Gravis GamePad Pro digital (GrIP, all buttons, 2 pads), 4=none (real gameport stays usable)", 0, MAIN_SETCMD_BASE10,
     "/USBKB", "USB keyboard typed through the PC's keyboard controller (1=on, 0=off; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
     "/USBMS", "USB mouse as a PS/2 mouse for a DOS mouse driver loaded after SBEMU (1=if one is plugged in at start, 2=always, 0=off; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
+    "/JOYBIOS", "BIOS joystick calls (INT 15h AH=84h) answered from the USB pad too (1=on, 0=off; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
     NULL, NULL, 0,
 };
 enum EOption
@@ -605,6 +642,7 @@ enum EOption
     OPT_JOYMODE,
     OPT_USBKB,
     OPT_USBMS,
+    OPT_JOYBIOS,
     OPT_COUNT,
 };
 
@@ -1859,6 +1897,8 @@ int main(int argc, char* argv[])
                     if(enablePM) MAIN_JOY_PM = HDPMIPT_Install_IOPortTrap(0x201, 0x201, MAIN_JOY_IODT, 1, &MAIN_JOY_IOPT_PM);
                     printf("Joystick (Port 201)%s: ", md >= 0 && md <= 3 ? modes[md] : "");
                     MAIN_Print_Enabled_Newline(MAIN_JOY_RM || MAIN_JOY_PM);
+                    if(MAIN_Options[OPT_JOYBIOS].value && !MAIN_HookInt15())
+                        MAIN_CPrintf(YELLOW, "  BIOS joystick (INT 15h AH=84h) not hooked: no memory.\n");
                 }
                 MAIN_CPrintf(LIGHTGRAY, "  USB: %s.\n", msg);
                 if(MAIN_Options[OPT_USBMS].value == 2 || (MAIN_Options[OPT_USBMS].value == 1 && (USBPAD_Have() & USBPAD_HAVE_MOUSE)))

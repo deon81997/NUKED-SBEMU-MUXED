@@ -767,6 +767,10 @@ CONTENTS
   keyboard controller (every PC with PS/2 ports; the D810 and P5PE-VM have
   one).
 
+  BIOS joystick (/JOYBIOS:1, on by default): the few games that read the
+  joystick through the BIOS (INT 15h function 84h) instead of port 201h
+  get the pad too: buttons, and the four axes as 0..255 (centre about
+  128; 0 = no stick there). /JOYBIOS:0 leaves INT 15h alone.
   USB mouse (/USBMS:1, default "auto"): a DOS mouse driver (CTMOUSE,
   MOUSE.COM) loaded AFTER SBEMU finds a PS/2 mouse - SBEMU answers its
   commands and sends the USB mouse's movement as PS/2 packets (the wheel

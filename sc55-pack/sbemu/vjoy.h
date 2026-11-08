@@ -12,7 +12,9 @@ int  VJOY_Init(uint64_t cps, const char* axes, const char* btns, const char* key
 void VJOY_SetLive(int dz, int mode); /* resident copy: new /JOYDZ, /JOYMODE (0-3) */
 uint32_t VJOY_IOHandler(uint32_t port, uint32_t val, uint32_t out);
 uint32_t VJOY_InfoHandler(uint32_t port, uint32_t val, uint32_t out);   /* port 206h, real mode: for SBEMU16 */
-void VJOY_Tick(void);   /* from the sound interrupt: USB poll + key presses */
+void VJOY_Tick(void);
+uint8_t VJOY_BiosButtons(void);   /* INT 15h AH=84h DX=0: AL bits 4-7 */
+void VJOY_BiosAxes(uint16_t* a);  /* INT 15h AH=84h DX=1: AX BX CX DX, 0..255 */   /* from the sound interrupt: USB poll + key presses */
 const char* VJOY_Names(void); /* list of the names for the help text */
 
 #endif
