@@ -60,7 +60,8 @@ CONTENTS
   * It runs in plain DOS. Windows 98 must be restarted in MS-DOS mode.
     (Since beta.51 this also works on PCs where Windows 98 switches the
     sound chip off on the way out, such as the Dell D810: SBEMU asks the
-    PCI BIOS for the chip's IRQ again instead of freezing.)
+    PCI BIOS for the chip's IRQ again instead of freezing, and since beta.53
+    it switches the chip and its amplifier back on and resets the codec.)
   * SBEMU cannot be unloaded. To stop it, restart the PC.
   * SETUP, CDINST and CLEANUP never edit CONFIG.SYS or AUTOEXEC.BAT. Nothing
     starts by itself. Only the optional BOOTCFG.BAT (section 13) changes boot

@@ -1509,6 +1509,7 @@ int main(int argc, char* argv[])
         mpu401_aui.card_handler ? mpu401_aui.card_handler->shortname : "none");
     atexit(&MAIN_Cleanup);
 
+    { extern char ICH_Diag[]; if(ICH_Diag[0]) MAIN_D("ICH AC'97 set-up:%s\n", ICH_Diag); }
     MAIN_Step("checking the sound card IRQ");
     if(aui.card_pci_dev)
         MAIN_D("Card PCI after init: cmd %04x, BAR0 %08lx BAR1 %08lx, IRQ line %d\n",

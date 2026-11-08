@@ -1,3 +1,5 @@
+#include <stdarg.h>
+#include <string.h>
 //**************************************************************************
 //*                     This file is part of the                           *
 //*                      Mpxplay - audio player.                           *
@@ -195,6 +197,42 @@ static inline uint32_t snd_intel_read_32 (struct intel_card_s *card, unsigned in
 #define snd_intel_read_32(card,reg) inl(card->baseport_bm+reg)
 #endif
 
+#ifdef SBEMU
+/* what the chip looked like before SBEMU set it up, for SBDETAIL.TXT (main.c). Windows 98 leaves the D810's AC'97
+ * switched off on its way to MS-DOS mode: PCI power state, AC-link and the codec's own power-down/EAPD bits. */
+char ICH_Diag[400];
+static void ich_diag(const char* fmt, ...)
+{
+ size_t n = strlen(ICH_Diag);
+ va_list ap; va_start(ap, fmt);
+ if(n < sizeof(ICH_Diag) - 1) vsnprintf(ICH_Diag + n, sizeof(ICH_Diag) - n, fmt, ap);
+ va_end(ap);
+}
+/* PCI power management: put the function back in D0 (Windows may leave it in D3hot, where it decodes no I/O). */
+static void ich_power_d0(pci_config_s* dev)
+{
+ unsigned int cap, guard;
+ if(!(pcibios_ReadConfig_Word(dev, 0x06) & 0x10)) { ich_diag(" PM: no caps;"); return; }
+ cap = pcibios_ReadConfig_Byte(dev, 0x34) & 0xFC;
+ for(guard = 0; cap && guard < 16; guard++){
+  if(pcibios_ReadConfig_Byte(dev, cap) == 0x01){
+   unsigned int pmcsr = pcibios_ReadConfig_Word(dev, cap + 4);
+   ich_diag(" PM D%u", pmcsr & 3);
+   if(pmcsr & 3){
+    pcibios_WriteConfig_Word(dev, cap + 4, (pmcsr & ~3) | 0x8000); /* D0, clear PME status */
+    pds_delay_10us(1000);                                          /* D3hot -> D0 needs 10 ms */
+    ich_diag("->D%u", pcibios_ReadConfig_Word(dev, cap + 4) & 3);
+   }
+   ich_diag(";");
+   return;
+  }
+  cap = pcibios_ReadConfig_Byte(dev, cap + 1) & 0xFC;
+ }
+}
+#else
+#define ich_diag(...)
+#endif
+
 static unsigned int snd_intel_codec_ready(struct intel_card_s *card,unsigned int codec)
 {
  unsigned int retry;
@@ -303,9 +341,24 @@ static void snd_intel_chip_init(struct intel_card_s *card)
  } else {
      cmd&= ~(ICH_GLOB_CNT_ACLINKOFF | ICH_PCM_246_MASK);
  }
+ #ifdef SBEMU
+ ich_diag(" GLOB_CNT %08x STAT %08x;", snd_intel_read_32(card, ICH_GLOB_CNT_REG), snd_intel_read_32(card, ICH_GLOB_STAT_REG));
+ if((cmd & ICH_GLOB_CNT_AC97COLD) && (snd_intel_read_32(card, ICH_GLOB_STAT_REG) & ICH_GLOB_STAT_PCR)) {
+  /* codec registers as the last driver left them (Windows: DAC/amp powered down) */
+  ich_diag(" codec before: pwr %04x master %04x pcm %04x;", snd_intel_codec_read(card, 0x26),
+   snd_intel_codec_read(card, AC97_MASTER_VOL_STEREO), snd_intel_codec_read(card, AC97_PCMOUT_VOL));
+ }
+ /* always a full cold reset (like a cold boot): a warm reset keeps the codec registers, and after Windows 98 those
+  * have the DAC and the external amplifier powered down - no sound. */
+ snd_intel_write_32(card, ICH_GLOB_CNT_REG, cmd & ~(ICH_GLOB_CNT_AC97COLD | ICH_GLOB_CNT_AC97WARM));
+ pds_delay_10us(100);
+ cmd = (cmd & ~ICH_GLOB_CNT_AC97WARM) | ICH_GLOB_CNT_AC97COLD;
+ snd_intel_write_32(card, ICH_GLOB_CNT_REG, cmd);
+ #else
  // finish cold or do warm reset
  cmd |= ((cmd&ICH_GLOB_CNT_AC97COLD)==0)? ICH_GLOB_CNT_AC97COLD : ICH_GLOB_CNT_AC97WARM;
  snd_intel_write_32(card, ICH_GLOB_CNT_REG, cmd);
+ #endif
  mpxplay_debugf(ICH_DEBUG_OUTPUT,"AC97 reset type: %s",((cmd&ICH_GLOB_CNT_AC97COLD)? "cold":"warm"));
 
  retry=ICH_DEFAULT_RETRY;
@@ -319,6 +372,10 @@ static void snd_intel_chip_init(struct intel_card_s *card)
 
  // wait for primary codec ready status
  retry=snd_intel_codec_ready(card,ICH_GLOB_STAT_PCR);
+ #ifdef SBEMU
+ { int extra; for(extra = 0; !retry && extra < 9; extra++) retry = snd_intel_codec_ready(card,ICH_GLOB_STAT_PCR); /* up to 1 s */
+   ich_diag(" codec %s;", retry ? "ready" : "NOT READY"); }
+ #endif
  mpxplay_debugf(ICH_DEBUG_OUTPUT,"primary codec reset timeout:%d",retry);
 
  //snd_intel_codec_read(card,0); // clear semaphore flag (removed for ICH0)
@@ -344,6 +401,14 @@ static void snd_intel_chip_close(struct intel_card_s *card)
 
 static void snd_intel_ac97_init(struct intel_card_s *card,unsigned int freq_set)
 {
+ #ifdef SBEMU
+ { unsigned int i, pwr;
+   snd_intel_codec_write(card, 0x00, 0);   /* register reset: every codec register to its default */
+   snd_intel_codec_write(card, 0x26, 0);   /* all sections powered up, EAPD 0 = external amplifier on */
+   for(i = 0, pwr = 0; i < 100; i++){ pwr = snd_intel_codec_read(card, 0x26); if((pwr & 0x0F) == 0x0F) break; pds_delay_10us(500); }
+   ich_diag(" codec %04x:%04x pwr %04x after %u ms;", snd_intel_codec_read(card, AC97_VENDOR_ID1), snd_intel_codec_read(card, AC97_VENDOR_ID2), pwr, i * 5);
+ }
+ #endif
  // initial ac97 volumes (and clear mute flag)
  snd_intel_codec_write(card, AC97_MASTER_VOL_STEREO, 0x0202);
  snd_intel_codec_write(card, AC97_PCMOUT_VOL,        0x0202);
@@ -508,6 +573,13 @@ static int INTELICH_adetect(struct mpxplay_audioout_info_s *aui)
 
  if(pcibios_search_devices(ich_devices,card->pci_dev)!=PCI_SUCCESSFUL)
   goto err_adetect;
+ #ifdef SBEMU
+ ICH_Diag[0] = 0;
+ ich_diag("cmd %04x BAR %08x %08x %08x %08x;", pcibios_ReadConfig_Word(card->pci_dev, PCIR_PCICMD),
+  pcibios_ReadConfig_Dword(card->pci_dev, 0x10), pcibios_ReadConfig_Dword(card->pci_dev, 0x14),
+  pcibios_ReadConfig_Dword(card->pci_dev, 0x18), pcibios_ReadConfig_Dword(card->pci_dev, 0x1c));
+ ich_power_d0(card->pci_dev);
+ #endif
 
 #ifdef SBEMU
  if(card->pci_dev->device_type == DEVICE_INTEL_ICH4)
@@ -584,6 +656,7 @@ static int INTELICH_adetect(struct mpxplay_audioout_info_s *aui)
  uint16_t ssdid = pcibios_ReadConfig_Dword(card->pci_dev, PCIR_SSID);
  mpxplay_debugf(ICH_DEBUG_OUTPUT,"subsystem %4.4X:%4.4X", ssvid, ssdid);
 
+ ich_diag(" %s bm %x codec %x;", card->use_mmio ? "MMIO" : "I/O", (unsigned)card->baseport_bm, (unsigned)card->baseport_codec);
  if(!snd_intel_buffer_init(card,aui))
   goto err_adetect;
  snd_intel_chip_init(card);

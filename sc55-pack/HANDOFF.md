@@ -275,3 +275,12 @@
   line of 0 etc. is not taken as a shared IRQ. SBDETAIL logs the card's PCI cmd/BARs/IRQ after init and USB controllers.
 - Reproduced in 86Box with PCIZAP (line register -> 0): beta.50 hangs, beta.51 routes IRQ 11; SBQ (8-bit DMA through
   SBEMU, DMA count must move) passes zapped and normal.
+
+## beta.53-usb (2026-11-08): no sound on the D810 after Windows 98 -> MS-DOS mode
+- beta.52 no longer froze there but was silent. sc_ich.c (SBEMU): PCI power state back to D0 (PM capability),
+  always a full AC'97 cold reset (upstream did only a warm reset when the link was already out of cold reset, which
+  keeps the codec registers Windows left: DAC/amp powered down, EAPD), codec register reset (00h) + power-up (26h = 0,
+  wait for the ready bits). ICH_Diag -> SBDETAIL "ICH AC'97 set-up:" (cmd, BARs, PM state, GLOB_CNT/STAT, codec
+  power/volume before, codec id and power after).
+- QEMU AC97 rig (rig98/t53.img, /tmp/qrun.sh, ACZAP = Windows-like state: 26h=FF00, master mute, cmd 0, BARs 0, IRQ 0):
+  plays after ACZAP (QEMU ignores the codec power-down bits, so the D810 is the real test).
