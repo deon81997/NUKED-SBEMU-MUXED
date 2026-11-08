@@ -21,6 +21,7 @@
 #include <sys/farptr.h>
 #include <crt0.h>
 #include "mpuport.h"
+#include "toolui.h"
 
 int _crt0_startup_flags = _CRT0_FLAG_LOCK_MEMORY;
 
@@ -47,10 +48,53 @@ static void tick_isr(void)
     outportb(0x20, 0x20);
 }
 
+/* the screen: everything out() writes, in a panel (plain text when redirected) */
+static int g_ui, g_phase, g_nphase = 2, g_done, g_hz = 140, g_secs = 5;
+static char g_text[8192];
+static void draw(void)
+{
+    static const char* ph[3] = { "Calibrate", "Phase 1: no music", "Phase 2: 24 notes" };
+    const char* res = strstr(g_text, "RESULT:");
+    int i;
+    char b[80];
+    tu_head("TIMETEST", "does the game timer lose ticks while SBEMU plays music?", NULL);
+    tui_panel(2, 3, 77, 5, 1, 0x1E, "Test");
+    snprintf(b, sizeof b, "Timer at %u Hz, %d s per phase", g_hz, g_secs);
+    tui_put(4, 4, 0x1F, b);
+    for (i = 0; i < 3; ++i)
+    {
+        int st = g_phase > i || g_done ? 1 : 0;
+        if (i == 2 && g_nphase < 2) { tu_state(4 + i * 25, 6, -1, "Phase 2: no MPU-401"); continue; }
+        if (g_phase == i && !g_done) tui_printf(4 + i * 25, 6, 0x5F, " %s ", ph[i]);   /* running now */
+        else tu_state(4 + i * 25, 6, st, ph[i]);
+    }
+    tui_panel(2, 8, 77, res ? 11 : 15, 1, 0x1E, "Measurements");
+    tu_log(4, 9, 73, res ? 9 : 13, 0x17, g_text);
+    if (res)
+    {
+        tui_panel(2, 19, 77, 4, 1, 0x1E, "Result");
+        char r[300]; int k = 0; const char* q = res + 8;
+        while (*q == ' ') ++q;
+        for (; *q && k < (int)sizeof r - 1 && strncmp(q, "Saved", 5); ++q) if (*q != '\n' || r[k - 1] != ' ') r[k++] = *q == '\n' ? ' ' : *q;
+        while (k && r[k - 1] == ' ') --k;
+        r[k] = 0;
+        { char* d; while ((d = strstr(r, "  ")) != NULL) memmove(d, d + 1, strlen(d)); }
+        tui_wrap(4, 20, 73, 2, strstr(res, "no timer ticks lost") ? 0x1A : 0x1C, r);
+    }
+    tu_foot(g_done ? "Saved to TIMETEST.TXT." : "Measuring - the PC is busy, keys wait until the test ends.",
+            g_done ? "Esc quit   F4 screen" : "");
+}
 static void out(const char* fmt, ...)
 {
     va_list ap;
-    va_start(ap, fmt); vprintf(fmt, ap); va_end(ap);
+    if (!g_ui) { va_start(ap, fmt); vprintf(fmt, ap); va_end(ap); }
+    else
+    {
+        size_t n = strlen(g_text);
+        if (n > sizeof g_text - 1024) { memmove(g_text, g_text + 2048, n - 2048 + 1); n -= 2048; }
+        va_start(ap, fmt); vsnprintf(g_text + n, sizeof g_text - n, fmt, ap); va_end(ap);
+        draw(); tu_poll();
+    }
     if (g_log) { va_start(ap, fmt); vfprintf(g_log, fmt, ap); va_end(ap); fflush(g_log); }
 }
 
@@ -195,6 +239,9 @@ int main(int argc, char** argv)
     expect = 1193182.0 / g_div * secs;
 
     { int p = mpu_find(g_port); if (p) g_port = p; }   /* SBEMU's MPU-401 on whatever port it uses */
+    g_hz = hz; g_secs = secs;
+    g_ui = isatty(1);
+    if (g_ui) { tu_start(argv[0]); draw(); tu_poll(); }
     g_log = fopen("TIMETEST.TXT", "w");
     out("TIMETEST - timer interrupt at %u Hz, %d s per phase, MPU-401 at %X\n", hz, secs, g_port);
     out("(the game-style test: does IRQ 0 lose ticks while SBEMU plays music?)\n\n");
@@ -202,13 +249,14 @@ int main(int argc, char** argv)
     _go32_dpmi_get_protected_mode_interrupt_vector(8, &g_old);
     g_new.pm_offset = (unsigned long)tick_isr;
     g_new.pm_selector = _go32_my_cs();
-    if (_go32_dpmi_allocate_iret_wrapper(&g_new) != 0) { out("Cannot install the timer handler.\n"); return 1; }
+    if (_go32_dpmi_allocate_iret_wrapper(&g_new) != 0) { out("Cannot install the timer handler.\n"); tu_end(); return 1; }
     disable();
     _go32_dpmi_set_protected_mode_interrupt_vector(8, &g_new);
     set_pit(g_div);
     enable();
 
     mpu = mpu_init();
+    if (!mpu) g_nphase = 1;
     if (!mpu) out("No MPU-401 answered at %X: is SBEMU loaded (run SC55 first)? Phase 2 is skipped.\n\n", g_port);
     else
     {   /* GM reset + a piano on 4 channels, then let the synth settle */
@@ -239,6 +287,7 @@ int main(int argc, char** argv)
             double ex = 1193182.0 / dv * secs, l1, l2 = 0;
             disable(); set_pit(dv); enable();
             { unsigned long w = g_ticks + rh / 2; while (g_ticks < w) {} }
+            g_phase = 1;
             out("== timer at %u Hz ==\nPhase 1: no music ...\n", rh);
             gap_reset(rh);
             base = measure(secs, 0, rh);
@@ -247,6 +296,7 @@ int main(int argc, char** argv)
             gap_report();
             if (mpu)
             {
+                g_phase = 2;
                 out("Phase 2: 24 notes playing ...\n");
                 gap_reset(rh);
                 busy = measure(secs, 1, rh);
@@ -275,7 +325,9 @@ int main(int argc, char** argv)
         out("RESULT: timer ticks are lost even without music (%.1f%%).\n", lb);
     else
         out("RESULT: no timer ticks lost - the timer is not the cause.\n");
+    g_done = 1;
     out("Saved to TIMETEST.TXT\n");
     if (g_log) fclose(g_log);
+    if (g_ui) { while (kbhit()) getch(); for (;;) { int c = tu_wait_key(); if (c == 27 || c == 13 || c == 'q' || c == 'Q') break; } tu_end(); }
     return 0;
 }

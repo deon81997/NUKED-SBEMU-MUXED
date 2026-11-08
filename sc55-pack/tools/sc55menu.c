@@ -361,7 +361,7 @@ static void build_menu(void)
     add(C_TESTS, "MIDI player (MIDPLAY)", "Browse your folders for .MID files and play them through the running SC-55 or"
         " SoundFont. A quick way to hear the synth without a game.", IT_BAT, "MIDPLAY.EXE /B", 1, 0, NULL);
     add(C_TESTS, "Test tune (MPUTEST)", "Plays a short tune on the MPU-401 (found on whatever port SBEMU uses). If you hear it, General MIDI works.",
-        IT_BAT, "MPUTEST.EXE", 1, 1, NULL);
+        IT_BAT, "MPUTEST.EXE", 1, 0, NULL);
     add(C_TESTS, "Joystick test (JOYTEST)", "Shows what games see on the gameport: the four axes and four buttons, live."
         " With the USB pad on (Settings > Joystick) move the sticks and press A/B/X/Y. Esc or Q quits.",
         IT_BAT, "JOYTEST.EXE", 1, 0, NULL);

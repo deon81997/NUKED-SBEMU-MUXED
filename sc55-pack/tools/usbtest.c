@@ -16,13 +16,22 @@
 #include <sys/farptr.h>
 #include "usbpad.h"
 #include "dpmi/dpmi.h"
+#include "toolui.h"
 
 static FILE* Log;
+static int Ui;                      /* full-screen view (on the screen; plain text when redirected) */
+static char Text[16384];            /* what out() wrote, for the Steps panel */
 
 static void out(const char* f, ...)
 {
     va_list a;
-    va_start(a, f); vprintf(f, a); va_end(a);
+    if (!Ui) { va_start(a, f); vprintf(f, a); va_end(a); }
+    else
+    {
+        size_t n = strlen(Text);
+        if (n > sizeof Text - 2048) { memmove(Text, Text + 4096, n - 4096 + 1); n -= 4096; }
+        va_start(a, f); vsnprintf(Text + n, sizeof Text - n, f, a); va_end(a);
+    }
     if (Log) { va_start(a, f); vfprintf(Log, f, a); va_end(a); fflush(Log); }
 }
 
@@ -42,6 +51,54 @@ static void kb(int id, const uint8_t* r)
 }
 static void ms(int b, int dx, int dy, int dw) { MX += dx; MY += dy; MW += dw; MBt = b; MNew = 1; }
 
+/* ------------------------------------------------------------------ the screen */
+static const char* Result = "";
+static void draw_pad(int i, int x, int y)
+{
+    static const struct { const char* n; unsigned bit; int x, y; } b[] = {
+        { "LB", XPAD_LB, 2, 1 }, { "RB", XPAD_RB, 42, 1 }, { "Back", XPAD_BACK, 15, 2 }, { "Guide", XPAD_GUIDE, 21, 2 },
+        { "Start", XPAD_START, 28, 2 }, { "Up", XPAD_DU, 16, 3 }, { "Left", XPAD_DL, 13, 4 }, { "Right", XPAD_DR, 19, 4 },
+        { "Down", XPAD_DD, 15, 5 }, { "Y", XPAD_Y, 29, 3 }, { "X", XPAD_X, 26, 4 }, { "B", XPAD_B, 32, 4 }, { "A", XPAD_A, 29, 5 },
+        { "LS", XPAD_LS, 14, 6 }, { "RS", XPAD_RS, 30, 6 } };
+    const USBPAD_State* p = USBPAD_GetPad(i);
+    char t[40]; int k;
+    snprintf(t, sizeof t, "Pad %d", i + 1);
+    tui_panel(x, y, 48, 10, 1, 0x1E, t);
+    if (!p->connected) { tui_put(x + 2, y + 1, 0x18, "not connected - plug a pad in"); return; }
+    tu_plot(x + 2, y + 2, 11, 5, (p->lx + 32768) / 65535.0f, (32767 - p->ly) / 65535.0f, 0x1E);
+    tu_plot(x + 35, y + 2, 11, 5, (p->rx + 32768) / 65535.0f, (32767 - p->ry) / 65535.0f, 0x1E);
+    tui_bar(x + 2, y + 8, 11, p->lt, 255, 0x1B, 0x18);
+    tui_bar(x + 35, y + 8, 11, p->rt, 255, 0x1B, 0x18);
+    tui_put(x + 14, y + 8, 0x17, "LT"); tui_put(x + 32, y + 8, 0x17, "RT");
+    for (k = 0; k < (int)(sizeof b / sizeof b[0]); ++k)
+    {
+        int xx = b[k].x, yy = b[k].y;
+        tu_lamp(x + xx, y + yy, p->buttons & b[k].bit, b[k].n);
+    }
+    tui_printf(x + 14, y + 7, 0x13, "reports %lu", (unsigned long)p->reports);
+}
+static void draw(int busy)
+{
+    int i;
+    tu_head("USBTEST", "USB pads, keyboards and mice, found like SBEMU /JOY", NULL);
+    draw_pad(0, 2, 3);
+    draw_pad(1, 2, 13);
+    tui_panel(51, 3, 28, 7, 1, 0x1E, "USB keyboard");
+    tui_printf(53, 5, 0x17, "modifiers %02X", KRep[0]);
+    tui_put(53, 6, 0x17, "keys");
+    for (i = 2; i < 8; ++i) tui_printf(58 + (i - 2) * 3, 6, KRep[i] ? 0x1E : 0x18, "%02X", KRep[i]);
+    tui_put(53, 8, 0x18, "HID usage codes");
+    tui_panel(51, 10, 28, 6, 1, 0x1E, "USB mouse");
+    tui_printf(53, 11, 0x1F, "x %5ld  y %5ld", MX, MY);
+    tui_printf(53, 12, 0x17, "wheel %ld", MW);
+    tu_lamp(53, 14, MBt & 1, "Left"); tu_lamp(60, 14, MBt & 4, "Middle"); tu_lamp(69, 14, MBt & 2, "Right");
+    tui_panel(51, 16, 28, 7, 1, 0x1E, "Result");
+    tu_text(53, 17, 24, 5, busy ? 0x1E : 0x1F, busy ? "Looking for USB controllers and devices (up to 3 s) ..." : Result);
+    tui_fill(1, 23, 80, 1, 0x10, ' ');
+    tu_log(2, 23, 78, 1, 0x13, Text);
+    tu_foot(NULL, Log ? "Esc quit (PS/2 or USB keyboard)   every step is also in the log file" : "Esc quit (PS/2 or USB keyboard)");
+}
+
 int main(int argc, char** argv)
 {
     unsigned long long cps, a, t, start;
@@ -57,6 +114,8 @@ int main(int argc, char** argv)
         else { printf("USBTEST [logfile] [/T:seconds]\n"); return 1; }
     }
     DPMI_Init();
+    Ui = isatty(1);
+    if (Ui) { tu_start(argv[0]); draw(1); tu_poll(); }
     tk = ticks(); while (ticks() == tk) {}
     a = tsc(); tk = ticks(); while (ticks() - tk < 4) {}
     cps = (tsc() - a) * 18206 / 4000;
@@ -66,7 +125,13 @@ int main(int argc, char** argv)
     n = USBPAD_Init(cps, 3000, USBPAD_F_KBD | USBPAD_F_MOUSE, &msg);
     out("%s\n", USBPAD_Trace());
     out("\nResult: %s\n", msg);
-    if (!n) { out("Nothing usable.\n"); return 1; }
+    Result = msg;
+    if (!n)
+    {
+        out("Nothing usable.\n");
+        if (Ui) { Result = "Nothing usable: no USB controller with a pad, keyboard or mouse. The log has every step."; draw(0); tu_wait_key(); tu_end(); }
+        return 1;
+    }
     out("\nLive view - plug / unplug, move the sticks, type, move the mouse. Esc quits.\n");
     {
         int shown = (int)strlen(USBPAD_Trace());
@@ -87,7 +152,26 @@ int main(int argc, char** argv)
                 KNew = 0;
                 out("\nUSB keys: mod %02X keys %02X %02X %02X %02X %02X %02X", KRep[0], KRep[2], KRep[3], KRep[4], KRep[5], KRep[6], KRep[7]);
             }
-            if (tsc() - t > cps / 10)
+            if (Ui && tsc() - t > cps / 30)
+            {
+                t = tsc();
+                Result = USBPAD_Devices()[0] ? USBPAD_Devices() : "(nothing in use)";
+                draw(0);
+                if (tu_poll() == 27) break;
+                for (i = 0; i < USBPAD_PADS; ++i)
+                {
+                    const USBPAD_State* p = USBPAD_GetPad(i);
+                    if (p->connected && p->buttons != lastb[i] && Log)
+                    {
+                        fprintf(Log, "pad %d buttons %04X  LX %d LY %d RX %d RY %d LT %d RT %d (reports %lu)\n", i + 1, p->buttons,
+                            p->lx, p->ly, p->rx, p->ry, p->lt, p->rt, (unsigned long)p->reports);
+                        fflush(Log);
+                        lastb[i] = p->buttons;
+                    }
+                }
+                if (MNew) { MNew = 0; if (Log) { fprintf(Log, "mouse x %ld y %ld wheel %ld buttons %d\n", MX, MY, MW, MBt); fflush(Log); } }
+            }
+            else if (!Ui && tsc() - t > cps / 10)
             {
                 t = tsc();
                 printf("\r");
@@ -113,12 +197,13 @@ int main(int argc, char** argv)
                 }
             }
             if (KEsc) break;
-            if (kbhit() && getch() == 27) break;
+            if (!Ui && kbhit() && getch() == 27) break;
             if (secs && tsc() - start > cps * (unsigned long long)secs) break;
         }
     }
     out("\n");
     USBPAD_Shutdown();
+    tu_end();
     if (Log) fclose(Log);
     return 0;
 }

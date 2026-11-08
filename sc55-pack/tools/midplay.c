@@ -36,6 +36,7 @@ static int key_get(void) { return 0; }
 #include <dos.h>
 #include <dir.h>
 #include "mpuport.h"
+#include "theme.h"
 static int base = 0x330;
 static uint64_t now_us(void) { return (uint64_t)uclock() * 1000000ULL / UCLOCKS_PER_SEC; }
 static void idle(void) {}
@@ -432,16 +433,31 @@ static void ui_flush(int force)
             memcpy(shown[r], scr[r], sizeof scr[r]);
         }
 }
+static char g_cfg[260];
 static void ui_begin(void)
 {
+    static int loaded;
+    if (!loaded)
+    {   /* the style, letters and safe mode chosen in MENU (THEME.CFG next to MIDPLAY.EXE) */
+        char home[300]; char* e;
+        snprintf(home, sizeof home, "%s", g_cfg);
+        e = strrchr(home, '\\'); if (!e) e = strrchr(home, '/');
+        if (e) *e = 0; else strcpy(home, ".");
+        tui_theme_load(home);
+        loaded = 1;
+    }
     textmode(C80);
     _setcursortype(_NOCURSOR);
+    tui_apply_theme();
+    tui_font_loaded = 0; tui_font_apply();
     textattr(0x07); clrscr();
     memset(scr, 0, sizeof scr);
 }
 static void ui_end(void)
 {
     if (!g_ui) return;
+    tui_font_restore();
+    tui_plain();
     textattr(0x07); clrscr(); _setcursortype(_NORMALCURSOR);
 }
 

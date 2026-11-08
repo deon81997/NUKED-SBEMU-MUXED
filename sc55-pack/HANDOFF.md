@@ -1,6 +1,6 @@
 # SC-55 pack — handoff
 
-## Current state (SBEMU 1.0.0-beta.49-usb-sc55, branch usb-xpad)
+## Current state (SBEMU 1.0.0-beta.50-usb-sc55, branch usb-xpad)
 - SBEMU + Nuked-SC55 (SC-55/mkII), Munt MT-32/CM-32L (/VMT32), SoundFont (/VSF); MPU side channel 0xA5-0xB0 (stats, SBDIAG, key player, triple-Esc, front panel/LCD + CPU load).
 - Key player holds each typed key 500 ms (vdiag.c key_tick); Duke 3D quit default `ESC W3 Q W2 Y W3 Y W3 ESC W3 Q W2 Y W3 Y` — verified in QEMU with Duke 3D Atomic 1.5 from logo, title and demo (GAMETEST /RUN, 20 s and 40 s tests).
 - Tools: SC55MENU (game profiles GAMES.CFG, safe mode, CPU%, first-run auto setup), SBSET (/TUNE benchmark, MT-32 choice), GAMETEST (/RUN), MIDPLAY (live SC-55/MT-32 LCD panel), CDGUI (CUE checks/fix), Ctrl+Alt+F12 in-game LCD overlay (text + mode 13h).
@@ -52,11 +52,14 @@
    firmware upload; check EHCI split transactions (pad behind an Intel 5/6-series built-in hub) on real hardware.
 3. User (beta.48): SC55J16.BAT + Jazz Jackrabbit on the D810 (sound gaps seen only in QEMU HDA?, joystick calibration,
    key response). Possible: SBEMU16 local 61h/DMA-count handling to cut real-mode trips; other 16-bit DPMI games.
+5. User (beta.50): 3D menu (F8) on real VESA cards (D810), speed on slow CPUs; themed test programs.
+   Open: TIMETEST reports "No MPU-401 answered" with SBEMU loaded (86Box; MPUTEST finds it) - predates beta.50.
+   Voodoo/Glide 3D style dropped for now (user: not needed).
 4. Older: Automatic setup, MIDPLAY S panel, Ctrl+Alt+F12, MT-32 game, GAMETEST Duke run; SBDIAG if music is choppy.
 
 ## Files
 - sbemu/vdiag.c (diagnostics, key player, overlay), sbemu/vmpu_sc55.c (MPU, panel 0xB0), sbemu/vmpu_mt32.cpp (Munt), sc55/sc55synth.cpp (SC55_GetLCD), main.c (/VMT32)
-- tools/: sc55menu.c, sbset.c, gametest.c, midplay.c, cdgui.c, sbdiag.c, tui.h, theme.h, fontdata.h, safewr.h
+- tools/: sc55menu.c, menu3d.h (3D menu), sbset.c, gametest.c, midplay.c, cdgui.c, sbdiag.c, tui.h, toolui.h (test-program screens), theme.h, fontdata.h, safewr.h
 - third_party/mt32emu (Munt 2.8.3), upstream/Nuked-SC55
 - dosimg/ (test rig): mkdisk.py (FreeDOS FAT16 image), mkiso.py (ISO9660 + Duke IDF), vm.py (QEMU driver); QEMU built in work/qemu/b7 (configure: --python=/usr/bin/python3.12, tests/fp skipped, dtc/keycodemapdb from GitHub mirrors)
 - USB: sbemu/usbpad.c (polled UHCI/OHCI/EHCI/xHCI host, hubs, pipes for 2 pads + keyboards + mice), sbemu/vjoy.c (port 201h,
@@ -74,7 +77,7 @@
   `export PATH=<djgpp>/bin:$PATH; make -j8` (delete output/*.o after header changes)
 
 ## Resume prompt
-"Continue NUKED SB-EMU from sc55-pack/HANDOFF.md (beta.49-usb): github.com/deon81997/NUKED-SBEMU-MUXED, branch usb-xpad. Rebuild with DJGPP, then continue from Next steps."
+"Continue NUKED SB-EMU from sc55-pack/HANDOFF.md (beta.50-usb): github.com/deon81997/NUKED-SBEMU-MUXED, branch usb-xpad. Rebuild with DJGPP, then continue from Next steps."
 
 ## 2026-11-06 (beta.37): SBEMU "Not loaded" on the D810 after SC55.BAT
 - SBEMU no longer quits when the real sound card uses the IRQ asked for (/I or BLASTER): it takes another of 7/5/9, warns, and updates BLASTER.
@@ -223,3 +226,13 @@
   no CMOV (vmpu_sc55.c), SBSET automatic setup likewise. README notes the SC-55/MT-32 CPU minimum.
 - /JOYMODE and /JOYDZ now apply to an already loaded SBEMU (VJOY_SetLive; not to/from 4). VMPU warning uses CR LF.
 - Not covered by 86Box: EHCI/xHCI, CardBus; USB keyboard/mouse through SBEMU not yet run there.
+
+## 2026-11-08 (beta.50-usb): optional 3D menu, test programs in the menu style
+- SC55MENU 3D menu (tools/menu3d.h): software renderer, VESA 640x480 (32/16/15/24 bpp, LFB or banked), styles Panels,
+  Carousel, Module (F3). F8 / Settings > 3D menu; MENU3D.CFG makes MENU start in 3D; Shift = text; no VESA -> text + note.
+  Tested in 86Box (P2B-LS, S3 ViRGE).
+- tools/toolui.h on tui.h: header band, panels, lamps, stick/mouse plots, log area, key bar; style/font/display mode
+  from THEME.CFG, Shift safe mode, F4. JOYTEST (axes + dot per stick, G = GrIP view), KMTEST, MPUTEST (steps, piano
+  keyboard, drum lamps, Enter replays; menu no longer pauses after it), USBTEST (pads, USB keys/mouse, result, last
+  step), TIMETEST (phases, log, result) now full-screen; redirected output (not a tty) keeps the old plain text.
+  MIDPLAY uses the MENU style palette and font. SBDIAG stays a report (viewed in MENU). All checked in 86Box.

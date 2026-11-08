@@ -171,7 +171,22 @@ CONTENTS
                                       windows) on / off
         F7                            letters: Terminus, Terminus bold or the
                                       VGA font
+        F8                            the 3D menu (see below)
         Esc                           back to DOS
+      3D MENU (optional; the text menu stays the normal one): F8, or
+      Settings > 3D menu. A 640x480 VESA graphics version of the same menu,
+      drawn in 3D by the CPU (no 3D card needed). F3 there picks the look: Panels (raised buttons), Carousel
+      (a ring of cards) or Module (a rack sound module with an LCD, buttons
+      and a knob). The keys are the same as in the text menu; F8 goes back
+      to the text menu, Esc to DOS. MENU starts in 3D the next time if you
+      left it in 3D (MENU3D.CFG); hold Shift while MENU starts for the text
+      menu. Without a 640x480 VESA mode (no VESA BIOS / UNIVBE) MENU says
+      so and stays in text.
+      THE TEST PROGRAMS (JOYTEST, KMTEST, MPUTEST, USBTEST, TIMETEST) and
+      MIDPLAY use the same style, letters and safe mode as MENU (the test
+      programs also its display mode; F4 there changes it). With their
+      output redirected (e.g. TIMETEST > FILE) the test programs write plain
+      text instead.
       Nothing runs by itself. The menu writes your choice to MENUGO.BAT and
       exits; MENU.BAT runs it from plain DOS (SBEMU stays resident, so it
       must not be started from inside another program), then shows the
