@@ -7,7 +7,7 @@ DEBUG ?= 0
 # 0: original SBEMU build with the TinySoundFont SoundFont synth
 VSC55 ?= 1
 
-VERSION ?= 1.0.0-beta.51-usb-sc55
+VERSION ?= 1.0.0-beta.52-usb-sc55
 
 INCLUDES := -I./mpxplay -I./sbemu -I./drivers/include -I./sc55 -I./third_party/nuked-opl3-fast
 DEFINES := -D__DOS__ -DSBEMU -DDEBUG=$(DEBUG) -DSBEMU_VSC55=$(VSC55) -DMAIN_SBEMU_VER=\"$(VERSION)\"
@@ -195,7 +195,7 @@ output/tools/sc55wav.o: tools/sc55wav.cpp sc55/sc55synth.h
 	$(SILENTMSG) "CXX\t$@\n"
 	$(SILENTCMD)$(CXX) $(CORE_CXXFLAGS) -I./sbemu -I./third_party/nuked-opl3-fast -c $< -o $@
 
-$(MPUTEST): tools/mputest.c
+$(MPUTEST): tools/mputest.c $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
 	$(SILENTCMD)$(CC) -O2 -Wall -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
@@ -213,7 +213,7 @@ output/sbdiag.exe: tools/sbdiag.c $(wildcard tools/*.h)
 USBTEST_SRC := tools/usbtest.c sbemu/usbpad.c mpxplay/au_cards/pcibios.c mpxplay/au_cards/au_base.c \
 	sbemu/dpmi/dpmi.c sbemu/dpmi/dpmi_dj2.c sbemu/dpmi/xms.c sbemu/dpmi/dbgutil.c sbemu/dpmi/dpmi_tsr.c \
 	sbemu/pic.c sbemu/serial.c sbemu/untrapio.c
-output/usbtest.exe: $(USBTEST_SRC) sbemu/usbpad.h
+output/usbtest.exe: $(USBTEST_SRC) sbemu/usbpad.h $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
 	$(SILENTCMD)$(CC) -O2 -march=i386 -fcommon -D__DOS__ -DSBEMU -DDEBUG=0 -DNDEBUG -I./mpxplay -I./sbemu -I./drivers/include -o $@ $(USBTEST_SRC) -s
@@ -223,12 +223,12 @@ output/sbemu16.com: tools/sbemu16.asm
 	$(SILENTMSG) "NASM\t$@\n"
 	$(SILENTCMD)nasm -f bin -o $@ $<
 
-output/kmtest.exe: tools/kmtest.c
+output/kmtest.exe: tools/kmtest.c $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
 	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
 
-output/joytest.exe: tools/joytest.c
+output/joytest.exe: tools/joytest.c $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
 	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
@@ -254,10 +254,10 @@ $(SBSET): output/tools/sbset.o $(SC55_OBJS) $(NUKEDOPL_OBJ) output/sbemu/dbopl.o
 	$(SILENTCMD)$(CXX) -O2 -o $@ $^ -lstdc++ -lm $(if $(filter 0,$(DEBUG)),-s,)
 
 SC55MENU := output/sc55menu.exe
-$(SC55MENU): tools/sc55menu.c tools/tui.h tools/theme.h tools/fontdata.h
+$(SC55MENU): tools/sc55menu.c tools/menu3d.h tools/tui.h tools/theme.h tools/fontdata.h
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
-	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
+	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -ffast-math -o $@ $< -lm $(if $(filter 0,$(DEBUG)),-s,)
 
 $(CDGUI): tools/cdgui.c tools/tui.h tools/theme.h tools/fontdata.h
 	@mkdir -p $(dir $@)

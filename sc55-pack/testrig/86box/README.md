@@ -23,3 +23,20 @@ Pro 133A, VT82C686B), Celeron 533, ES1371. The board's onboard VIA AC'97 (BIOS: 
 Onboard Legacy Audio = Disabled) is found by SBEMU, but 86Box 6.0 crashed (segfault) after SBEMU had
 played for a while, so the config uses an ES1371 card.
 Celeron 533: SC55LOG mk1-v2.00 0.41x real time, Nuked OPL3 2.1x, DBOPL 4.7x.
+
+## Regression run: `regress.py`
+
+`python3 regress.py [--only joytest,kmtest,mputest,timetest,midplay,menu,usbtest,vm2] [--out DIR]` copies the built
+programs (`output/*.exe`) and a MIDI file onto the two VMs (disk changed only while the VM is off), boots them and
+checks SBEMU (pads found, Pentium 133 without CMOV), JOYTEST (+GrIP view), KMTEST, MPUTEST (screen, to the end,
+plain text when redirected), TIMETEST, MIDPLAY, MENU text + all three 3D styles (screenshot colour count) and
+USBTEST with pad 2 unplugged and plugged again. PASS/FAIL per check in DIR/regress.txt, screenshots in DIR
+(default `output/regress`). Takes about 10 minutes. Keys are typed 80 ms apart (faster drops letters while SBEMU
+watches the keyboard). Known failure: TIMETEST finds no MPU-401 in this VM (see HANDOFF).
+
+`USB_IGNADDR=n` in a VM's `env`: the emulated USB devices ack the first n SET_ADDRESS requests without taking the
+address (tests usbpad.c's recovery for devices that stay at address 0).
+
+`XPAD_KIND` / `XPAD_KIND2` in a VM's `env`: `one` makes that pad an Xbox One pad (GIP, 045E:02EA: silent until the
+power-on packet, the Xbox button in its own packet asking for an ack), `hid` a generic HID gamepad (0079:0006 style
+report descriptor: X Y Z Z Rz bytes, a hat, 12 buttons). Same state file format; buttons in the 360 bit layout.

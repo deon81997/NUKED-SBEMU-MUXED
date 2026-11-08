@@ -174,7 +174,34 @@ CONTENTS
                                       windows) on / off
         F7                            letters: Terminus, Terminus bold or the
                                       VGA font
+        F8                            the 3D menu (see below)
         Esc                           back to DOS
+      3D MENU (optional; the text menu stays the normal one): F8, or
+      Settings > 3D menu. A 640x480 VESA graphics version of the same menu,
+      drawn in 3D by the CPU (no 3D card needed). F3 there picks the look:
+      Panels (raised buttons), Carousel (a ring of cards) or Module (a rack
+      sound module with an LCD, buttons and a knob). The keys are the same
+      as in the text menu; F8 goes back to the text menu, Esc to DOS. F4
+      sets the speed: auto (the 3D scene at half resolution when the PC
+      draws fewer than 15 pictures a second), full or half; the top right
+      corner shows the frame rate for a few seconds. On a Pentium (not II)
+      the 3D menu is slow even at half resolution: the text menu is the
+      better choice there. MENU starts in 3D the next time if you left it in
+      3D (MENU3D.CFG); hold Shift while MENU starts for the text menu.
+      Without a 640x480 VESA mode (no VESA BIOS / UNIVBE) MENU says so and
+      stays in text.
+      THE TEST PROGRAMS (JOYTEST, KMTEST, MPUTEST, USBTEST, TIMETEST,
+      SBDIAG) and MIDPLAY use the same style, letters and safe mode as MENU
+      (the test programs also its display mode; F4 there changes it). With
+      their output redirected (e.g. TIMETEST > FILE) the test programs write
+      plain text instead.
+      MOUSE (with a DOS mouse driver such as CTMOUSE loaded; a USB mouse
+      through SBEMU works too): click a menu to open it, an item to choose
+      it, the chosen item again to run it; the wheel moves up and down; a
+      right click is "back" in questions, the file viewer and the display
+      modes. In the 3D menu: click the menu tabs (and in Panels the items);
+      in Carousel and Module click the middle to run the chosen item, the
+      left or right side for the previous or next one.
       Nothing runs by itself. The menu writes your choice to MENUGO.BAT and
       exits; MENU.BAT runs it from plain DOS (SBEMU stays resident, so it
       must not be started from inside another program), then shows the
@@ -744,17 +771,16 @@ CONTENTS
   keyboard controller (every PC with PS/2 ports; the D810 and P5PE-VM have
   one).
 
+  BIOS joystick (/JOYBIOS:1, on by default): the few games that read the
+  joystick through the BIOS (INT 15h function 84h) instead of port 201h
+  get the pad too: buttons, and the four axes as 0..255 (centre about
+  128; 0 = no stick there). /JOYBIOS:0 leaves INT 15h alone.
   USB mouse (/USBMS:1, default "auto"): a DOS mouse driver (CTMOUSE,
   MOUSE.COM) loaded AFTER SBEMU finds a PS/2 mouse - SBEMU answers its
   commands and sends the USB mouse's movement as PS/2 packets (the wheel
   too, for drivers that ask). Auto = only when a USB mouse is plugged in
   as SBEMU starts (a real PS/2 mouse is then not used); 2 = always; 0 =
   off. Test with MENU > Tests > Keyboard / mouse test (KMTEST).
-  The mouse driver is loaded for you: SC55.BAT runs C:\SC55\MOUSE\MOUSE.BAT
-  after SBEMU, which loads CuteMouse 2.1b4 (included, GPL). To use the
-  Microsoft MOUSE.COM 8.20 instead, put it in C:\SC55\MOUSE and change the
-  GOTO line in MOUSE.BAT to GOTO MS; GOTO NONE loads no driver. See
-  C:\SC55\MOUSE\README.TXT.
 
   Test without a game:  MENU > Tests > Joystick test (JOYTEST), or run
   JOYTEST.EXE. Move the sticks: about 24 = left/up, 575 = centre and 1124
@@ -795,8 +821,16 @@ CONTENTS
   pads in the Windows 98 x360c driver). The wireless receiver for PC may
   work (two pads; not tested). Keyboards / mice: any USB keyboard, and
   mice that offer the standard "boot" mode (nearly all); wireless
-  keyboard + mouse receivers too. Not: Xbox One / Series pads, other
-  USB joysticks. A USB hub in between is fine (up to four deep).
+  keyboard + mouse receivers too. Also (new in beta.51, tested in an
+  emulator only so far): wired Xbox One / Series pads (USB cable;
+  not Bluetooth or the wireless adapter), and ordinary USB gamepads and
+  joysticks ("HID" pads: generic PC pads, PlayStation 4 pads on the
+  cable, Logitech in DirectInput mode, retro USB pads). For those:
+  buttons 1-4 are A B X Y (fire 1-4), 5 6 = LB RB, 7 8 = the triggers,
+  9 10 = Back Start, 11 12 = the stick buttons; the hat is the D-pad;
+  X/Y = left stick, Z/Rz (or Rx/Ry) = right stick. Not: PlayStation 3
+  pads (need a start command), Xbox One wireless adapter.
+  A USB hub in between is fine (up to four deep).
   USB controllers - all PC kinds; the pad can go in any port of any of them:
      UHCI  Intel (ICH - ICH10, the D810's ICH6) and VIA chipsets
      OHCI  NEC uPD720100 / uPD720101 USB 2.0 PCI cards, SiS, ALi, nVidia
@@ -1182,57 +1216,19 @@ CONTENTS
  17. LICENCES AND CREDITS
 =============================================================================
 
-  NUKED SB-EMU stands on the work of many people. Thank you all.
-  The combined work is GPL-2.0-or-later (COPYING in the source).
-
-  BUILT INTO SBEMU.EXE
-  SBEMU ............ crazii and SBEMU's contributors, GPL-2.0+
-                     https://github.com/crazii/SBEMU
-  Sound-chip drivers  from MPXPlay, Attila Padar (PDSoft): open source,
-                     used with the author's permission
-  More chip drivers  ported from Linux ALSA by jiyunomegami
-  Nuked-SC55 ....... nukeykt (Nuke.YKT), GPL-2.0+
-                     https://github.com/nukeykt/Nuked-SC55
-                     backend fork used here: J.C. Moyer (jcmoyer), GPL-2.0+
-                     https://github.com/jcmoyer/Nuked-SC55
-                     with thanks to John McMaster (PCM chip decap),
-                     org / ogamespec (deroute tool), Wohlstand, mattw,
-                     HardWareMan, giulioz, Cloudschatze, NikitaLita,
-                     Karmeck, Falcosoft and Michael Mouton
-  Munt libmt32emu .. 2.8.5, Dean Beeler, Jerome Fisher, Sergey V. Mikayev
-                     and the Munt team, LGPL-2.1+ (C:\SC55\MUNT-LIC.TXT)
-                     https://github.com/munt/munt
-  Nuked-OPL3 ....... nukeykt, LGPL-2.1+; faster bit-exact fork
-                     Nuked-OPL3-fast by Tony Gies (tgies), LGPL-2.1+
-  DOSBox OPL and PC speaker: the DOSBox Team, GPL-2.0+; PC speaker port to
-                     SBEMU by andersrodrig
-  TinySoundFont .... Bernhard Schelling (after SFZero by Steve Folta), MIT
-  SoundFont MPU-401  in SBEMU: Cacodemon345 (VSBHDASF)
-  USB pads, keyboard, mouse  written for this pack, GPL-2.0; UHCI / OHCI after
-                     USBDDOS (crazii), xHCI bring-up after the DOS tool of
-                     xhci98 (Yeo Kheng Meng), pad layout after Linux xpad.c
-  Terminus font .... Dimitar Zhekov, SIL Open Font Licence 1.1
-
-  PROGRAMS IN THIS PACK
-  HDPMI32i ......... Japheth (HX); IOPL0 build by crazii
-  HDPMI16I ......... Japheth (HX); built for this pack from crazii's HX
-                     fork (port traps) with a two-line patch
-  SBEMU16.COM ...... written for this pack, GPL-2.0
-  Jemm, JLoad, QPIEMU  Japheth: see JEMMLIC.TXT
-  uCDD ............. vorvek, GPL-3.0 (UCDD-LIC.TXT)
-  SHSUCDX .......... Jason Hood, from v1.4b by John McCoy
-  XCDROM ........... Jack R. Ellis, GPL (source in FILES\XCDROM)
-  CuteMouse 2.1b4 .. Nagy Daniel, Arkady V. Belousov, Eric Auer and
-                     others, GPL-2.0 (source in FILES\MOUSE\CTM21B4.ZIP)
-  Not included, belonging to their owners: MSCDEX and MOUSE.COM
-  (Microsoft), VIDE-CDD
-  (Acer / BenQ), GSCDROM (LG), QEMM (Quarterdeck).
-
-  BUILT AND TESTED WITH
-  DJGPP (DJ Delorie, via build-djgpp by andrewwutw), MinGW-w64, Open
-  Watcom 2, JWasm (Japheth), QEMU and usbredir.
-
-  Roland, SC-55, MT-32 and CM-32L are trademarks of Roland Corporation.
-  Sound Blaster is a trademark of Creative Technology. Xbox and Xbox 360
-  are trademarks of Microsoft. NUKED SB-EMU is not affiliated with any of
-  them. The ROM dumps are your own; SoundFonts have their own licences.
+  SBEMU (Baron-von-Riedesel, crazii, others), Nuked-SC55 and this port:
+  GPL-2.0-or-later. Nuked-OPL3: LGPL-2.1+. TinySoundFont: MIT.
+  Munt libmt32emu 2.8.3 (MT-32 emulation, Dean Beeler, Jerome Fisher,
+  Sergey V. Mikayev and others): LGPL-2.1+ (C:\SC55\MUNT-LIC.TXT), source
+  at https://github.com/munt/munt.
+  The screen font Terminus (Dimitar Zhekov): SIL Open Font Licence 1.1.
+  USB joystick: written for this pack (GPL-2.0); xHCI bring-up after the DOS
+  tool of xhci98 (Yeo Kheng Meng, GPL-2.0); UHCI / OHCI handling after
+  USBDDOS (crazii, GPL-2.0), the pad's report layout after Linux xpad.c.
+  Xbox and Xbox 360 are trademarks of Microsoft.
+  HDPMI32i is part of HX (japheth). Jemm, JLoad and QPIEMU (japheth): see
+  JEMMLIC.TXT. uCDD: GPL-3.0 (UCDD-LIC.TXT).
+  XCDROM: GPL (source in FILES\XCDROM). SHSUCDX, VIDE-CDD, GSCDROM and
+  MSCDEX belong to their authors.
+  Roland, SC-55, MT-32 and CM-32L are trademarks of their owners. The ROM dumps are your
+  own; SoundFonts have their own licences.

@@ -1,5 +1,6 @@
 /* JOYTEST - shows what a DOS game sees on the gameport (port 201h).
- *   JOYTEST              live view: four axes in microseconds and as bars, four buttons; Esc or Q quits
+ *   JOYTEST              live view: four axes in microseconds, as bars and as a dot per stick, four buttons;
+ *                        G switches to the GrIP view; Esc or Q quits
  *   JOYTEST /LOG:n FILE  n readings, 0.2 s apart, written to FILE (and keys typed meanwhile), then exits
  * Works with a real gameport as well as with SBEMU /JOY (USB Xbox 360 pad). */
 #include <stdio.h>
@@ -10,6 +11,7 @@
 #include <dos.h>
 #include <go32.h>
 #include <sys/farptr.h>
+#include "toolui.h"
 
 static unsigned long long cps;
 
@@ -78,11 +80,63 @@ static void grip_text(char* s, long d)
     if (!n) strcpy(s, "-");
 }
 
-static void bar(char* s, long us)
+/* ------------------------------------------------------------------ the screens */
+static void draw_stick(int x, int y, const char* title, const long* us, int b, int b1)
 {
-    int i, n = us < 0 ? -1 : (int)(us * 40 / 1150);
-    for (i = 0; i < 40; ++i) s[i] = n < 0 ? ' ' : i < n ? '\xDB' : '\xFA';
-    s[40] = 0;
+    int k, there = us[0] >= 0 || us[1] >= 0;
+    static const char* ax[2] = { "X", "Y" };
+    tui_panel(x, y, 38, 10, 1, 0x1E, title);
+    tu_plot(x + 2, y + 1, 15, 7, there ? (us[0] < 0 ? 0.5f : us[0] / 1124.0f) : -1, us[1] < 0 ? 0.5f : us[1] / 1124.0f, 0x1E);
+    for (k = 0; k < 2; ++k)
+    {
+        int yy = y + 2 + k * 2;
+        if (us[k] < 0) { tui_printf(x + 19, yy, 0x17, "%s  ----", ax[k]); tui_bar(x + 19, yy + 1, 16, 0, 1, 0x1B, 0x18); }
+        else { tui_printf(x + 19, yy, 0x1F, "%s %5ld us", ax[k], us[k]); tui_bar(x + 19, yy + 1, 16, us[k], 1124, 0x1B, 0x18); }
+    }
+    tu_lamp(x + 19, y + 7, b & (1 << b1), b1 ? "Fire 3" : "Fire 1");
+    tu_lamp(x + 28, y + 7, b & (2 << b1), b1 ? "Fire 4" : "Fire 2");
+    if (!there) tui_put(x + 19, y + 8, 0x18, "nothing connected");
+}
+static void draw_axes(void)
+{
+    long us[4];
+    int b = read_port(us);
+    tu_head("JOYTEST", "what games see on the gameport (port 201h)", NULL);
+    draw_stick(2, 3, "Joystick A", us, b, 0);
+    draw_stick(41, 3, "Joystick B", us + 2, b, 2);
+    tui_panel(2, 14, 77, 9, 1, 0x1E, "Reading the numbers");
+    tui_wrap(4, 15, 73, 7, 0x17,
+        "Axis times in microseconds, as a game measures them: about 24 = left / up, 575 = centre, 1124 = right / down."
+        " A stick that never moves its dot, or an axis showing ---- , is not connected (or SBEMU's /JOY is off)."
+        " Games need the stick calibrated in their own setup. With the USB pad: the left stick is joystick A,"
+        " A / B / X / Y are fire 1-4 (Settings > Joystick changes the layout). G shows the Gravis GrIP view.");
+    tu_foot("Move the sticks and press the buttons: the dots, bars and lamps follow.", "Esc / Q quit   G GrIP view   F4 screen");
+}
+static void draw_grip(void)
+{
+    static const struct { const char* n; int bit, x, y; } btn[] = {
+        { "L2", 5, 2, 0 }, { "R2", 2, 27, 0 }, { "L1", 10, 2, 1 }, { "R1", 11, 27, 1 },
+        { "Up", 12, 5, 3 }, { "Left", 16, 0, 4 }, { "Right", 15, 7, 4 }, { "Down", 13, 4, 5 },
+        { "Select", 1, 16, 4 }, { "Start", 0, 16, 5 },
+        { "X", 8, 27, 3 }, { "Y", 3, 30, 4 }, { "A", 6, 24, 4 }, { "B", 7, 27, 5 } };
+    int p, j;
+    tu_head("JOYTEST", "Gravis GamePad Pro (GrIP, digital mode)", NULL);
+    for (p = 0; p < 2; ++p)
+    {
+        long d = grip_read(4 + p * 2);
+        int x = 2 + p * 39, y = 3;
+        char t[16]; snprintf(t, sizeof t, "Pad %d", p + 1);
+        tui_panel(x, y, 38, 10, 1, 0x1E, t);
+        for (j = 0; j < (int)(sizeof btn / sizeof btn[0]); ++j)
+            tu_lamp(x + 2 + btn[j].x, y + 2 + btn[j].y, d >= 0 && (d >> btn[j].bit) & 1, btn[j].n);
+        tui_put(x + 2, y + 8, d >= 0 ? 0x1A : 0x18, d >= 0 ? "pad answers" : "no GrIP pad on this port");
+    }
+    tui_panel(2, 14, 77, 9, 1, 0x1E, "GrIP");
+    tui_wrap(4, 15, 73, 7, 0x17,
+        "Every button of up to two Gravis GamePad Pro pads, read the way games with GrIP support read them."
+        " With the USB pad this needs Settings > Joystick > Stick type = Gravis GamePad Pro (SBEMU /JOYMODE:3)."
+        " G goes back to the plain gameport view.");
+    tu_foot("Press the pad buttons: the lamps light while they are held.", "Esc / Q quit   G gameport view   F4 screen");
 }
 
 int main(int argc, char** argv)
@@ -127,47 +181,17 @@ int main(int argc, char** argv)
         if (logf) fclose(f);
         return 0;
     }
-    clrscr();
-    _setcursortype(_NOCURSOR);
-    cprintf("JOYTEST - what games see on the gameport (port 201h)       Esc or Q quits\r\n\r\n");
-    cprintf("Axis times in microseconds: 24 = left/up, 575 = centre, 1124 = right/down,\r\n");
-    cprintf("---- = nothing connected. Calibrate in each game's setup.\r\n");
-    if (grip)
-    {
-        gotoxy(1, 5); cprintf("GrIP view (Gravis GamePad Pro, digital mode; SBEMU /JOYMODE:3)");
-        for (;;)
-        {
-            char a[120];
-            for (i = 0; i < 2; ++i)
-            {
-                grip_text(a, grip_read(4 + i * 2));
-                gotoxy(1, 7 + i); clreol(); cprintf("Pad %d: %s", i + 1, a);
-            }
-            if (kbhit()) { int c = getch(); if (c == 27 || c == 'q' || c == 'Q') break; }
-            delay(30);
-        }
-        gotoxy(1, 14);
-        _setcursortype(_NORMALCURSOR);
-        return 0;
-    }
+    if (!isatty(1)) { printf("JOYTEST: run it on the screen (or use /LOG:n FILE)\n"); return 1; }
+    tu_start(argv[0]);
     for (;;)
     {
-        char s[48];
-        static const char* nm[4] = { "Joystick A  X", "Joystick A  Y", "Joystick B  X", "Joystick B  Y" };
-        b = read_port(us);
-        for (i = 0; i < 4; ++i)
-        {
-            bar(s, us[i]);
-            gotoxy(1, 7 + i);
-            if (us[i] < 0) cprintf("%s   ----  %s", nm[i], s);
-            else cprintf("%s  %5ld  %s", nm[i], us[i], s);
-        }
-        gotoxy(1, 12);
-        cprintf("Buttons     1:%s  2:%s  3:%s  4:%s", b & 1 ? "DOWN" : " up ", b & 2 ? "DOWN" : " up ", b & 4 ? "DOWN" : " up ", b & 8 ? "DOWN" : " up ");
-        if (kbhit()) { int c = getch(); if (c == 27 || c == 'q' || c == 'Q') break; }
+        int c;
+        if (grip) draw_grip(); else draw_axes();
+        c = tu_poll();
+        if (c == 27 || c == 'q' || c == 'Q') break;
+        if (c == 'g' || c == 'G') grip = !grip;
         delay(30);
     }
-    gotoxy(1, 14);
-    _setcursortype(_NORMALCURSOR);
+    tu_end();
     return 0;
 }

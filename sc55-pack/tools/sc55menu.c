@@ -31,7 +31,7 @@ static char g_opts[300];        /* saved settings (SBOPTS.TXT / SBOPTS.BAT) */
 static char g_optfile[16];      /* "@SBOPTS.TXT" or "@SBOPTS.BAT" or "" */
 static int  g_gt_green, g_gt_yellow, g_gt_red, g_gt_lock;
 
-enum { IT_BAT, IT_VIEW, IT_GAME, IT_EDIT };
+enum { IT_BAT, IT_VIEW, IT_GAME, IT_EDIT, IT_M3D };
 enum { C_SOUND, C_SETTINGS, C_TESTS, C_GAMES, C_CD, C_FILES, NCAT };
 static const char* g_catname[NCAT] = { "Sound", "Settings", "Tests", "Games", "CD-ROM", "Files" };
 static const unsigned char g_caticon[NCAT] = { 0x0E, 0x0F, 0xFB, 0x02, 0x0A, 0xF0 };
@@ -347,6 +347,10 @@ static void build_menu(void)
     add(C_SETTINGS, "Timing & advanced", "Render-ahead and timer give-back (these keep game music at the right tempo), OPL on/off"
         " and core, output jack, sample-rate fix, CD audio, protected/real-mode support, which sound card, MIDI out port.",
         IT_BAT, c, 0, 0, NULL);
+    add(C_SETTINGS, "3D menu (F8)", "Shows this menu in 3D (640x480 VESA graphics, drawn by the CPU - no 3D card needed): F3 picks"
+        " the style - Panels (raised buttons), Carousel (cards on a turning ring) or Module (a sound module whose display and knob"
+        " are the menu). F8 there comes back to this text menu, which stays the main one. Shift at start always gives the text menu.",
+        IT_M3D, NULL, 0, 0, NULL);
     snprintf(c, sizeof c, "CALL %s\\SETTINGS.BAT /PAGE:JOY", g_home);
     add(C_SETTINGS, "Joystick (USB pad)", "A wired USB Xbox 360 pad (or compatible) as the PC gameport joystick at port 201h"
         " (/JOY): which sticks and buttons the game sees, a dead zone, and pad buttons typed as keys (Start = Enter,"
@@ -357,7 +361,7 @@ static void build_menu(void)
     add(C_TESTS, "MIDI player (MIDPLAY)", "Browse your folders for .MID files and play them through the running SC-55 or"
         " SoundFont. A quick way to hear the synth without a game.", IT_BAT, "MIDPLAY.EXE /B", 1, 0, NULL);
     add(C_TESTS, "Test tune (MPUTEST)", "Plays a short tune on the MPU-401 (found on whatever port SBEMU uses). If you hear it, General MIDI works.",
-        IT_BAT, "MPUTEST.EXE", 1, 1, NULL);
+        IT_BAT, "MPUTEST.EXE", 1, 0, NULL);
     add(C_TESTS, "Joystick test (JOYTEST)", "Shows what games see on the gameport: the four axes and four buttons, live."
         " With the USB pad on (Settings > Joystick) move the sticks and press A/B/X/Y. Esc or Q quits.",
         IT_BAT, "JOYTEST.EXE", 1, 0, NULL);
@@ -378,9 +382,9 @@ static void build_menu(void)
         " music timing. Unattended: the games quit by themselves. Remembers the best settings for each game, which Play uses.",
         IT_BAT, "GAMETEST.EXE", 1, 0, NULL);
     add(C_TESTS, "SBDIAG: start measuring", "Starts SBEMU's self-measurement. Then play a game for a minute, quit it, and pick"
-        " 'SBDIAG: report' to see why music would play too slow.", IT_BAT, "SBDIAG.EXE START", 1, 1, NULL);
+        " 'SBDIAG: report' to see why music would play too slow.", IT_BAT, "SBDIAG.EXE START", 1, 0, NULL);
     add(C_TESTS, "SBDIAG: report", "Reads the last measurement: lost timer ticks, how long SBEMU's sound interrupt takes,"
-        " synth load, and what would fix it. Also saved to SBDIAG.TXT.", IT_BAT, "SBDIAG.EXE > NUL", 1, 0, "SBDIAG.TXT");
+        " synth load, and what would fix it. Also saved to SBDIAG.TXT.", IT_BAT, "SBDIAG.EXE", 1, 0, NULL);
     /* Games */
     add_games();
     /* CD-ROM */
@@ -807,6 +811,7 @@ static void help(void)
         "F7               letters: Terminus, Terminus bold or the VGA font",
         "F4               display mode: 80x25 ... 80x60, VESA modes",
         "F5               MIDI player (MIDPLAY) from anywhere in the menu",
+        "F8               3D menu (F8 there comes back here)",
         "Esc              back to DOS (type MENU to come back)",
         "",
         "Nothing runs by itself: the menu writes your choice to MENUGO.BAT,",
@@ -946,9 +951,11 @@ static int jump_letter(int sel, int c)
     return sel;
 }
 
+#include "menu3d.h"
+
 int main(int argc, char** argv)
 {
-    int c;
+    int c, firstrun;
     char* s; const char* v;
     if (argc > 1) snprintf(g_home, sizeof g_home, "%s", argv[1]);
     else
@@ -971,10 +978,18 @@ int main(int argc, char** argv)
     g_sel = load_sel();
     g_cat = g_it[g_sel].cat;
     tui_theme_load(g_home);
+    /* the first-run offer of the automatic setup is a text-menu question: on that start, no 3D */
+    firstrun = !g_running && !home_exists("SBOPTS.TXT") && !home_exists("TUNED.FLG") && !(_farpeekb(_dos_ds, 0x417) & 3);
+    if (!firstrun && m3_cfg_load() && !(_farpeekb(_dos_ds, 0x417) & 3) && !(v = getenv("MENUVIEW"), v && *v))
+    {
+        int r = m3_main();
+        if (r == 0) return 0;
+    }
+    tui_theme_load(g_home);
     tui_init();
     tui_anim = anim;
     /* first run: offer the automatic setup once (TUNED.FLG remembers it was offered) */
-    if (!g_running && !home_exists("SBOPTS.TXT") && !home_exists("TUNED.FLG") && !tui_safe)
+    if (firstrun && !tui_safe)
     {
         int k;
         draw(g_cat, g_sel);
@@ -1007,6 +1022,21 @@ int main(int argc, char** argv)
         g_reveal = 99; shown_cat = g_cat;
         draw(g_cat, g_sel);
         c = tui_key();
+        if (c == K_MOUSE)
+        {   /* click a menu to open it, an item to choose it, the chosen item again to run it */
+            int k[80], n, i;
+            for (i = 0; i < NCAT; i++)
+                if (tui_hit(3, 9 + i, 15, 1) && cat_items(i, k)) { g_cat = i; g_sel = first_in(i); }
+            n = cat_items(g_cat, k);
+            if (tui_hit(22, 9, 56, 6) && g_itop + tui_my - 9 < n)
+            {
+                int s2 = k[g_itop + tui_my - 9];
+                if (s2 == g_sel) c = K_ENTER; else g_sel = s2;
+            }
+            if (tui_hit(78, 8, 1, 1)) g_sel = move_in(g_cat, g_sel, -1);
+            if (tui_hit(78, 15, 1, 1)) g_sel = move_in(g_cat, g_sel, 1);
+            if (c != K_ENTER) continue;
+        }
         if (c == K_ESC) break;
         if (c == K_UP) g_sel = move_in(g_cat, g_sel, -1);
         else if (c == K_DOWN) g_sel = move_in(g_cat, g_sel, 1);
@@ -1015,6 +1045,17 @@ int main(int argc, char** argv)
         else if (c == K_HOME) g_sel = first_in(g_cat);
         else if (c == K_END) { int k[80], n = cat_items(g_cat, k); if (n) g_sel = k[n - 1]; }
         else if (c == K_F1) help();
+        else if (c == 0x142 || (c == K_ENTER && g_it[g_sel].kind == IT_M3D))     /* F8: the 3D menu */
+        {
+            int r;
+            save_sel(&g_it[g_sel]); m3_cfg_save(); tui_done();
+            r = m3_main();
+            if (r == 0) return 0;
+            if (r == 2) { char p[300]; home_path(p, "MENU3D.CFG"); remove(p); }
+            tui_init();
+            if (r == 2) tui_message("3D menu", "This PC's video BIOS has no 640x480 VESA mode with 15/16/24/32-bit colour, so the 3D menu cannot be shown.");
+            continue;
+        }
         else if (c == 0x13E) tui_pick_mode(g_home);                           /* F4 */
         else if (c == 0x140) { tui_animate = !tui_animate; tui_theme_save(g_home); }   /* F6 */
         else if (c == 0x141) { tui_font = (tui_font + 1) % FONT_COUNT; tui_font_apply(); tui_theme_save(g_home); } /* F7 */

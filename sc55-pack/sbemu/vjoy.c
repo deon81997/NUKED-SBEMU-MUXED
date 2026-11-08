@@ -157,6 +157,33 @@ static const USBPAD_State* pad_for(int i, int* m)
     return USBPAD_GetPad(0);
 }
 
+/* BIOS joystick (INT 15h AH=84h, hooked by main.c): DX=0 the buttons as port 201h bits 4-7 (0 = pressed),
+ * DX=1 the four axes 0..255 (centre about 128; 0 = nothing connected), as DOSBox answers it */
+uint8_t VJOY_BiosButtons(void)
+{
+    if (!Inited) return 0xF0;
+    return (uint8_t)(VJOY_IOHandler(0x201, 0, 0) & 0xF0);
+}
+void VJOY_BiosAxes(uint16_t* a)
+{
+    int i, m;
+    if (!Inited) { for (i = 0; i < 4; ++i) a[i] = 0; return; }
+    poll(0);
+    for (i = 0; i < 4; ++i)
+    {
+        const USBPAD_State* p = pad_for(i, &m);
+        uint32_t v;
+        if (Mode == 2 && i == 3 && p->connected)
+        {
+            uint16_t b = p->buttons;
+            v = (b & XPAD_DU) ? 0 : (b & XPAD_DR) ? 16384 : (b & XPAD_DD) ? 32768 : (b & XPAD_DL) ? 49152 : 65535;
+        }
+        else if (Ax[m] == A_NONE || !p->connected) { a[i] = 0; continue; }
+        else v = axis(m, p);
+        a[i] = (uint16_t)(v >> 8);
+    }
+}
+
 uint32_t VJOY_IOHandler(uint32_t port, uint32_t val, uint32_t out)
 {
     int i, m;
