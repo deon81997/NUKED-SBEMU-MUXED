@@ -710,7 +710,7 @@ static void ohci_reset(int i)
     /* schedule, for good (real chips such as NEC's read HcHCCA only when they start, so it is never changed):
      * every interrupt slot -> pipe ED 0 -> ... -> pipe ED 5 (skipped unless in use); control list = one ED */
     zero(h->fl, 64);
-    zero(h->ctl, 4); h->ctl[0] = ED_SKIP;
+    zero(h->ctl, 12); h->ctl[0] = ED_SKIP; h->ctl[8] = ED_SKIP; h->ctl[3] = PHYS(h->ctl + 8);
     for (k = 0; k < MAX_PIPE; ++k)
     {
         zero(PQ(i, k), 4);
@@ -1093,11 +1093,15 @@ static void otd(volatile uint32_t* t, uint32_t flags, uint32_t buf, int len, vol
 }
 
 /* runs TDs 0..n-1 on the control ED */
+/* NEC uPD720101 + wired 360 pad experiments (enumerate() picks them per try and says which in the trace):
+ * OAltEd: a second control ED, used only for addresses other than 0 (Linux never rewrites a live ED's address);
+ * OSplit: SET_ADDRESS's SETUP and status stage as two separate runs, 2 ms apart */
+static int OAltEd, OSplit;
 static int o_run_tds(const Dev* d, int ep, int mps, int n, uint32_t timeout_us)
 {
     uint64_t end;
     int i, r = -1, h = d->hc;
-    volatile uint32_t* ed = HC[h].ctl;
+    volatile uint32_t* ed = (OAltEd && d->addr) ? HC[h].ctl + 8 : HC[h].ctl;
     volatile uint32_t* tail = tdn(n);
     uint32_t info = (uint32_t)d->addr | ((uint32_t)ep << 7) | (d->speed == SP_LS ? ED_LS : 0) | ((uint32_t)mps << 16);
     zero(tail, 4);
@@ -1119,7 +1123,7 @@ static int o_run_tds(const Dev* d, int ep, int mps, int n, uint32_t timeout_us)
     ed[0] = ED_SKIP | info;
     ed[1] = PHYS(tail);
     ed[2] = PHYS(tdn(0));
-    ed[3] = 0;
+    ed[3] = ed == HC[h].ctl ? PHYS(HC[h].ctl + 8) : 0;       /* control list: main ED -> second ED (skipped) */
     fl(TD, (n + 1) * 32); fl(CBuf, 512);
     ed[0] &= ~ED_SKIP;
     fl(ed, 16);
@@ -1158,6 +1162,14 @@ static int o_run_tds(const Dev* d, int ep, int mps, int n, uint32_t timeout_us)
 static int o_control(const Dev* d, int len, int in)
 {
     int n = 0;
+    if (OSplit && !len)
+    {
+        otd(tdn(0), OTD_SETUP | OTD_T0, PHYS(CBuf), 8, tdn(1));
+        if (o_run_tds(d, 0, d->mps0, 1, 300000) != 0) return -1;
+        wait_us(2000);
+        otd(tdn(0), OTD_IN | OTD_T1, 0, 0, tdn(1));
+        return o_run_tds(d, 0, d->mps0, 1, 300000);
+    }
     otd(tdn(n), OTD_SETUP | OTD_T0, PHYS(CBuf), 8, tdn(n + 1)); ++n;
     if (len) { otd(tdn(n), (in ? OTD_IN : OTD_OUT) | OTD_T1 | OTD_R, PHYS(CBuf + 16), len, tdn(n + 1)); ++n; }
     otd(tdn(n), (in && len ? OTD_OUT : OTD_IN) | OTD_T1, 0, 0, tdn(n + 1)); ++n;
@@ -1934,7 +1946,16 @@ typedef struct { int type, ifc, ep, mps, intv, outep, outmps, wl, kind, hidlen; 
 
 /* make device di usable (address, descriptors, configuration, its pads / keyboards / mice started):
  * 1 = in use, 2 = hub ready, 0 = failed (retried), -1 = nothing usable there */
+static int enumerate_(int di);
 static int enumerate(int di)
+{
+    int r;
+    OAltEd = OSplit = 0;
+    r = enumerate_(di);
+    OAltEd = OSplit = 0;
+    return r;
+}
+static int enumerate_(int di)
 {
     Dev* d = &D[di];
     int h = d->hc;
@@ -1943,6 +1964,9 @@ static int enumerate(int di)
     Fn f[MAX_PIPE];
     uint16_t vid, pid;
     int att = d->parent < 0 ? HC[h].fails[d->rootport] : 0;   /* earlier failed tries of this root port */
+#ifdef OFORCE
+    att = OFORCE;
+#endif
     if (HC[h].type == T_XHCI)
     {
         if (x_address(di) != 0) { trace("addr! "); return 0; }
@@ -1955,7 +1979,10 @@ static int enumerate(int di)
          * (the device's first short packet ends it), a second port reset, then SET_ADDRESS. The wired 360 pad on
          * the NEC uPD720101 (P5PE-VM, beta.54 USBTEST) answered an 8-byte request and SET_ADDRESS but stayed at
          * address 0 every time; devices are tested against the Windows order. */
-        int winseq = HC[h].type == T_OHCI && d->parent < 0;
+        int winseq = HC[h].type == T_OHCI && d->parent < 0 && att == 0;
+        int ohci = HC[h].type == T_OHCI;
+        OAltEd = ohci && att >= 1; OSplit = ohci && att >= 2;
+        if (ohci && att) trace("[try%d:%s%s] ", att + 1, OAltEd ? " 2nd ED" : "", OSplit ? " split" : "");
         d->addr = 0;
         if (winseq && d->speed == SP_FS) d->mps0 = 64;
         for (k = 0; k < 4; ++k)
@@ -1976,8 +2003,17 @@ static int enumerate(int di)
             wait_us(20000);
             trace("re-reset ");
         }
-        if (control(di, 0x00, 5, (uint16_t)HC[h].nextaddr, 0, 0) != 0) return 0;
+        if (control(di, 0x00, 5, (uint16_t)HC[h].nextaddr, 0, 0) != 0) { trace("setaddr! "); return 0; }
+        if (ohci) trace("sa[%08lx %08lx] ", (unsigned long)tdn(0)[0], (unsigned long)tdn(1)[0]);
         d->addr = HC[h].nextaddr++;
+        if (ohci)
+        {   /* where does it answer 2 ms after SET_ADDRESS? (GET_STATUS, 2 bytes) */
+            int a = d->addr, rn, r0;
+            wait_us(2000);
+            rn = control(di, 0x80, 0, 0, 0, 2);
+            d->addr = 0; r0 = rn ? control(di, 0x80, 0, 0, 0, 2) : -1; d->addr = a;
+            trace("@2ms new:%s old:%s ", rn ? "no" : "yes", rn ? (r0 ? "no" : "yes") : "-");
+        }
         if (HC[h].nextaddr > 127) HC[h].nextaddr = 1;
         /* Linux gives SET_ADDRESS 10 ms to settle; the wired 360 pad on a NEC OHCI did not answer at its new
          * address after 5 ms (CC 5, USBTEST from the P5PE-VM): wait 20 ms (100 ms on the last try) */
@@ -1996,7 +2032,8 @@ static int enumerate(int di)
         if (control(di, 0x80, 6, 0x0100, 0, 8) == 0)
         {
             trace("still at 0 ");
-            if (control(di, 0x00, 5, (uint16_t)a, 0, 0) == 0)
+            if (control(di, 0x00, 5, (uint16_t)a, 0, 0) != 0) trace("setaddr2! ");
+            else
             {
                 d->addr = a;
                 wait_us(50000);
@@ -2006,6 +2043,7 @@ static int enumerate(int di)
         else trace("silent at 0 too ");
         d->addr = a;
     }
+    OSplit = 0;
     if (k == 4) { trace("desc18! "); return 0; }
     if (k) trace("desc18 try%d ", k + 1);
     vid = (uint16_t)(b[8] | b[9] << 8); pid = (uint16_t)(b[10] | b[11] << 8);

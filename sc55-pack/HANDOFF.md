@@ -307,3 +307,13 @@
   "address 1" still go to the old one; the "still at 0" probe then hits the real address 1, and the resent
   SET_ADDRESS fails). o_run_tds: when FA/EN/MPS/speed change, clear CLE, wait 2 frame starts, ControlCurrentED = 0,
   rewrite the ED, set CLE again (OHCI 5.2.7). QEMU OHCI + kbd + fakepad still fine.
+
+## beta.57-usb (2026-11-08): NEC experiments per try (user can't test right now; one USBTEST run tells more)
+- beta.56 (ED re-read with CLE off) did not help: same "still at 0". Official Microsoft wired 360 pad.
+- enumerate() on OHCI root ports, by earlier failed tries of the port: try 1 Windows order (beta.55); try 2 a second
+  control ED (ctl+8, linked after the main one, only for addresses != 0, kept for the whole enumeration); try 3 also
+  SET_ADDRESS split (SETUP run, 2 ms, status run). Trace: "[tryN: 2nd ED split]", "sa[TD0 TD1]" (TD dword 0 after
+  SET_ADDRESS), "@2ms new:yes/no old:yes/no" (GET_STATUS at the new address, then at 0), "setaddr!" / "setaddr2!".
+- QEMU: tries 2/3 forced (-DOFORCE=n) enumerate kbd + fakepad; the split try aborts QEMU with usb-redir (QEMU limit),
+  fine with usb-kbd.
+- Asked the user for: pad and Logitech receiver swapped on the NEC card; pad on the P5PE-VM's own ports.
