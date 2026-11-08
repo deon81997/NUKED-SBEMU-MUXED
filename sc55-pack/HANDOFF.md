@@ -300,3 +300,10 @@
 - usbpad.c enumerate(): OHCI root ports now use the Windows/Linux order: GET_DESCRIPTOR(64) with ep0 MPS 64 (full
   speed; first short packet ends it), second port reset, then SET_ADDRESS. UHCI / EHCI / hubs unchanged.
 - QEMU pci-ohci + usb-kbd + fakepad: both enumerate, pad input read (fakepad.log shows len=64 first).
+
+## beta.56-usb (2026-11-08): NEC OHCI still "still at 0" with the Windows order (beta.55 USBTEST, P5PE-VM, E5800)
+- First request did go out with MPS 64 (ed00400000), then the same pattern. The ED trace can't show what the HC used.
+- Theory: the NEC caches the shared control ED, so the in-place FA change after SET_ADDRESS isn't seen (requests to
+  "address 1" still go to the old one; the "still at 0" probe then hits the real address 1, and the resent
+  SET_ADDRESS fails). o_run_tds: when FA/EN/MPS/speed change, clear CLE, wait 2 frame starts, ControlCurrentED = 0,
+  rewrite the ED, set CLE again (OHCI 5.2.7). QEMU OHCI + kbd + fakepad still fine.

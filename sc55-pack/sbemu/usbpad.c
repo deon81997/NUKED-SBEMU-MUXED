@@ -1099,8 +1099,24 @@ static int o_run_tds(const Dev* d, int ep, int mps, int n, uint32_t timeout_us)
     int i, r = -1, h = d->hc;
     volatile uint32_t* ed = HC[h].ctl;
     volatile uint32_t* tail = tdn(n);
+    uint32_t info = (uint32_t)d->addr | ((uint32_t)ep << 7) | (d->speed == SP_LS ? ED_LS : 0) | ((uint32_t)mps << 16);
     zero(tail, 4);
-    ed[0] = ED_SKIP | (uint32_t)d->addr | ((uint32_t)ep << 7) | (d->speed == SP_LS ? ED_LS : 0) | ((uint32_t)mps << 16);
+    fl(ed, 16);
+    if ((ed[0] & ~ED_SKIP) != info)
+    {   /* new address / max packet / speed on the shared control ED. An OHCI may keep a copy of an ED it has
+         * read (the NEC uPD720101 seems to: after SET_ADDRESS the wired 360 pad was "silent" at its new address
+         * and "still at 0", every try - the old address still went out). OHCI 5.2.7: take the list out of use for
+         * a frame before changing an ED, and restart it from the head so the HC reads the ED again. */
+        uint32_t c = ord(h, O_CONTROL), f0 = ord(h, 0x3C) & 0xFFFF;
+        int n;
+        owr(h, O_CONTROL, c & ~OC_CLE);
+        for (n = 0; n < 40 && ((ord(h, 0x3C) - f0) & 0xFFFF) < 2; ++n) wait_us(250);   /* 2 frame starts */
+        owr(h, O_CTLCUR, 0);
+        ed[0] = ED_SKIP | info;
+        fl(ed, 16);
+        owr(h, O_CONTROL, c);
+    }
+    ed[0] = ED_SKIP | info;
     ed[1] = PHYS(tail);
     ed[2] = PHYS(tdn(0));
     ed[3] = 0;
