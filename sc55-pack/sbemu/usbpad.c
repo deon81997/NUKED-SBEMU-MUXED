@@ -1109,7 +1109,9 @@ static int o_run_tds(const Dev* d, int ep, int mps, int n, uint32_t timeout_us)
         {
             uint32_t cc = OTD_CC(tdn(i)[0]);
             if (cc >= 0xE) { done = 0; break; }
-            if (cc) { err = 1; break; }
+            /* an error code with the ED not halted is a try the HC repeats (ErrorCount < 3: a device that
+             * did not answer once, e.g. just after SET_ADDRESS); only a halted ED means the TD failed */
+            if (cc) { if (ed[2] & ED_HALT) err = 1; else done = 0; break; }
         }
         if (err || (ed[2] & ED_HALT)) break;
         if (done) { r = 0; break; }
@@ -1117,8 +1119,9 @@ static int o_run_tds(const Dev* d, int ep, int mps, int n, uint32_t timeout_us)
         owr(h, O_CMDSTS, OS_CLF);
     }
     if (r)
-        trace("[o%08lx/%08lx ed%08lx %08lx ctl%08lx fn%04lx] ", (unsigned long)tdn(0)[0], (unsigned long)tdn(n - 1)[0],
-            (unsigned long)ed[0], (unsigned long)ed[2], (unsigned long)ord(h, O_CONTROL), (unsigned long)(ord(h, 0x3C) & 0xFFFF));
+        trace("[o%08lx/%08lx ed%08lx %08lx ctl%08lx is%08lx ps%08lx fn%04lx] ", (unsigned long)tdn(0)[0], (unsigned long)tdn(n - 1)[0],
+            (unsigned long)ed[0], (unsigned long)ed[2], (unsigned long)ord(h, O_CONTROL), (unsigned long)ord(h, O_INTSTS),
+            (unsigned long)(d->parent < 0 ? ord(h, O_PORT + d->rootport * 4) : 0), (unsigned long)(ord(h, 0x3C) & 0xFFFF));
     ed[0] |= ED_SKIP;
     fl(ed, 16);
     wait_us(1100);
@@ -1570,6 +1573,7 @@ static int poll_in(int k)
         fl(q->td, 32);
         cc = OTD_CC(t[0]);
         if (cc >= 0xE) return 0;
+        if (cc) { fl(PQ(h, k), 16); if (!(PQ(h, k)[2] & ED_HALT)) return 0; }   /* the HC tries again (ErrorCount < 3) */
         fl(q->ibuf, 64);
         owr(h, O_INTSTS, 0x06);
         if (cc) { PQ(h, k)[2] = PHYS(o_tdi(q, q->ocur)); fl(PQ(h, k), 16); return cc == 4 ? -2 : -1; }
@@ -1729,6 +1733,7 @@ static int enumerate(int di)
     int total, pos, cfgval, ishub, p, nf = 0, cur = -1, k, i, used = 0, pads = 0, kbds = 0, mice = 0;
     Fn f[MAX_PIPE];
     uint16_t vid, pid;
+    int att = d->parent < 0 ? HC[h].fails[d->rootport] : 0;   /* earlier failed tries of this root port */
     if (HC[h].type == T_XHCI)
     {
         if (x_address(di) != 0) { trace("addr! "); return 0; }
@@ -1746,18 +1751,45 @@ static int enumerate(int di)
         if (k == 4) { trace("desc8! "); return 0; }
         if (k) trace("desc8 try%d ", k + 1);
         d->mps0 = b[7] >= 8 && b[7] <= 64 ? b[7] : 8;
+        /* later tries of a root port (USBTEST on a NEC OHCI card: the wired 360 pad took SET_ADDRESS, then
+         * never answered at the new address): reset the port again before SET_ADDRESS, as Windows does */
+        if (att >= 1 && d->parent < 0)
+        {
+            p_reset_start(h, d->rootport);
+            wait_us(55000);
+            if (!p_reset_end(h, d->rootport)) { trace("re-reset! "); return 0; }
+            wait_us(20000);
+            trace("re-reset ");
+        }
         if (control(di, 0x00, 5, (uint16_t)HC[h].nextaddr, 0, 0) != 0) return 0;
         d->addr = HC[h].nextaddr++;
         if (HC[h].nextaddr > 127) HC[h].nextaddr = 1;
         /* Linux gives SET_ADDRESS 10 ms to settle; the wired 360 pad on a NEC OHCI did not answer at its new
-         * address after 5 ms (CC 5, USBTEST from the P5PE-VM): wait 20 ms and retry */
-        wait_us(20000);
+         * address after 5 ms (CC 5, USBTEST from the P5PE-VM): wait 20 ms (100 ms on the last try) */
+        wait_us(att >= 2 ? 100000 : 20000);
     }
     for (k = 0; k < 4; ++k)
     {
         if (control(di, 0x80, 6, 0x0100, 0, 18) == 0) break;
         if (HC[h].type == T_XHCI) return 0;
         wait_us(30000);
+    }
+    if (k == 4 && HC[h].type != T_XHCI)
+    {   /* does it still answer at address 0 (SET_ADDRESS not taken)? then send it once more */
+        int a = d->addr;
+        d->addr = 0;
+        if (control(di, 0x80, 6, 0x0100, 0, 8) == 0)
+        {
+            trace("still at 0 ");
+            if (control(di, 0x00, 5, (uint16_t)a, 0, 0) == 0)
+            {
+                d->addr = a;
+                wait_us(50000);
+                if (control(di, 0x80, 6, 0x0100, 0, 18) == 0) k = 5;
+            }
+        }
+        else trace("silent at 0 too ");
+        d->addr = a;
     }
     if (k == 4) { trace("desc18! "); return 0; }
     if (k) trace("desc18 try%d ", k + 1);
@@ -2028,10 +2060,13 @@ static int pick_root(int* ph, int* pp)
 static void root_gone(int h, int p)
 {
     int i;
+    if (HC[h].type == T_OHCI)    /* why: PESC (bit 17) = disabled by an error, OCIC (19) = over-current; UE = HC stopped */
+        trace("%s%d.%d: gone [ps%08lx is%08lx ctl%08lx rh%08lx] ", tname(h), HC[h].idx, p + 1, (unsigned long)ord(h, O_PORT + p * 4),
+            (unsigned long)ord(h, O_INTSTS), (unsigned long)ord(h, O_CONTROL), (unsigned long)ord(h, O_RHSTS));
+    else trace("%s%d.%d: gone ", tname(h), HC[h].idx, p + 1);
     for (i = 0; i < MAX_DEV; ++i) if (D[i].used && D[i].hc == h && D[i].parent < 0 && D[i].rootport == p) dev_free(i);
     HC[h].own &= ~(1UL << p);
     p_clear_change(h, p);
-    trace("%s%d.%d: gone ", tname(h), HC[h].idx, p + 1);
     if (!HC[h].own && Cur != h) uhci_run(h, 0);
 }
 
@@ -2081,6 +2116,18 @@ static void step(void)
                     trace("[UHCI%d halted sts%04x cmd%04x fr%03x] ", HC[h].idx, st, inportw(HC[h].io + U_CMD), inportw(HC[h].io + U_FRNUM) & 0x7FF);
                     outportw(HC[h].io + U_STS, 0x3F);
                     outportw(HC[h].io + U_CMD, CMD_RS | CMD_CF | CMD_MAXP);
+                }
+            }
+        for (h = 0; h < HCn; ++h)                                       /* OHCI stopped (UnrecoverableError, as */
+            if (HC[h].type == T_OHCI && HC[h].own)                      /* NEC chips can do): reset it, find again */
+            {
+                uint32_t is = ord(h, O_INTSTS), c = ord(h, O_CONTROL);
+                if (is != 0xFFFFFFFFUL && ((is & 0x10) || (c & 0xC0) != OC_OPER))
+                {
+                    trace("[OHCI%d stopped is%08lx ctl%08lx] ", HC[h].idx, (unsigned long)is, (unsigned long)c);
+                    for (p = 0; p < HC[h].nports; ++p) if (HC[h].own & (1UL << p)) root_gone(h, p);
+                    ohci_reset(h);
+                    HubQuiet = 0;
                 }
             }
         for (h = 0; h < HCn; ++h)
