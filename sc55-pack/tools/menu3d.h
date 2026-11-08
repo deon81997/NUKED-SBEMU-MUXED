@@ -22,6 +22,11 @@ static uint32_t* m3_fb;
 static float*    m3_zb;
 static M3SURF    m3_scr;
 static int       m3_style;
+/* speed: the 3D scene can be drawn at half resolution (320x240, doubled) on slow PCs. m3_quality: 0 = auto
+ * (half when under 15 frames a second), 1 = full, 2 = half; F4 cycles it, MENU3D.CFG keeps it */
+static int       m3_quality, m3_half, m3_rw = 640, m3_rh = 480;
+static float     m3_fps;
+static double    m3_note_until;           /* show the quality / speed note in the top bar until then */
 static int       m3_bpp, m3_pitch, m3_sel, m3_lfb, m3_winseg, m3_gran, m3_bank = -1, m3_mode;
 static int       m3_rs, m3_rp, m3_gs, m3_gp, m3_bs, m3_bp;
 static unsigned long m3_lin;
@@ -267,6 +272,7 @@ static M3P m3_xf(M3V w, float u, float v, float l)
 }
 
 typedef struct { float sx, sy, iz, uz, vz, lz; } M3S;
+static int m3_texwrap;                     /* the texture repeats (the floor) instead of being clamped */
 static void m3_tri_raster(const M3S* a0, const M3S* b0, const M3S* c0, const M3SURF* tex, uint32_t col, int alpha, int zwrite)
 {
     const M3S *a = a0, *b = b0, *c = c0, *t;
@@ -276,7 +282,7 @@ static void m3_tri_raster(const M3S* a0, const M3S* b0, const M3S* c0, const M3S
     if (a->sy > b->sy) { t = a; a = b; b = t; }
     if (c->sy - a->sy < 1e-4f) return;
     ys = (int)ceilf(a->sy); ye = (int)ceilf(c->sy);
-    if (ys < 0) ys = 0; if (ye > M3H) ye = M3H;
+    if (ys < 0) ys = 0; if (ye > m3_rh) ye = m3_rh;
     for (y = ys; y < ye; y++)
     {
         float fy = (float)y, tl = (fy - a->sy) / (c->sy - a->sy), ts;
@@ -291,24 +297,47 @@ static void m3_tri_raster(const M3S* a0, const M3S* b0, const M3S* c0, const M3S
         dx = R.sx - L.sx; if (dx < 1e-6f) continue;
         diz = (R.iz - L.iz) / dx; duz = (R.uz - L.uz) / dx; dvz = (R.vz - L.vz) / dx; dlz = (R.lz - L.lz) / dx;
         xs = (int)ceilf(L.sx); xe = (int)ceilf(R.sx);
-        if (xs < 0) xs = 0; if (xe > M3W) xe = M3W;
+        if (xs < 0) xs = 0; if (xe > m3_rw) xe = m3_rw;
         { float pre = (float)xs - L.sx; iz = L.iz + diz * pre; uz = L.uz + duz * pre; vz = L.vz + dvz * pre; lz = L.lz + dlz * pre; }
-        for (x = xs; x < xe; x++, iz += diz, uz += duz, vz += dvz, lz += dlz)
+        /* perspective-correct every 16 pixels, linear in between: one divide per 16 pixels, and the pixels
+         * stepped in 16.16 fixed point (float-to-int conversions are slow on Pentium-class FPUs) */
+        x = xs;
         {
-            float* zp = m3_zb + y * M3W + x; uint32_t px; int li; float z;
-            if (iz <= *zp) continue;
-            z = 1.0f / iz;
-            li = (int)(lz * z * 256.0f); if (li < 0) li = 0; if (li > 511) li = 511;
-            if (tex)
+            float fk = m3_fog1 > m3_fog0 ? 256.0f / (m3_fog1 - m3_fog0) : 0;
+            int tw = tex ? tex->w : 1, th = tex ? tex->h : 1;
+            while (x < xe)
             {
-                int tu = (int)(uz * z * tex->w), tv = (int)(vz * z * tex->h);
-                tu = tu < 0 ? 0 : tu >= tex->w ? tex->w - 1 : tu; tv = tv < 0 ? 0 : tv >= tex->h ? tex->h - 1 : tv;
-                px = m3_mul(tex->p[tv * tex->w + tu], li);
+                int n = xe - x > 16 ? 16 : xe - x, j;
+                float z0 = 1.0f / iz, iz1 = iz + diz * n, z1 = 1.0f / iz1;
+                float f0 = (z0 - m3_fog0) * fk, f1 = (z1 - m3_fog0) * fk;
+                int U = (int)(uz * z0 * tw * 65536.0f), V = (int)(vz * z0 * th * 65536.0f), Lq = (int)(lz * z0 * 256.0f * 65536.0f);
+                int U1 = (int)((uz + duz * n) * z1 * tw * 65536.0f), V1 = (int)((vz + dvz * n) * z1 * th * 65536.0f);
+                int L1 = (int)((lz + dlz * n) * z1 * 256.0f * 65536.0f);
+                int F = (int)(f0 * 65536.0f), F1 = (int)(f1 * 65536.0f);
+                int dU = (U1 - U) / n, dV = (V1 - V) / n, dL = (L1 - Lq) / n, dF = (F1 - F) / n;
+                float* zp = m3_zb + y * M3W + x;
+                uint32_t* fp = m3_fb + y * M3W + x;
+                int fog = f0 > 0 || f1 > 0;
+                for (j = 0; j < n; j++, zp++, fp++, iz += diz, U += dU, V += dV, Lq += dL, F += dF)
+                {
+                    uint32_t px; int li;
+                    if (iz <= *zp) continue;
+                    li = Lq >> 16; if (li < 0) li = 0; if (li > 511) li = 511;
+                    if (tex)
+                    {
+                        int tu = U >> 16, tv = V >> 16;
+                        if (m3_texwrap) { tu &= tw - 1; tv &= th - 1; }   /* tiled (power-of-2 texture) */
+                        else { tu = tu < 0 ? 0 : tu >= tw ? tw - 1 : tu; tv = tv < 0 ? 0 : tv >= th ? th - 1 : tv; }
+                        px = tex->p[tv * tw + tu];
+                        if (li != 256) px = m3_mul(px, li);
+                    }
+                    else px = li == 256 ? col : m3_mul(col, li);
+                    if (fog && F > 0) px = m3_lerpc(px, m3_fog, F >> 16);
+                    if (alpha >= 256) *fp = px; else *fp = m3_blend(*fp, px, alpha);
+                    if (zwrite) *zp = iz;
+                }
+                x += n; uz += duz * n; vz += dvz * n; lz += dlz * n;
             }
-            else px = m3_mul(col, li);
-            if (z > m3_fog0) { int f = (int)((z - m3_fog0) / (m3_fog1 - m3_fog0) * 256); px = m3_lerpc(px, m3_fog, f); }
-            if (alpha >= 256) m3_fb[y * M3W + x] = px; else m3_fb[y * M3W + x] = m3_blend(m3_fb[y * M3W + x], px, alpha);
-            if (zwrite) *zp = iz;
         }
     }
 }
@@ -332,7 +361,8 @@ static void m3_poly(const M3P* in, int n, const M3SURF* tex, uint32_t col, int a
     for (i = 0; i < m; i++)
     {
         float iz = 1.0f / o[i].z;
-        s[i].sx = M3W / 2 + o[i].x * m3_f * iz; s[i].sy = M3H / 2 - o[i].y * m3_f * iz;
+        float f = m3_f * m3_rw / M3W;
+        s[i].sx = m3_rw / 2 + o[i].x * f * iz; s[i].sy = m3_rh / 2 - o[i].y * f * iz;
         s[i].iz = iz; s[i].uz = o[i].u * iz; s[i].vz = o[i].v * iz; s[i].lz = o[i].l * iz;
     }
     for (i = 1; i + 1 < m; i++) m3_tri_raster(&s[0], &s[i], &s[i + 1], tex, col, alpha, alpha >= 256);
@@ -403,7 +433,7 @@ static const char* m3_stylename[] = { "Panels", "Carousel", "Module", "Voodoo" }
 #define M3_STYLES 3
 static M3SURF m3_cards[80];          /* card textures of the current category (by item number) */
 static int    m3_cards_cat = -1;
-static M3SURF m3_floor, m3_panel;
+static M3SURF m3_floor, m3_floor_solid, m3_panel;   /* floor_solid: the floor already blended over the sky */
 static float  m3_ring, m3_catanim, m3_knob, m3_btnpress[NCAT];
 
 static M3SURF m3_surf(int w, int h) { M3SURF s; s.w = w; s.h = h; s.p = (uint32_t*)calloc((size_t)w * h, 4); return s; }
@@ -432,6 +462,8 @@ static void m3_make_floor(void)
         int l = (x % 32 == 0 || y % 32 == 0) ? 1 : 0;
         m3_floor.p[y * 128 + x] = l ? 0x2088C0 : ((x / 32 + y / 32) & 1 ? 0x0A0E1C : 0x0C1224);
     }
+    m3_floor_solid = m3_surf(128, 128);
+    for (x = 0; x < 128 * 128; x++) m3_floor_solid.p[x] = m3_blend(0x0E0A2C, m3_floor.p[x], 160);   /* over the sky's lower part */
 }
 static void m3_cards_build(int cat)
 {
@@ -447,7 +479,14 @@ static void m3_overlay(int cat, int sel, int sb)
     m3_vgrad(&m3_scr, 0, 0, M3W, 40, 0x000000, 0x000000, 150);
     m3_text_sh(&m3_scr, 12, 6, 2, "NUKED SB-EMU", 0xFFFFFF);
     m3_text(&m3_scr, 172, 12, 0, sb ? "SBEMU loaded" : "SBEMU not loaded", sb ? 0x60FF80 : 0xFFB040, 256);
-    m3_text(&m3_scr, M3W - 8 - 8 * (int)strlen(m3_stylename[m3_style]), 12, 0, m3_stylename[m3_style], 0x8090B0, 256);
+    {
+        char b[80];
+        if (m3_now() < m3_note_until)
+            snprintf(b, sizeof b, "%s  %s %.0f fps", m3_stylename[m3_style],
+                     m3_quality == 1 ? "full" : m3_quality == 2 ? "half" : m3_half ? "auto: half" : "auto: full", m3_fps);
+        else snprintf(b, sizeof b, "%s", m3_stylename[m3_style]);
+        m3_text(&m3_scr, M3W - 8 - 8 * (int)strlen(b), 12, 0, b, 0x8090B0, 256);
+    }
     for (i = 0; i < NCAT; i++)
     {
         int w = (int)strlen(g_catname[i]) * 8 + 16, on = i == cat, k[80];
@@ -463,38 +502,56 @@ static void m3_overlay(int cat, int sel, int sb)
     m3_bevel(&m3_scr, 10, 372, M3W - 20, 98, 2, 1, 120);
     m3_text_sh(&m3_scr, 22, 380, 1, it->label, m3_mul(m3_catcol[it->cat], 380));
     m3_wrap(&m3_scr, 22, 404, M3W - 44, 3, 0, it->desc, 0xD0D8E8, 0);
-    m3_text(&m3_scr, 22, 452, 0, "Up/Down item  Left/Right menu  Enter go  F3 style  F8 text menu  Esc quit", 0x7080A0, 256);
+    m3_text(&m3_scr, 22, 452, 0, "Arrows choose  Enter go  F3 style  F4 speed  F8 text menu  Esc quit", 0x7080A0, 256);
 }
 
 /* ------------------------------------------------------------------------------------------- styles */
+/* half resolution: the scene in the top left 320x240 is doubled to fill the screen */
+static void m3_upscale(void)
+{
+    int x, y;
+    if (!m3_half) return;
+    for (y = m3_rh - 1; y >= 0; y--)
+    {
+        const uint32_t* s = m3_fb + y * M3W;
+        uint32_t* d0 = m3_fb + (2 * y) * M3W; uint32_t* d1 = d0 + M3W;
+        for (x = m3_rw - 1; x >= 0; x--) { uint32_t c = s[x]; d1[2 * x] = d1[2 * x + 1] = c; d0[2 * x + 1] = c; d0[2 * x] = c; }
+    }
+}
 static float m3_bgphase;
 static void m3_sky(void)
 {
     int y, i;
-    for (y = 0; y < M3H; y++)
+    for (y = 0; y < m3_rh; y++)
     {
-        uint32_t c = m3_lerpc(0x02030C, 0x1A1040, y * 256 / M3H);
-        uint32_t* p = m3_fb + y * M3W; for (i = 0; i < M3W; i++) p[i] = c;
+        uint32_t c = m3_lerpc(0x02030C, 0x1A1040, y * 256 / m3_rh);
+        uint32_t* p = m3_fb + y * M3W; for (i = 0; i < m3_rw; i++) p[i] = c;
+        memset(m3_zb + y * M3W, 0, m3_rw * sizeof(float));
     }
     for (i = 0; i < 90; i++)
     {   /* drifting stars */
         unsigned h = (unsigned)i * 2654435761u; int x = (int)((h % M3W + (int)(m3_bgphase * (4 + h % 7))) % M3W), yy = (int)(h / M3W % 240);
+        if (m3_half) { x /= 2; yy /= 2; }
         m3_fb[yy * M3W + x] = m3_lerpc(0x404060, 0xFFFFFF, 80 + (int)(h % 170));
     }
-    for (i = 0; i < M3W * M3H; i++) m3_zb[i] = 0;
 }
 
 static void m3_draw_panels(int cat, int sel, float selanim)
 {
     int k[80], n = cat_items(cat, k), i, x, y, j, t = (int)(m3_bgphase * 40);
     const ITEM* it = &g_it[sel];
-    for (y = 0; y < M3H; y++)
-    {
-        uint32_t* p = m3_fb + y * M3W;
-        for (x = 0; x < M3W; x++)
+    {   /* sin(x*0.01 + b) = sin(x*0.01) cos b + cos(x*0.01) sin b: two tables instead of 300000 sinf a frame */
+        static float sx[M3W], cx[M3W]; static int init;
+        if (!init) { for (x = 0; x < M3W; x++) { sx[x] = 14 * sinf(x * 0.01f); cx[x] = 14 * cosf(x * 0.01f); } init = 1; }
+        for (y = 0; y < M3H; y++)
         {
-            int v = ((x + y + t) >> 5 & 1) ? 6 : 0, w = (int)(24 + 14 * sinf((x * 0.01f) + (y * 0.013f) + m3_bgphase * 0.6f));
-            p[x] = m3_rgb(8 + v, 14 + w / 2 + v, 40 + w + v);
+            uint32_t* p = m3_fb + y * M3W;
+            float b = y * 0.013f + m3_bgphase * 0.6f, sb = sinf(b), cb = cosf(b);
+            for (x = 0; x < M3W; x++)
+            {
+                int v = ((x + y + t) >> 5 & 1) ? 6 : 0, w = (int)(24 + sx[x] * cb + cx[x] * sb);
+                p[x] = m3_rgb(8 + v, 14 + w / 2 + v, 40 + w + v);
+            }
         }
     }
     /* title bar */
@@ -546,20 +603,23 @@ static void m3_draw_panels(int cat, int sel, float selanim)
     m3_rect(&m3_scr, 12, 366, M3W - 24, 104, 0x0A0F1C, 235);
     m3_bevel(&m3_scr, 12, 366, M3W - 24, 104, 2, 1, 200);
     m3_wrap(&m3_scr, 24, 374, M3W - 48, 4, 0, it->desc, 0xD8E0F0, 0);
-    m3_text(&m3_scr, 24, 450, 0, "Up/Down item  Left/Right menu  Enter go  F3 style  F8 text menu  Esc quit", 0x8090B0, 256);
+    m3_text(&m3_scr, 24, 450, 0, "Arrows choose  Enter go  F3 style  F4 speed  F8 text menu  Esc quit", 0x8090B0, 256);
 }
 
-static void m3_draw_floor(float y, float yaw0)
+static void m3_draw_floor(float y, int alpha)            /* alpha 256: opaque (faster), less: the mirror shows */
 {
     int i, j; float s = 2.0f;
-    (void)yaw0;
-    for (j = -6; j < 6; j++) for (i = -6; i < 6; i++)
+    /* 4 big quads with the tile repeated 6 times each (was 144 small ones: too slow on Pentium-class PCs) */
+    m3_texwrap = 1;
+    for (j = -1; j < 1; j++) for (i = -1; i < 1; i++)
     {
-        M3V a = m3_v(i * s, y, (j + 1) * s), b = m3_v((i + 1) * s, y, (j + 1) * s), c = m3_v((i + 1) * s, y, j * s), d = m3_v(i * s, y, j * s);
+        float S = 6 * s;
+        M3V a = m3_v(i * S, y, (j + 1) * S), b = m3_v((i + 1) * S, y, (j + 1) * S), c = m3_v((i + 1) * S, y, j * S), d = m3_v(i * S, y, j * S);
         M3P p[4];
-        p[0] = m3_xf(a, 0, 0, 1); p[1] = m3_xf(b, 1, 0, 1); p[2] = m3_xf(c, 1, 1, 1); p[3] = m3_xf(d, 0, 1, 1);
-        m3_poly(p, 4, &m3_floor, 0, 160);
+        p[0] = m3_xf(a, 0, 0, 1); p[1] = m3_xf(b, 6, 0, 1); p[2] = m3_xf(c, 6, 6, 1); p[3] = m3_xf(d, 0, 6, 1);
+        m3_poly(p, 4, alpha >= 256 ? &m3_floor_solid : &m3_floor, 0, alpha);
     }
+    m3_texwrap = 0;
 }
 
 static void m3_draw_carousel(int cat, int sel, double t)
@@ -575,7 +635,7 @@ static void m3_draw_carousel(int cat, int sel, double t)
     m3_sky();
     for (pass = 0; pass < 2; pass++)
     {   /* pass 0: the mirror images under the floor, pass 1: the cards */
-        if (pass == 1) m3_draw_floor(-1.0f, 0);
+        if (pass == 1) m3_draw_floor(-1.0f, 160);
         for (i = 0; i < n; i++)
         {
             float a = (i - m3_ring) * step, x = R * sinf(a), z = -R * cosf(a), on = (k[i] == sel), bob, y, sc;
@@ -590,10 +650,13 @@ static void m3_draw_carousel(int cat, int sel, double t)
         }
         if (pass == 0)
         {   /* darken the mirror images */
-            int q; for (q = 0; q < M3W * M3H; q++) if (m3_zb[q] != 0) { m3_fb[q] = m3_mul(m3_fb[q], 90); m3_zb[q] = 0; }
+            int yy, q;
+            for (yy = 0; yy < m3_rh; yy++)
+                for (q = yy * M3W; q < yy * M3W + m3_rw; q++) if (m3_zb[q] != 0) { m3_fb[q] = m3_mul(m3_fb[q], 90); m3_zb[q] = 0; }
         }
     }
     m3_boxback = 0;
+    m3_upscale();
     m3_overlay(cat, sel, g_running);
 }
 
@@ -601,8 +664,14 @@ static void m3_make_panel(int cat, int sel, double t)
 {
     M3SURF* s = &m3_panel; const ITEM* it = &g_it[sel]; int i, k[80], n = cat_items(cat, k), si = 0;
     char line[48];
+    static int kcat = -1, ksel = -1, koff = -1, krun = -1;
     if (!s->p) *s = m3_surf(512, 128);
     for (i = 0; i < n; i++) if (k[i] == sel) si = i;
+    {   /* drawn again only when something on it changed (it was 1/5 of a frame on a Pentium) */
+        int len = (int)strlen(it->desc), off = len > 28 ? (int)(t * 6) % (len + 8) : 0;
+        if (cat == kcat && sel == ksel && off == koff && g_running == krun) return;
+        kcat = cat; ksel = sel; koff = off; krun = g_running;
+    }
     { int y, x; for (y = 0; y < 128; y++) for (x = 0; x < 512; x++) { int v = 46 + ((x * 7 + y * 13) % 5) + ((y & 1) ? 2 : 0); s->p[y * 512 + x] = m3_rgb(v, v, v + 4); } }
     m3_bevel(s, 0, 0, 512, 128, 3, 0, 120);
     m3_text(s, 12, 8, 2, "NUKED", 0xE8E8F0, 256);
@@ -640,7 +709,7 @@ static void m3_draw_module(int cat, int sel, double t)
     m3_fog = 0x0A0820; m3_fog0 = 8; m3_fog1 = 22;
     m3_camera(0.9f * sinf((float)t * 0.25f), 0.15f + 0.1f * sinf((float)t * 0.17f), -6.6f, -0.14f * sinf((float)t * 0.25f), -0.12f);
     m3_sky();
-    m3_draw_floor(-H - 0.02f, 0);
+    m3_draw_floor(-H - 0.02f, 256);
     m3_make_panel(cat, sel, t);
     m3_box(m3_v(0, 0, 0), W, H, D, 0, &m3_panel, 0x26262C, 0, 256);
     m3_box(m3_v(-W + 0.3f, -H - 0.01f, -D + 0.3f), 0.12f, 0.02f, 0.12f, 0, NULL, 0x101010, 0, 256);   /* feet */
@@ -654,19 +723,25 @@ static void m3_draw_module(int cat, int sel, double t)
         float u = (150 + c * 42 + 17) / 512.0f, v = 96 / 128.0f, x = -W + u * 2 * W, y = H - v * 2 * H, p = m3_btnpress[c];
         m3_box(m3_v(x, y, -D - 0.06f + p * 0.05f), 0.11f, 0.06f, 0.05f, 0, NULL, c == cat ? m3_mul(m3_catcol[c], 230) : 0x505058, c == cat ? 0.2f : 0, 256);
     }
+   
     /* the knob: one notch per item */
     m3_knob3d(m3_v(-W + (440 / 512.0f) * 2 * W, H - (56 / 128.0f) * 2 * H, -D - 0.16f), 0.34f, 0.16f, m3_knob, 0);
+    m3_upscale();
     m3_overlay(cat, sel, g_running);
 }
 
 /* ------------------------------------------------------------------------------------------- loop */
 static void m3_cfg_save(void)
-{ char p[300]; FILE* f; home_path(p, "MENU3D.CFG"); if ((f = fopen(p, "w")) != NULL) { fprintf(f, "STYLE=%d\n", m3_style); fclose(f); } }
+{ char p[300]; FILE* f; home_path(p, "MENU3D.CFG"); if ((f = fopen(p, "w")) != NULL) { fprintf(f, "STYLE=%d\nQUALITY=%d\n", m3_style, m3_quality); fclose(f); } }
 static int m3_cfg_load(void)
 {
     char p[300], l[40]; FILE* f; home_path(p, "MENU3D.CFG");
     if ((f = fopen(p, "r")) == NULL) return 0;
-    if (fgets(l, sizeof l, f) && !strncmp(l, "STYLE=", 6)) m3_style = atoi(l + 6) % M3_STYLES;
+    while (fgets(l, sizeof l, f))
+    {
+        if (!strncmp(l, "STYLE=", 6)) m3_style = atoi(l + 6) % M3_STYLES;
+        else if (!strncmp(l, "QUALITY=", 8)) m3_quality = atoi(l + 8) % 3;
+    }
     fclose(f); return 1;
 }
 static int m3_key(void)
@@ -691,9 +766,11 @@ static int m3_main(void)
 {
     double last, t; int c, k[80], n;
     float selanim = 0;
+    double fps_t; int frames = 0;
     if (!m3_open()) return 2;
     m3_time_init();
-    last = m3_now();
+    last = fps_t = m3_now();
+    m3_half = m3_quality == 2; m3_rw = m3_half ? M3W / 2 : M3W; m3_rh = m3_half ? M3H / 2 : M3H;
     m3_cards_cat = -1; m3_catanim = 1;
     for (;;)
     {
@@ -712,12 +789,28 @@ static int m3_main(void)
         else if (m3_style == 1) m3_draw_carousel(g_cat, g_sel, t);
         else m3_draw_module(g_cat, g_sel, t);
         m3_present();
+        if (++frames, t - fps_t >= 1.0)
+        {   /* frames a second; auto quality drops to half resolution once if the PC is too slow */
+            m3_fps = (float)(frames / (t - fps_t));
+            if (getenv("M3PROF")) { FILE* pf = fopen("C:\\M3PROF.TXT", "a"); if (pf) { fprintf(pf, "style %d half %d fps %.1f\n", m3_style, m3_half, m3_fps); fclose(pf); } }
+            frames = 0; fps_t = t;
+            if (m3_quality == 0 && !m3_half && m3_style != 0 && t > 2.5 && m3_fps < 15)
+            { m3_half = 1; m3_rw = M3W / 2; m3_rh = M3H / 2; m3_note_until = t + 5; }
+        }
         while ((c = m3_key()) != 0)
         {
             int oc = g_cat;
             if (c == K_ESC) { save_sel(&g_it[g_sel]); m3_vbe_close(); return 0; }
             if (c == 0x142) { char p[300]; save_sel(&g_it[g_sel]); home_path(p, "MENU3D.CFG"); remove(p); m3_vbe_close(); return 1; } /* F8 */
             if (c == K_F3) { m3_style = (m3_style + 1) % M3_STYLES; m3_cfg_save(); m3_catanim = 1; continue; }
+            if (c == 0x13E)                                             /* F4: auto / full / half resolution */
+            {
+                m3_quality = (m3_quality + 1) % 3;
+                m3_half = m3_quality == 2;
+                m3_rw = m3_half ? M3W / 2 : M3W; m3_rh = m3_half ? M3H / 2 : M3H;
+                m3_cfg_save(); m3_note_until = m3_now() + 5;
+                continue;
+            }
             if (c == K_UP) g_sel = move_in(g_cat, g_sel, -1);
             else if (c == K_DOWN) g_sel = move_in(g_cat, g_sel, 1);
             else if (c == K_LEFT || c == K_STAB || c == K_PGUP) { g_cat = next_cat(g_cat, -1); g_sel = first_in(g_cat); }
