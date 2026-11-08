@@ -35,7 +35,7 @@ class Pad:
     def __init__(s, script):
         s.st = dict(lx=0, ly=0, rx=0, ry=0, lt=0, rt=0, buttons=0)
         s.events = []
-        for ln in open(script):
+        for ln in ([] if script.startswith('live:') else open(script)):
             ln = ln.split('#')[0].split()
             if not ln: continue
             t = float(ln[0]); ch = {}
@@ -44,10 +44,21 @@ class Pad:
                 ch[k] = int(v, 16) if k == 'buttons' else int(v)
             s.events.append((t, ch))
         s.start = None; s.sent = None
+        s.live = script[5:] if script.startswith('live:') else None; s.livem = None
     def report(s):
         b = s.st['buttons']
         return struct.pack('<BBBBBBhhhh6x', 0, 0x14, b & 0xFF, b >> 8, s.st['lt'], s.st['rt'], s.st['lx'], s.st['ly'], s.st['rx'], s.st['ry'])
     def update(s):
+        if s.live:                      # live:FILE - the state is whatever FILE says now ("lx=.. buttons=..")
+            try:
+                m = os.stat(s.live).st_mtime
+                if m != s.livem:
+                    s.livem = m; ch = {}
+                    for kv in open(s.live).read().split():
+                        k, v = kv.split('='); ch[k] = int(v, 16) if k == 'buttons' else int(v)
+                    s.st.update({'buttons': 0, 'lt': 0, 'rt': 0, 'lx': 0, 'ly': 0, 'rx': 0, 'ry': 0}); s.st.update(ch); log('state', s.st)
+            except (OSError, ValueError): pass
+            return
         if s.start is None: return
         t = time.time() - s.start
         while s.events and s.events[0][0] <= t:
