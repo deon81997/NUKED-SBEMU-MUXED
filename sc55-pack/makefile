@@ -250,10 +250,10 @@ $(SBSET): output/tools/sbset.o $(SC55_OBJS) $(NUKEDOPL_OBJ) output/sbemu/dbopl.o
 	$(SILENTCMD)$(CXX) -O2 -o $@ $^ -lstdc++ -lm $(if $(filter 0,$(DEBUG)),-s,)
 
 SC55MENU := output/sc55menu.exe
-$(SC55MENU): tools/sc55menu.c tools/tui.h tools/theme.h tools/fontdata.h
+$(SC55MENU): tools/sc55menu.c tools/menu3d.h tools/tui.h tools/theme.h tools/fontdata.h
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
-	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
+	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -ffast-math -o $@ $< -lm $(if $(filter 0,$(DEBUG)),-s,)
 
 $(CDGUI): tools/cdgui.c tools/tui.h tools/theme.h tools/fontdata.h
 	@mkdir -p $(dir $@)

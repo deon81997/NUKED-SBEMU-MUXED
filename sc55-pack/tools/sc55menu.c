@@ -31,7 +31,7 @@ static char g_opts[300];        /* saved settings (SBOPTS.TXT / SBOPTS.BAT) */
 static char g_optfile[16];      /* "@SBOPTS.TXT" or "@SBOPTS.BAT" or "" */
 static int  g_gt_green, g_gt_yellow, g_gt_red, g_gt_lock;
 
-enum { IT_BAT, IT_VIEW, IT_GAME, IT_EDIT };
+enum { IT_BAT, IT_VIEW, IT_GAME, IT_EDIT, IT_M3D };
 enum { C_SOUND, C_SETTINGS, C_TESTS, C_GAMES, C_CD, C_FILES, NCAT };
 static const char* g_catname[NCAT] = { "Sound", "Settings", "Tests", "Games", "CD-ROM", "Files" };
 static const unsigned char g_caticon[NCAT] = { 0x0E, 0x0F, 0xFB, 0x02, 0x0A, 0xF0 };
@@ -347,6 +347,10 @@ static void build_menu(void)
     add(C_SETTINGS, "Timing & advanced", "Render-ahead and timer give-back (these keep game music at the right tempo), OPL on/off"
         " and core, output jack, sample-rate fix, CD audio, protected/real-mode support, which sound card, MIDI out port.",
         IT_BAT, c, 0, 0, NULL);
+    add(C_SETTINGS, "3D menu (F8)", "Shows this menu in 3D (640x480 VESA graphics, drawn by the CPU - no 3D card needed): F3 picks"
+        " the style - Panels (raised buttons), Carousel (cards on a turning ring) or Module (a sound module whose display and knob"
+        " are the menu). F8 there comes back to this text menu, which stays the main one. Shift at start always gives the text menu.",
+        IT_M3D, NULL, 0, 0, NULL);
     snprintf(c, sizeof c, "CALL %s\\SETTINGS.BAT /PAGE:JOY", g_home);
     add(C_SETTINGS, "Joystick (USB pad)", "A wired USB Xbox 360 pad (or compatible) as the PC gameport joystick at port 201h"
         " (/JOY): which sticks and buttons the game sees, a dead zone, and pad buttons typed as keys (Start = Enter,"
@@ -807,6 +811,7 @@ static void help(void)
         "F7               letters: Terminus, Terminus bold or the VGA font",
         "F4               display mode: 80x25 ... 80x60, VESA modes",
         "F5               MIDI player (MIDPLAY) from anywhere in the menu",
+        "F8               3D menu (F8 there comes back here)",
         "Esc              back to DOS (type MENU to come back)",
         "",
         "Nothing runs by itself: the menu writes your choice to MENUGO.BAT,",
@@ -946,6 +951,8 @@ static int jump_letter(int sel, int c)
     return sel;
 }
 
+#include "menu3d.h"
+
 int main(int argc, char** argv)
 {
     int c;
@@ -970,6 +977,12 @@ int main(int argc, char** argv)
     build_menu();
     g_sel = load_sel();
     g_cat = g_it[g_sel].cat;
+    tui_theme_load(g_home);
+    if (m3_cfg_load() && !(_farpeekb(_dos_ds, 0x417) & 3) && !(v = getenv("MENUVIEW"), v && *v))
+    {
+        int r = m3_main();
+        if (r == 0) return 0;
+    }
     tui_theme_load(g_home);
     tui_init();
     tui_anim = anim;
@@ -1015,6 +1028,17 @@ int main(int argc, char** argv)
         else if (c == K_HOME) g_sel = first_in(g_cat);
         else if (c == K_END) { int k[80], n = cat_items(g_cat, k); if (n) g_sel = k[n - 1]; }
         else if (c == K_F1) help();
+        else if (c == 0x142 || (c == K_ENTER && g_it[g_sel].kind == IT_M3D))     /* F8: the 3D menu */
+        {
+            int r;
+            save_sel(&g_it[g_sel]); m3_cfg_save(); tui_done();
+            r = m3_main();
+            if (r == 0) return 0;
+            if (r == 2) { char p[300]; home_path(p, "MENU3D.CFG"); remove(p); }
+            tui_init();
+            if (r == 2) tui_message("3D menu", "This PC's video BIOS has no 640x480 VESA mode with 15/16/24/32-bit colour, so the 3D menu cannot be shown.");
+            continue;
+        }
         else if (c == 0x13E) tui_pick_mode(g_home);                           /* F4 */
         else if (c == 0x140) { tui_animate = !tui_animate; tui_theme_save(g_home); }   /* F6 */
         else if (c == 0x141) { tui_font = (tui_font + 1) % FONT_COUNT; tui_font_apply(); tui_theme_save(g_home); } /* F7 */
