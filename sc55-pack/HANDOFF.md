@@ -348,3 +348,9 @@
   trace "init" / "init-stall". QEMU fakepad answers it and still reports.
 - TODO if the NEC still shows no reports: periodic EDs are rewritten in place (start_in); the NEC may cache them -
   alternate two ED slots per pipe or toggle PLE around the change.
+
+## beta.61-usb (2026-11-08): split SET_ADDRESS first on real OHCIs
+- beta.60 SBEMU on the P5PE-VM: "nothing connected yet" - the pad needed try 3 (several seconds of failing tries),
+  past SBEMU's 3 s window. Now try 1 on an OHCI = second ED + split SET_ADDRESS, try 2 plain, try 3 Windows order.
+  QEMU's OHCI (vendor 106B) keeps the old order (split + usb-redir aborts QEMU).
+- Still waiting for a beta.60+ USBTEST.TXT from the NEC (init / handoff / emulation traces, reports).

@@ -1989,10 +1989,16 @@ static int enumerate_(int di)
          * (the device's first short packet ends it), a second port reset, then SET_ADDRESS. The wired 360 pad on
          * the NEC uPD720101 (P5PE-VM, beta.54 USBTEST) answered an 8-byte request and SET_ADDRESS but stayed at
          * address 0 every time; devices are tested against the Windows order. */
-        int winseq = HC[h].type == T_OHCI && d->parent < 0 && att == 0;
         int ohci = HC[h].type == T_OHCI;
-        OAltEd = ohci && att >= 1; OSplit = ohci && att >= 2;
-        if (ohci && att) trace("[try%d:%s%s] ", att + 1, OAltEd ? " 2nd ED" : "", OSplit ? " split" : "");
+        /* QEMU's OHCI (106B:003F) aborts on a split control transfer with a passed-through device */
+        int qemu = ohci && PCI_ReadWord(HC[h].bus, HC[h].dev, HC[h].func, 0) == 0x106B;
+        int winseq, split_first = ohci && !qemu;
+        /* first try on a real OHCI: second ED + SET_ADDRESS split - the only way the official wired 360 pad took
+         * its address on the NEC uPD720101 (beta.58 USBTEST, try 3); with three slow failing tries first it was
+         * found only after SBEMU's 3-second start-up window. Later tries: the plain order, then Windows' order. */
+        if (split_first) { OAltEd = OSplit = (att == 0); winseq = d->parent < 0 && att == 2; }
+        else { winseq = ohci && d->parent < 0 && att == 0; OAltEd = ohci && att >= 1; OSplit = ohci && att >= 2; }
+        if (ohci && (att || OAltEd || winseq)) trace("[try%d:%s%s%s] ", att + 1, OAltEd ? " 2nd ED" : "", OSplit ? " split" : "", winseq ? " win" : "");
         d->addr = 0;
         if (winseq && d->speed == SP_FS) d->mps0 = 64;
         for (k = 0; k < 4; ++k)
