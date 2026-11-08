@@ -14,3 +14,16 @@ packages); ROMs from github.com/86Box/roms.
 - `a.py SOCK cmd...`: automation requests, plus `@type:TEXT` (\n = Enter) and `@screen` (text screen).
 - `p2bls-uhci.cfg` ASUS P2B-LS (440BX, PIIX4E UHCI, PII-400, ES1371, + OPTi OHCI card);
   `p54tp4xe-ohci.cfg` ASUS P/I-P55TP4XE (430FX, no USB, Pentium 133, ES1371, OPTi 82C861 OHCI card).
+
+## Regression run: `regress.py`
+
+`python3 regress.py [--only joytest,kmtest,mputest,timetest,midplay,menu,usbtest,vm2] [--out DIR]` copies the built
+programs (`output/*.exe`) and a MIDI file onto the two VMs (disk changed only while the VM is off), boots them and
+checks SBEMU (pads found, Pentium 133 without CMOV), JOYTEST (+GrIP view), KMTEST, MPUTEST (screen, to the end,
+plain text when redirected), TIMETEST, MIDPLAY, MENU text + all three 3D styles (screenshot colour count) and
+USBTEST with pad 2 unplugged and plugged again. PASS/FAIL per check in DIR/regress.txt, screenshots in DIR
+(default `output/regress`). Takes about 10 minutes. Keys are typed 80 ms apart (faster drops letters while SBEMU
+watches the keyboard). Known failure: TIMETEST finds no MPU-401 in this VM (see HANDOFF).
+
+`USB_IGNADDR=n` in a VM's `env`: the emulated USB devices ack the first n SET_ADDRESS requests without taking the
+address (tests usbpad.c's recovery for devices that stay at address 0).
