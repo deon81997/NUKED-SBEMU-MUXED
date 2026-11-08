@@ -54,6 +54,9 @@ CONTENTS
   * SC55.BAT serves protected-mode games only (DOS4GW, DOS32A, DJGPP, ...); no
     memory manager is used. Real-mode games need JEMM+QPIEMU or QEMM, offered
     as separate optional launchers (section 11); you supply those files.
+  * The SC-55 and MT-32 emulations need a Pentium Pro / Pentium II or newer
+    (on a Pentium, Pentium MMX, K6 or Cyrix SBEMU says so and keeps the MPU
+    silent; Sound Blaster, OPL3 FM, USB and the joystick work on any Pentium).
   * It runs in plain DOS. Windows 98 must be restarted in MS-DOS mode.
   * SBEMU cannot be unloaded. To stop it, restart the PC.
   * SETUP, CDINST and CLEANUP never edit CONFIG.SYS or AUTOEXEC.BAT. Nothing

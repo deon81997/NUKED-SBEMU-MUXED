@@ -325,7 +325,25 @@ void VMPU_SetMidiVolume(int percent)
 
 void VMPU_SetMixVolume(int q8) { if (!VMPU_UseSF && !VMPU_UseMT32) SC55_SetMixVolume(q8); }
 
-const char* VMPU_LastError(void) { return VMPU_UseMT32 ? MT32_LastError() : VMPU_UseSF ? "the SoundFont file could not be loaded (not a valid .sf2, or out of memory)" : SC55_LastError(); }
+/* The SC-55 and MT-32 cores are built for i686 (they use CMOV): on a CPU without it (Pentium, Pentium MMX,
+   AMD K5/K6, Cyrix 6x86/MII) they would stop with an invalid opcode, so they are not started there. Those CPUs
+   are far too slow for them anyway. */
+static int VMPU_NoCmov;
+static int VMPU_HasCmov(void)
+{
+    unsigned int a, b, c, d, f0, f1;
+    /* CPUID is there when EFLAGS.ID (bit 21) can be changed */
+    asm volatile("pushfl; popl %0; movl %0,%1; xorl $0x200000,%0; pushl %0; popfl; pushfl; popl %0; pushl %1; popfl"
+                 : "=&r"(f0), "=&r"(f1));
+    if (!((f0 ^ f1) & 0x200000)) return 0;
+    asm volatile("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "a"(0));
+    if (a < 1) return 0;
+    asm volatile("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "a"(1));
+    return (d >> 15) & 1;
+}
+
+const char* VMPU_LastError(void) { if (VMPU_NoCmov) return "it needs a Pentium Pro / Pentium II or newer CPU (this CPU has no CMOV)";
+    return VMPU_UseMT32 ? MT32_LastError() : VMPU_UseSF ? "the SoundFont file could not be loaded (not a valid .sf2, or out of memory)" : SC55_LastError(); }
 const char* VMPU_ModelName(void) { return VMPU_UseMT32 ? MT32_ModelName() : SC55_ModelName(); }
 
 static void Stat_Snapshot(void)
@@ -384,6 +402,13 @@ static uint8_t VMPU_Read(uint16_t port)
 BOOL VMPU_Init(int baseaddr, int* voices, int freq, const char* romdir)
 {
     SC55_Config cfg;
+    VMPU_NoCmov = 0;
+    if (!VMPU_UseSF && !VMPU_HasCmov())
+    {
+        VMPU_NoCmov = 1;
+        VMPU_base = baseaddr;
+        return FALSE;
+    }
     if (VMPU_UseMT32)
     {
         int ok = MT32_Init(romdir, VMPU_MT32Want, VMPU_EffGain(), 0);

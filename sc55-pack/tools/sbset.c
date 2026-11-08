@@ -61,6 +61,19 @@ enum {
 #define LV11 { "0", "10", "20", "30", "40", "50", "60", "70", "80", "90", "100" }, 11
 #define CARDS { "0", "1", "2", "3", "4" }, 5
 
+/* The SC-55 / MT-32 cores are built for i686 (CMOV); see vmpu_sc55.c. */
+static int has_cmov(void)
+{
+    unsigned int a, b, c, d, f0, f1;
+    asm volatile("pushfl; popl %0; movl %0,%1; xorl $0x200000,%0; pushl %0; popfl; pushfl; popl %0; pushl %1; popfl"
+                 : "=&r"(f0), "=&r"(f1));
+    if (!((f0 ^ f1) & 0x200000)) return 0;
+    asm volatile("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "a"(0));
+    if (a < 1) return 0;
+    asm volatile("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "a"(1));
+    return (d >> 15) & 1;
+}
+
 static Field F[NF] = {
     { "Port",            "/A",       { "220", "240" }, 2, 0, 0, "Sound Blaster base port. Games: Setup / BLASTER.", {0}, "Sound Blaster" },
     { "IRQ",             "/I",       { "5", "7", "9" }, 3, 1, 1, "Must differ from the IRQs of other cards.", {0}, 0 },
@@ -1049,6 +1062,14 @@ static int tune(void)
     put(x + 2, y, A_TITLE, " Automatic setup ");
     put(x + 2, y + 1, A_WIN, "Measuring how much of this PC's CPU the SC-55 needs. About a");
     put(x + 2, y + 2, A_WIN, "minute: the music is rendered silently, nothing is played.");
+    if (!has_cmov())
+    {
+        put(x + 2, ln, A_ERR, " The SC-55 / MT-32 emulation needs a Pentium Pro / Pentium II ");
+        put(x + 2, ln + 1, A_ERR, " or newer CPU (this one has no CMOV). Use Sound Blaster FM/OPL3. ");
+        put(x + 2, y + h - 2, A_GROUP, "Any key: back");
+        getkey();
+        return 0;
+    }
     if (!sets[0] && !sets[1])
     {
         put(x + 2, ln, A_ERR, " No complete SC-55 ROM set in the ROMS folder. ");

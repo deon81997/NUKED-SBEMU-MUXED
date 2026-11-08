@@ -1,6 +1,6 @@
 # SC-55 pack — handoff
 
-## Current state (SBEMU 1.0.0-beta.48-usb-sc55, branch usb-xpad)
+## Current state (SBEMU 1.0.0-beta.49-usb-sc55, branch usb-xpad)
 - SBEMU + Nuked-SC55 (SC-55/mkII), Munt MT-32/CM-32L (/VMT32), SoundFont (/VSF); MPU side channel 0xA5-0xB0 (stats, SBDIAG, key player, triple-Esc, front panel/LCD + CPU load).
 - Key player holds each typed key 500 ms (vdiag.c key_tick); Duke 3D quit default `ESC W3 Q W2 Y W3 Y W3 ESC W3 Q W2 Y W3 Y` — verified in QEMU with Duke 3D Atomic 1.5 from logo, title and demo (GAMETEST /RUN, 20 s and 40 s tests).
 - Tools: SC55MENU (game profiles GAMES.CFG, safe mode, CPU%, first-run auto setup), SBSET (/TUNE benchmark, MT-32 choice), GAMETEST (/RUN), MIDPLAY (live SC-55/MT-32 LCD panel), CDGUI (CUE checks/fix), Ctrl+Alt+F12 in-game LCD overlay (text + mode 13h).
@@ -68,11 +68,13 @@
   port 206h with a per-read virtual clock; saves FS/GS), third_party/hdpmi16 (HDPMI16I patch + build.sh, crazii/HX
   43182b4, JWasm/JWlink built from GitHub in /home/claude/dl), SETUP makes SC55J16.BAT. testrig/sbt.asm (SB DMA+IRQ
   test, 'SBT P' from 16-bit DPMI), joy16.asm. Jazz VM: /home/claude/games/jvm (starthda.sh = HDA + wav capture).
+- 86Box rig: testrig/86box (README.md; build in /home/claude/86box/86box, ROMs /home/claude/86box/roms, VMs
+  /home/claude/86vm/{p2b,u1,u2}); emulated 360 pad usb_xpad.c with hot-plug via automation.
 - Build: DJGPP gcc 12.2 from github.com/andrewwutw/build-djgpp v3.4 (djgpp-linux64-gcc1220.tar.bz2);
   `export PATH=<djgpp>/bin:$PATH; make -j8` (delete output/*.o after header changes)
 
 ## Resume prompt
-"Continue NUKED SB-EMU from sc55-pack/HANDOFF.md (beta.48-usb): github.com/deon81997/NUKED-SBEMU-MUXED, branch usb-xpad. Rebuild with DJGPP, then continue from Next steps."
+"Continue NUKED SB-EMU from sc55-pack/HANDOFF.md (beta.49-usb): github.com/deon81997/NUKED-SBEMU-MUXED, branch usb-xpad. Rebuild with DJGPP, then continue from Next steps."
 
 ## 2026-11-06 (beta.37): SBEMU "Not loaded" on the D810 after SC55.BAT
 - SBEMU no longer quits when the real sound card uses the IRQ asked for (/I or BLASTER): it takes another of 7/5/9, warns, and updates BLASTER.
@@ -209,3 +211,15 @@
 - Results: SB Pro detected, music + SFX play (HDA capture; AC97 in QEMU gives silence even for real-mode tests), joystick
   detected/calibrated/moves menus, all keys register with 400 ms holds (100 ms taps drop: QEMU frame time). Silence seen
   earlier was the VM's CONFIG.000 with volume 1 (mixer multiplier [928]=1), not an emulation bug.
+
+## 2026-11-08 (beta.49-usb): 86Box testing (real chipset emulation) + Pentium-class CPU fix
+- 86Box built from source with automation + a local emulated Xbox 360 pad (testrig/86box). PCem not used (no PCI sound,
+  no USB). Jazz + SBEMU16 on P2B-LS/ES1371: continuous music (QEMU's gaps were QEMU's HDA).
+- USB on 86Box: PIIX4E UHCI (P2B-LS) and OPTi 82C861 OHCI card (P/I-P55TP4XE, Pentium 133): 2 pads enumerate,
+  reports, hot-unplug/replug OK; SBEMU 2-pad mapping OK; /JOYMODE 1 CH hat F/B/7/3, 2 FCS axis-4 0/.25/.5/.75/full,
+  3 GrIP both pads all decoded by JOYTEST.
+- BUG FIXED: SBEMU crashed (SIGILL, CMOV) on any CPU without CMOV (Pentium/MMX, K5/K6, Cyrix): Nuked OPL3 was built
+  with the SC-55's -march=i686. Now OPL_CFLAGS i586; SC-55/MT-32 (i686 cores) refused with a message when CPUID has
+  no CMOV (vmpu_sc55.c), SBSET automatic setup likewise. README notes the SC-55/MT-32 CPU minimum.
+- /JOYMODE and /JOYDZ now apply to an already loaded SBEMU (VJOY_SetLive; not to/from 4). VMPU warning uses CR LF.
+- Not covered by 86Box: EHCI/xHCI, CardBus; USB keyboard/mouse through SBEMU not yet run there.
