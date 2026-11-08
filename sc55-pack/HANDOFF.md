@@ -293,3 +293,10 @@
   (MAIN_CardIrqs, waited up to 0.5 s before going resident); zero -> red warning on screen.
 - Neither QEMU (AC97) nor 86Box (ES1371) loses interrupts with ELCR cleared, so not reproduced; waiting for the D810's
   SBDETAIL. 86Box has no Intel ICH AC'97; QEMU's AC97 (82801AA) is the only emulated ICH sound for sc_ich.c tests.
+
+## beta.55-usb (2026-11-08): NEC uPD720101 OHCI + wired 360 pad (P5PE-VM USBTEST)
+- Log: desc8 (try 2), SET_ADDRESS accepted, then DNR at the new address; still answers at 0, every try incl. re-reset
+  and resent SET_ADDRESS. Logitech receiver on the other OHCI fine.
+- usbpad.c enumerate(): OHCI root ports now use the Windows/Linux order: GET_DESCRIPTOR(64) with ep0 MPS 64 (full
+  speed; first short packet ends it), second port reset, then SET_ADDRESS. UHCI / EHCI / hubs unchanged.
+- QEMU pci-ohci + usb-kbd + fakepad: both enumerate, pad input read (fakepad.log shows len=64 first).

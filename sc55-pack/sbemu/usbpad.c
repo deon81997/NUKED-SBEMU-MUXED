@@ -1935,10 +1935,16 @@ static int enumerate(int di)
     }
     else
     {
+        /* OHCI root port: the Windows / Linux "new scheme" - GET_DESCRIPTOR asking 64 bytes with a 64-byte ep0
+         * (the device's first short packet ends it), a second port reset, then SET_ADDRESS. The wired 360 pad on
+         * the NEC uPD720101 (P5PE-VM, beta.54 USBTEST) answered an 8-byte request and SET_ADDRESS but stayed at
+         * address 0 every time; devices are tested against the Windows order. */
+        int winseq = HC[h].type == T_OHCI && d->parent < 0;
         d->addr = 0;
+        if (winseq && d->speed == SP_FS) d->mps0 = 64;
         for (k = 0; k < 4; ++k)
         {
-            if (control(di, 0x80, 6, 0x0100, 0, 8) == 0) break;
+            if (control(di, 0x80, 6, 0x0100, 0, winseq ? 64 : 8) == 0) break;
             wait_us(50000);
         }
         if (k == 4) { trace("desc8! "); return 0; }
@@ -1946,7 +1952,7 @@ static int enumerate(int di)
         d->mps0 = b[7] >= 8 && b[7] <= 64 ? b[7] : 8;
         /* later tries of a root port (USBTEST on a NEC OHCI card: the wired 360 pad took SET_ADDRESS, then
          * never answered at the new address): reset the port again before SET_ADDRESS, as Windows does */
-        if (att >= 1 && d->parent < 0)
+        if ((att >= 1 || winseq) && d->parent < 0)
         {
             p_reset_start(h, d->rootport);
             wait_us(55000);
