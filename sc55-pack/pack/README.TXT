@@ -813,8 +813,16 @@ CONTENTS
   pads in the Windows 98 x360c driver). The wireless receiver for PC may
   work (two pads; not tested). Keyboards / mice: any USB keyboard, and
   mice that offer the standard "boot" mode (nearly all); wireless
-  keyboard + mouse receivers too. Not: Xbox One / Series pads, other
-  USB joysticks. A USB hub in between is fine (up to four deep).
+  keyboard + mouse receivers too. Also (new in beta.51, tested in an
+  emulator only so far): wired Xbox One / Series pads (USB cable;
+  not Bluetooth or the wireless adapter), and ordinary USB gamepads and
+  joysticks ("HID" pads: generic PC pads, PlayStation 4 pads on the
+  cable, Logitech in DirectInput mode, retro USB pads). For those:
+  buttons 1-4 are A B X Y (fire 1-4), 5 6 = LB RB, 7 8 = the triggers,
+  9 10 = Back Start, 11 12 = the stick buttons; the hat is the D-pad;
+  X/Y = left stick, Z/Rz (or Rx/Ry) = right stick. Not: PlayStation 3
+  pads (need a start command), Xbox One wireless adapter.
+  A USB hub in between is fine (up to four deep).
   USB controllers - all PC kinds; the pad can go in any port of any of them:
      UHCI  Intel (ICH - ICH10, the D810's ICH6) and VIA chipsets
      OHCI  NEC uPD720100 / uPD720101 USB 2.0 PCI cards, SiS, ALi, nVidia

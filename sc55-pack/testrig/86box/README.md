@@ -27,3 +27,7 @@ watches the keyboard). Known failure: TIMETEST finds no MPU-401 in this VM (see 
 
 `USB_IGNADDR=n` in a VM's `env`: the emulated USB devices ack the first n SET_ADDRESS requests without taking the
 address (tests usbpad.c's recovery for devices that stay at address 0).
+
+`XPAD_KIND` / `XPAD_KIND2` in a VM's `env`: `one` makes that pad an Xbox One pad (GIP, 045E:02EA: silent until the
+power-on packet, the Xbox button in its own packet asking for an ack), `hid` a generic HID gamepad (0079:0006 style
+report descriptor: X Y Z Z Rz bytes, a hat, 12 buttons). Same state file format; buttons in the 360 bit layout.

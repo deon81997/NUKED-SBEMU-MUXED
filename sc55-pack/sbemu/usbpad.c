@@ -207,6 +207,7 @@ enum { TT_NORMAL = 1, TT_SETUP = 2, TT_DATA = 3, TT_STATUS = 4, TT_LINK = 6, TT_
 enum { T_UHCI, T_OHCI, T_EHCI, T_XHCI };
 enum { SP_FS, SP_LS, SP_HS };
 enum { PT_PAD, PT_KBD, PT_MOUSE };
+enum { PK_360, PK_GIP, PK_HID };          /* kinds of pad: Xbox 360 (wired / wireless), Xbox One (GIP), HID gamepad */
 
 typedef struct { volatile uint32_t* t; uint32_t ph; int n, enq, cyc; } Ring;
 typedef struct
@@ -257,6 +258,7 @@ static Dev       D[MAX_DEV];
 typedef struct
 {
     int used, type, dev, hc, ifc, ep, mps, intv, tog, ocur, outep, outmps, otog, pad, wireless, wlpresent, watched;
+    int kind, gseq;                     /* PK_*; Xbox One: sequence number of the packets sent */
     volatile uint32_t* td;              /* its IN TD(s): UHCI 1, OHCI 2, EHCI 2 (used in turn) */
     uint8_t *ibuf, *obuf;
     Ring xin, xout;
@@ -267,6 +269,11 @@ typedef struct
     uint32_t reports;
 } Pipe;
 static Pipe      P[MAX_PIPE];
+
+/* HID gamepads: where the axes, the hat and the buttons are in the input report (from its report descriptor) */
+typedef struct { int id, off, size; int32_t lmin, lmax; } HidF;    /* id -1 = not there; off in bits after the ID */
+typedef struct { int ids; HidF ax[6], hat, btn; int nbtn; } HidMap;  /* ax: X Y Z Rx Ry Rz */
+static HidMap    Hm[MAX_PIPE];
 
 static xmsmem_t Mem;
 #define M_TD    0x0000                  /* NTD control TDs, 64 bytes apart */
@@ -985,7 +992,8 @@ static const char* pipe_name(const Pipe* q)
     static char s[40];
     if (q->type == PT_KBD) return "keyboard";
     if (q->type == PT_MOUSE) return "mouse";
-    snprintf(s, sizeof(s), "%s %d", q->wireless ? "wireless 360 pad" : "360 pad", q->pad + 1);
+    snprintf(s, sizeof(s), "%s %d", q->kind == PK_GIP ? "Xbox One pad" : q->kind == PK_HID ? "USB gamepad" :
+             q->wireless ? "wireless 360 pad" : "360 pad", q->pad + 1);
     return s;
 }
 
@@ -1626,6 +1634,175 @@ static void parse_pad(USBPAD_State* s, const uint8_t* r)
 }
 static void clear_pad(USBPAD_State* s) { s->buttons = 0; s->lt = s->rt = 0; s->lx = s->ly = s->rx = s->ry = 0; }
 
+/* Xbox One input packet 20h (as Linux xpad reads it): buttons in bytes 4-5, triggers 0..1023, sticks like the 360's */
+static void parse_gip(USBPAD_State* s, const uint8_t* r)
+{
+    static const uint16_t b4[8] = { 0, 0, XPAD_START, XPAD_BACK, XPAD_A, XPAD_B, XPAD_X, XPAD_Y };
+    static const uint16_t b5[8] = { XPAD_DU, XPAD_DD, XPAD_DL, XPAD_DR, XPAD_LB, XPAD_RB, XPAD_LS, XPAD_RS };
+    uint16_t b = (uint16_t)(s->buttons & XPAD_GUIDE);
+    int i, t;
+    for (i = 0; i < 8; ++i) { if (r[4] >> i & 1) b |= b4[i]; if (r[5] >> i & 1) b |= b5[i]; }
+    s->buttons = b;
+    t = r[6] | r[7] << 8; s->lt = (uint8_t)(t > 1023 ? 255 : t >> 2);
+    t = r[8] | r[9] << 8; s->rt = (uint8_t)(t > 1023 ? 255 : t >> 2);
+    s->lx = (int16_t)(r[10] | r[11] << 8); s->ly = (int16_t)(r[12] | r[13] << 8);
+    s->rx = (int16_t)(r[14] | r[15] << 8); s->ry = (int16_t)(r[16] | r[17] << 8);
+    ++s->reports;
+}
+
+/* ---------------- HID gamepads: the report descriptor tells where X, Y, Z, Rx, Ry, Rz, the hat and the buttons are */
+static int32_t hid_sval(const uint8_t* d, int sz) /* item data, sign-extended */
+{
+    int32_t v = sz == 1 ? (int8_t)d[0] : sz == 2 ? (int16_t)(d[0] | d[1] << 8) : sz == 4 ? (int32_t)(d[0] | d[1] << 8 | d[2] << 16 | (uint32_t)d[3] << 24) : 0;
+    return v;
+}
+static uint32_t hid_uval(const uint8_t* d, int sz)
+{
+    return sz == 1 ? d[0] : sz == 2 ? (uint32_t)(d[0] | d[1] << 8) : sz == 4 ? (uint32_t)(d[0] | d[1] << 8 | d[2] << 16 | (uint32_t)d[3] << 24) : 0;
+}
+/* 1 = a joystick / gamepad with at least X and Y */
+static int hid_parse(HidMap* m, const uint8_t* d, int len)
+{
+    int pos = 0, page = 0, rsize = 0, rcount = 0, rid = 0, nu = 0, umin = -1, umax = -1, coll = 0, app = 0, i;
+    int32_t lmin = 0, lmax = 0;
+    int usages[16];
+    static int bits[256];                       /* input bit position per report ID */
+    memset(m, 0, sizeof(*m));
+    for (i = 0; i < 6; ++i) m->ax[i].id = -1;
+    m->hat.id = m->btn.id = -1;
+    memset(bits, 0, sizeof bits);
+    while (pos < len)
+    {
+        int h = d[pos], sz = h & 3, type = (h >> 2) & 3, tag = h >> 4;
+        const uint8_t* v;
+        if (h == 0xFE) { if (pos + 2 >= len) break; pos += 3 + d[pos + 1]; continue; }   /* long item */
+        if (sz == 3) sz = 4;
+        if (pos + 1 + sz > len) break;
+        v = d + pos + 1;
+        pos += 1 + sz;
+        if (type == 1)                                                  /* global */
+        {
+            if (tag == 0) page = (int)hid_uval(v, sz);
+            else if (tag == 1) lmin = hid_sval(v, sz);
+            else if (tag == 2) lmax = lmin >= 0 ? (int32_t)hid_uval(v, sz) : hid_sval(v, sz);
+            else if (tag == 7) rsize = (int)hid_uval(v, sz);
+            else if (tag == 8) { rid = (int)hid_uval(v, sz) & 255; m->ids = 1; }
+            else if (tag == 9) rcount = (int)hid_uval(v, sz);
+        }
+        else if (type == 2)                                             /* local */
+        {
+            uint32_t u = hid_uval(v, sz);
+            if (sz == 4) u &= 0xFFFF;
+            if (tag == 0 && nu < 16) usages[nu++] = (int)u;
+            else if (tag == 1) umin = (int)u;
+            else if (tag == 2) umax = (int)u;
+        }
+        else if (type == 0)                                             /* main */
+        {
+            uint32_t f = hid_uval(v, sz);
+            if (tag == 0xA)
+            {   /* the application collection must be a joystick (4) or a gamepad (5) */
+                if (coll == 0 && page == 1 && nu > 0 && (usages[0] == 4 || usages[0] == 5)) app = 1;
+                ++coll;
+            }
+            else if (tag == 0xC) { if (coll) --coll; }
+            else if (tag == 0x8)                                        /* input */
+            {
+                for (i = 0; i < rcount; ++i)
+                {
+                    int u = nu ? usages[i < nu ? i : nu - 1] : umin >= 0 ? umin + i : -1;
+                    if (umax >= 0 && umin >= 0 && u > umax) u = -1;
+                    if (!(f & 1) && u >= 0 && rsize > 0 && rsize <= 32)
+                    {
+                        HidF x; x.id = m->ids ? rid : 0; x.off = bits[rid]; x.size = rsize; x.lmin = lmin; x.lmax = lmax;
+                        if (page == 1 && u >= 0x30 && u <= 0x35 && m->ax[u - 0x30].id < 0 && lmax > lmin) m->ax[u - 0x30] = x;
+                        else if (page == 1 && u == 0x39 && m->hat.id < 0) m->hat = x;
+                        else if (page == 9 && rsize == 1 && u >= 1 && u <= 16)
+                        {
+                            if (m->btn.id < 0 && u == 1) { m->btn = x; m->nbtn = 1; }
+                            else if (m->btn.id == x.id && x.off == m->btn.off + u - 1 && u > m->nbtn) m->nbtn = u;
+                        }
+                    }
+                    bits[rid] += rsize;
+                }
+            }
+            nu = 0; umin = umax = -1;
+        }
+    }
+    return app && m->ax[0].id >= 0 && m->ax[1].id >= 0;
+}
+static uint32_t hid_get(const uint8_t* r, int len, const HidF* x)
+{
+    uint32_t v = 0; int i;
+    for (i = 0; i < x->size; ++i)
+    {
+        int b = x->off + i;
+        if ((b >> 3) >= len) break;
+        v |= (uint32_t)((r[b >> 3] >> (b & 7)) & 1) << i;
+    }
+    if (x->lmin < 0 && x->size < 32 && (v >> (x->size - 1) & 1)) v |= ~0U << x->size;    /* sign */
+    return v;
+}
+static int16_t hid_axis(const uint8_t* r, int len, const HidF* x, int flip)
+{
+    int32_t v = (int32_t)hid_get(r, len, x);
+    int32_t n = (int32_t)(((int64_t)(v - x->lmin) * 65535) / (x->lmax - x->lmin)) - 32768;
+    if (n < -32768) n = -32768;
+    if (n > 32767) n = 32767;
+    return (int16_t)(flip ? -1 - n : n);
+}
+/* buttons 1-4 = A B X Y (the game's fire buttons), 5 6 = LB RB, 7 8 = triggers, 9 10 = Back Start, 11 12 = sticks,
+ * 13 = Guide; X Y = left stick; Z Rz (or Rx Ry) = right stick; the hat = d-pad */
+static void parse_hid(USBPAD_State* s, const HidMap* m, const uint8_t* r0, int len)
+{
+    static const uint16_t bm[13] = { XPAD_A, XPAD_B, XPAD_X, XPAD_Y, XPAD_LB, XPAD_RB, 0, 0, XPAD_BACK, XPAD_START, XPAD_LS, XPAD_RS, XPAD_GUIDE };
+    int id = m->ids ? r0[0] : 0, i, any = 0;
+    const uint8_t* r = m->ids ? r0 + 1 : r0;
+    uint16_t b = 0;
+    if (m->ids) --len;
+    if (m->ax[0].id == id) { s->lx = hid_axis(r, len, &m->ax[0], 0); any = 1; }
+    if (m->ax[1].id == id) { s->ly = hid_axis(r, len, &m->ax[1], 1); any = 1; }
+    if (m->ax[2].id >= 0 && m->ax[5].id >= 0)
+    {
+        if (m->ax[2].id == id) s->rx = hid_axis(r, len, &m->ax[2], 0);
+        if (m->ax[5].id == id) s->ry = hid_axis(r, len, &m->ax[5], 1);
+        if (m->ax[3].id == id) s->lt = (uint8_t)((hid_axis(r, len, &m->ax[3], 0) + 32768) >> 8);
+        if (m->ax[4].id == id) s->rt = (uint8_t)((hid_axis(r, len, &m->ax[4], 0) + 32768) >> 8);
+    }
+    else
+    {
+        if (m->ax[3].id == id) s->rx = hid_axis(r, len, &m->ax[3], 0);
+        if (m->ax[4].id == id) s->ry = hid_axis(r, len, &m->ax[4], 1);
+    }
+    if (m->btn.id == id)
+    {
+        HidF x = m->btn;
+        for (i = 0; i < m->nbtn && i < 13; ++i)
+        {
+            x.off = m->btn.off + i; x.size = 1; x.lmin = 0;
+            if (hid_get(r, len, &x))
+            {
+                b |= bm[i];
+                if (i == 6) s->lt = 255;
+                if (i == 7) s->rt = 255;
+            }
+            else if ((i == 6 && m->ax[3].id < 0) || (i == 7 && m->ax[4].id < 0)) { if (i == 6) s->lt = 0; else s->rt = 0; }
+        }
+        any = 1;
+    }
+    else b = (uint16_t)(s->buttons & ~(XPAD_DU | XPAD_DD | XPAD_DL | XPAD_DR));
+    if (m->hat.id == id)
+    {
+        static const uint16_t hd[8] = { XPAD_DU, XPAD_DU | XPAD_DR, XPAD_DR, XPAD_DR | XPAD_DD, XPAD_DD, XPAD_DD | XPAD_DL, XPAD_DL, XPAD_DL | XPAD_DU };
+        int32_t v = (int32_t)hid_get(r, len, &m->hat) - m->hat.lmin;
+        if (v >= 0 && v < 8 && m->hat.lmax - m->hat.lmin >= 7) b |= hd[v];
+        any = 1;
+    }
+    else b |= (uint16_t)(s->buttons & (XPAD_DU | XPAD_DD | XPAD_DL | XPAD_DR));
+    s->buttons = b;
+    if (any) ++s->reports;
+}
+
 static void pad_leds(int k)
 {
     Pipe* q = &P[k];
@@ -1680,7 +1857,23 @@ static void pipe_poll(int k)
     case PT_PAD:
     {
         USBPAD_State* s = &Pad[q->pad];
-        if (!q->wireless)
+        if (q->kind == PK_GIP)
+        {
+            const uint8_t* r = q->ibuf;
+            if (r[0] == 0x20 && len >= 18) parse_gip(s, r);
+            else if (r[0] == 0x07 && len >= 5)                          /* the Xbox button has its own packet */
+            {
+                s->buttons = (uint16_t)((s->buttons & ~XPAD_GUIDE) | ((r[4] & 1) ? XPAD_GUIDE : 0));
+                if ((r[1] & 0x10) && !Light)
+                {   /* the pad wants this one acknowledged (else it sends it again) */
+                    uint8_t ack[13] = { 0x01, 0x20, 0, 0x09, 0x00, 0x07, 0x20, 0x02, 0, 0, 0, 0, 0 };
+                    ack[2] = r[2]; ack[5] = r[0];
+                    arm_in(k); send_out(k, ack, 13); return;
+                }
+            }
+        }
+        else if (q->kind == PK_HID) { if (len > 0) parse_hid(s, &Hm[k], q->ibuf, len); }
+        else if (!q->wireless)
         {
             if (len >= 14 && q->ibuf[0] == 0x00) parse_pad(s, q->ibuf);
         }
@@ -1721,7 +1914,7 @@ static void pipe_poll(int k)
 }
 
 /* ================================================================== enumeration */
-typedef struct { int type, ifc, ep, mps, intv, outep, outmps, wl; } Fn;
+typedef struct { int type, ifc, ep, mps, intv, outep, outmps, wl, kind, hidlen; HidMap hm; } Fn;
 
 /* make device di usable (address, descriptors, configuration, its pads / keyboards / mice started):
  * 1 = in use, 2 = hub ready, 0 = failed (retried), -1 = nothing usable there */
@@ -1813,14 +2006,19 @@ static int enumerate(int di)
             cur = -1;
             if (c == 9) ishub = 1;
             if (b[pos + 3] != 0 || nf >= MAX_PIPE) continue;
+            int kind = PK_360;
             if (c == 0xFF && s == 0x5D && (pr == 0x01 || pr == 0x81)) t = PT_PAD;
+            else if (c == 0xFF && s == 0x47 && pr == 0xD0) { t = PT_PAD; kind = PK_GIP; }   /* Xbox One / Series pad */
             else if (c == 3 && s == 1 && pr == 1) t = PT_KBD;
             else if (c == 3 && s == 1 && pr == 2) t = PT_MOUSE;
+            else if (c == 3 && s <= 1 && pr == 0) { t = PT_PAD; kind = PK_HID; }   /* maybe a gamepad: its report descriptor says */
             if (t < 0) continue;
             cur = nf++;
             memset(&f[cur], 0, sizeof(f[cur]));
-            f[cur].type = t; f[cur].ifc = b[pos + 2]; f[cur].wl = pr == 0x81;
+            f[cur].type = t; f[cur].ifc = b[pos + 2]; f[cur].wl = pr == 0x81; f[cur].kind = kind;
         }
+        else if (type == 0x21 && cur >= 0 && pos + 8 < total)                      /* HID descriptor: report length */
+            f[cur].hidlen = b[pos + 7] | b[pos + 8] << 8;
         else if (type == 5 && cur >= 0 && pos + 6 < total && (b[pos + 3] & 3) == 3)
         {
             Fn* x = &f[cur];
@@ -1850,6 +2048,12 @@ static int enumerate(int di)
     for (i = 0; i < nf; ++i)
     {
         int ok = f[i].ep != 0;
+        if (f[i].type == PT_PAD && f[i].kind == PK_HID && ok && pads < USBPAD_PADS)
+        {   /* a HID interface is used as a pad only if it says it is a joystick / gamepad with X and Y */
+            int n = f[i].hidlen > 480 ? 480 : f[i].hidlen;
+            ok = n > 0 && control(di, 0x81, 6, 0x2200, (uint16_t)f[i].ifc, (uint16_t)n) == 0 && hid_parse(&f[i].hm, b, n);
+            if (!ok) trace("hid-not-pad ");
+        }
         if (f[i].type == PT_PAD) ok = ok && pads < USBPAD_PADS;
         else if (f[i].type == PT_KBD) ok = ok && (Flags & USBPAD_F_KBD) && kbds < 2;
         else ok = ok && (Flags & USBPAD_F_MOUSE) && mice < 2;
@@ -1873,7 +2077,8 @@ static int enumerate(int di)
         memset(q, 0, sizeof(*q));
         q->used = 1; q->type = f[i].type; q->dev = di; q->hc = h; q->ifc = f[i].ifc;
         q->ep = f[i].ep; q->mps = f[i].mps; q->intv = f[i].intv; q->outep = f[i].outep; q->outmps = f[i].outmps ? f[i].outmps : 32;
-        q->wireless = f[i].wl;
+        q->wireless = f[i].wl; q->kind = f[i].kind;
+        if (q->kind == PK_HID) Hm[k] = f[i].hm;
         q->td = (volatile uint32_t*)((uint8_t*)Mem.linearptr + M_PIPE + k * 0x800);
         q->ibuf = (uint8_t*)Mem.linearptr + M_PIPE + k * 0x800 + 0x100;
         q->obuf = q->ibuf + 0x40;
@@ -1887,7 +2092,9 @@ static int enumerate(int di)
                 if (!taken) break;
             }
             q->pad = n;
-            if (q->type == PT_PAD && q->mps < 20) q->mps = 32;
+            if (q->kind == PK_360 && q->mps < 20) q->mps = 32;
+            if (q->kind == PK_HID) control(di, 0x21, 0x0A, 0, (uint16_t)q->ifc, 0);   /* SET_IDLE: only changes */
+            if (q->kind != PK_360 && q->mps > 64) q->mps = 64;
         }
         else
         {
@@ -1912,7 +2119,16 @@ static int enumerate(int di)
         {
             USBPAD_State* s = &Pad[q->pad];
             memset((void*)s, 0, sizeof(*s));
-            if (q->wireless)
+            if (q->kind == PK_GIP)
+            {   /* Xbox One: nothing comes until the pad is told to start (Linux xpad: power on, then the
+                 * "S" init that newer Microsoft pads want; others ignore it) */
+                uint8_t on[5] = { 0x05, 0x20, 0x00, 0x01, 0x00 }, sinit[5] = { 0x05, 0x20, 0x00, 0x0F, 0x06 };
+                on[2] = (uint8_t)q->gseq++; send_out(k, on, 5);
+                if (vid == 0x045E) { sinit[2] = (uint8_t)q->gseq++; send_out(k, sinit, 5); }
+                s->connected = 1;
+            }
+            else if (q->kind == PK_HID) s->connected = 1;
+            else if (q->wireless)
             {
                 static const uint8_t inq[12] = { 0x08, 0x00, 0x0F, 0xC0 };
                 send_out(k, inq, 12);
