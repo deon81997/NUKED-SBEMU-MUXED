@@ -60,7 +60,7 @@ period-correct DOS sound setup. It's tuned on a **Dell Latitude D810**
 <summary><b>🎼 MIDI: SC-55, MT-32, CM-32L, SoundFont</b></summary>
 
 - **SC-55** (mk1 v1.00 – v2.00) and **SC-55mkII** (v1.01) firmware emulated with Nuked-SC55; ROM sets found by content, best one picked automatically
-- **MT-32** and **CM-32L / LAPC-I** with Munt 2.8.3
+- **MT-32** and **CM-32L / LAPC-I** with Munt 2.8.5
 - **SoundFont** (`.SF2`) with reverb and chorus, for slower CPUs
 - MPU-401 UART on any port (330, 300, 310, 320, 332, 334); every tool finds it wherever it is
 - Render-ahead buffer, timer give-back and automatic speed control keep music smooth while games run
@@ -314,7 +314,14 @@ The release leaves out what it may not legally share. Only the ROMs are needed f
 
 | | Minimum | Recommended |
 |---|---|---|
-| **CPU** | SoundFont / FM: a far smaller CPU than the SC-55 needs | SC-55: a fast Pentium-class CPU (the D810's Pentium M works). It runs the real firmware: `SC55WAV` or *Settings > Automatic setup* measures yours |
+| **CPU** | Sound Blaster + FM: any Pentium. MT-32 / SC-55 need a CPU with CMOV (Pentium Pro / II or newer) | SC-55: about a Pentium M 1.5 GHz, Pentium 4 2.4 GHz or Athlon XP 2000+ or faster (it runs the real firmware and needs 1.5× real time). `TEST.BAT` or *Settings > Automatic setup* measures yours |
+
+Measured with `SC55LOG` (higher is faster; 1.0× = just real time):
+
+| CPU | SC-55 (mk1 v2.00) | Nuked OPL3 FM | DOSBox FM | Notes |
+|---|---|---|---|---|
+| Celeron 533 (86Box, VIA AC'97) | 0.41× | 2.1× | 4.7× | too slow for the SC-55; FM and Sound Blaster fine |
+| Pentium M (Dell D810) | live playback works | — | — | the reference machine |
 | **Memory** | 32 MB (about 21 MB stay resident with the SC-55) | 64 MB or more |
 | **Sound** | a PCI / onboard chip from the [list above](#-supported-sound-chips) | Intel AC'97 or HD Audio |
 | **DOS** | MS-DOS 6.22 / 7.x or FreeDOS, booted to plain DOS | Windows 98 "Restart in MS-DOS mode" (MS-DOS 7.1) |
@@ -374,7 +381,7 @@ sc55-pack/
 │   └── sbemu/vmpu_sc55.c, vmpu_mt32.cpp, vmpu_sf.c, cdlink.c, vdiag.c
 ├── sc55/                 SC-55 engine around Nuked-SC55
 ├── upstream/Nuked-SC55   Nuked-SC55, unmodified
-├── third_party/          Munt mt32emu 2.8.3, Nuked OPL3
+├── third_party/          Munt mt32emu 2.8.5, Nuked OPL3-fast 1.8-fast.3
 ├── tools/                DOS programs (menu, settings, GAMETEST, MIDPLAY, CD images …) + text UI
 ├── win98/                Windows 98 part: vxd/, helper/, mididrv/, compat/
 ├── pack/                 the pack's batch files and guides
@@ -441,7 +448,7 @@ Combined work: **GPL-2.0-or-later** ([`COPYING`](sc55-pack/COPYING)).
 | [Nuked-SC55](https://github.com/nukeykt/Nuked-SC55) | **nukeykt (Nuke.YKT)**, SC-55 emulator | GPL-2.0+ |
 | Nuked-SC55 [backend fork](https://github.com/jcmoyer/Nuked-SC55) used here | **J.C. Moyer (jcmoyer)**: library backend, fast H8/532 VM, ROM detection by hash | GPL-2.0+ |
 | Nuked-SC55 research and help | John McMaster (PCM chip decap), org / ogamespec (deroute tool), Wohlstand, mattw, HardWareMan, giulioz, Cloudschatze, NikitaLita, Karmeck, Falcosoft, Michael Mouton | — |
-| [Munt](https://github.com/munt/munt) libmt32emu 2.8.3 | **Dean Beeler, Jerome Fisher, Sergey V. Mikayev** and the Munt team | LGPL-2.1+ |
+| [Munt](https://github.com/munt/munt) libmt32emu 2.8.5 | **Dean Beeler, Jerome Fisher, Sergey V. Mikayev** and the Munt team | LGPL-2.1+ |
 | [Nuked-OPL3](https://github.com/nukeykt/Nuked-OPL3) | **nukeykt** | LGPL-2.1+ |
 | [Nuked-OPL3-fast](https://github.com/tgies/Nuked-OPL3-fast) | **Tony Gies (tgies)**: bit-exact, faster fork | LGPL-2.1+ |
 | DOSBox OPL (DBOPL) and PC speaker | **The DOSBox Team**; PC speaker port to SBEMU by [andersrodrig](https://github.com/andersrodrig) | GPL-2.0+ |

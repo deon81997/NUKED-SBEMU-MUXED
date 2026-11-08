@@ -1196,7 +1196,7 @@ CONTENTS
                      org / ogamespec (deroute tool), Wohlstand, mattw,
                      HardWareMan, giulioz, Cloudschatze, NikitaLita,
                      Karmeck, Falcosoft and Michael Mouton
-  Munt libmt32emu .. 2.8.3, Dean Beeler, Jerome Fisher, Sergey V. Mikayev
+  Munt libmt32emu .. 2.8.5, Dean Beeler, Jerome Fisher, Sergey V. Mikayev
                      and the Munt team, LGPL-2.1+ (C:\SC55\MUNT-LIC.TXT)
                      https://github.com/munt/munt
   Nuked-OPL3 ....... nukeykt, LGPL-2.1+; faster bit-exact fork

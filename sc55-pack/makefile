@@ -7,7 +7,7 @@ DEBUG ?= 0
 # 0: original SBEMU build with the TinySoundFont SoundFont synth
 VSC55 ?= 1
 
-VERSION ?= 1.0.0-beta.49-usb-sc55
+VERSION ?= 1.0.0-beta.50-usb-sc55
 
 INCLUDES := -I./mpxplay -I./sbemu -I./drivers/include -I./sc55 -I./third_party/nuked-opl3-fast
 DEFINES := -D__DOS__ -DSBEMU -DDEBUG=$(DEBUG) -DSBEMU_VSC55=$(VSC55) -DMAIN_SBEMU_VER=\"$(VERSION)\"
@@ -173,6 +173,10 @@ LINUX_DRIVERS_SRC := $(CTXFI_SRC) $(EMU10K1_SRC) $(TRIDENT_SRC) $(ALS4000_SRC) $
 SRC := $(LINUX_DRIVERS_SRC) $(CARDS_SRC) $(SBEMU_SRC)
 NUKEDOPL_OBJ := output/third_party/nuked-opl3-fast/opl3.o
 OBJS := $(patsubst %.cpp,output/%.o,$(patsubst %.c,output/%.o,$(SRC))) $(SC55_OBJS) $(NUKEDOPL_OBJ)
+# no per-file header tracking: rebuild every object when any project header changes
+# (a stale object built against an older opl3.h corrupted memory in beta.50 testing)
+PROJECT_HEADERS := $(wildcard sbemu/*.h sbemu/*/*.h mpxplay/*.h mpxplay/au_cards/*.h sc55/*.h third_party/*/*.h $(CORE_DIR)/*.h)
+$(OBJS): $(PROJECT_HEADERS)
 
 $(TARGET): $(OBJS)
 	@mkdir -p $(dir $@)

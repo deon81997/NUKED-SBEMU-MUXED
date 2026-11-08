@@ -223,3 +223,14 @@
   no CMOV (vmpu_sc55.c), SBSET automatic setup likewise. README notes the SC-55/MT-32 CPU minimum.
 - /JOYMODE and /JOYDZ now apply to an already loaded SBEMU (VJOY_SetLive; not to/from 4). VMPU warning uses CR LF.
 - Not covered by 86Box: EHCI/xHCI, CardBus; USB keyboard/mouse through SBEMU not yet run there.
+
+## 2026-11-08 (beta.50): upstream updates
+- SBEMU (crazii) since cbdbb7c: CS4281 init/AC97/clock fixes, ES1370 UART/clock fixes, AK4531 routing bits,
+  SB Live! MPU-401 passthrough (8db907d, 2d1cd2a, 9aa26dc, 3963f4a). Nuked-OPL3-fast 1.8-fast.2 -> 1.8-fast.3.
+  Munt libmt32emu 2.8.3 -> 2.8.5 (MidiStreamParser sysex overflow fix). jcmoyer Nuked-SC55 0.7.0 -> 66d1272
+  (compile fixes only). SHSUCDX built from adoxa/shsucd 5ea0787 (Associated Files fix; NASM, 3.09 source
+  rebuild matched the shipped binary byte for byte). uCDD 0.9.5-a3 only changes the resident-audio DPMI host:
+  the pack's mount-only UCDD.EXE stays a2. Jemm 5.87pre1 skipped (pre-release). Win98 part already used the
+  latest Munt and Nuked-SC55.
+- opl3.h changed size of opl3_chip: a stale output/sbemu/opl3emu.o crashed programs after FM output.
+  makefile now rebuilds every object when any project header changes.
