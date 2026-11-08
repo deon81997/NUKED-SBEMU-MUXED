@@ -239,6 +239,8 @@ typedef struct
     uint32_t ignore;                    /* root ports: nothing usable there, skip until unplugged */
     uint8_t  fails[MAX_PORT];
     int      run;                       /* UHCI: running (only while it has a device, as in beta.44) */
+    int      oslow;                     /* OHCI that misses tail-appended TDs (NEC uPD720101): every new IN TD
+                                         * goes in by rewriting the ED while it is skipped for a frame */
 } HCI;
 static HCI      HC[MAX_HC];
 static int      HCn, UhciN, OhciN, EhciN, XhciN, EhciGiven;
@@ -1494,11 +1496,35 @@ static void arm_in(int k)
     case T_OHCI:
     {
         volatile uint32_t* nt = o_tdi(q, q->ocur ^ 1);
+        volatile uint32_t* e = PQ(h, k);
+#ifdef OSLOWFORCE
+        HC[h].oslow = 1;
+#endif
+        if (HC[h].oslow)
+        {   /* skip the ED, let a frame start (the HC drops what it read of it), then point head AND tail at
+             * the new TD / new empty tail - keeping the toggle carry */
+            uint32_t f0, tog;
+            int n;
+            e[0] |= ED_SKIP; fl(e, 16);
+            f0 = ord(h, 0x3C) & 0xFFFF;
+            for (n = 0; n < 12 && ((ord(h, 0x3C) - f0) & 0xFFFF) < 1; ++n) wait_us(100);
+            fl(e, 16);
+            tog = e[2] & 2;
+            zero(nt, 4);
+            otd(o_tdi(q, q->ocur), OTD_IN | OTD_R, PHYS(q->ibuf), q->mps, nt);
+            fl(q->td, 32); fl(q->ibuf, 64);
+            e[1] = PHYS(nt);
+            e[2] = PHYS(o_tdi(q, q->ocur)) | tog;
+            fl(e, 16);
+            e[0] &= ~ED_SKIP; fl(e, 16);
+            q->ocur ^= 1;
+            break;
+        }
         zero(nt, 4);
         otd(o_tdi(q, q->ocur), OTD_IN | OTD_R, PHYS(q->ibuf), q->mps, nt);
         fl(q->td, 32); fl(q->ibuf, 64);
-        PQ(h, k)[1] = PHYS(nt);
-        fl(PQ(h, k), 16);
+        e[1] = PHYS(nt);
+        fl(e, 16);
         q->ocur ^= 1;
         break;
     }
@@ -1618,7 +1644,23 @@ static int poll_in(int k)
         uint32_t cc;
         fl(q->td, 32);
         cc = OTD_CC(t[0]);
-        if (cc >= 0xE) return 0;
+        if (cc >= 0xE)
+        {
+            /* our TD still waits, but the ED says its queue is empty: the HC lost the TD we appended (seen on
+             * the NEC uPD720101: one report per pipe, then "EMPTY" with the new TD outside head..tail) */
+            volatile uint32_t* e = PQ(h, k);
+            fl(e, 16);
+            if (!(e[0] & ED_SKIP) && (e[2] & ~0xFUL) == e[1] && e[1] != PHYS(t))
+            {
+                fl(q->td, 32);
+                if (OTD_CC(t[0]) < 0xE) return 0;                   /* finished meanwhile: next poll takes it */
+                if (!HC[h].oslow) trace("[OHCI %d lost a TD: ED rewrite per transfer from now] ", h + 1);
+                HC[h].oslow = 1;
+                q->ocur ^= 1;                                       /* arm the same slot again, the slow way */
+                arm_in(k);
+            }
+            return 0;
+        }
         if (cc) { fl(PQ(h, k), 16); if (!(PQ(h, k)[2] & ED_HALT)) return 0; }   /* the HC tries again (ErrorCount < 3) */
         fl(q->ibuf, 64);
         owr(h, O_INTSTS, 0x06);

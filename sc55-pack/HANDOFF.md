@@ -360,3 +360,13 @@
 - One TD per IN pipe completes, the tail-appended next one apparently never does. USBTEST now dumps every IN pipe
   (USBPAD_Dump: ED info/tail/head, both TDs, EMPTY/HALTED/waiting) at 5 s and 20 s and on D; R restarts every pipe
   with a full ED rewrite (USBPAD_Rearm -> start_in). Next step depends on that dump.
+
+## beta.63-usb (2026-11-08): the NEC drops tail-appended interrupt TDs - found with the beta.62 dump
+- P5PE-VM USBTEST 5 s dump, all three pipes: ED "EMPTY" (head == tail) while our newly armed TD (CC F) sits in the
+  other slot, outside head..tail; one report per pipe, then nothing. The HC ran off a stale copy of the old empty
+  tail TD (or ED) and never saw the append.
+- poll_in (OHCI): our TD still pending + ED empty + tail != our TD -> trace "[OHCI n lost a TD: ED rewrite per
+  transfer from now]", HC[h].oslow = 1, re-arm that slot. arm_in with oslow: ED skipped, wait for a frame start
+  (<= 1.2 ms), head AND tail rewritten to the new TD / new empty tail (toggle carry kept), unskipped.
+- QEMU with oslow forced (-DOSLOWFORCE): all fakepad changes arrive (reports 21); normal build unchanged.
+- SBEMU on the NEC (beta.62 SBDETAIL) found pad 1, keyboard and mouse at start-up (split SET_ADDRESS first).
