@@ -27,6 +27,7 @@ CONTENTS
   10. CD-Audio through your sound card (HYBRID, experimental)
  10b. USB in DOS: Xbox 360 pads on the gameport, USB keyboard and mouse
   11. Real-mode games: JEMM+QPIEMU or QEMM (optional, you supply the files)
+ 11b. 16-bit protected-mode games (Jazz Jackrabbit): SC55J16.BAT
   12. Using your real CD-ROM drive in DOS
   13. Optional: load the CD-ROM driver at every start (BOOTCFG / RESET)
   14. Cleaning up and uninstalling
@@ -866,6 +867,39 @@ CONTENTS
 
 
 =============================================================================
+ 11b. 16-BIT PROTECTED-MODE GAMES (JAZZ JACKRABBIT)  (experimental)
+=============================================================================
+
+  A few games run as 16-bit DPMI programs (Borland Pascal / C++ "16-bit
+  protected mode", e.g. Jazz Jackrabbit). They need a 16-bit DPMI host,
+  and neither SC55.BAT nor SC55JEM.BAT gives their Sound Blaster, OPL,
+  MPU-401 or joystick ports to SBEMU. Use this launcher instead:
+
+     C:\SC55\SC55J16.BAT       (JEMMEX loaded from CONFIG.SYS, as for
+                                SC55JEM.BAT - section 11)
+
+  It loads QPIEMU, then C:\HDPMI\HDPMI16I.EXE (16-bit HDPMI that can trap
+  ports), HDPMI32I, SBEMU with your settings, and SBEMU16.COM. SBEMU16
+  stays resident (about 3 KB) and sends every access a 16-bit game makes to
+  the SB / OPL / MPU / PIC / DMA ports and the gameport through to SBEMU,
+  so the game sees the same emulated card as a real-mode game. The
+  joystick is answered locally from the stick position SBEMU gives it, so
+  calibration is stable.
+
+  Notes
+  * HDPMI16I must be loaded before HDPMI32I, and only this HDPMI16I works
+    with the pack's HDPMI32I (another HDPMI16 stops with "DPMI detected").
+  * 32-bit protected-mode games and real-mode games keep working as with
+    SC55JEM.BAT.
+  * Jazz Jackrabbit: choose "Sound Blaster Pro" in SETUP.EXE. If the CD
+    version stops with "Runtime error 200", it needs the Turbo Pascal CRT
+    fix for fast CPUs (any "TPPATCH" style patch for FILE0001.EXE).
+    Check MUSIC / SOUND FX in its options are not turned all the way down.
+  * Tested in QEMU (Jazz: sound, music, joystick calibration and menus).
+    Not yet tested on real hardware.
+
+
+=============================================================================
  12. USING YOUR REAL CD-ROM DRIVE IN DOS  (Dell D810 etc.)
 =============================================================================
 
@@ -951,7 +985,7 @@ CONTENTS
          D = delete them too, for exactly the state before the install.
       3. It removes every folder and file the pack created: C:\SC55 (with
          ROMS, SF2, CDDRV, DOSMODE, RM, logs and settings), C:\CDSET,
-         C:\CDIMAGES, HDPMI32I.EXE in C:\HDPMI, the LG driver in
+         C:\CDIMAGES, HDPMI32I/16I.EXE in C:\HDPMI, the LG driver in
          C:\GSCDROM, C:\MOUNT.BAT, C:\RESET.BAT, and leftovers of older
          packs (CLEANUP's list). C:\HDPMI, C:\GSCDROM and C:\CDIMAGES are
          only removed if nothing of yours is left in them.
@@ -1108,9 +1142,9 @@ CONTENTS
      FILES\SC55       SBEMU.EXE, SBSET.EXE, SC55WAV.EXE, SC55LOG.EXE,
                       MPUTEST.EXE, MIDPLAY.EXE, CPUMHZ.EXE, SC55MENU.EXE,
                       SBDIAG.EXE, GAMETEST.EXE, TIMETEST.EXE, JOYTEST.EXE,
-                      USBTEST.EXE, KMTEST.EXE
+                      USBTEST.EXE, KMTEST.EXE, SBEMU16.COM
      FILES\ROMS       ROM dumps (yours)
-     FILES\HDPMI      HDPMI32I.EXE
+     FILES\HDPMI      HDPMI32I.EXE, HDPMI16I.EXE (16-bit, section 11b)
      FILES\CDSET      uCDD, SHSUCDX, CDGUI, CDPLAY, GUI/CDIMG/CDON/CDDIAG
      FILES\CDIMAGES   TEST.CUE / TEST.BIN test disc
      FILES\BOOT       BOOTCFG.BAT, RESET.BAT
@@ -1124,6 +1158,7 @@ CONTENTS
                         short-lived "what to run next" file)
      C:\SC55\SC55.BAT TEST.BAT SETTINGS.BAT CDROM.BAT CDROMLG.BAT
      C:\SC55\SC55JEM.BAT SC55QMM.BAT   real-mode launchers (section 11)
+     C:\SC55\SC55J16.BAT   + 16-bit protected-mode games (section 11b)
      C:\SC55\RM\JEMM (Jemm 5.86), C:\SC55\RM\QEMM (your files)
      C:\SC55\THEME.CFG    menu style, display mode, animation and font
      C:\SC55\MENU.CFG     the item the menu was last on

@@ -1,0 +1,25 @@
+--- a/Src/HDPMI/HDPMI.INC	2026-11-07 19:36:49.934131975 -0500
++++ b/Src/HDPMI/HDPMI.INC	2026-11-07 19:43:22.566377432 -0500
+@@ -1460,7 +1460,7 @@
+ 
+ ?IRQ_ROUTE_IVT equ 1 ;route PM irq to IVT after PM handles are done.
+ 
+-if ?PMIOPL eq 0
++if ?PMIOPL eq 0 and ?32BIT
+ ?IRQ_ROUTE equ 1 ;custom routing
+ else
+ ?IRQ_ROUTE equ 0
+--- a/Src/HDPMI/I2FHDPMI.ASM	2026-11-07 19:36:49.934131975 -0500
++++ b/Src/HDPMI/I2FHDPMI.ASM	2026-11-07 19:56:59.298325666 -0500
+@@ -49,7 +49,11 @@
+ 
+ ;--- in a first step, it might be sufficient to have static storage for 4 port ranges.
+ ?IOTP_COUNT equ 16
++if ?32BIT
+ ?USE_HOST_MEM equ 1 ;use host memory to store trapped stack frame. does not support trap recursion
++else
++?USE_HOST_MEM equ 0 ;16-bit (SBEMU16): frame on the client stack, so a trap inside a trap (a game IRQ handler during a trapped access) works
++endif
+ 
+ _DATA16 segment
+ traptable label byte

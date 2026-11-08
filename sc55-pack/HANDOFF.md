@@ -1,6 +1,6 @@
 # SC-55 pack — handoff
 
-## Current state (SBEMU 1.0.0-beta.47-usb-sc55, branch usb-xpad)
+## Current state (SBEMU 1.0.0-beta.48-usb-sc55, branch usb-xpad)
 - SBEMU + Nuked-SC55 (SC-55/mkII), Munt MT-32/CM-32L (/VMT32), SoundFont (/VSF); MPU side channel 0xA5-0xB0 (stats, SBDIAG, key player, triple-Esc, front panel/LCD + CPU load).
 - Key player holds each typed key 500 ms (vdiag.c key_tick); Duke 3D quit default `ESC W3 Q W2 Y W3 Y W3 ESC W3 Q W2 Y W3 Y` — verified in QEMU with Duke 3D Atomic 1.5 from logo, title and demo (GAMETEST /RUN, 20 s and 40 s tests).
 - Tools: SC55MENU (game profiles GAMES.CFG, safe mode, CPU%, first-run auto setup), SBSET (/TUNE benchmark, MT-32 choice), GAMETEST (/RUN), MIDPLAY (live SC-55/MT-32 LCD panel), CDGUI (CUE checks/fix), Ctrl+Alt+F12 in-game LCD overlay (text + mode 13h).
@@ -50,7 +50,9 @@
    /JOYMODE 1 CH and 2 FCS verified in Descent 1 (QEMU, see below); GrIP still needs a game with GrIP support.
 2. Possible next: CardBus slot bring-up (D810 PC Card), Xbox One pads (GIP init), INT 15h AH=84h BIOS joystick, Renesas
    firmware upload; check EHCI split transactions (pad behind an Intel 5/6-series built-in hub) on real hardware.
-3. Older: Automatic setup, MIDPLAY S panel, Ctrl+Alt+F12, MT-32 game, GAMETEST Duke run; SBDIAG if music is choppy.
+3. User (beta.48): SC55J16.BAT + Jazz Jackrabbit on the D810 (sound gaps seen only in QEMU HDA?, joystick calibration,
+   key response). Possible: SBEMU16 local 61h/DMA-count handling to cut real-mode trips; other 16-bit DPMI games.
+4. Older: Automatic setup, MIDPLAY S panel, Ctrl+Alt+F12, MT-32 game, GAMETEST Duke run; SBDIAG if music is choppy.
 
 ## Files
 - sbemu/vdiag.c (diagnostics, key player, overlay), sbemu/vmpu_sc55.c (MPU, panel 0xB0), sbemu/vmpu_mt32.cpp (Munt), sc55/sc55synth.cpp (SC55_GetLCD), main.c (/VMT32)
@@ -62,11 +64,15 @@
   main.c (/JOY*, /USBKB, /USBMS), tools/joytest.c, usbtest.c, kmtest.c, sbset.c (Joystick page), sc55menu.c;
   testrig/fakepad.py (usbredir pad), joyrun.sh, joyrm.asm. Test scripts in work/joyvm: multi.sh (2 pads + usb-kbd/mouse,
   LATE=1 adds kbd/mouse after POST so SeaBIOS doesn't serve INT 15h C2 itself), qmp.py (keys/mouse via QMP)
+- 16-bit PM: tools/sbemu16.asm (NASM .COM, HDPMI16 trap client -> real-mode in/out; 201h answered from vjoy's info
+  port 206h with a per-read virtual clock; saves FS/GS), third_party/hdpmi16 (HDPMI16I patch + build.sh, crazii/HX
+  43182b4, JWasm/JWlink built from GitHub in /home/claude/dl), SETUP makes SC55J16.BAT. testrig/sbt.asm (SB DMA+IRQ
+  test, 'SBT P' from 16-bit DPMI), joy16.asm. Jazz VM: /home/claude/games/jvm (starthda.sh = HDA + wav capture).
 - Build: DJGPP gcc 12.2 from github.com/andrewwutw/build-djgpp v3.4 (djgpp-linux64-gcc1220.tar.bz2);
   `export PATH=<djgpp>/bin:$PATH; make -j8` (delete output/*.o after header changes)
 
 ## Resume prompt
-"Continue NUKED SB-EMU from sc55-pack/HANDOFF.md (beta.47-usb): github.com/deon81997/NUKED-SBEMU-MUXED, branch usb-xpad. Rebuild with DJGPP, then continue from Next steps."
+"Continue NUKED SB-EMU from sc55-pack/HANDOFF.md (beta.48-usb): github.com/deon81997/NUKED-SBEMU-MUXED, branch usb-xpad. Rebuild with DJGPP, then continue from Next steps."
 
 ## 2026-11-06 (beta.37): SBEMU "Not loaded" on the D810 after SC55.BAT
 - SBEMU no longer quits when the real sound card uses the IRQ asked for (/I or BLASTER): it takes another of 7/5/9, warns, and updates BLASTER.
@@ -195,3 +201,11 @@
 - Descent II demo (user's d2demo10.zip): no GrIP (supports CH/TM/Gravis analog/SideWinder) - not needed for coverage.
 - Harness: testrig/fakepad.py "live:FILE" script = pad state read from FILE whenever it changes (manual driving);
   game VM scripts in work: /home/claude/games/dvm (start.sh, m.sh shot|key|pad|cmd). QEMU needs -device AC97 for SBEMU.
+
+## 2026-11-07 (beta.48-usb): 16-bit protected-mode games (SBEMU16 + HDPMI16I), tested with Jazz Jackrabbit in QEMU
+- Jazz (Borland 16PMODE) needs HDPMI16; only a crazii-fork HDPMI16I coexists with the pack's HDPMI32I (built from source).
+  CD Jazz FILE0001.EXE needs the Turbo Pascal RTE 200 patch (offset 223467 F7D0F7D2B93700F7F1 -> B8FFFF909090909090).
+- SBEMU16 traps 00-21,42-43,61,81-8F,A0-DF,220-22F,201,330-38B (port 60h must NOT be trapped: QPIEMU re-reads it).
+- Results: SB Pro detected, music + SFX play (HDA capture; AC97 in QEMU gives silence even for real-mode tests), joystick
+  detected/calibrated/moves menus, all keys register with 400 ms holds (100 ms taps drop: QEMU frame time). Silence seen
+  earlier was the VM's CONFIG.000 with volume 1 (mixer multiplier [928]=1), not an emulation bug.

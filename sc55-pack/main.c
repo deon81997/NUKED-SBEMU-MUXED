@@ -1000,7 +1000,7 @@ update_serial_mpu_output()
 
 static BOOL OPLRMInstalled, OPLPMInstalled, MPURMInstalled, MPUPMInstalled;
 /* USB Xbox 360 pad -> gameport 201h (/JOY) */
-static QEMM_IODT MAIN_JOY_IODT[1] = { { 0x201, (void*)&VJOY_IOHandler } };
+static QEMM_IODT MAIN_JOY_IODT[2] = { { 0x201, (void*)&VJOY_IOHandler }, { 0x206, (void*)&VJOY_InfoHandler } };   /* 206h: real mode only (SBEMU16) */
 static QEMM_IOPT MAIN_JOY_IOPT, MAIN_JOY_IOPT_PM;
 static BOOL MAIN_JOY_RM, MAIN_JOY_PM, MAIN_JOY_On;
 /* USB mouse -> PS/2 mouse commands answered by vkbc.c (/USBMS) */
@@ -1855,7 +1855,7 @@ int main(int argc, char* argv[])
                 {
                     static const char* modes[] = { "", " as CH Flightstick Pro", " as Thrustmaster FCS", " as Gravis GamePad Pro (GrIP)" };
                     int md = MAIN_Options[OPT_JOYMODE].value;
-                    if(enableRM) MAIN_JOY_RM = QEMM_Install_IOPortTrap(MAIN_JOY_IODT, 1, &MAIN_JOY_IOPT);
+                    if(enableRM) MAIN_JOY_RM = QEMM_Install_IOPortTrap(MAIN_JOY_IODT, 2, &MAIN_JOY_IOPT);
                     if(enablePM) MAIN_JOY_PM = HDPMIPT_Install_IOPortTrap(0x201, 0x201, MAIN_JOY_IODT, 1, &MAIN_JOY_IOPT_PM);
                     printf("Joystick (Port 201)%s: ", md >= 0 && md <= 3 ? modes[md] : "");
                     MAIN_Print_Enabled_Newline(MAIN_JOY_RM || MAIN_JOY_PM);
