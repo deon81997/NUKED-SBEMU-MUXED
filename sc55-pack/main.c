@@ -888,6 +888,7 @@ static void MAIN_D(const char* fmt, ...)
     va_start(ap, fmt); vfprintf(MAIN_Det, fmt, ap); va_end(ap);
     fflush(MAIN_Det); fsync(fileno(MAIN_Det));
 }
+static void MAIN_UsbTrace(const char* s) { MAIN_D("%s", s); }
 static void MAIN_Step(const char* s)
 {
     MAIN_DetStage = s;
@@ -1922,7 +1923,12 @@ int main(int argc, char* argv[])
             int flags = (MAIN_Options[OPT_USBKB].value ? USBPAD_F_KBD : 0) | (MAIN_Options[OPT_USBMS].value ? USBPAD_F_MOUSE : 0);
             VKBC_Init(MAIN_TCps, 0);
             USBPAD_SetHid(&VKBC_UsbKeys, &VKBC_UsbMouse);
-            if(!USBPAD_Init(MAIN_TCps, 3000, flags, &msg))
+            int usb_ok;
+            if(MAIN_Det) { MAIN_D("USB live: "); USBPAD_SetTraceHook(MAIN_UsbTrace); }
+            usb_ok = USBPAD_Init(MAIN_TCps, 3000, flags, &msg);
+            USBPAD_SetTraceHook(NULL);
+            MAIN_D("\n");
+            if(!usb_ok)
                 MAIN_CPrintf(YELLOW, "Joystick: %s, USB off.\n", msg);
             else
             {

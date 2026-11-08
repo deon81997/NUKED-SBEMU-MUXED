@@ -370,3 +370,11 @@
   (<= 1.2 ms), head AND tail rewritten to the new TD / new empty tail (toggle carry kept), unskipped.
 - QEMU with oslow forced (-DOSLOWFORCE): all fakepad changes arrive (reports 21); normal build unchanged.
 - SBEMU on the NEC (beta.62 SBDETAIL) found pad 1, keyboard and mouse at start-up (split SET_ADDRESS first).
+
+## beta.64-usb (2026-11-08): beta.63 USBTEST on the NEC works fully (360 pad, 0F30:010B HID pad, Logitech keys and
+## mouse, "[OHCI n lost a TD: ED rewrite per transfer from now]"), but SBEMU hangs in its /JOY step (SBDETAIL ends at
+## "[step] USB joystick / keyboard / mouse"). beta.62 SBEMU got past it (no data flowed then).
+- Not reproduced: QEMU AC97 + pci-ohci + usb-kbd/usb-mouse/fakepad with oslow forced, SBEMU loads.
+- SBEMU now streams the USB trace into SBDETAIL during USBPAD_Init ("USB live: ...", USBPAD_SetTraceHook), so the
+  next hang shows the last USB step. Suspects: VKBC callbacks with real data (first time on real HW), LED SET_REPORT,
+  the HID pad on low speed, the sound ISR (SC-55) running alongside.

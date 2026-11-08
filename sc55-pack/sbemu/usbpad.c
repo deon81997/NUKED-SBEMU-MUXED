@@ -311,14 +311,18 @@ static int       Inited, Light, Settling;
 /* short trace of what happened (start-up report / SBDETAIL), oldest first, stops when full */
 static char      Trace[4096]; static int TraceN, TraceOff;
 void USBPAD_TraceStop(void) { TraceOff = 1; }   /* SBEMU: no libc formatting inside its interrupt */
+static void (*TraceHook)(const char* s);
+void USBPAD_SetTraceHook(void (*fn)(const char* s)) { TraceHook = fn; }
 static void trace(const char* f, ...)
 {
     va_list a;
+    int n0 = TraceN;
     if (TraceOff || TraceN >= (int)sizeof(Trace) - 2) return;
     va_start(a, f);
     TraceN += vsnprintf(Trace + TraceN, sizeof(Trace) - TraceN, f, a);
     va_end(a);
     if (TraceN > (int)sizeof(Trace) - 1) TraceN = sizeof(Trace) - 1;
+    if (TraceHook) TraceHook(Trace + n0);    /* SBEMU start-up: straight into SBDETAIL, in case the PC hangs */
 }
 const char* USBPAD_Trace(void) { return Trace; }
 
