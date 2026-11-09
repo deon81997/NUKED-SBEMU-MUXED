@@ -8,6 +8,7 @@
 #include "synths.h"
 
 struct EngineStats {
+    int midi_volume = 100;          // Windows MIDI volume, percent (average of L and R)
     unsigned midi_bytes = 0, opl_writes = 0, pcm_frames = 0, late_events = 0, resyncs = 0;
     double load = 0;     // render time / audio time, smoothed
     bool fx_shed = false;

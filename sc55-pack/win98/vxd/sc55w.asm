@@ -12,6 +12,8 @@
 
 ; services not in vxd98.inc
 @_LinPageLock               equ 0063h
+@Hook_V86_Int_Chain         equ 0041h
+@Unhook_V86_Int_Chain       equ 0118h
 @_LinPageUnLock             equ 0064h
 @VTD_Get_Real_Time          equ 0007h
 @VTD_Begin_Min_Int_Period   equ 0003h
@@ -23,12 +25,14 @@ PAGEMAPGLOBAL               equ 40000000h
 ; C core
 extern _sc_in:near, _sc_out:near, _sc_tick:near, _sc_dma_changed:near
 extern _sc_eoi:near, _sc_ioctl:near, _sc_exit:near, _sc_api_midi:near
+extern _sc_int15:near, _sc_api_volume:near
 
 public _vxd_time_us, _vxd_muldiv, _vxd_raise_irq, _vxd_lower_irq
 public _vxd_dma_get, _vxd_dma_set, _vxd_timer_arm
 public _vxd_install_io, _vxd_remove_io, _vxd_virt_irq, _vxd_unvirt_irq
 public _vxd_virt_dma, _vxd_unvirt_dma, _vxd_map_block, _vxd_unmap_block
 public _vxd_min_period
+public _vxd_sys_vm, _vxd_port_in, _vxd_port_out, _vxd_hook_int15
 public SC55W_DDB
 
 _LDATA  segment dword public 'LCODE'
@@ -115,6 +119,8 @@ PM_API proc near
         movzx   eax, word ptr [ebp+Client_EAX]
         cmp     eax, 1
         je      api_send
+        cmp     eax, 2
+        je      api_volume
         or      eax, eax
         jne     api_bad
         mov     word ptr [ebp+Client_EAX], 0100h
@@ -148,6 +154,14 @@ api_send:
 api_ok:
         and     dword ptr [ebp+Client_EFlags], not 1
         ret
+api_volume:                             ; AX=2: MIDI volume, DX = left, CX = right
+        movzx   eax, word ptr [ebp+Client_ECX]
+        shl     eax, 16
+        mov     ax, word ptr [ebp+Client_EDX]
+        push    eax
+        call    _sc_api_volume
+        add     esp, 4
+        jmp     api_ok
 api_bad:
         or      dword ptr [ebp+Client_EFlags], 1
         ret
@@ -526,6 +540,73 @@ _vxd_unmap_block proc near
         add     esp, 12
         ret
 _vxd_unmap_block endp
+
+;---------------------------------------------------------------------------
+; INT 15h hook (V86 chain), for AH=84h (BIOS joystick) in DOS boxes.
+; EAX = 15h, EBX = VM, EBP = client registers. CF clear = handled.
+;---------------------------------------------------------------------------
+Int15_Hook proc near
+        cmp     byte ptr [ebp+Client_EAX+1], 84h
+        jne     i15_pass
+        pushad
+        push    ebp
+        push    ebx
+        call    _sc_int15
+        add     esp, 8
+        or      eax, eax                ; popad keeps the flags
+        popad
+        jz      i15_pass
+        clc
+        ret
+i15_pass:
+        stc
+        ret
+Int15_Hook endp
+
+; int vxd_hook_int15(int on): 0 = ok
+_vxd_hook_int15 proc near
+        push    esi
+        mov     eax, 15h
+        mov     esi, offset Int15_Hook
+        cmp     dword ptr [esp+8], 0
+        je      i15_off
+        int 20h
+        dd (VMM_DEVICE_ID shl 16) + @Hook_V86_Int_Chain
+        jmp     i15_ret
+i15_off:
+        int 20h
+        dd (VMM_DEVICE_ID shl 16) + @Unhook_V86_Int_Chain
+i15_ret:
+        sbb     eax, eax
+        neg     eax
+        pop     esi
+        ret
+_vxd_hook_int15 endp
+
+; u32 vxd_sys_vm(void)
+_vxd_sys_vm proc near
+        push    ebx
+        int 20h
+        dd (VMM_DEVICE_ID shl 16) + @Get_Sys_VM_Handle
+        mov     eax, ebx
+        pop     ebx
+        ret
+_vxd_sys_vm endp
+
+; u32 vxd_port_in(u32 port) / void vxd_port_out(u32 port, u32 val): the real port
+_vxd_port_in proc near
+        mov     edx, [esp+4]
+        xor     eax, eax
+        in      al, dx
+        ret
+_vxd_port_in endp
+
+_vxd_port_out proc near
+        mov     edx, [esp+4]
+        mov     eax, [esp+8]
+        out     dx, al
+        ret
+_vxd_port_out endp
 
 ; void vxd_min_period(int on): 1 ms timer resolution while attached
 _vxd_min_period proc near

@@ -86,6 +86,25 @@ static void send_bytes(unsigned n, BYTE a, BYTE b, BYTE c);
     "pop bp" \
     parm [cx] [dl] [dh] [bl] modify [ax bx cx dx si di es];
 
+/* AX=2: MIDI volume, DX = left, CX = right (0xFFFF = full) */
+static void send_volume(unsigned l, unsigned r);
+#pragma aux send_volume = \
+    "push bp" \
+    "mov ax, 2" \
+    "call dword ptr api_ep" \
+    "pop bp" \
+    parm [dx] [cx] modify [ax bx cx dx si di es];
+
+static DWORD volume = 0xFFFFFFFFUL;     /* low word left, high word right */
+
+static void push_volume(void)
+{
+    int had = api_ep != 0;
+    if (!FindWindow("SC55W_Main", NULL) || !lookup()) return;
+    send_volume(LOWORD(volume), HIWORD(volume));
+    if (!had && opens == 0) api_ep = 0;
+}
+
 static void send(const BYTE FAR *p, unsigned n)
 {
     if (!api_ep) return;
@@ -174,7 +193,7 @@ DWORD FAR PASCAL __export __loadds modMessage(UINT dev, UINT msg, DWORD user, DW
         mc.wVoices = 0;
         mc.wNotes = 0;
         mc.wChannelMask = 0xFFFF;
-        mc.dwSupport = 0;
+        mc.dwSupport = MIDICAPS_VOLUME | MIDICAPS_LRVOLUME;
         if (n > sizeof mc) n = sizeof mc;
         d = (BYTE FAR *)caps; s = (const BYTE *)&mc;
         for (k = 0; k < n; k++) d[k] = s[k];
@@ -193,9 +212,17 @@ DWORD FAR PASCAL __export __loadds modMessage(UINT dev, UINT msg, DWORD user, DW
         c->status = 0;
         *(DWORD FAR *)user = (DWORD)i;
         opens++;
+        send_volume(LOWORD(volume), HIWORD(volume));   /* SC55W may have been restarted */
         notify(c, MOM_OPEN, 0);
         return MMSYSERR_NOERROR;
     }
+    case MODM_GETVOLUME:                /* by device or by handle: one volume for all */
+        *(DWORD FAR *)p1 = volume;
+        return MMSYSERR_NOERROR;
+    case MODM_SETVOLUME:
+        volume = p1;
+        push_volume();
+        return MMSYSERR_NOERROR;
     }
     if ((DWORD)user >= MAX_CLIENTS || !clients[(int)user].used) return MMSYSERR_INVALHANDLE;
     c = &clients[(int)user];

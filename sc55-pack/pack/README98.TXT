@@ -12,7 +12,12 @@ inside Windows 98:
     MT-32 or a SoundFont), the FM music by the DOSBox or Nuked OPL3 core,
     and the digital sound effects through your sound card.
   * Windows programs (Media Player, MIDI sequencers, Windows games) get a
-    MIDI device called "NUKED SB-EMU" played by the same synth.
+    MIDI device called "NUKED SB-EMU" played by the same synth. Its volume
+    follows Windows (games' music sliders, midiOutSetVolume).
+  * DOS programs also get a joystick: a game port at 201h and the BIOS
+    joystick call (INT 15h AH=84h), fed by the joystick Windows knows
+    (Control Panel > Game Controllers) - e.g. an Xbox 360 pad with its
+    Windows 98 driver.
   * The settings are the DOS pack's: C:\SC55\SBOPTS.TXT. What you set in
     DOS (SETTINGS.BAT) applies in Windows and the other way round.
 
@@ -90,6 +95,17 @@ C:\SC55\WIN98\SC55W.INI and the uninstaller puts it back.
   MIDI Mapper, if Setup made it the default). Control Panel > Multimedia >
   MIDI shows and changes the default.
 
+  Joystick in DOS games: set it up in Windows first (Control Panel > Game
+  Controllers: add it, calibrate it, check it on the Test page), then pick
+  "Joystick" / "Gravis" / "CH" in the game's setup as usual.
+     Stick 1     = Windows joystick 1, X and Y
+     Stick 2     = Windows joystick 2, or joystick 1's second stick
+                   (U or Z across, R down) when there is no joystick 2
+     Buttons 1-4 = joystick 1's buttons 1-4 (joystick 2's buttons 1-2
+                   also press buttons 3-4)
+  Status shows the joystick Windows found and how often DOS read it.
+  Windows' own programs keep using the joystick through Windows as before.
+
   Command line (Start > Run):
      C:\SC55\WIN98\SC55W.EXE              start (or show the status)
      C:\SC55\WIN98\SC55W.EXE /SETTINGS    open the settings
@@ -146,6 +162,9 @@ Windows-only options, in C:\SC55\WIN98\SC55W.INI under [SC55W]:
      BlockMs=10         size of each buffer block (5-50).
      RecordWav=C:\X.WAV also record everything played to a WAV file
                         (troubleshooting).
+     Joystick=1         game port 201h for DOS programs (0 = off, e.g. for a
+                        real game port card that DOS should read directly).
+     JoyBios=1          BIOS joystick call INT 15h AH=84h (0 = off).
      CpuMax=60          most of the CPU (percent, 20-95) the synth may use.
                         When it cannot keep up the music lags or breaks up
                         instead of Windows slowing down.

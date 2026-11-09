@@ -27,7 +27,7 @@ typedef int32_t  s32;
 #endif
 
 #define SC55W_MAGIC      0x57353543UL   /* "C55W" */
-#define SC55W_IF_VERSION 4
+#define SC55W_IF_VERSION 5
 
 /* DeviceIoControl codes */
 #define IOCTL_SC55W_VERSION  0x10   /* out: u32 interface version            */
@@ -44,6 +44,8 @@ typedef int32_t  s32;
 #define ST_OK_IRQ       0x0008   /* IRQ virtualized                         */
 #define ST_OK_DMA8      0x0010   /* 8-bit DMA channel virtualized           */
 #define ST_OK_DMA16     0x0020   /* 16-bit DMA channel virtualized          */
+#define ST_OK_JOY       0x0040   /* game port 201h trapped (DOS boxes)      */
+#define ST_OK_JBIOS     0x0080   /* INT 15h AH=84h answered (DOS boxes)     */
 #define ST_ERR_BLOCK    0x0100   /* bad block (magic/size/version)          */
 #define ST_ERR_LOCK     0x0200   /* could not lock/map the block            */
 #define ST_ERR_SBPORT   0x0400   /* an SB port is owned by another driver   */
@@ -53,6 +55,8 @@ typedef int32_t  s32;
 #define ST_ERR_DMA8     0x4000
 #define ST_ERR_DMA16    0x8000
 #define ST_ERR_BUSY     0x10000  /* already attached                       */
+#define ST_ERR_JOYPORT  0x20000  /* 201h is owned by another driver        */
+#define ST_ERR_JBIOS    0x40000  /* could not hook INT 15h                 */
 
 /* event types in the event ring */
 #define EV_OPL      1   /* a = register (low 8 bits), b = value, c = bank (0/1) */
@@ -88,7 +92,8 @@ typedef struct {
     u8  sbtype;        /* 1..6 as SBEMU /T                          */
     u8  opl;           /* 1 = trap OPL ports (SB base + 388h)       */
     u8  fixtc;         /* 1 = snap time constants to 11/22/44 kHz   */
-    u8  reserved[6];
+    u8  joy;           /* bit0 = game port 201h, bit1 = INT 15h AH=84h */
+    u8  reserved[5];
 } SC55W_CONFIG;
 
 typedef struct {
@@ -125,6 +130,18 @@ typedef struct {
     /* diagnostics trace (VxD -> helper), overwritten when full */
     volatile u32 tr_head;
     u32 tr[TRACE_SIZE][4];      /* time, code, a, b */
+
+    /* joystick for DOS boxes (helper -> VxD), from the Windows joystick API */
+    volatile u16 joy_axis[4];   /* 0..65535: stick A x, y, stick B x, y  */
+    volatile u8  joy_buttons;   /* bit0..3 = A1 A2 B1 B2, 1 = pressed     */
+    volatile u8  joy_present;   /* bit0 = stick A, bit1 = stick B        */
+    volatile u16 joy_pad;
+    volatile u32 joy_reads;     /* 201h reads + INT 15h calls (VxD)      */
+
+    /* Windows MIDI volume (SC55MIDI.DRV -> VxD -> helper): low word left,
+       high word right, 0xFFFF = full; set_by = 1 once the driver set it */
+    volatile u32 midi_volume;
+    volatile u32 midi_volume_set;
 } SC55W_SHARED;
 
 #endif

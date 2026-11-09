@@ -216,9 +216,18 @@ void Engine::render(SC55W_SHARED* sh, uint32_t now_us, int16_t* out, int frames)
             bm[i * 2 + c] = y;
         }
     }
+    // Windows MIDI volume (Volume Control, midiOutSetVolume): the synth's output
+    float wl = 1, wr = 1;
+    if (sh && sh->midi_volume_set) {
+        uint32_t v = sh->midi_volume;
+        wl = (v & 0xFFFF) / 65535.0f;
+        wr = (v >> 16) / 65535.0f;
+    }
+    const float mvl = master * wl, mvr = master * wr;
+    st.midi_volume = (int)((wl + wr) * 50 + 0.5f);
     for (int i = 0; i < frames; i++) {
-        float l = bp[i * 2] * pl + bo[i * 2] * ol + bm[i * 2] * master;
-        float r = bp[i * 2 + 1] * pr + bo[i * 2 + 1] * orr + bm[i * 2 + 1] * master;
+        float l = bp[i * 2] * pl + bo[i * 2] * ol + bm[i * 2] * mvl;
+        float r = bp[i * 2 + 1] * pr + bo[i * 2 + 1] * orr + bm[i * 2 + 1] * mvr;
         int a = (int)lrintf(l * 32767.0f), b = (int)lrintf(r * 32767.0f);
         out[i * 2] = (int16_t)(a > 32767 ? 32767 : a < -32768 ? -32768 : a);
         out[i * 2 + 1] = (int16_t)(b > 32767 ? 32767 : b < -32768 ? -32768 : b);

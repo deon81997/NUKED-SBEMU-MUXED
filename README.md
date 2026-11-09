@@ -67,6 +67,11 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.75.** **Joysticks in DOS boxes!!** Any controller Windows 98
+knows about now works in DOS games inside Windows too, on the game port and through the BIOS, so a 360 pad with its
+Windows driver can play your DOS games without leaving Windows. And Windows games' music volume sliders now work
+on the NUKED SB-EMU MIDI device.
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.74.** The **Windows 98 part** gets its first update in ages!!
 It now has the faster SC-55 too, and it can't hog the CPU any more: when the synth can't keep up, the music lags
 instead of Windows. Started with Windows, it waits 15 seconds so Windows can finish starting first. And if Windows

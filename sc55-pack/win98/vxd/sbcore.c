@@ -34,6 +34,10 @@ extern void __cdecl vxd_unvirt_dma(int idx);
 extern u32  __cdecl vxd_map_block(u32 addr, u32 size);
 extern void __cdecl vxd_unmap_block(u32 alias, u32 size);
 extern void __cdecl vxd_min_period(int on);
+extern u32  __cdecl vxd_sys_vm(void);
+extern u32  __cdecl vxd_port_in(u32 port);
+extern void __cdecl vxd_port_out(u32 port, u32 val);
+extern int  __cdecl vxd_hook_int15(int on);
 
 #ifndef BUILD_ID
 #define BUILD_ID 0
@@ -768,9 +772,60 @@ static u8 dsp_read_data(void)
 /* ====================================================================== */
 /* port dispatch (called by the I/O trap stub for byte I/O)               */
 /* ====================================================================== */
+/* ====================================================================== */
+/* game port 201h and INT 15h AH=84h for DOS boxes                        */
+/* (the stick values come from the helper, which reads the Windows        */
+/* joystick API; Windows' own programs keep the real port)                */
+/* ====================================================================== */
+static u32 joy_t0, sys_vm;
+static u32 vol_saved = 0xFFFFFFFFUL, vol_set;
+
+static u8 joy_read(void)
+{
+    u32 dt = vxd_time_us() - joy_t0;
+    u8 v = 0;
+    int i;
+    for (i = 0; i < 4; i++) {
+        /* an axis bit stays 1 for 8..1008 us after a write, by stick position;
+           no stick: it never drops, as on a real port */
+        if (!(sh->joy_present & (1 << (i >> 1)))) { v |= (u8)(1 << i); continue; }
+        if (dt < 8 + (u32)sh->joy_axis[i] * 1000u / 65535u) v |= (u8)(1 << i);
+    }
+    v |= (u8)((~sh->joy_buttons & 0x0F) << 4);    /* buttons: 0 = pressed */
+    sh->joy_reads++;
+    return v;
+}
+
+/* INT 15h AH=84h from the asm hook; returns 1 when answered */
+int __cdecl sc_int15(u32 vm, u8 *cl)
+{
+    u32 *eax = (u32 *)(cl + 0x1C), *ebx = (u32 *)(cl + 0x10), *ecx = (u32 *)(cl + 0x18),
+        *edx = (u32 *)(cl + 0x14), *efl = (u32 *)(cl + 0x2C);
+    u32 dx = *edx & 0xFFFF;
+    if (!sh || !(trapped & ST_OK_JBIOS) || vm == sys_vm || !sh->joy_present) return 0;
+    if (dx == 0) {                                  /* buttons: AL bits 4-7, 0 = pressed */
+        *eax = (*eax & 0xFFFFFF00UL) | (u8)((~sh->joy_buttons & 0x0F) << 4);
+    } else if (dx == 1) {                           /* axes: AX BX CX DX, 0..255 */
+        u32 a[4];
+        int i;
+        for (i = 0; i < 4; i++) a[i] = (sh->joy_present & (1 << (i >> 1))) ? (u32)sh->joy_axis[i] >> 8 : 0;
+        *eax = (*eax & 0xFFFF0000UL) | a[0];
+        *ebx = (*ebx & 0xFFFF0000UL) | a[1];
+        *ecx = (*ecx & 0xFFFF0000UL) | a[2];
+        *edx = (*edx & 0xFFFF0000UL) | a[3];
+    } else return 0;
+    *efl &= ~1UL;
+    sh->joy_reads++;
+    return 1;
+}
+
 u32 __cdecl sc_in(u32 vm, u32 port)
 {
     u32 off;
+    if ((trapped & ST_OK_JOY) && port == 0x201) {
+        if (vm == sys_vm) return vxd_port_in(port);
+        return joy_read();
+    }
     if ((trapped & ST_OK_SB) && port >= cfg.sb_port && port < (u32)cfg.sb_port + 16) {
         off = port - cfg.sb_port;
         switch (off) {
@@ -799,6 +854,11 @@ void __cdecl sc_out(u32 vm, u32 port, u32 val)
 {
     u8 v = (u8)val;
     u32 off;
+    if ((trapped & ST_OK_JOY) && port == 0x201) {
+        if (vm == sys_vm) vxd_port_out(port, val);
+        else joy_t0 = vxd_time_us();
+        return;
+    }
     if ((trapped & ST_OK_SB) && port >= cfg.sb_port && port < (u32)cfg.sb_port + 16) {
         off = port - cfg.sb_port;
         switch (off) {
@@ -859,6 +919,8 @@ static void detach(void)
     if (trapped & ST_OK_IRQ) vxd_unvirt_irq();
     if (trapped & ST_OK_DMA8) vxd_unvirt_dma(0);
     if (trapped & ST_OK_DMA16) vxd_unvirt_dma(1);
+    if (trapped & ST_OK_JOY) vxd_remove_io(0x201);
+    if (trapped & ST_OK_JBIOS) vxd_hook_int15(0);
     if (trapped) vxd_min_period(0);
     trapped = 0;
     if (sh) { vxd_unmap_block((u32)sh, sh_size); sh = 0; }
@@ -890,6 +952,9 @@ static u32 attach(u32 user_addr)
     opl_ctrl = opl_status = 0;
     pcm_rate_sent = 0;
     sh = s;
+    sys_vm = vxd_sys_vm();
+    s->midi_volume = vol_saved;
+    s->midi_volume_set = vol_set;
     mixer_reset();
     dsp_reset();
 
@@ -908,6 +973,12 @@ static u32 attach(u32 user_addr)
         if (cfg.dma16 && dsp.version >= 0x400) {
             if (vxd_virt_dma(1, cfg.dma16) == 0) st |= ST_OK_DMA16; else st |= ST_ERR_DMA16;
         }
+    }
+    if (cfg.joy & 1) {
+        if (vxd_install_io(0x201) == 0) st |= ST_OK_JOY; else st |= ST_ERR_JOYPORT;
+    }
+    if (cfg.joy & 2) {
+        if (vxd_hook_int15(1) == 0) st |= ST_OK_JBIOS; else st |= ST_ERR_JBIOS;
     }
     trapped = st & 0xFF;
     if (trapped) vxd_min_period(1);
@@ -962,6 +1033,14 @@ int __cdecl sc_ioctl(u32 code, u8 *in, u32 inlen, u8 *out, u32 outlen)
 void __cdecl sc_api_midi(u32 b)
 {
     ev_put(EV_MIDI, (u8)b, 0, 0);
+}
+
+/* 16-bit MIDI driver: Windows MIDI volume (low word left, high word right) */
+void __cdecl sc_api_volume(u32 v)
+{
+    vol_saved = v;
+    vol_set = 1;
+    if (sh) { sh->midi_volume = v; sh->midi_volume_set = 1; }
 }
 
 /* the VxD is being unloaded */

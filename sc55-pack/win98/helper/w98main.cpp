@@ -198,6 +198,9 @@ static SC55W_CONFIG config_for(const Options& o)
     c.sbtype = (u8)o.sbtype;
     c.opl = (u8)(o.opl != 0);
     c.fixtc = (u8)(o.fixtc != 0);
+    // DOS boxes get a game port (201h) and the BIOS joystick call (INT 15h AH=84h),
+    // fed from the Windows joystick (SC55W.INI Joystick= / JoyBios=, 1 = on)
+    c.joy = (u8)((ini_int("Joystick", 1) ? 1 : 0) | (ini_int("JoyBios", 1) ? 2 : 0));
     return c;
 }
 
@@ -521,6 +524,13 @@ static DWORD WINAPI audio_main(LPVOID)
         }
         if (g_wo && !step_ok_at) step_ok_at = now + 20000;
         if (step_ok_at > 1 && (int32_t)(now - step_ok_at) >= 0) { set_step("ok"); step_ok_at = 1; logf("start-up complete"); }
+        if (g_sh) {                         // Windows MIDI volume changes, for the log
+            static uint32_t last_vol = 0xFFFFFFFFu, last_set = 0;
+            uint32_t v = g_sh->midi_volume, vs = g_sh->midi_volume_set;
+            if (vs && (v != last_vol || vs != last_set))
+                logf("Windows MIDI volume: left %u%%, right %u%%", (unsigned)((v & 0xFFFF) * 100 / 65535), (unsigned)((v >> 16) * 100 / 65535));
+            last_vol = v; last_set = vs;
+        }
         // the first minute after start: a trace every 5 s (a freeze then leaves its last line)
         if (now - trace_start < 60000 && now - trace_last >= 5000) {
             trace_last = now;
@@ -666,7 +676,101 @@ static std::string attach_problems(const Options& o, DWORD st)
         snprintf(b, sizeof b, "- 16-bit DMA %d could not be taken over.\r\n", o.dma16);
         m += b;
     }
+    if (st & ST_ERR_JOYPORT) m += "- The game port (201) is taken by another driver; DOS programs get no joystick.\r\n";
+    if (st & ST_ERR_JBIOS) m += "- The BIOS joystick call (INT 15h) could not be hooked.\r\n";
     return m;
+}
+
+// ---------------------------------------------------------------------------
+// joystick: the Windows joystick API -> the shared block -> game port / INT 15h in DOS boxes.
+// Stick A = joystick 1 X/Y. Stick B = joystick 2 X/Y, or joystick 1's second stick (U or Z
+// across, R down) when there is no joystick 2. Buttons 1-4 of joystick 1 = A1 A2 B1 B2;
+// joystick 2's buttons 1-2 also press B1 B2. Any controller Windows knows works, e.g. an
+// Xbox 360 pad with its Windows 98 driver.
+static std::string g_joy_desc = "not checked yet";
+
+static u16 joy_scale(DWORD v, UINT lo, UINT hi)
+{
+    if (hi <= lo) return 32768;
+    if (v <= lo) return 0;
+    if (v >= hi) return 65535;
+    return (u16)((uint64_t)(v - lo) * 65535 / (hi - lo));
+}
+
+static DWORD WINAPI joy_main(LPVOID)
+{
+    JOYCAPSA cap[2];
+    bool ok[2] = {false, false};
+    DWORD last_check = 0;
+    std::string last_desc;
+    while (!g_quit) {
+        DWORD now = GetTickCount();
+        if (!last_check || now - last_check > 3000) {       // plugged in / out
+            last_check = now;
+            std::string d;
+            for (int j = 0; j < 2; j++) {
+                ok[j] = joyGetDevCapsA(j, &cap[j], sizeof cap[j]) == JOYERR_NOERROR;
+                if (ok[j]) {
+                    JOYINFOEX t; t.dwSize = sizeof t; t.dwFlags = JOY_RETURNALL;
+                    ok[j] = joyGetPosEx(j, &t) == JOYERR_NOERROR;   // configured but unplugged -> no
+                }
+                if (ok[j]) {
+                    char b[160];
+                    snprintf(b, sizeof b, "%s%d: %s (%u axes, %u buttons)", d.empty() ? "" : "; ", j + 1,
+                             cap[j].szPname, cap[j].wNumAxes, cap[j].wNumButtons);
+                    d += b;
+                }
+            }
+            if (d.empty()) d = "none found in Windows (Control Panel > Game Controllers)";
+            if (d != last_desc) {
+                logf("joystick: %s", d.c_str());
+                last_desc = d;
+                EnterCriticalSection(&g_cs);
+                g_joy_desc = d;
+                LeaveCriticalSection(&g_cs);
+            }
+        }
+        if (g_sh) {
+            u16 ax[4] = {32768, 32768, 32768, 32768};
+            u8 btn = 0, present = 0;
+            JOYINFOEX ji[2];
+            bool got[2] = {false, false};
+            for (int j = 0; j < 2; j++) {
+                if (!ok[j]) continue;
+                ji[j].dwSize = sizeof ji[j];
+                ji[j].dwFlags = JOY_RETURNALL;
+                got[j] = joyGetPosEx(j, &ji[j]) == JOYERR_NOERROR;
+            }
+            if (got[0]) {
+                const JOYCAPSA& c = cap[0];
+                ax[0] = joy_scale(ji[0].dwXpos, c.wXmin, c.wXmax);
+                ax[1] = joy_scale(ji[0].dwYpos, c.wYmin, c.wYmax);
+                present |= 1;
+                btn |= (u8)(ji[0].dwButtons & 0x0F);
+                if (!got[1]) {
+                    bool hx = (c.wCaps & JOYCAPS_HASU) || (c.wCaps & JOYCAPS_HASZ), hy = (c.wCaps & JOYCAPS_HASR) != 0;
+                    if (hx && hy) {
+                        ax[2] = (c.wCaps & JOYCAPS_HASU) ? joy_scale(ji[0].dwUpos, c.wUmin, c.wUmax)
+                                                         : joy_scale(ji[0].dwZpos, c.wZmin, c.wZmax);
+                        ax[3] = joy_scale(ji[0].dwRpos, c.wRmin, c.wRmax);
+                        present |= 2;
+                    }
+                }
+            }
+            if (got[1]) {
+                const JOYCAPSA& c = cap[1];
+                ax[2] = joy_scale(ji[1].dwXpos, c.wXmin, c.wXmax);
+                ax[3] = joy_scale(ji[1].dwYpos, c.wYmin, c.wYmax);
+                present |= 2;
+                btn |= (u8)((ji[1].dwButtons & 3) << 2);
+            }
+            for (int i = 0; i < 4; i++) g_sh->joy_axis[i] = ax[i];
+            g_sh->joy_buttons = btn;
+            g_sh->joy_present = present;
+        }
+        Sleep(10);
+    }
+    return 0;
 }
 
 static std::string status_text()
@@ -693,7 +797,21 @@ static std::string status_text()
         std::string pr = attach_problems(o, p.attach);
         if (!pr.empty()) s += pr;
     }
+    if (g_vxd != INVALID_HANDLE_VALUE) {
+        EnterCriticalSection(&g_cs);
+        std::string jd = g_joy_desc;
+        LeaveCriticalSection(&g_cs);
+        if (p.attach & ST_OK_JOY) {
+            snprintf(b, sizeof b, "   Joystick: game port 201%s, %lu reads. Windows joystick %s\r\n",
+                     (p.attach & ST_OK_JBIOS) ? " + BIOS" : "", g_sh ? (unsigned long)g_sh->joy_reads : 0UL, jd.c_str());
+            s += b;
+        } else if (!(p.attach & ST_ERR_JOYPORT)) s += "   Joystick: off (SC55W.INI Joystick=0)\r\n";
+    }
     s += "MIDI synth: " + (p.synth_error.empty() ? p.synth : "none - " + p.synth_error) + "\r\n";
+    if (p.st.midi_volume != 100) {
+        snprintf(b, sizeof b, "Windows MIDI volume: %d%%\r\n", p.st.midi_volume);
+        s += b;
+    }
     s += midi_driver_installed() ? "Windows MIDI device: \"NUKED SB-EMU\" (installed)\r\n"
                                  : "Windows MIDI device: not installed (run SETUP98)\r\n";
     if (!p.wave_error.empty()) s += p.wave_error + "\r\n";
@@ -1235,6 +1353,10 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR cmd, int)
     push_options(g_opt);
     DWORD tid;
     g_thread = CreateThread(NULL, 0, audio_main, NULL, 0, &tid);
+    if (ini_int("Joystick", 1) || ini_int("JoyBios", 1)) {
+        HANDLE jt = CreateThread(NULL, 0, joy_main, NULL, 0, &tid);
+        if (jt) { SetThreadPriority(jt, THREAD_PRIORITY_ABOVE_NORMAL); CloseHandle(jt); }
+    }
 
     // report DOS-side problems once at start (port taken by another driver, ...)
     if (g_vxd == INVALID_HANDLE_VALUE) {

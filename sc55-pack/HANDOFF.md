@@ -519,3 +519,29 @@
 - Test rig: 86Box P2B-LS + SB16 PnP Win98 SE (QuickInstall stock image), emulation on 240/300; test builds with
   -march=pentium2 (86Box has no SSE2 CPU). PLAYMID.EXE (no-CRT MIDI file player), resp.py (Start>Run notepad timer).
   QEMU -cpu coreduo Win98 hung at the logo after hardware redetection (not pursued).
+
+## beta.75-usb (2026-11-09): Windows 98 part - joystick in DOS boxes, MIDI volume
+- Toolchain back: JWasm built from Baron-von-Riedesel/JWasm (/home/claude/jwasm-src), Open Watcom v2 snapshot
+  (Current-build ow-snapshot.tar.xz -> /home/claude/ow). The unchanged sources rebuild SC55W.VXD and SC55MIDI.DRV
+  byte-identical to beta.74's, so the toolchain matches the earlier one.
+- Interface version 5 (common/sc55wif.h): cfg.joy (bit0 201h, bit1 INT 15h), shared joy_axis[4] / joy_buttons /
+  joy_present / joy_reads, midi_volume / midi_volume_set; status ST_OK_JOY 0x40, ST_OK_JBIOS 0x80,
+  ST_ERR_JOYPORT 0x20000, ST_ERR_JBIOS 0x40000.
+- VxD: 201h trapped (Install_IO_Handler); system VM passes through to the real port (vxd_port_in/out, so VJOYD and
+  Win32 programs are unaffected); DOS VMs: write starts the one-shots, axis bit = 1 for 8 + axis*1000/65535 us,
+  absent stick = bit stays 1, buttons active low. INT 15h hooked with Hook_V86_Int_Chain (0041h) /
+  Unhook_V86_Int_Chain (0118h): AH=84h DX=0 buttons in AL, DX=1 axes 0..255 in AX BX CX DX, CF clear; system VM
+  and no joystick -> passed on. PM API AX=2 (DX left, CX right) = MIDI volume, kept across re-attach (vol_saved).
+- EXE: joy_main thread (100 Hz, ABOVE_NORMAL): joyGetPosEx on JOYSTICKID1/2, caps re-checked every 3 s (hot plug),
+  stick B = joystick 2 or joystick 1's U/Z + R. Status line + "joystick:" log line. Engine multiplies the MIDI
+  synth's output by the Windows MIDI volume (L/R); "Windows MIDI volume" log line on change.
+- SC55MIDI.DRV: dwSupport = MIDICAPS_VOLUME | MIDICAPS_LRVOLUME; MODM_GET/SETVOLUME (device or handle level),
+  volume re-sent to the VxD at each open.
+- Tested in 86Box (P2B-LS, SB16 PnP, Win98 SE, -march=pentium2 test EXE): local 86Box patch qt/sdl_joystick.c
+  ($JOYSTATE file "x y b1 b2 b3 b4" drives game port 0 joystick 1; plat_joystick_nr=1 so it counts as connected),
+  Game Controllers "2-axis, 4-button joystick" OK. DOS box JOYRM/J15 (testrig): right+up+b1 -> 00AA/0004 EC,
+  INT 15h AL=E0 AX=00C0 BX=0003; left+down+b3b4 -> 0004/00AA 3C, AL=30 AX=0003 BX=00C0 (uncalibrated range in
+  Windows, so not full 00FF); stick B bits stay 1. Without SC55W INT 15h gave the BIOS's 0001s.
+  VOLTEST.EXE: NUKED SB-EMU support 3, set 0x80004000 reads back, SC55W.LOG "left 25%, right 50%".
+- Pending: the user's Xbox 360 Windows 98 drivers (X360DrvWin98SE.7z, x360c.w98.x86.en.zip - attached in another
+  chat) to bundle as the Windows-side pad driver; status window (SC-55 LCD/meters); MS-DOS-mode shortcuts.
