@@ -618,7 +618,10 @@
   tools/padmap/k2j.py decodes DOSBox Pure 0.9.9's keyb2joypad.cpp (data only, raw-deflate tables) to JSON:
   3557 games, 4232 file ids, every bind has an action name ("Jump", "Pogo"). Newer data is on
   codeberg.org/schelling/dosbox-pure (blocked from the container; user may attach it). Data terms: no explicit
-  license found yet - check before shipping the data.
+  license found, so the user's decision: the data is NOT shipped. DOWNLOADS.TXT links
+  https://raw.githubusercontent.com/schellingb/dosbox-pure/0.9.9/keyb2joypad.cpp -> the pack's FILES\PADMAP;
+  tools/padmap/padconv.c (own raw inflate, plain C, no downloaded code) turns it into PADMAP.TXT on the user's
+  machine: same 3557 games / 4232 ids as k2j.py. Built for Win32 (MinGW); DOS = same source with DJGPP.
 - Game id = FNV-1a 32 over the UPPERCASE 8.3 file name, then ^= (file size << 3)
   (verified: WOLF3D.EXE 98402, PRINCE.EXE 123335, KEEN4E.EXE 103224/105108). Ids also cover data files
   (GAMEMAPS.WL6), so match the started EXE first, then the files in its folder.
