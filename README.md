@@ -71,6 +71,11 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.77-w98.2.** **Your pad presses the keys!!** In Windows 98
+DOS boxes the game pad's buttons now type the right keys for the game you're playing: jump, fire, pogo, menu. Download
+one free file (the Keyb2Joypad layouts from DOSBox Pure, link in DOWNLOADS.TXT) and over 3500 DOS games know their
+buttons. Your own layouts go in PADUSER.TXT.
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.77.** **SETTINGS, CD images and GAMETEST in 3D!!** Same
 three looks as the 3D menu (Panels, Carousel and Module), with mouse support and pop-ups that stay in 3D. Turn on the 3D
 menu and they all follow; <kbd>F8</kbd> flips everything back to text.
@@ -89,15 +94,15 @@ knows about now works in DOS games inside Windows too, on the game port and thro
 Windows driver can play your DOS games without leaving Windows. And Windows games' music volume sliders now work
 on the NUKED SB-EMU MIDI device.
 
-<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.74.** The **Windows 98 part** gets its first update in ages!!
-It now has the faster SC-55 too, and it can't hog the CPU any more: when the synth can't keep up, the music lags
-instead of Windows. Started with Windows, it waits 15 seconds so Windows can finish starting first. And if Windows
-ever freezes while it's starting, the next boot skips it and tells you where it got stuck.
-
 <details>
 <summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
 
 <br>
+
+<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.74.** The **Windows 98 part** gets its first update in ages!!
+It now has the faster SC-55 too, and it can't hog the CPU any more: when the synth can't keep up, the music lags
+instead of Windows. Started with Windows, it waits 15 seconds so Windows can finish starting first. And if Windows
+ever freezes while it's starting, the next boot skips it and tells you where it got stuck.
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.73.** SBEMU loads more than **twice as fast**!! On
 a 366 MHz Celeron it went from 15 seconds to under 7. A ROM check was being redone almost every time by
