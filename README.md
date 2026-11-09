@@ -67,6 +67,10 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.77.** **SETTINGS, CD images and GAMETEST in 3D!!** Same
+three looks as the 3D menu (Panels, Carousel and Module), with mouse support and pop-ups that stay in 3D. Turn on the 3D
+menu and they all follow; <kbd>F8</kbd> flips everything back to text.
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.76-w98.1.** **Xbox 360 pads in Windows 98!!** The pack now
 comes with an unofficial Windows 98 driver for the 360 controller (and HORI, Mad Catz, Logitech and Saitek pads), with
 English install steps. Plug your pad in and the NUKED SB-EMU even tells you where the driver is. Then it works in
@@ -381,6 +385,16 @@ works for some people.
 <td align="center"><img src="docs/shots/menu-3d-panels.png" width="280"><br><sub><i>Panels</i>: raised buttons</sub></td>
 <td align="center"><img src="docs/shots/menu-3d-carousel.png" width="280"><br><sub><i>Carousel</i>: cards on a turning ring</sub></td>
 <td align="center"><img src="docs/shots/menu-3d-module.png" width="280"><br><sub><i>Module</i>: a sound module whose LCD and knob are the menu</sub></td>
+</tr>
+</table>
+
+<b>SETTINGS, CD images and GAMETEST go 3D too!!</b> When the 3D menu is on, they open in 3D as well (<kbd>F8</kbd> switches, in any of them):
+
+<table>
+<tr>
+<td align="center"><img src="docs/shots/settings-3d.png" width="280"><br><sub>SETTINGS: every page a tab</sub></td>
+<td align="center"><img src="docs/shots/cd-images-3d.png" width="280"><br><sub>CD images: discs, folders, CD music</sub></td>
+<td align="center"><img src="docs/shots/gametest-3d.png" width="280"><br><sub>GAMETEST: games, options, runs</sub></td>
 </tr>
 </table>
 

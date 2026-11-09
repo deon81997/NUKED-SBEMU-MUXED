@@ -21,6 +21,7 @@
 #include <conio.h>
 #include <pc.h>
 #include "tui.h"
+#include "form3d.h"
 #include "safewr.h"
 #include "mpuport.h"
 #include <unistd.h>
@@ -756,10 +757,75 @@ static void draw_menu(int row, const int* col)
     tui_put(2, 25, 0x30, "\x18\x19 move  Enter select  F3 style  F4 screen  Esc quit  Full reports: GTFULL.TXT");
 }
 
+/* ---------------------------------------------------------------- 3D screen (beta.77, form3d.h)
+ * On while MENU3D.CFG exists (the 3D menu is on); F8 switches. Typing stays in 3D; the result viewers and the
+ * test runs themselves are text screens (the 3D mode is left for them and set again afterwards). */
+static int g3, g3_present = -1;
+static double g3_present_t;
+static F3VIEW g3_v;
+static int g3_row[F3_MAXROWS];                 /* view row -> menu row (0..14), -1 = heading */
+static void g3_build(F3VIEW* v, int row, const int* col)
+{
+    int i, k, np, na; char b[120];
+    F3ROW* r;
+    f3_clear(v);
+    v->app = "GAMETEST"; v->accent = 0x20C080; v->ntab = 0;
+    snprintf(v->title, sizeof v->title, "SBEMU game test with SBDIAG");
+    if (g3_present < 0 || m3_now() - g3_present_t > 2) { g3_present = sbemu_present(); g3_present_t = m3_now(); }
+    snprintf(v->status, sizeof v->status, "%s", g3_present ? "SBEMU loaded" : "SBEMU not loaded");
+    v->statcol = g3_present ? 0x60FF80 : 0xFFB040;
+    na = build_plan(1); np = build_plan(0);
+#define G3ADD(kind, lab, val, mrow) (r = f3_add(v, kind, lab, val), g3_row[v->nrows - 1] = mrow, r)
+    G3ADD(F3_HEAD, "Games", NULL, -1);
+    for (i = 0; i < NGAMES; i++)
+    {
+        const GAME* g = &g_games[i];
+        if (g_bestopt[i][0]) snprintf(b, sizeof b, "%s  best %d.%d%%", g->path[0] ? g->path : "(not set)", g_bestclk[i] / 10, g_bestclk[i] % 10);
+        else snprintf(b, sizeof b, "%s  %s", g->path[0] ? g->path : "(not set)", g->autoquit ? "quits itself" : g->kquit[0] ? "auto (keys)" : "you quit");
+        G3ADD(F3_ITEM, g->name, b, i);
+        r->mark = g->on ? F3M_ON : F3M_OFF; r->dim = !g->path[0];
+    }
+    G3ADD(F3_HEAD, "SBEMU options to test", NULL, -1);
+    for (k = 0; k < NOPTS; k++)
+    {
+        int n = 0;
+        b[0] = 0;
+        for (i = 0; i < g_opts[k].nval; i++)
+            n += snprintf(b + n, sizeof b - n, "%s%s%s%s ", i == col[k] ? "[" : " ", (g_opts[k].sel >> i) & 1 ? "*" : "", g_opts[k].names[i], i == col[k] ? "]" : " ");
+        G3ADD(F3_VALUE, g_opts[k].label, b, 4 + k);
+    }
+    G3ADD(F3_HEAD, "Run", NULL, -1);
+    snprintf(b, sizeof b, "%d s", g_secs); G3ADD(F3_VALUE, "Test length per game", b, 8);
+    snprintf(b, sizeof b, "%d tests, about %d min", np, (np * (g_secs + 20) + 59) / 60); G3ADD(F3_ITEM, "Run the selected tests", b, 9)->mark = F3M_GO;
+    snprintf(b, sizeof b, "%d tests, about %d min", na, (na * (g_secs + 20) + 59) / 60); G3ADD(F3_ITEM, "Test ALL options", b, 10)->mark = F3M_GO;
+    G3ADD(F3_ITEM, "View results", "GAMETEST.TXT", 11);
+    G3ADD(F3_ITEM, "Full SBDIAG reports", "GTFULL.TXT", 12);
+    G3ADD(F3_ITEM, "Best settings per game", "used by MENU's Play", 13);
+    G3ADD(F3_ITEM, "Clear all results", "", 14);
+#undef G3ADD
+    for (i = 0; i < v->nrows; i++) if (g3_row[i] == row) v->sel = i;
+    if (row < 4)
+    {
+        const GAME* g = &g_games[row];
+        snprintf(v->info, sizeof v->info, "Space on/off   E path   A options   S start keys   Q quit keys.   Start keys: %s%s%s.   Quit keys: %s.",
+                 g->kstart[0] ? g->kstart : "none", g->args[0] ? "   Options: " : "", g->args,
+                 g->kquit[0] ? g->kquit : (g->autoquit ? "none (quits by itself)" : "none (you quit)"));
+    }
+    else if (row < 8) snprintf(v->info, sizeof v->info, "%s  (* = tested; Space switches the value in [ ])", g_hint[row]);
+    else snprintf(v->info, sizeof v->info, "%s", g_hint[row]);
+    { SBVALS sv = sb_values(); snprintf(v->foot, sizeof v->foot, "Games get SB %X/%d/%d + MIDI %X automatically (Doom, Duke 3D ...)", sv.a, sv.i, sv.d, sv.p); }
+    v->keys = "Arrows move  Enter select  Space on/off  F3 style  F8 text  Esc quit";
+}
+static void ui_message(const char* t, const char* m) { if (g3) f3_message(&g3_v, t, m); else tui_message(t, m); }
+static int ui_yesno(const char* q) { return g3 ? f3_yesno(&g3_v, q) : tui_yesno(q); }
+static int ui_input(const char* t, const char* p, char* b, int max, int up) { return g3 ? f3_input(&g3_v, t, p, b, max, up) : tui_input(t, p, b, max, up); }
+static void g3_text_begin(void) { if (g3) { f3_leave(); tui_init(); } }
+static void g3_text_end(void) { if (g3) { tui_done(); if (!f3_enter()) { g3 = 0; tui_init(); } g3_present = -1; } }
+
 static void clear_results(void)
 {
     char p[300];
-    if (!tui_yesno("Delete GAMETEST.TXT, GTFULL.TXT and the best settings?")) return;
+    if (!ui_yesno("Delete GAMETEST.TXT, GTFULL.TXT and the best settings?")) return;
     path_in_home(p, "GAMETEST.TXT"); remove(p);
     path_in_home(p, "GTFULL.TXT"); remove(p);
     path_in_home(p, "GTBEST.CFG"); remove(p);
@@ -785,13 +851,42 @@ int main(int argc, char** argv)
         {
             int n = build_plan(0);
             if (n && sbemu_present()) run_plan(0, n);
-            else tui_message("GAMETEST", n ? "SBEMU's MPU-401 does not answer: run SC55 first." : "No game selected (or no path set).");
+            else ui_message("GAMETEST", n ? "SBEMU's MPU-401 does not answer: run SC55 first." : "No game selected (or no path set).");
         }
 
+    if (f3_wanted(g_home)) { tui_done(); if (f3_enter()) g3 = 1; else tui_init(); }   /* the 3D menu is on */
     for (;;)
     {
-        draw_menu(row, col);
-        c = tui_key();
+        if (g3)
+        {
+            int i;
+            g3_build(&g3_v, row, col);
+            f3_frame(&g3_v);
+            c = f3_key(&g3_v);
+            if (!c) continue;
+            if (g3_row[g3_v.sel] >= 0) row = g3_row[g3_v.sel];            /* clicked a row */
+            if (c == F3K_REDRAW || c == F3K_TABSEL) continue;
+            if (c == F3K_F8) { f3_cfg_off(); f3_leave(); g3 = 0; tui_init(); continue; }
+            if (c == K_ENTER && row < 8) c = ' ';                              /* Enter / a click switches games and values */
+            if (c == K_UP || c == K_DOWN)
+            {
+                g3_v.sel = f3_step(&g3_v, c == K_UP ? -1 : 1);
+                for (i = 0; i < g3_v.nrows; i++) if (i == g3_v.sel) row = g3_row[i];
+                continue;
+            }
+        }
+        else
+        {
+            draw_menu(row, col);
+            c = tui_key();
+            if (c == 0x142)                                                     /* F8: 3D on */
+            {
+                f3_cfg_load(g_home); f3_cfg_save(); tui_done();
+                if (f3_enter()) g3 = 1;
+                else { f3_cfg_off(); tui_init(); tui_message("3D screens", "This PC's video BIOS has no 640x480 VESA mode with 15/16/24/32-bit colour."); }
+                continue;
+            }
+        }
         if (c == K_ESC) break;
         if (c == 0x13E) { tui_pick_mode(g_home); continue; }                  /* F4: display mode */
         if (c == K_F3) { tui_theme_next(g_home); continue; }                  /* F3: next style */
@@ -809,17 +904,17 @@ int main(int argc, char** argv)
             GAME* g = &g_games[row];
             int u = c < 256 ? toupper(c) : 0;
             if (c == ' ') g->on = !g->on;
-            if (u == 'E') { char t[80]; strcpy(t, g->path); if (tui_input(g->name, "Path of the game's .EXE:", t, 79, 1)) strcpy(g->path, t); }
-            if (u == 'A') { char t[64]; strcpy(t, g->args); if (tui_input(g->name, "Command-line options for the test:", t, 63, 0)) strcpy(g->args, t); }
+            if (u == 'E') { char t[80]; strcpy(t, g->path); if (ui_input(g->name, "Path of the game's .EXE:", t, 79, 1)) strcpy(g->path, t); }
+            if (u == 'A') { char t[64]; strcpy(t, g->args); if (ui_input(g->name, "Command-line options for the test:", t, 63, 0)) strcpy(g->args, t); }
             if (u == 'S' || u == 'Q')
             {
                 char t[64], bad[16]; unsigned char tmp[96]; char* dst = u == 'S' ? g->kstart : g->kquit;
                 strcpy(t, dst);
-                if (tui_input(g->name, u == 'S' ? "Keys typed when the game starts (W2 = wait 2 s, ESC ENTER F10 Y ...):"
+                if (ui_input(g->name, u == 'S' ? "Keys typed when the game starts (W2 = wait 2 s, ESC ENTER F10 Y ...):"
                                                 : "Keys typed when the test time is up (to quit the game):", t, 63, 1))
                 {
                     if (compile_keys(t, tmp, 40, bad) < 0)
-                    { char m[80]; sprintf(m, "Unknown key '%s'. Use ESC ENTER SPACE F1-F12 UP A-Z 0-9 W2.", bad); tui_message("Keys", m); }
+                    { char m[80]; sprintf(m, "Unknown key '%s'. Use ESC ENTER SPACE F1-F12 UP A-Z 0-9 W2.", bad); ui_message("Keys", m); }
                     else strcpy(dst, t);
                 }
             }
@@ -837,17 +932,18 @@ int main(int argc, char** argv)
             char buf[120];
             int n = build_plan(row == 10);
             save_cfg();
-            if (!n) { tui_message("GAMETEST", "No game selected (or no path set)."); continue; }
-            if (!sbemu_present()) { tui_message("GAMETEST", "SBEMU's MPU-401 does not answer: run SC55 first."); continue; }
+            if (!n) { ui_message("GAMETEST", "No game selected (or no path set)."); continue; }
+            if (!sbemu_present()) { ui_message("GAMETEST", "SBEMU's MPU-401 does not answer: run SC55 first."); continue; }
             sprintf(buf, "Run %d tests (about %d min)? Keep your hands off the keyboard.", n, (n * (g_secs + 20) + 59) / 60);
-            if (tui_yesno(buf)) run_plan(0, n);
+            if (ui_yesno(buf)) { g3_text_begin(); run_plan(0, n); g3_text_end(); }
         }
-        else if (c == K_ENTER && row == 11) show_file("GAMETEST.TXT");
-        else if (c == K_ENTER && row == 12) show_file("GTFULL.TXT");
-        else if (c == K_ENTER && row == 13) show_best();
+        else if (c == K_ENTER && row == 11) { g3_text_begin(); show_file("GAMETEST.TXT"); g3_text_end(); }
+        else if (c == K_ENTER && row == 12) { g3_text_begin(); show_file("GTFULL.TXT"); g3_text_end(); }
+        else if (c == K_ENTER && row == 13) { g3_text_begin(); show_best(); g3_text_end(); }
         else if (c == K_ENTER && row == 14) clear_results();
     }
     save_cfg();
+    if (g3) f3_leave();
     tui_done();
     return 0;
 }

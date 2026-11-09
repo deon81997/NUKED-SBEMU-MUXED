@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <dir.h>
 #include "tui.h"
+#include "form3d.h"
 
 #define MAXIMG 300
 #define MAXTR 99
@@ -697,6 +698,86 @@ static void draw(void)
 
 static void anim(unsigned long t) { g_phase = (int)(t % 6); draw_header(); }
 
+/* ---------------------------------------------------------------- 3D screen (beta.77, form3d.h)
+ * On while MENU3D.CFG exists (the 3D menu is on); F8 switches. The help and the disc's file list are text
+ * screens: the 3D mode is left for them and set again afterwards. */
+static int g3;
+static F3VIEW c3_v;
+static void c3_build(F3VIEW* v);
+static void ui_message(const char* t, const char* m) { if (g3) { c3_build(&c3_v); f3_message(&c3_v, t, m); } else tui_message(t, m); }
+static int ui_yesno(const char* q) { if (g3) { c3_build(&c3_v); return f3_yesno(&c3_v, q); } return tui_yesno(q); }
+static void c3_text_begin(void) { f3_leave(); tui_init(); draw(); }
+static void c3_text_end(void) { tui_done(); if (!f3_enter()) { g3 = 0; tui_init(); } }
+
+static void c3_details(const IMG* m, char* o, size_t n)
+{
+    char sz[16], tm[16]; size_t k = 0;
+#define C3P(...) do { if (k < n) k += (size_t)snprintf(o + k, n - k, __VA_ARGS__); } while (0)
+    o[0] = 0;
+    if (!m) { C3P("Copy disc images into the images folder, or a folder of their own in it: .CUE with its .BIN (games with CD music), .ISO (data only) or .MDM (a list of discs). DOS needs 8.3 names, e.g. DUKE3D.CUE. Then press R."); return; }
+    if (m->type == T_UP) { C3P("Back to the folder above (Backspace does the same)."); return; }
+    if (m->type == T_DIR) { C3P("Folder. Enter opens it. Keep each game's images in a folder of its own if you like."); return; }
+    size_text(sz, sizeof sz, m->size);
+    { char* t = sz; while (*t == ' ') t++; memmove(sz, t, strlen(t) + 1); }
+    C3P("%s", m->type == T_CUE ? "CUE sheet + BIN" : m->type == T_ISO ? "ISO image" : m->type == T_MDM ? "Disc list (MDM)" : m->sec == 2352 ? "BIN (raw sectors)" : "BIN image");
+    if (m->type != T_MDM) C3P(", %s", sz);
+    if (m->fs_ok) { C3P(". Label %s", m->label[0] ? m->label : "(none)"); if (m->date[0]) C3P(", made %s", m->date); }
+    else if (m->type == T_CUE && m->ntr && m->tr_audio[0]) C3P(". Audio CD (no files)");
+    if (m->type == T_CUE && m->ntr)
+    {
+        if (m->audio) { time_text(tm, sizeof tm, m->music); C3P(". %d data + %d audio tracks, %s of CD music", m->data, m->audio, tm); }
+        else C3P(". %d data track%s", m->data, m->data == 1 ? "" : "s");
+    }
+    else if (m->type == T_MDM) C3P(". %d disc%s listed", m->ndisc, m->ndisc == 1 ? "" : "s");
+    if (m->install[0]) C3P(". I runs %s", m->install);
+    C3P(". ");
+    if (m->type == T_CUE)
+    {
+        if (m->files > 1) C3P("Several BIN files: uCDD needs one. Join them with binmerge.");
+        else if (!m->bin_ok && m->fixbin[0]) C3P("DOS cannot open the long BIN name. F writes a copy of the CUE that uses %s.", m->fixbin);
+        else if (!m->bin_ok) C3P("Its BIN is not in this folder. Copy it next to the CUE.");
+        else if (m->audio) C3P("CD music: start the game with HYBRID.BAT.");
+    }
+    else if (m->type == T_ISO) C3P("Data only. For CD music use a CUE/BIN copy of the disc.");
+    else if (m->type == T_BIN) C3P("No CUE: data only. Put the disc's .CUE next to it for music.");
+    else if (m->type == T_MDM) C3P("Mounts the first disc; swap discs with the uCDD hotkeys (UCDD-DOC.TXT).");
+    if (is_mounted(m)) C3P("  In drive M: now.");
+#undef C3P
+}
+static void c3_build(F3VIEW* v)
+{
+    int i; char d[200], b[80], sz[16];
+    f3_clear(v);
+    v->app = "CD IMAGES"; v->accent = 0xE0A020; v->ntab = 0;
+    cur_dir(d, sizeof d);
+    snprintf(v->title, sizeof v->title, "%.40s  (sorted by %s)", d, g_sortname[g_sort]);
+    if (!g_cdon) { snprintf(v->status, sizeof v->status, "Drive M: off"); v->statcol = 0xFF6050; }
+    else if (g_mounted[0]) { snprintf(v->status, sizeof v->status, "M: %.24s", g_mounted); v->statcol = 0x60FF80; }
+    else { snprintf(v->status, sizeof v->status, "Drive M: empty"); v->statcol = 0xFFD060; }
+    for (i = 0; i < g_n; i++)
+    {
+        const IMG* m = &g_img[i]; F3ROW* r;
+        if (m->type == T_UP) { r = f3_add(v, F3_ITEM, "..", "folder above"); r->mark = F3M_UP; continue; }
+        if (m->type == T_DIR) { r = f3_add(v, F3_ITEM, m->file, "folder"); r->mark = F3M_FOLDER; continue; }
+        size_text(sz, sizeof sz, m->size);
+        snprintf(b, sizeof b, "%s%-4s %-12.12s %s%s", is_mounted(m) ? "M: " : "", g_tname[m->type], m->label, m->type == T_MDM ? "" : sz,
+                 m->install[0] && !is_mounted(m) ? "  I" : "");
+        r = f3_add(v, F3_ITEM, m->file, b);
+        if (problem(m)) { r->mark = F3M_WARN; r->col = m->fixbin[0] && m->files <= 1 ? 0xFFD060 : 0xFF7060; }
+        else if (m->type == T_CUE && m->audio) { r->mark = F3M_MUSIC; r->col = 0x70D0FF; }
+        else r->mark = F3M_DISC;
+        if (is_mounted(m)) r->col = 0x70FF90;
+    }
+    if (!g_n) f3_add(v, F3_ITEM, "(no disc images here)", "");
+    v->sel = g_n ? g_sel : 0;
+    c3_details(g_n ? &g_img[g_sel] : NULL, v->info, sizeof v->info);
+    v->infocol = g_n && problem(&g_img[g_sel]) ? 0xFFC060 : 0xD8E0F0;
+    snprintf(v->foot, sizeof v->foot, "%d image%s, %d folder%s   %s", g_nimg, g_nimg == 1 ? "" : "s", g_ndir, g_ndir == 1 ? "" : "s",
+             g_label[0] ? "" : "");
+    if (g_label[0]) snprintf(v->foot + strlen(v->foot), sizeof v->foot - strlen(v->foot), "disc in M: labelled %s", g_label);
+    v->keys = "Enter mount  I install  C files  U eject  F fix  S sort  F1 help  F8 text";
+}
+
 /* ---------------------------------------------------------------- pop-ups */
 static void help(void)
 {
@@ -900,36 +981,36 @@ static void show_result(void)
     {
         if (g_label[0]) snprintf(msg, sizeof msg, "%s is in drive M: (disc label %s).", res + 3, g_label);
         else snprintf(msg, sizeof msg, "%s is in drive M: now.", res + 3);
-        tui_message("Mounted", msg);
+        ui_message("Mounted", msg);
     }
     else if (!strncmp(res, "RUN", 3))
     {
         snprintf(msg, sizeof msg, "%s has finished. The disc stays in drive M: - start the game from the menu, "
                  "or its folder on drive C:.", res + 4);
-        tui_message("Installer", msg);
+        ui_message("Installer", msg);
     }
-    else if (!strncmp(res, "EJECT", 5)) tui_message("Ejected", "Drive M: is empty now.");
+    else if (!strncmp(res, "EJECT", 5)) ui_message("Ejected", "Drive M: is empty now.");
     else if (!strncmp(res, "STUCK", 5))
     {
         snprintf(msg, sizeof msg, "uCDD could not take the disc out of drive M (%s). Close any program that uses "
                  "drive M and try again; if it still says this, restart the PC to change discs.", out[0] ? out : "no message");
-        tui_message("Not ejected", msg);
+        ui_message("Not ejected", msg);
     }
     else
     {
         snprintf(msg, sizeof msg, "uCDD could not mount %s. %s", res + 4, out[0] ? out : "(no message)");
-        tui_message("Not mounted", msg);
+        ui_message("Not mounted", msg);
     }
 }
 
 static int can_mount(const IMG* m)
 {
-    if (!g_cdon) { tui_message("Virtual drive off", "uCDD did not start (see the messages before this screen). "
+    if (!g_cdon) { ui_message("Virtual drive off", "uCDD did not start (see the messages before this screen). "
                                "Restart the PC to plain DOS and open CD images again. CDDIAG.BAT in C:\\CDSET checks the setup."); return 0; }
-    if (m->type == T_CUE && m->files > 1) { tui_message("Cannot mount", "uCDD needs a CUE with one BIN file. Join the BINs (binmerge) first."); return 0; }
+    if (m->type == T_CUE && m->files > 1) { ui_message("Cannot mount", "uCDD needs a CUE with one BIN file. Join the BINs (binmerge) first."); return 0; }
     if (m->type == T_CUE && !m->bin_ok)
     {
-        tui_message("Cannot mount", m->fixbin[0] ? "DOS cannot open the BIN name in this CUE. Press F to write a fixed copy, then mount that."
+        ui_message("Cannot mount", m->fixbin[0] ? "DOS cannot open the BIN name in this CUE. Press F to write a fixed copy, then mount that."
                                                  : "The BIN file named in this CUE is not in the folder.");
         return 0;
     }
@@ -968,15 +1049,38 @@ int main(int argc, char** argv)
     scan();
     select_file(sel);
     tui_theme_load(g_home);
-    tui_init();
     tui_anim = anim;
+    if (f3_wanted(g_home) && f3_enter()) g3 = 1;      /* the 3D menu is on: this screen in 3D too */
+    else tui_init();
+    c3_build(&c3_v);
     show_result();
 
     while (!go)
     {
         IMG* m = g_n ? &g_img[g_sel] : NULL;
-        draw();
-        c = tui_key();
+        if (g3)
+        {
+            c3_build(&c3_v);
+            f3_frame(&c3_v);
+            c = f3_key(&c3_v);
+            if (!c) continue;
+            if (g_n && c3_v.sel != g_sel && c3_v.sel < g_n) g_sel = c3_v.sel;   /* clicked a row */
+            m = g_n ? &g_img[g_sel] : NULL;
+            if (c == F3K_REDRAW || c == F3K_TABSEL) continue;
+            if (c == F3K_F8) { f3_cfg_off(); f3_leave(); g3 = 0; tui_init(); continue; }
+        }
+        else
+        {
+            draw();
+            c = tui_key();
+            if (c == 0x142)                                                     /* F8: 3D on */
+            {
+                f3_cfg_load(g_home); f3_cfg_save(); tui_done();
+                if (f3_enter()) g3 = 1;
+                else { f3_cfg_off(); tui_init(); tui_message("3D screens", "This PC's video BIOS has no 640x480 VESA mode with 15/16/24/32-bit colour."); }
+                continue;
+            }
+        }
         if (c == K_ESC || c == 'q' || c == 'Q') break;
         else if (c == K_UP) { if (g_sel > 0) g_sel--; }
         else if (c == K_DOWN) { if (g_sel + 1 < g_n) g_sel++; }
@@ -987,35 +1091,35 @@ int main(int argc, char** argv)
         else if (c == 8 || c == K_LEFT) go_up();
         else if (c == 'r' || c == 'R') { char keep[13]; snprintf(keep, sizeof keep, "%s", m ? m->file : ""); scan(); read_state(); select_file(keep); }
         else if (c == 's' || c == 'S') { g_sort = (g_sort + 1) % S_COUNT; sort_list(); }
-        else if (c == K_F1 || c == 'h' || c == 'H' || c == '?') help();
+        else if (c == K_F1 || c == 'h' || c == 'H' || c == '?') { if (g3) { c3_text_begin(); help(); c3_text_end(); } else help(); }
         else if (c == K_F3) { tui_theme = (tui_theme + 1) % THEME_COUNT; tui_apply_theme(); tui_theme_save(g_home); tui_invalidate(); }
         else if (c == 0x13E) { draw(); tui_pick_mode(g_home); tui_invalidate(); }
         else if (c == 0x140) { tui_animate = !tui_animate; tui_theme_save(g_home); }
         else if (c == 0x141) { tui_font = (tui_font + 1) % FONT_COUNT; tui_font_apply(); tui_theme_save(g_home); }
-        else if ((c == 'c' || c == 'C') && m) contents(m);
+        else if ((c == 'c' || c == 'C') && m) { if (g3 && m->type > T_DIR) { c3_text_begin(); contents(m); c3_text_end(); } else contents(m); }
         else if (c == 'u' || c == 'U')
         {
-            if (!g_mounted[0]) tui_message("Eject", "There is no disc in drive M:.");
+            if (!g_mounted[0]) ui_message("Eject", "There is no disc in drive M:.");
             else if (eject()) go = 1;
         }
         else if ((c == 'f' || c == 'F') && m)
         {
             char nm[13], q[200];
-            if (m->type != T_CUE || m->bin_ok) tui_message("Fix CUE", "This image needs no fixing.");
-            else if (m->files > 1) tui_message("Fix CUE", "This CUE uses several BIN files. Join them with binmerge first.");
-            else if (!m->fixbin[0]) tui_message("Fix CUE", "The BIN this CUE names is not in the folder, so there is nothing to point it to.");
+            if (m->type != T_CUE || m->bin_ok) ui_message("Fix CUE", "This image needs no fixing.");
+            else if (m->files > 1) ui_message("Fix CUE", "This CUE uses several BIN files. Join them with binmerge first.");
+            else if (!m->fixbin[0]) ui_message("Fix CUE", "The BIN this CUE names is not in the folder, so there is nothing to point it to.");
             else
             {
                 snprintf(q, sizeof q, "Write a copy of %s that uses %s? The original stays as it is.", m->file, m->fixbin);
-                if (tui_yesno(q))
+                if (ui_yesno(q))
                 {
-                    if (!fix_cue(m, nm)) tui_message("Fix CUE", "Could not write the new CUE file (disk full or read-only?).");
+                    if (!fix_cue(m, nm)) ui_message("Fix CUE", "Could not write the new CUE file (disk full or read-only?).");
                     else
                     {
                         scan();
                         select_file(nm);
                         snprintf(q, sizeof q, "Written %s. It is selected - press Enter to mount it.", nm);
-                        draw(); tui_message("Fix CUE", q);
+                        draw(); ui_message("Fix CUE", q);
                     }
                 }
             }
@@ -1023,15 +1127,15 @@ int main(int argc, char** argv)
         else if ((c == 'i' || c == 'I') && m && m->type > T_DIR)
         {
             char q[200];
-            if (!m->install[0]) tui_message("Install", m->fs_ok ? "There is no INSTALL or SETUP program in the disc's root folder. Mount it (Enter) and look on drive M:, or press C to see its files."
+            if (!m->install[0]) ui_message("Install", m->fs_ok ? "There is no INSTALL or SETUP program in the disc's root folder. Mount it (Enter) and look on drive M:, or press C to see its files."
                                                                 : "This screen cannot read the files of this image. Mount it (Enter) and look on drive M:.");
             else if (can_mount(m))
             {
                 snprintf(q, sizeof q, "Mount %s and run %s from it? Install the game to drive C:. Afterwards this screen comes back.", m->file, m->install);
-                if (tui_yesno(q))
+                if (ui_yesno(q))
                 {
                     if (mount(m, m->install)) go = 1;
-                    else tui_message("Install", "Could not write CDRUN.BAT in the CD tools folder.");
+                    else ui_message("Install", "Could not write CDRUN.BAT in the CD tools folder.");
                 }
             }
         }
@@ -1047,12 +1151,13 @@ int main(int argc, char** argv)
             }
             else if (c == K_RIGHT) ;
             else if (!can_mount(m)) ;
-            else if (is_mounted(m)) tui_message("Mount", "That disc is already in drive M:.");
+            else if (is_mounted(m)) ui_message("Mount", "That disc is already in drive M:.");
             else if (mount(m, NULL)) go = 1;
-            else tui_message("Mount", "Could not write CDRUN.BAT in the CD tools folder.");
+            else ui_message("Mount", "Could not write CDRUN.BAT in the CD tools folder.");
         }
     }
     cfg_save();
+    if (g3) f3_leave();
     tui_done();
     if (go) printf("Working with drive M: ...\n");
     return 0;

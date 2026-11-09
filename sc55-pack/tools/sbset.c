@@ -1171,6 +1171,185 @@ static void tune_done_flag(void)
     if ((f = fopen(p, "w")) != NULL) { fputs("automatic setup offered\n", f); fclose(f); }
 }
 
+/* ---- 3D screen (beta.77): the same settings as tabs in the 3D menu's styles (form3d.h) --------------
+ * On when MENU3D.CFG exists (the 3D menu is on); F8 switches between this and the text screen. The SoundFont
+ * file browser, the automatic setup and the questions that need typing switch to text and come back. */
+#include "form3d.h"
+static const char* s3_tabname[6] = { "Main", "SC-55", "SoundFont", "Volume", "Timing", "Joystick" };
+static const char* s3_title[6] = { "Sound Blaster / MIDI / SBEMU setup", "SC-55 options", "SoundFont options", "Volume", "Timing & advanced", "Joystick" };
+static const MI* s3_menu(int tab) { return tab == 1 ? M_SC : tab == 2 ? M_SF : tab == 3 ? M_VOL : tab == 4 ? M_ADV : M_JOY; }
+static int s3_tab_of(int f) { return f == F_SCMENU ? 1 : f == F_SFMENU ? 2 : f == F_VOLMENU ? 3 : f == F_ADVMENU ? 4 : f == F_JOYMENU ? 5 : 0; }
+static int s3_field[F3_MAXROWS];
+static F3VIEW s3_v;
+
+static void s3_build(F3VIEW* v, const char* msg)
+{
+    int i; char val[120], line[512]; const char* w = warning();
+    f3_clear(v);
+    v->app = "SETTINGS"; v->accent = 0xB050FF;
+    snprintf(v->title, sizeof v->title, "%s", s3_title[v->tab]);
+    v->ntab = 6; for (i = 0; i < 6; i++) v->tabs[i] = s3_tabname[i];
+    snprintf(v->status, sizeof v->status, "%s", g_dirty ? "not saved yet" : "saved");
+    v->statcol = g_dirty ? 0xFFC060 : 0x80FF90;
+    if (v->tab == 0)
+        for (i = 0; i < NMAIN; i++)
+        {
+            F3ROW* r;
+            if (F[i].group) { f3_add(v, F3_HEAD, F[i].group, NULL); s3_field[v->nrows - 1] = -1; }
+            if (is_menu(i)) summary(i, val); else snprintf(val, sizeof val, "%s", show(&F[i]));
+            r = f3_add(v, is_menu(i) ? F3_ITEM : F3_VALUE, F[i].label, val);
+            r->dim = !enabled(i);
+            s3_field[v->nrows - 1] = i;
+        }
+    else
+    {
+        const MI* m = s3_menu(v->tab);
+        for (i = 0; m[i].f != -2; i++)
+        {
+            if (m[i].f < 0) { f3_add(v, F3_HEAD, m[i].head, NULL); s3_field[v->nrows - 1] = -1; continue; }
+            sub_value(m[i].f, val);
+            f3_add(v, m[i].f == F_SF ? F3_ITEM : F3_VALUE, F[m[i].f].label, val);
+            s3_field[v->nrows - 1] = m[i].f;
+        }
+    }
+    if (!f3_selectable(v, v->sel)) v->sel = f3_first(v);
+    {
+        int f = s3_field[v->sel];
+        if (msg[0]) { snprintf(v->info, sizeof v->info, "%s", msg); v->infocol = 0x80FF90; }
+        else if (w[0] && v->tab == 0) { snprintf(v->info, sizeof v->info, "%s  %s", w, f >= 0 ? F[f].hint : ""); v->infocol = 0xFFB060; }
+        else snprintf(v->info, sizeof v->info, "%s", f >= 0 ? F[f].hint : "");
+    }
+    build_line(line);
+    snprintf(v->foot, sizeof v->foot, "SBEMU options: %s", line[0] ? line : "(none - all defaults)");
+    v->keys = "Arrows/Enter change  Tab page  S save  D defaults  T auto  F8 text  Esc";
+}
+
+/* the text screen (after the 3D one, or for its text-only parts) */
+static void s3_text_screen(int sel, const char* msg)
+{
+    tui_apply_theme(); tui_font_apply(); _setcursortype(_NOCURSOR);
+    textattr(A_DESK); clrscr();
+    fill(1, 2, 80, 23, A_DESK, '\xb0');
+    draw_bar();
+    draw_all(sel, msg);
+}
+static int s3_text_begin(void) { f3_leave(); s3_text_screen(s3_v.tab == 0 && s3_field[s3_v.sel] >= 0 ? s3_field[s3_v.sel] : 0, ""); return 1; }
+static int s3_text_end(void) { return f3_enter(); }
+
+/* leaving the SoundFont page without a file: back to the SC-55 (as the text screen does) */
+static void s3_tab(int t)
+{
+    /* the synth becomes the SoundFont only when a file is chosen (just looking at the page changes nothing) */
+    if (s3_v.tab == 2 && t != 2 && !g_sf[0] && using_sf()) F[F_SYNTH].cur = 0;
+    s3_v.tab = t; s3_v.sel = -1;
+}
+
+/* returns 0: quit SETTINGS, 1: go on in the text screen, 2: no 640x480 VESA mode (text screen) */
+static int s3_run(int tab, int direct)
+{
+    char msg[160] = "";
+    if (!f3_enter()) return 2;
+    s3_v.tab = 0; s3_v.sel = -1;
+    if (tab) s3_tab(tab);
+    for (;;)
+    {
+        int k, f;
+        s3_build(&s3_v, msg);
+        f3_frame(&s3_v);
+        k = f3_key(&s3_v);
+        if (!k) continue;
+        if (k != F3K_REDRAW) msg[0] = 0;
+        f = s3_field[s3_v.sel];
+        switch (k)
+        {
+        case F3K_UP: s3_v.sel = f3_step(&s3_v, -1); break;
+        case F3K_DOWN: s3_v.sel = f3_step(&s3_v, 1); break;
+        case F3K_HOME: s3_v.sel = f3_first(&s3_v); break;
+        case F3K_END: s3_v.sel = f3_last_row(&s3_v); break;
+        case F3K_TABSEL: s3_tab(f3_mval); break;
+        case F3K_TAB: s3_tab((s3_v.tab + 1) % 6); break;
+        case F3K_STAB: s3_tab((s3_v.tab + 5) % 6); break;
+        case F3K_LEFT: case F3K_RIGHT:
+        {
+            int d = k == F3K_LEFT ? -1 : 1;
+            if (f < 0 || f == F_SF) break;
+            if (is_menu(f)) { if (d > 0) s3_tab(s3_tab_of(f)); break; }
+            F[f].cur = (F[f].cur + F[f].n + d) % F[f].n; g_dirty = 1;
+            if (f == F_SYNTH && using_sf() && !g_sf[0])
+            {
+                s3_text_begin(); check_sf(d);
+                if (!s3_text_end()) return 1;
+            }
+            break;
+        }
+        case F3K_ENTER: case ' ':
+            if (f < 0) break;
+            if (is_menu(f)) { s3_tab(s3_tab_of(f)); break; }
+            if (f == F_SF)
+            {
+                char out[200];
+                s3_text_begin();
+                if (browse_sf(out, sizeof out, g_sf)) { strcpy(g_sf, out); F[F_SYNTH].cur = 1; g_dirty = 1; }
+                if (!s3_text_end()) return 1;
+                break;
+            }
+            {
+                const char* items[MAXVAL]; int i, r;
+                for (i = 0; i < F[f].n; i++) items[i] = F[f].labels[i] ? F[f].labels[i] : F[f].vals[i];
+                r = f3_pick(&s3_v, F[f].label, items, F[f].n, F[f].cur);
+                if (r >= 0 && r != F[f].cur)
+                {
+                    F[f].cur = r; g_dirty = 1;
+                    if (f == F_SYNTH && using_sf() && !g_sf[0]) { s3_text_begin(); check_sf(0); if (!s3_text_end()) return 1; }
+                }
+            }
+            break;
+        case 't': case 'T':
+        {
+            int r;
+            s3_text_begin();
+            r = tune(); tune_done_flag();
+            if (r > 0) { g_dirty = 0; strcpy(msg, "Saved the measured settings."); }
+            else if (r < 0) strcpy(msg, "Cannot write SBOPTS.TXT (does the folder exist?)");
+            if (!s3_text_end()) return 1;
+            break;
+        }
+        case 'd': case 'D':
+        {
+            int i;
+            if (!f3_yesno(&s3_v, "Put every setting back to its default? (Nothing is saved until you press S.)")) break;
+            for (i = 0; i < NF; i++) F[i].cur = F[i].def;
+            g_sf[0] = 0; g_dirty = 1; strcpy(msg, "Defaults restored (not saved yet).");
+            break;
+        }
+        case 's': case 'S': case 0x13C:
+            if (using_sf() && !g_sf[0]) { strcpy(msg, "Choose a SoundFont file first (or switch back to the SC-55)."); break; }
+            if (save()) { g_dirty = 0; strcpy(msg, "Saved. Restart the PC and run SC55 (or MENU) to use the new settings."); }
+            else strcpy(msg, "Cannot write SBOPTS.TXT (does the folder exist?)");
+            break;
+        case F3K_F8:
+            f3_cfg_off(); f3_leave();
+            return 1;
+        case F3K_ESC: case 'q': case 'Q':
+            if (s3_v.tab != 0 && !direct) { s3_tab(0); break; }
+            if (g_dirty)
+            {
+                static const char* b[3] = { "Yes", "No", "Cancel" };
+                int r = f3_choice(&s3_v, "Save?", "Save the changed settings before leaving?", b, 3);
+                if (r == 2) break;
+                if (r == 0)
+                {
+                    if (using_sf() && !g_sf[0]) { strcpy(msg, "Choose a SoundFont file first."); break; }
+                    if (!save()) { strcpy(msg, "Cannot write SBOPTS.TXT (does the folder exist?)"); break; }
+                }
+            }
+            f3_leave();
+            return 0;
+        default: break;
+        }
+    }
+}
+
 int main(int argc, char** argv)
 {
     int sel = 0, done = 0, i, page = -1, want_tune = 0; char msg[120] = "";
@@ -1192,6 +1371,12 @@ int main(int argc, char** argv)
     set_labels(); detect_roms(); load();
     if (using_sf() && !g_sf[0]) F[F_SYNTH].cur = 0;
     tui_theme_load(g_dir);
+    if (!want_tune && f3_wanted(g_dir))
+    {   /* the 3D menu is on: this screen in 3D too */
+        int r = s3_run(page >= 0 ? s3_tab_of(page) : 0, page >= 0);
+        if (r == 0) { tui_plain(); textattr(0x07); clrscr(); _setcursortype(_NORMALCURSOR); return 0; }
+        page = -1;
+    }
     tui_apply_theme();                 /* the style chosen in MENU (F3) */
     tui_font_apply();
     if (TUI_FANCY && tui_animate) tui_palette_level(0);   /* fade in once the first screen is drawn */
@@ -1249,6 +1434,16 @@ int main(int argc, char** argv)
             if (save()) { g_dirty = 0; strcpy(msg, "Saved. Restart the PC and run SC55 (or MENU) to use the new settings."); }
             else strcpy(msg, "Cannot write SBOPTS.TXT (does the folder exist?)");
             break;
+        case 0x142:                                     /* F8: the 3D screen (and the 3D menu) on */
+        {
+            int r;
+            f3_cfg_load(g_dir); f3_cfg_save();
+            r = s3_run(0, 0);
+            if (r == 0) { done = 1; break; }
+            if (r == 2) { f3_cfg_off(); strcpy(msg, "No 640x480 VESA mode with 15/16/24/32-bit colour on this PC: the 3D screens cannot be shown."); }
+            s3_text_screen(sel, msg);
+            break;
+        }
         case K_Escape: case 'q': case 'Q':
             if (g_dirty)
             {

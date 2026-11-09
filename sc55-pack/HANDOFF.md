@@ -591,3 +591,22 @@
   status line, prompt, Yes opens X360.TXT + folder, No writes X360Prompt=0 and the next start does not ask;
   has-driver build: "none found"; uninstall removes WIN98\X360. Not testable here: the real pad + driver install
   (86Box/QEMU have no USB pad) - needs the D810.
+
+## beta.77-usb (2026-11-09): SETTINGS, CD images and GAMETEST in 3D
+- tools/form3d.h (new): generic 3D list screen on m3core.h. F3VIEW = app, title, status, tabs, rows (F3_HEAD /
+  F3_ITEM / F3_VALUE, mark icons, dim, colour), info, foot, keys, accent. Styles = MENU's: 0 Panels (tabs down the
+  left, label + inset value with arrows, sliding highlight, 10 rows scrolling), 1 Carousel (cards; LRU cache of 24
+  card textures keyed by content; >14 rows: only +-6 around the selection), 2 Module (LCD = page / row / scrolling
+  value, tab buttons, knob). f3_key(): keyboard + mouse hits (row click selects, again = Enter; value arrows =
+  Left/Right; tab click = F3K_TABSEL; right click = Esc); F3 (style) and F4 (speed) handled inside. Pop-ups in 3D:
+  f3_pick, f3_choice/f3_yesno/f3_message, f3_input. On/off = MENU3D.CFG exists (shared with MENU; F8 anywhere
+  toggles it); Shift / SC55SAFE = text.
+- sbset.c: s3_run() (tabs Main + the 5 sub-menus; pick lists in 3D; SoundFont browser, T (tune) and check_sf
+  switch to text and back; Esc on a tab = Main, on Main = quit with Yes/No/Cancel; /PAGE: opens its tab, Esc quits).
+  In 3D the synth only becomes the SoundFont when a file is chosen (looking at the tab no longer marks it unsaved).
+- cdgui.c: c3_build()/c3_details(); ui_message/ui_yesno pick 3D or text; F1 help and C (files) are text.
+- gametest.c: g3_build() (Games / options / Run groups; option values "[*50ms]" = cursor, * = tested); Enter on
+  game/option rows = Space; ui_input = f3_input in 3D; result viewers, best settings and test runs are text.
+- makefile: cdgui and gametest link -lm; sbset.o, sc55menu and cdgui depend on tools/*.h.
+- 86Box (Celeron 366, Panels full / Carousel+Module auto half): all three in all styles, pick list, message,
+  input, F8 both ways, help/results text and back, Esc out.

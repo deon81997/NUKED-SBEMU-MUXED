@@ -191,6 +191,16 @@ CONTENTS
       3D (MENU3D.CFG); hold Shift while MENU starts for the text menu.
       Without a 640x480 VESA mode (no VESA BIOS / UNIVBE) MENU says so and
       stays in text.
+      SETTINGS, CD IMAGES AND GAMETEST IN 3D (since beta.77): while the 3D
+      menu is on they open in 3D too, in the same look (F3) and speed (F4).
+      F8 in any of them switches all of them (and MENU) between 3D and
+      text. SETTINGS shows its pages as tabs (Tab or click); Left/Right
+      change a value, Enter opens the list of values. Lists, questions,
+      messages and typing stay in 3D; the SoundFont file browser, the
+      automatic setup, help, a disc's file list, the result viewers and
+      the test runs are text screens and come back to 3D afterwards. The
+      mouse works too: click a row to choose it, again to open it, the
+      small arrows to change a value; right click = Esc.
       THE TEST PROGRAMS (JOYTEST, KMTEST, MPUTEST, USBTEST, TIMETEST,
       SBDIAG), MIDPLAY, SETTINGS, GAMETEST and the CD images screen use the
       same style, letters and safe mode as MENU, and F3 in any of them

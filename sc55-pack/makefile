@@ -7,7 +7,7 @@ DEBUG ?= 0
 # 0: original SBEMU build with the TinySoundFont SoundFont synth
 VSC55 ?= 1
 
-VERSION ?= 1.0.0-beta.76-usb-sc55
+VERSION ?= 1.0.0-beta.77-usb-sc55
 
 INCLUDES := -I./mpxplay -I./sbemu -I./drivers/include -I./sc55 -I./third_party/nuked-opl3-fast
 DEFINES := -D__DOS__ -DSBEMU -DDEBUG=$(DEBUG) -DSBEMU_VSC55=$(VSC55) -DMAIN_SBEMU_VER=\"$(VERSION)\"
@@ -203,7 +203,7 @@ $(MPUTEST): tools/mputest.c $(wildcard tools/*.h)
 output/gametest.exe: tools/gametest.c $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
-	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
+	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< -lm $(if $(filter 0,$(DEBUG)),-s,)
 
 output/sbdiag.exe: tools/sbdiag.c $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
@@ -243,7 +243,7 @@ $(MIDPLAY): tools/midplay.c $(wildcard tools/*.h)
 	$(SILENTMSG) "CC\t$@\n"
 	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< -lm $(if $(filter 0,$(DEBUG)),-s,)
 
-output/tools/sbset.o: tools/sbset.c sc55/sc55synth.h
+output/tools/sbset.o: tools/sbset.c sc55/sc55synth.h $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
 	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -c $< -o $@
@@ -254,15 +254,15 @@ $(SBSET): output/tools/sbset.o $(SC55_OBJS) $(NUKEDOPL_OBJ) output/sbemu/dbopl.o
 	$(SILENTCMD)$(CXX) -O2 -o $@ $^ -lstdc++ -lm $(if $(filter 0,$(DEBUG)),-s,)
 
 SC55MENU := output/sc55menu.exe
-$(SC55MENU): tools/sc55menu.c tools/menu3d.h tools/tui.h tools/theme.h tools/fontdata.h
+$(SC55MENU): tools/sc55menu.c $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
 	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -ffast-math -o $@ $< -lm $(if $(filter 0,$(DEBUG)),-s,)
 
-$(CDGUI): tools/cdgui.c tools/tui.h tools/theme.h tools/fontdata.h
+$(CDGUI): tools/cdgui.c $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
-	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
+	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< -lm $(if $(filter 0,$(DEBUG)),-s,)
 
 # same tool, but it also writes the whole report to SC55LOG.TXT next to the exe
 output/tools/sc55log.o: tools/sc55wav.cpp sc55/sc55synth.h
