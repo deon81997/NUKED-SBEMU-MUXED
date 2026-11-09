@@ -67,6 +67,11 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.76-w98.1.** **Xbox 360 pads in Windows 98!!** The pack now
+comes with an unofficial Windows 98 driver for the 360 controller (and HORI, Mad Catz, Logitech and Saitek pads), with
+English install steps. Plug your pad in and the NUKED SB-EMU even tells you where the driver is. Then it works in
+Windows games and in DOS games in DOS boxes, left stick and right stick both!
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.76.** Laptop gamers rejoice!! A **USB mouse now
 works right next to your touchpad** in plain DOS, no JEMM needed. Before, the mouse driver found the touchpad
 and the USB mouse just sat there. You can even plug it in while a game is running.

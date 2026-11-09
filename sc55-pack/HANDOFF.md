@@ -9,6 +9,7 @@
 - Never reuse the other session's next number: pull before releasing; the DOS session takes the next
   beta.NN, the Win98 session only ever adds -w98.M on top of the newest beta.NN. (beta.74 and beta.75
   were Win98 releases from before this rule.)
+- release/ holds one zip, the newest. Build the next zip from that one (it has both sessions' files).
 
 ## Current state (SBEMU 1.0.0-beta.51-usb-sc55, branch usb-xpad)
 - SBEMU + Nuked-SC55 (SC-55/mkII), Munt MT-32/CM-32L (/VMT32), SoundFont (/VSF); MPU side channel 0xA5-0xB0 (stats, SBDIAG, key player, triple-Esc, front panel/LCD + CPU load).
@@ -553,8 +554,7 @@
   INT 15h AL=E0 AX=00C0 BX=0003; left+down+b3b4 -> 0004/00AA 3C, AL=30 AX=0003 BX=00C0 (uncalibrated range in
   Windows, so not full 00FF); stick B bits stay 1. Without SC55W INT 15h gave the BIOS's 0001s.
   VOLTEST.EXE: NUKED SB-EMU support 3, set 0x80004000 reads back, SC55W.LOG "left 25%, right 50%".
-- Pending: the user's Xbox 360 Windows 98 drivers (X360DrvWin98SE.7z, x360c.w98.x86.en.zip - attached in another
-  chat) to bundle as the Windows-side pad driver; status window (SC-55 LCD/meters); MS-DOS-mode shortcuts.
+- Xbox 360 Windows 98 driver: done in Win98 w98.1 (below).
 
 ## beta.76-usb (2026-11-09): USB mouse without JEMM (D810: touchpad + USB mouse)
 - User report (D810): with the USB mouse plugged in, the touchpad worked and the USB mouse was ignored. Cause: the
@@ -573,3 +573,21 @@
   "touchpad"; /tmp/mq run2.sh + MT.EXE INT 33h logger): CTMOUSE 2.1b4 and MOUSE.COM 8.20 both get USB moves +
   left button and PS/2 moves + right button alternately. beta.73 control: PS/2 only. J15 (BIOS joystick) same
   answers as beta.71 (vector offset 0000 -> 0010 only).
+
+## Win98 w98.1 (on beta.76) - 2026-11-09: Xbox 360 pad driver in the pack
+- Release: release/NUKED-SB-EMU-1.0.0-beta.76-w98.1-usb.zip (= beta.76 zip + new SC55W.EXE, README98, SOURCE.ZIP,
+  FILES\WIN98\X360), tag v1.0.0-beta.76-w98.1-usb. VXD / MIDI driver unchanged.
+- win98/x360: morii's unofficial x360c driver for 98 SE/ME (Microsoft XP x360c.sys 5.2.3790 patched; from the user's
+  x360c.w98.x86.en.zip: X360C.INF, X360HORI.INF, X360MDCZ.INF (renamed from x360c_hori/_mdcz to 8.3), .SYS, CCP/CFF
+  DLLs, X360CSA.EXE, README.JP = Shift-JIS readme) + MDGX/ (X360DrvWin98SE.7z "X360 fixed": combined INF + X2.INF
+  right-click install, ADVPACK). Same .sys/.dll in both. X360.TXT = English steps + translated README.JP tips.
+- install98: copies FILES\WIN98\X360 tree to <pack>\WIN98\X360 (copy_tree); uninstall deletes it (delete_tree).
+- w98main: when no Windows joystick, x360_without_driver() walks HKEY_DYN_DATA\Config Manager\Enum (present
+  devnodes), HardWareKey USB\ + one of the 25 VID/PIDs from the INFs, driver missing = no HKLM\Enum\<key> Driver
+  value or devnode Problem != 0 -> status/log line + one prompt per run (Yes = X360.TXT in Notepad + folder;
+  No = SC55W.INI X360Prompt=0). X360_TEST=1/2 build defines fake it with the 440BX host bridge (PCI) for 86Box.
+- Bug found: Windows 98 CreateThread fails when lpThreadId is NULL (the prompt never showed) - always pass &tid.
+- Tested in 86Box (P2B-LS, Win98 SE, pentium2 test builds): setup copies X360 (12 files + MDGX); no-driver build:
+  status line, prompt, Yes opens X360.TXT + folder, No writes X360Prompt=0 and the next start does not ask;
+  has-driver build: "none found"; uninstall removes WIN98\X360. Not testable here: the real pad + driver install
+  (86Box/QEMU have no USB pad) - needs the D810.

@@ -802,7 +802,8 @@ static DWORD WINAPI joy_main(LPVOID)
                         "install it from WIN98\\X360 (X360.TXT)";
                     if (!x360_asked && ini_int("X360Prompt", 1)) {
                         x360_asked = true;
-                        HANDLE t = CreateThread(NULL, 0, x360_prompt, NULL, 0, NULL);
+                        DWORD tid;       // Windows 98: CreateThread fails with a NULL thread id
+                        HANDLE t = CreateThread(NULL, 0, x360_prompt, NULL, 0, &tid);
                         if (t) CloseHandle(t);
                     }
                 } else d = "none found in Windows (Control Panel > Game Controllers)";
