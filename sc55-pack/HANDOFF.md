@@ -9,6 +9,7 @@
 - Never reuse the other session's next number: pull before releasing; the DOS session takes the next
   beta.NN, the Win98 session only ever adds -w98.M on top of the newest beta.NN. (beta.74 and beta.75
   were Win98 releases from before this rule.)
+- Win98 work in progress (pad buttons -> keys per game, untested): branch `w98-pad-wip`, see its HANDOFF.md.
 - release/ holds one zip, the newest. Build the next zip from that one (it has both sessions' files).
 - README.md "What's NEW!!" shows the 5 newest entries; when adding one, move the oldest visible entry to the
   top of the "Older news" <details> block under them.
