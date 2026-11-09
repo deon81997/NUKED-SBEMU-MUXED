@@ -607,6 +607,11 @@ static void m3_draw_panels(int cat, int sel, float selanim)
             m3_text_sh(&m3_scr, 224 + on, yy + 7 + on, 1, t2->label, ok ? 0xFFFFFF : 0x8890A0);
             m3_hit(188, yy, M3W - 212, 36, on ? 3 : 2, k[i]);
         }
+        {   /* small arrows in the right margin when items are hidden above or below */
+            int r2;
+            if (top > 0) for (r2 = 0; r2 < 4; r2++) m3_rect(&m3_scr, 621 - r2, 70 + r2, 1 + 2 * r2, 1, 0xC0D0F0, 256);
+            if (top + rows < n) for (r2 = 0; r2 < 4; r2++) m3_rect(&m3_scr, 621 - r2, 351 - r2, 1 + 2 * r2, 1, 0xC0D0F0, 256);
+        }
     }
     /* description */
     m3_shadow(&m3_scr, 12, 366, M3W - 24, 104, 6);

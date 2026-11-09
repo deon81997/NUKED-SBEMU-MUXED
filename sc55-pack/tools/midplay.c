@@ -452,6 +452,7 @@ static void ui_begin(void)
     tui_font_loaded = 0; tui_font_apply();
     textattr(0x07); clrscr();
     memset(scr, 0, sizeof scr);
+    memset(shown, 0xFF, sizeof shown); /* the screen was cleared: repaint every row */
 }
 static void ui_end(void)
 {
@@ -1034,7 +1035,14 @@ static void seek_rel(long delta_s)
 
 /* runs a modal screen without losing the song position */
 static void modal_begin(void) { silence(); P.p0 = now_us(); }
-static void modal_end(void) { if (!P.paused) P.start += now_us() - P.p0; g_last_draw = 0; }
+static void modal_end(void)
+{
+    if (!P.paused) P.start += now_us() - P.p0;
+    g_last_draw = 0;
+#ifndef HOSTTEST
+    memset(shown, 0xFF, sizeof shown); /* the list screen drew over everything: repaint every row */
+#endif
+}
 
 /* handles one key; returns 0 to carry on or a play() result (1 next, 2 quit, 3 prev, 4 jump) */
 static int do_key(int k, int in_tail)

@@ -427,3 +427,19 @@
   lags the game).
 - Remaining profile: PCM_Update 45% (20-bit DSP arithmetic, inherent), timers 14%, MCU_Step 11%, MCU_Read 7%.
 - Bench: /home/claude/bench (bench.cpp, build.sh, ir.sh; SC_SET=<romset> env picks the ROM set).
+
+## beta.70-usb (2026-11-09): bug sweep (86Box, Celeron 366)
+- Checked OK: SBEMU start-up, MPUTEST, TIMETEST (now finds the MPU with the SC-55 loaded; 0 ticks lost), SBDIAG,
+  MIDPLAY play/seek/views/browser, MENU (all pages, launching a game and coming back), CDGUI mount, CD audio
+  (CDT.BAT: track plays to the end), GAMETEST, JOYTEST, Dark Forces setup Test Music.
+- Fixed:
+  - MIDPLAY: after the file browser (B) or playlist (Tab) the title bar, column headers, "Notes" row and key bar
+    stayed blank (ui_flush compares with `shown`, which was not reset after the list screen cleared the screen).
+    modal_end() and ui_begin() now invalidate `shown`.
+  - MENU (3D): four descriptions ran past the 4-line box ("...") - shortened (checker: /tmp/desc.py, 74 cols x 4).
+    Scroll arrows in the item list when items are hidden (Settings has 8, the box shows 7).
+  - SBSET Automatic setup: skips the mkII when the SC-55 without effects already needs over 50% (the mkII is
+    always heavier, it could never be picked) - saves a full init + 2 measurements on slow PCs. "About a minute"
+    text corrected. The "a SoundFont would suit this PC better" warning overflowed the dialog - two lines now.
+  - TIMETEST: SBEMU statistics line wrapped mid-word - fits in two lines now.
+- Not a bug (checked): Automatic setup leaves /VSCAUTO on (value index 0 = "1").

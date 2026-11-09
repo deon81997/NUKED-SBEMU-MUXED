@@ -183,7 +183,7 @@ static void sbemu_stats(void)
     for (i = 0; i < 32; ++i) b[i] = inportb(g_port);
     for (i = 0; i < 8; ++i) { d[i] = 0; for (j = 3; j >= 0; --j) d[i] = (d[i] << 8) | b[4*i+j]; }
     if (d[0] != 0x35355342UL) { out("  SBEMU statistics: none (this is an older SBEMU than beta.8)\n"); return; }
-    out("  SBEMU: speed control level %lu, load %lu.%lu%%, render per block avg %lu us / max %lu us,\n"
+    out("  SBEMU: speed level %lu, load %lu.%lu%%, render avg %lu / max %lu us/block\n"
         "         block %lu frames at %lu Hz (%lu us), %lu blocks\n",
         d[1], d[2] / 10, d[2] % 10, d[4], d[3], d[5], d[6], d[6] ? d[5] * 1000000UL / d[6] : 0UL, d[7]);
 }

@@ -311,8 +311,8 @@ static void build_menu(void)
     /* Sound */
     snprintf(c, sizeof c, "CALL %s\\SC55.BAT", g_home);
     add(C_SOUND, "Start SC-55 / SoundFont", "Loads SBEMU with your saved settings: a Sound Blaster plus an MPU-401 (port 330 unless changed in Settings) played by the"
-        " SC-55 emulation (or the SoundFont chosen in Settings). For protected-mode games (DOS4GW and the like): Duke 3D, Doom,"
-        " most 90s games. Shows SBEMU's messages, then comes back here.", IT_BAT, c, -1, 1, NULL);
+        " SC-55 (or your SoundFont). For protected-mode games (DOS4GW and the like): Duke 3D, Doom, most 90s games."
+        " Shows SBEMU's messages, then comes back here.", IT_BAT, c, -1, 1, NULL);
     if (home_exists("SC55JEM.BAT"))
     { snprintf(c, sizeof c, "CALL %s\\SC55JEM.BAT", g_home);
       add(C_SOUND, "Start for real-mode (JEMM)", "The same, but also for real-mode games (older games that do not use DOS4GW)."
@@ -327,9 +327,8 @@ static void build_menu(void)
         " synth (SC-55, MT-32, CM-32L or a SoundFont), and the sample rate. Saved to SBOPTS.TXT. If SBEMU is already loaded, restart the PC so the new"
         " settings are used.", IT_BAT, c, 0, 0, NULL);
     snprintf(c, sizeof c, "CALL %s\\SETTINGS.BAT /TUNE", g_home);
-    add(C_SETTINGS, "Automatic setup", "Measures how much of this PC's CPU the SC-55 needs - each ROM set you have, with and"
-        " without reverb/chorus - and picks the best-sounding settings that leave enough for the game: ROM set, reverb/chorus,"
-        " sample rate and note limit. About a minute; nothing is played. You see the numbers and choose whether to save them."
+    add(C_SETTINGS, "Automatic setup", "Measures how much CPU the SC-55 needs on this PC and picks the best-sounding ROM set, reverb/chorus,"
+        " sample rate and note limit that leave enough for the game. A minute or more, silent; you choose whether to save."
         " Only while SBEMU is not loaded (restart the PC first).", IT_BAT, c, -1, 0, NULL);
     snprintf(c, sizeof c, "CALL %s\\SETTINGS.BAT /PAGE:SC", g_home);
     add(C_SETTINGS, "SC-55 options", "SC-55 emulation: which ROM set (auto, SC-55, SC-55mkII), its volume (/VSCGAIN),"
@@ -347,15 +346,14 @@ static void build_menu(void)
     add(C_SETTINGS, "Timing & advanced", "Render-ahead and timer give-back (these keep game music at the right tempo), OPL on/off"
         " and core, output jack, sample-rate fix, CD audio, protected/real-mode support, which sound card, MIDI out port.",
         IT_BAT, c, 0, 0, NULL);
-    add(C_SETTINGS, "3D menu (F8)", "Shows this menu in 3D (640x480 VESA graphics, drawn by the CPU - no 3D card needed): F3 picks"
-        " the style - Panels (raised buttons), Carousel (cards on a turning ring) or Module (a sound module whose display and knob"
-        " are the menu). F8 there comes back to this text menu, which stays the main one. Shift at start always gives the text menu.",
+    add(C_SETTINGS, "3D menu (F8)", "Shows this menu in 3D (640x480 VESA, drawn by the CPU - no 3D card needed). F3 picks the style: Panels,"
+        " Carousel (cards on a ring) or Module (a sound module whose display and knob are the menu). F8 comes back to"
+        " the text menu; holding Shift at start always gives the text menu.",
         IT_M3D, NULL, 0, 0, NULL);
     snprintf(c, sizeof c, "CALL %s\\SETTINGS.BAT /PAGE:JOY", g_home);
-    add(C_SETTINGS, "Joystick (USB pad)", "A wired USB Xbox 360 pad (or compatible) as the PC gameport joystick at port 201h"
-        " (/JOY): which sticks and buttons the game sees, a dead zone, and pad buttons typed as keys (Start = Enter,"
-        " Back = Esc). Works on every kind of USB controller (USB 1.1, 2.0 and 3), also behind a hub. On by default; turn it off if"
-        " you use a USB keyboard or mouse in DOS (SBEMU takes the USB ports over). Applies the next time SBEMU starts.",
+    add(C_SETTINGS, "Joystick (USB pad)", "A wired USB Xbox 360 pad (or compatible) as the gameport joystick (/JOY): sticks, buttons, dead zone,"
+        " pad keys (Start = Enter, Back = Esc). Any USB controller or hub. On by default; turn it off if you"
+        " use a USB keyboard or mouse in DOS (SBEMU takes the USB ports). Applies next start.",
         IT_BAT, c, 0, 0, NULL);
     /* Tests */
     add(C_TESTS, "MIDI player (MIDPLAY)", "Browse your folders for .MID files and play them through the running SC-55 or"
@@ -994,7 +992,7 @@ int main(int argc, char** argv)
         int k;
         draw(g_cat, g_sel);
         if (tui_yesno("Welcome! Measure this PC now and choose the best SC-55 settings for it automatically?"
-                      " (About a minute. Later: Settings > Automatic setup.)"))
+                      " (A minute or more. Later: Settings > Automatic setup.)"))
         {
             for (k = 0; k < g_n; k++) if (!strcmp(g_it[k].label, "Automatic setup")) break;
             if (k < g_n && write_go(&g_it[k], 0)) { tui_done(); return 0; }

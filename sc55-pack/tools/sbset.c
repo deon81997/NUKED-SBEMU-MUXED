@@ -1060,8 +1060,8 @@ static int tune(void)
     if (!sets[0] && F[F_ROMSET].n > 1) sets[0] = F[F_ROMSET].vals[1];
     fill(x, y, w, h, A_WIN, ' '); frame(x, y, w, h, A_WIN, 1); shadow(x, y, w, h);
     put(x + 2, y, A_TITLE, " Automatic setup ");
-    put(x + 2, y + 1, A_WIN, "Measuring how much of this PC's CPU the SC-55 needs. About a");
-    put(x + 2, y + 2, A_WIN, "minute: the music is rendered silently, nothing is played.");
+    put(x + 2, y + 1, A_WIN, "Measuring how much of this PC's CPU the SC-55 needs. A minute");
+    put(x + 2, y + 2, A_WIN, "or two (more on slow PCs), silently: nothing is played.");
     if (!has_cmov())
     {
         put(x + 2, ln, A_ERR, " The SC-55 / MT-32 emulation needs a Pentium Pro / Pentium II ");
@@ -1082,6 +1082,12 @@ static int tune(void)
     {
         SC55_Config cfg; double t = 0, next = 0; int beat = -1;
         if (!sets[i]) continue;
+        if (i == 1 && load[0][1] > 0.50)
+        {   /* the mkII needs more CPU than the original: if even the original without effects is over half the
+             * CPU, the mkII cannot win - skip it (saves minutes on slow PCs) */
+            sprintf(line, "%-14s skipped (needs more CPU than %s)", sets[i], sets[0]); put(x + 2, ln++, A_WIN, line);
+            continue;
+        }
         sprintf(line, "%-14s loading ...", sets[i]); put(x + 2, ln, A_WIN, line);
         memset(&cfg, 0, sizeof cfg);
         cfg.romdir = romdir; cfg.romset = sets[i]; cfg.gain_percent = 100; cfg.verbose = 0;
@@ -1121,7 +1127,11 @@ static int tune(void)
         put(x + 2, ln++, A_GROUP, "Best for this PC:");
         sprintf(line, "  ROM set %s, reverb/chorus %s, %s Hz%s", best_set, bfx ? "off" : "on", rate ? "32000" : "22050", limit ? ", note limit 16" : "");
         put(x + 2, ln++, A_BOLD, line);
-        if (l > 0.50) put(x + 2, ln++, A_ERR, " Even this needs over half the CPU: a SoundFont would suit this PC better. ");
+        if (l > 0.50)
+        {
+            put(x + 2, ln++, A_ERR, " Even this needs over half the CPU: a SoundFont             ");
+            put(x + 2, ln++, A_ERR, " (Settings > SoundFont options) would suit this PC better.  ");
+        }
     }
     put(x + 2, y + h - 2, A_GROUP, "[Y] Use and save these settings    [N] Keep mine");
     for (;;)

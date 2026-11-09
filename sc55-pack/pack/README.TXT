@@ -365,7 +365,9 @@ CONTENTS
   SC-55 with effects, mkII with effects, SC-55 without, mkII without. It
   uses 32000 Hz if there is plenty of room (under 35%), otherwise 22050 Hz,
   and a note limit of 16 above 40%. You see the numbers and choose with Y
-  or N whether they are saved. Takes about a minute.
+  or N whether they are saved. Takes a minute or more (several on a
+  Pentium II/Celeron). If the SC-55 without effects already needs over half
+  of the CPU, the mkII (always heavier) is skipped.
 
   Defaults: port 220, IRQ 7, DMA 1, 16-bit DMA 5, type 5 (SB Pro), MPU 330,
   ROM set auto, 22050 Hz, fast FM, render-ahead 50 ms, timer give-back on.
