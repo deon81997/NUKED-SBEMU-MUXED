@@ -18,6 +18,8 @@ inside Windows 98:
     joystick call (INT 15h AH=84h), fed by the joystick Windows knows
     (Control Panel > Game Controllers) - e.g. an Xbox 360 pad with the
     Windows 98 driver that comes with the pack (WIN98\X360).
+  * Game pad buttons can press keys in DOS games, with a layout per game
+    for 3500+ games (see "Game pad buttons as keys" below).
   * The settings are the DOS pack's: C:\SC55\SBOPTS.TXT. What you set in
     DOS (SETTINGS.BAT) applies in Windows and the other way round.
 
@@ -114,6 +116,31 @@ C:\SC55\WIN98\SC55W.INI and the uninstaller puts it back.
   plugged in without a driver, NUKED SB-EMU says so once and offers to show
   the steps (SC55W.INI X360Prompt=0 stops that).
 
+  Game pad buttons as keys: when a DOS box has the keyboard, the pad's
+  buttons and sticks can press keys, with a layout for the game running in
+  it (found by its EXE name and size, or by the files in its folder).
+     Layouts for 3500+ games: download keyb2joypad.cpp as DOWNLOADS.TXT
+       says (the Keyb2Joypad project, as built into DOSBox Pure; not
+       shipped with the pack) into C:\SC55\PADMAP (Setup copies it from
+       the pack's FILES\PADMAP). The next start turns it into
+       C:\SC55\PADMAP.TXT.
+     Without a layout for the game ("Default"): sticks and A B X Y are the
+       DOS joystick as above, D-pad = arrow keys, Start = Enter, Back = Esc.
+     Your own layouts and changes: C:\SC55\PADUSER.TXT, same format as
+       PADMAP.TXT. A section with a game's title (or [Default]) changes only
+       the lines it has, e.g.
+          [Default]
+          Y=F1
+          [Commander Keen 4 - Secret of the Oracle]
+          RB=F2+F3
+       Buttons: A B X Y LB RB LT RT LS RS Back Start DUp DDown DLeft DRight
+       Sticks:  LStickX LStickY RStickX RStickY = key-for-left/up key-for-
+       right/down. Keys as in PADMAP.TXT (LCtrl, Space, Up, F1, A ... Z,
+       None); JoyButton1-4, JoyUp/Down/Left/Right, Joy2Up... = DOS joystick.
+     Status shows the layout in use and the last button pressed with its
+     Windows button number, to check the [Pad] settings below.
+     Held keys are let go when Windows takes the keyboard.
+
   Command line (Start > Run):
      C:\SC55\WIN98\SC55W.EXE              start (or show the status)
      C:\SC55\WIN98\SC55W.EXE /SETTINGS    open the settings
@@ -175,6 +202,11 @@ Windows-only options, in C:\SC55\WIN98\SC55W.INI under [SC55W]:
      JoyBios=1          BIOS joystick call INT 15h AH=84h (0 = off).
      X360Prompt=1       0 = do not offer the Xbox 360 driver when a 360 pad
                         without a driver is plugged in.
+     PadKeys=1          game pad buttons -> keys in DOS boxes (0 = off).
+   Under [Pad]: which Windows joystick button is which pad button, for pads
+   that number them differently from the Xbox 360 driver (its order is the
+   default: A=1 B=2 X=3 Y=4 LB=5 RB=6 Back=7 Start=8 LS=9 RS=10; D-pad =
+   the POV hat; Triggers=Z (LT one way, RT the other); RStickX=U RStickY=R).
      CpuMax=60          most of the CPU (percent, 20-95) the synth may use.
                         When it cannot keep up the music lags or breaks up
                         instead of Windows slowing down.

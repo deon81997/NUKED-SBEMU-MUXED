@@ -4,7 +4,7 @@
 // keyb2joypad.cpp, the Keyb2Joypad project) and PADUSER.TXT (the user's, same format, wins):
 //
 //   [Commander Keen 4 - Secret of the Oracle]
-//   Id=B408B7B3 ...              FNV-1a of the upper-case 8.3 file name, xor (size << 3)
+//   Id=B408B7B3 ...              FNV-1 of the upper-case 8.3 file name, xor (size << 3)
 //   A=LCtrl ; Jump               button = key[+key...]   (None = nothing)
 //   LStickX=Left Right           axis = keys for left/up, keys for right/down
 //
@@ -233,7 +233,7 @@ std::string pad_select(const std::vector<std::pair<std::string, uint32_t>>& prog
 }
 
 // ---------------------------------------------------------------- input -> output
-static bool g_down[NKEYS];
+static bool g_down[NKEYS], g_stale[NKEYS];   // down in the DOS box / down there when Windows took the keyboard
 
 static void key_bytes(int k, bool make, std::vector<uint8_t>& o)
 {
@@ -299,10 +299,21 @@ void pad_step(const PadInput& in, bool focus_dos, PadOutput& out)
             else if (in.axis[i] > 13000) for (int x : p) act(x);
         }
     }
-    // keys: only to a DOS box; when Windows has the keyboard, everything is up
+    // keys: only to a DOS box. When Windows takes the keyboard, held keys are released at
+    // once (VKD hands a held Ctrl / Alt / Shift on to Windows; the VxD lets breaks through
+    // to Windows) and again when a DOS box has the keyboard back, unless still held there.
     for (int k = 0; k < NKEYS; k++) {
-        bool w = want[k] && focus_dos;
-        if (w != g_down[k]) { key_bytes(k, w, out.scancodes); g_down[k] = w; }
+        if (!focus_dos) {
+            if (g_down[k]) { key_bytes(k, false, out.scancodes); g_down[k] = false; g_stale[k] = true; }
+            continue;
+        }
+        if (g_stale[k]) {
+            g_stale[k] = false;
+            if (want[k]) g_down[k] = true;              // still down in the game: nothing to send
+            else key_bytes(k, false, out.scancodes);
+            continue;
+        }
+        if (want[k] != g_down[k]) { key_bytes(k, want[k], out.scancodes); g_down[k] = want[k]; }
     }
     // game port: the sticks the layout uses are there, the others are not
     uint8_t used = 0;

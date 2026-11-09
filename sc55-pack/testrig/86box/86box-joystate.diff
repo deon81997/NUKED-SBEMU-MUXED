@@ -1,0 +1,44 @@
+diff --git a/src/qt/sdl_joystick.c b/src/qt/sdl_joystick.c
+index fe8173b63..6d67a40f1 100644
+--- a/src/qt/sdl_joystick.c
++++ b/src/qt/sdl_joystick.c
+@@ -174,11 +174,39 @@ joystick_get_axis(int joystick_nr, int mapping)
+         return plat_joystick_state[joystick_nr].a[plat_joystick_state[joystick_nr].axis[mapping].id];
+ }
+ 
++/* test rig: $JOYSTATE file "x y b1 b2 b3 b4" (x/y -32768..32767) drives gameport joystick 1 */
++static int
++joystate_file(uint8_t gp)
++{
++    const char *fn = getenv("JOYSTATE");
++    if (!fn)
++        return 0;
++    FILE *f = fopen(fn, "r");
++    int v[6] = { 0, 0, 0, 0, 0, 0 };
++    if (f) {
++        if (fscanf(f, "%d %d %d %d %d %d", &v[0], &v[1], &v[2], &v[3], &v[4], &v[5]) < 2)
++            v[0] = v[1] = 0;
++        fclose(f);
++    }
++    for (int js = 0; js < joystick_get_max_joysticks(joystick_type[gp]); js++) {
++        for (int a = 0; a < joystick_get_axis_count(joystick_type[gp]); a++)
++            joystick_state[gp][js].axis[a] = (js == 0 && a < 2) ? v[a] : 0;
++        for (int b = 0; b < joystick_get_button_count(joystick_type[gp]); b++)
++            joystick_state[gp][js].button[b] = (js == 0 && b < 4) ? v[2 + b] : 0;
++        for (int p = 0; p < joystick_get_pov_count(joystick_type[gp]); p++)
++            joystick_state[gp][js].pov[p] = -1;
++        joystick_state[gp][js].plat_joystick_nr = (js == 0) ? 1 : 0;
++    }
++    return 1;
++}
++
+ void
+ joystick_process(uint8_t gp)
+ {
+     if (!joystick_type[gp])
+         return;
++    if (joystate_file(gp))
++        return;
+ 
+     SDL_UpdateJoysticks();
+     for (int js = 0; js < joysticks_present; js++) {

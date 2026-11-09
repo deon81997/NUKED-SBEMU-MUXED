@@ -9,7 +9,7 @@
  *
  *   [Commander Keen 4 - Secret of the Oracle]
  *   Year=1991
- *   Id=B408B7B3 B408FAD3 ...          file ids: FNV-1a over the upper-case 8.3 file name ^ (size << 3)
+ *   Id=B408B7B3 B408FAD3 ...          file ids: FNV-1 (multiply, then xor) over the upper-case 8.3 file name ^ (size << 3)
  *   A=LCtrl ; Jump                    pad button (Xbox names) = key[+key...] ; action
  *   LStickX=Left Right ; Move ...     axis = key for the negative side, key for the positive side
  *
@@ -297,6 +297,14 @@ static int cmp_title(const void* a, const void* b)
     return x->year != y->year ? x->year - y->year : (x->first < y->first ? -1 : 1);
 }
 
+/* titles that differ only in case ("OverKill" 1992, "Overkill" 1996) are different games too:
+   SC55W matches section titles without case, so they get numbered like exact repeats */
+static int same_title(const char* p, const char* q)
+{
+    for (; *p && tolower((u8)*p) == tolower((u8)*q); p++, q++) ;
+    return tolower((u8)*p) == tolower((u8)*q);
+}
+
 static long convert(const char* in, const char* outname, long* nid_out);
 static void free_all(void);
 
@@ -377,7 +385,7 @@ static long convert(const char* in, const char* outname, long* nid_out)
     fprintf(f, "; PADMAP.TXT - game pad layouts for NUKED SB-EMU, %ld games.\n"
                "; Made by PADCONV from keyb2joypad.cpp: the Keyb2Joypad project by Jemy Murphy and bigjim,\n"
                "; as built into DOSBox Pure. Do not edit: put your own layouts in PADUSER.TXT (same format).\n"
-               ";   Id=      files of the game: FNV-1a of the upper-case file name, xor (file size << 3)\n"
+               ";   Id=      files of the game: FNV-1 of the upper-case file name, xor (file size << 3)\n"
                ";   Button=  key[+key...]  ; action     Axis= key-for-left/up key-for-right/down\n"
                ";   Buttons: A B X Y LB RB LT RT LS RS Back Start DUp DDown DLeft DRight\n"
                ";   Axes:    LStickX LStickY RStickX RStickY\n", ng);
@@ -385,7 +393,7 @@ static long convert(const char* in, const char* outname, long* nid_out)
         const u8 *ms = bk[g[i].mb].maps, *p = ms + g[i].moff;
         int cnt = *p++, n, dup = 0;
         long j;
-        for (j = i - 1; j >= 0 && !strcmp(g[j].title, g[i].title); j--) dup++;
+        for (j = i - 1; j >= 0 && same_title(g[j].title, g[i].title); j--) dup++;
         fprintf(f, "\n[%s", g[i].title);
         if (dup) fprintf(f, " (%d)", dup + 1);
         fprintf(f, "]\nYear=%d\nId=", g[i].year);

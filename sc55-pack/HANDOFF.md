@@ -623,7 +623,7 @@
   https://raw.githubusercontent.com/schellingb/dosbox-pure/0.9.9/keyb2joypad.cpp -> the pack's FILES\PADMAP;
   tools/padmap/padconv.c (own raw inflate, plain C, no downloaded code) turns it into PADMAP.TXT on the user's
   machine: same 3557 games / 4232 ids as k2j.py. Built for Win32 (MinGW); DOS = same source with DJGPP.
-- Game id = FNV-1a 32 over the UPPERCASE 8.3 file name, then ^= (file size << 3)
+- Game id = FNV-1 32 (multiply, then xor; not FNV-1a) over the UPPERCASE 8.3 file name, then ^= (file size << 3)
   (verified: WOLF3D.EXE 98402, PRINCE.EXE 123335, KEEN4E.EXE 103224/105108). Ids also cover data files
   (GAMEMAPS.WL6), so match the started EXE first, then the files in its folder.
 - Button names in the data are RetroArch/SNES positions: B = bottom (Xbox A), A = right (Xbox B), Y = left (Xbox X),
@@ -639,32 +639,54 @@
 - Split: Win98 session = format, converter, engine (C, shared), SC55W + VxD key injection (VKD_Force_Keys).
   DOS session = feed the engine from its USB pad code and inject through its existing 60h/64h traps.
 
-## Win98 w98.2 IN PROGRESS (branch w98-pad-wip, NOT released, NOT tested yet) - pad buttons -> keys per game
+## Win98 w98.2 (on beta.77) - 2026-11-09: pad buttons -> keys per game
+- Release: release/NUKED-SB-EMU-1.0.0-beta.77-w98.2-usb.zip (= beta.77 zip + new SC55W.EXE, SC55W.VXD, README98,
+  DOWNLOADS.TXT, SOURCE.ZIP, empty FILES\PADMAP), tag v1.0.0-beta.77-w98.2-usb. SC55MIDI.DRV unchanged.
 - Decided by the user: the Keyb2Joypad data is NOT shipped, only linked (DOWNLOADS.TXT); the X360 driver stays.
-- Done (builds, untested):
-  - VxD (IF version 6): IOCTL_SC55W_KEYS 0x16 (VKD_Force_Keys into the VM that has the keyboard, dropped when
-    it is the system VM), IOCTL_SC55W_FOCUS 0x17 (SC55W_FOCUS: owner VM + its program list). INT 21h V86 hook
-    (cfg.joy bit2): AX=4B00h -> nested DOS calls (Save_Client_State, Begin_Nest_V86_Exec, Exec_Int 21h:
-    2Fh get DTA, 60h TRUENAME into the DTA, 4Eh FINDFIRST for the size; DTA bytes saved/restored) -> pushed
-    on a per-VM list (8 VMs x 4 programs); AH=4Ch/31h/00h pop. Create_VM/Destroy_VM clear a slot.
-    VMM ordinals used: 82h Begin_Nest_V86_Exec, 84h Exec_Int, 86h End_Nest_Exec, 8Dh/8Eh Save/Restore_Client_
-    State; VKD (device 0Dh) 7 Force_Keys, 8 Get_Kbd_Owner - from memory of the DDK, VERIFY in the test.
-    Status bits ST_OK_PROG 0x80000 / ST_ERR_PROG 0x100000.
-  - helper/pad.cpp/.h: PADMAP.TXT + PADUSER.TXT parser (user sections override line by line, [Default]
-    too), key names -> set-1 scan codes (E0 for extended), JoyButton1-4 / Joy(2)Up.. -> game port (axis bound
-    to JoyLeft JoyRight = analog pass-through), pad_select (newest program's name+size id, then files in its
-    folder), pad_step (key diff -> make/break; all keys up when Windows has the keyboard).
-  - w98main: [Pad] INI (A..RS button numbers, default x360 order 1-10, D-pad = POV, Triggers=Z, RStickX=U,
-    RStickY=R), PadKeys=1, FOCUS poll every 100 ms, "pad:" log lines, status line "Pad keys: layout ...
-    Last button: X (Windows button n)". PADMAP.TXT rebuilt at start from <base>\PADMAP\keyb2joypad.cpp when
-    newer (padconv.c built in with -DPADCONV_LIB). install98 copies FILES\PADMAP -> <base>\PADMAP.
-  - build98.sh + the scratch build script compile pad.cpp and padconv.c.
-- NEXT: test in 86Box (w98s_joybase.img = Win98 + 2-axis 4-button game port joystick, JOYSTATE file
-  "x y b1 b2 b3 b4" drives it; see test/keys): new SC55W (p2 build) + SC55W.VXD, keyb2joypad.cpp in
-  C:\SC55\PADMAP, PADUSER.TXT "[Default] Y=F1", KEYLOG.COM + KD.BAT in C:\, fake KEEN4E.EXE (KEYLOG wrapped in
-  an MZ header, padded to 103224 bytes = Keen 4's id) in C:\KEEN4 + KT.BAT. In a DOS box run KT (expect
-  layout "Commander Keen 4": A -> 1D/9D LCtrl, B -> 39/B9 Space, stick left -> E0 4B) and KD (Default: Y ->
-  3B/BB F1, A -> no key). Output via >COM1 (drv.py ser). Check SC55W.LOG "pad:" lines. Then: real pad on the
-  D810 (button numbers via the status line), README98/HANDOFF/README news, release beta.77-w98.2.
-- Resume prompt: "Continue the NUKED SB-EMU Windows 98 part: branch w98-pad-wip, see HANDOFF.md 'Win98 w98.2
-  IN PROGRESS' - test pad keys in 86Box, fix, then release beta.77-w98.2."
+- VxD (IF version 6): IOCTL_SC55W_KEYS 0x16 (VKD_Force_Keys into the VM that has the keyboard; when that is the
+  system VM only break-only sequences go through - see below), IOCTL_SC55W_FOCUS 0x17 (SC55W_FOCUS: owner VM + its
+  program list). INT 21h V86 hook (cfg.joy bit2): AX=4B00h -> nested DOS calls (Save_Client_State,
+  Begin_Nest_V86_Exec, Exec_Int 21h: 2Fh get DTA, 60h TRUENAME into the DTA, 4Eh FINDFIRST for the size; DTA bytes
+  saved/restored) -> pushed on a per-VM list (8 VMs x 4 programs); AH=4Ch/31h/00h pop. Create_VM/Destroy_VM clear
+  a slot. VMM ordinals 82h Begin_Nest_V86_Exec, 84h Exec_Int, 86h End_Nest_Exec, 8Dh/8Eh Save/Restore_Client_State
+  and VKD (0Dh) 7 Force_Keys, 8 Get_Kbd_Owner: VERIFIED in 86Box (programs tracked, keys typed).
+- helper/pad.cpp/.h: PADMAP.TXT + PADUSER.TXT parser (user sections override line by line, [Default] too), key
+  names -> set-1 scan codes (E0 for extended), JoyButton1-4 / Joy(2)Up.. -> game port (axis bound to JoyLeft
+  JoyRight = analog pass-through), pad_select (newest program's name+size id, then files in its folder),
+  pad_step (key diff -> make/break). w98main: [Pad] INI (A..RS button numbers, default x360 order 1-10, D-pad =
+  POV, Triggers=Z, RStickX=U, RStickY=R), PadKeys=1, FOCUS poll every 100 ms, "pad:" log lines, status line
+  "Pad keys: layout ... Last button: X (Windows button n)". PADMAP.TXT rebuilt at start from
+  <base>\PADMAP\keyb2joypad.cpp when newer (padconv.c built in, -DPADCONV_LIB). install98 copies FILES\PADMAP.
+- Fixed in testing:
+  - VKD hands the shift keys a DOS VM holds (Ctrl/Alt/Shift, forced keys included) on to Windows when it takes
+    the keyboard: pad A held in Keen (LCtrl) + Start menu -> Ctrl stuck in Windows (Esc = Ctrl+Esc, menu would
+    not close). Now pad_step sends the breaks of held keys at once when focus leaves DOS (the VxD lets
+    break-only sequences into the system VM) and again when a DOS box has the keyboard back unless still held
+    (g_stale; a non-shift key like Space stays down in the DOS VM otherwise).
+  - padconv: titles that differ only in case (OverKill 1992 / Overkill 1996, Wipeout / WipEout) were merged by
+    pad.cpp (titles match without case): now numbered like exact repeats ("Overkill (2)"): 3557 sections.
+  - The id hash is FNV-1 (multiply, then xor), not FNV-1a as the comments said (code was right).
+- Tested in 86Box (P2B-LS PII-400, SB16 PnP, Win98 SE from the user's QuickInstall 1.1.0 stock ISO, installed in
+  QEMU then booted in 86Box; game port joystick "2-axis, 4-button" in Game Controllers; Pentium II test build):
+  Setup copies PADMAP, first start makes PADMAP.TXT (3557 games, 4232 ids), log shows the program chain
+  (COMMAND.COM, MODE.COM, KEEN4E.EXE "found by" its id). KT (fake Keen 4): A -> 1D 9D, B -> 39 B9, stick left ->
+  E0 2A E0 4B E0 CB E0 AA (VKD adds the NumLock fake shifts, as a real keyboard), Y -> 1C 9C, X -> 38 B8.
+  KD (Default + PADUSER "[Default] Y=F1"): only Y -> 3B BB. Focus test: A held, Start menu, released, Esc back:
+  1D 9D ... 9D, Windows keyboard fine afterwards. Not testable here: the real 360 pad (D810 / P5PE-VM).
+- Test rig (rebuilt this session; nothing of it is in the repo but the scripts):
+  - Win98 image: QuickInstall ISO (github.com/oerg866/win98-quickinstall v1.1.0 win98qi_v1.1.0_stock.iso) booted
+    in qemu-system-i386 -cpu pentium2 (press Enter at the loader prompt within its countdown), DISK -> cfdisk
+    (1 GB, type c, bootable, Write), INSTALL defaults; then 86Box with testrig/86box/86box-joystate.diff applied
+    (sdl_joystick.c: $JOYSTATE file "x y b1 b2 b3 b4" drives game port joystick 1) on top of 86box-xpad.diff.
+    86Box config: p2bls, sb16_pnp, joystick_type = 2axis_4button, joystick_0_nr = 1; F1 at the CMOS message.
+  - win98/test/keys: k.py (keys/typing/screenshots over the automation socket: win+r, @type:..., shot),
+    joyseq.sh (A, B, stick left, Y, X), mkkeen.py (fake KEEN4E.EXE from KEYLOG.COM), KT/KD.BAT now write
+    C:\KT.TXT / C:\KD.TXT (COM1 without an automation backend hung KEYLOG; read the files with mtools after
+    shutdown, offset 1048576). Copy files with mtools while 86Box is off; killing 86Box -> ScanDisk next boot.
+  - Toolchain: mingw-w64 (Ubuntu, win32 threads), Open Watcom snapshot, JWasm (Baron-von-Riedesel), Munt
+    d885a95 (b98/config.h by hand: 2.8.5, EXPORTS_TYPE 3), Nuked-SC55 from upstream/ (build98/backend/config.h
+    by hand); win98/third_party stands in for the old sbemu-src / nopl3 paths (symlinks). build98.sh takes
+    ARCH= OBJ= LIB= for the Pentium II test build (ARCH="-march=pentium2 -O2" OBJ=build98p2 LIB=b98p2).
+    The VxD rebuilt byte-identical to the committed WIP one, so the toolchain matches.
+- Next: real pad on the D810 / P5PE-VM (button numbers via the status line); DOS session: feed pad.cpp's format
+  from usbpad.c and inject through vkbc.c (PLANNED, SHARED above).

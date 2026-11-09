@@ -1127,8 +1127,12 @@ int __cdecl sc_ioctl(u32 code, u8 *in, u32 inlen, u8 *out, u32 outlen)
         mpu_uart = 0; mpu_qn = 0;
         return 0;
     case IOCTL_SC55W_KEYS: {
-        u32 owner = vxd_kbd_owner(), r = 0;
-        if (owner && owner != vxd_sys_vm() && inlen) r = vxd_force_keys(in, inlen) ? 2 : 1;
+        u32 owner = vxd_kbd_owner(), r = 0, i, brk = 1;
+        /* only breaks (bit 7, prefixes E0/E1) may go to Windows: VKD carries the shift keys
+           (Ctrl, Alt, Shift) a DOS box holds over to Windows when it takes the keyboard */
+        for (i = 0; i < inlen; i++)
+            if (!(in[i] & 0x80)) brk = 0;
+        if (owner && inlen && (owner != vxd_sys_vm() || brk)) r = vxd_force_keys(in, inlen) ? 2 : 1;
         if (outlen >= 4) { *(u32 *)out = r; return 4; }
         return 0;
     }

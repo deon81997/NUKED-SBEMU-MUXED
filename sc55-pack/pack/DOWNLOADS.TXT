@@ -51,8 +51,10 @@ is optional. Put each file where it says and run SETUP / CDINST again.
       FILES\PADMAP folder:
         https://raw.githubusercontent.com/schellingb/dosbox-pure/0.9.9/keyb2joypad.cpp
       (newer versions: https://codeberg.org/schelling/dosbox-pure, same file
-      name). SETUP / SETUP98 turn it into PADMAP.TXT. Without it the pad uses
-      the standard layout (D-pad = arrow keys, Start = Enter, Back = Esc).
+      name). NUKED SB-EMU for Windows 98 turns it into PADMAP.TXT (README98.TXT,
+      "Game pad buttons as keys"); the DOS part will use it too. Without it
+      the pad uses the standard layout (D-pad = arrow keys, Start = Enter,
+      Back = Esc).
 
 -----------------------------------------------------------------------------
  INCLUDED THIRD-PARTY PROGRAMS (their own licences, sources here)
