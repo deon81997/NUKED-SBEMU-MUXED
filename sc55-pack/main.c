@@ -1932,23 +1932,27 @@ int main(int argc, char* argv[])
                 MAIN_CPrintf(YELLOW, "Joystick: %s, USB off.\n", msg);
             else
             {
-                MAIN_JOY_On = TRUE;
+                /* MAIN_JOY_On (USB polled from the sound interrupt) only once everything below is in place:
+                 * beta.64 on the P5PE-VM hung right after USBPAD_Init, somewhere in here */
                 if(MAIN_Options[OPT_JOYMODE].value == 4)
                     printf("Joystick (Port 201): left to the real gameport (/JOYMODE:4)\n");
                 else
                 {
                     static const char* modes[] = { "", " as CH Flightstick Pro", " as Thrustmaster FCS", " as Gravis GamePad Pro (GrIP)" };
                     int md = MAIN_Options[OPT_JOYMODE].value;
+                    MAIN_Step("USB: port 201h trap");
                     if(enableRM) MAIN_JOY_RM = QEMM_Install_IOPortTrap(MAIN_JOY_IODT, 2, &MAIN_JOY_IOPT);
                     if(enablePM) MAIN_JOY_PM = HDPMIPT_Install_IOPortTrap(0x201, 0x201, MAIN_JOY_IODT, 1, &MAIN_JOY_IOPT_PM);
                     printf("Joystick (Port 201)%s: ", md >= 0 && md <= 3 ? modes[md] : "");
                     MAIN_Print_Enabled_Newline(MAIN_JOY_RM || MAIN_JOY_PM);
+                    MAIN_Step("USB: INT 15h joystick hook");
                     if(MAIN_Options[OPT_JOYBIOS].value && !MAIN_HookInt15())
                         MAIN_CPrintf(YELLOW, "  BIOS joystick (INT 15h AH=84h) not hooked: no memory.\n");
                 }
                 MAIN_CPrintf(LIGHTGRAY, "  USB: %s.\n", msg);
                 if(MAIN_Options[OPT_USBMS].value == 2 || (MAIN_Options[OPT_USBMS].value == 1 && (USBPAD_Have() & USBPAD_HAVE_MOUSE)))
                 {
+                    MAIN_Step("USB: keyboard controller traps (60h/64h)");
                     VKBC_Init(MAIN_TCps, 1);
                     if(enableRM) MAIN_KBC_RM = QEMM_Install_IOPortTrap(MAIN_KBC_IODT, 2, &MAIN_KBC_IOPT);
                     if(enablePM) MAIN_KBC_PM60 = HDPMIPT_Install_IOPortTrap(0x60, 0x60, MAIN_KBC_IODT, 1, &MAIN_KBC_IOPT_PM60);
@@ -1960,6 +1964,13 @@ int main(int argc, char* argv[])
                 if(!(USBPAD_Have() & (USBPAD_HAVE_PAD1 | USBPAD_HAVE_PAD2)))
                     MAIN_CPrintf(LIGHTGRAY, "  Plug a pad in any time; it is picked up while games run.\n"
                         "  Not found? Run USBTEST.EXE (without SBEMU loaded) to see every USB step.\n");
+                MAIN_Step("USB: polling from the sound interrupt on");
+                MAIN_JOY_On = TRUE;
+                {   /* a second of it before going on, so a hang there shows up in this log */
+                    uint64_t t0 = DIAG_Tsc();
+                    while(DIAG_Tsc() - t0 < MAIN_TCps) {}
+                }
+                MAIN_Step("USB: 1 s of polling went fine");
             }
         }
         MAIN_D("Joystick mode %d\n", MAIN_Options[OPT_JOYMODE].value);

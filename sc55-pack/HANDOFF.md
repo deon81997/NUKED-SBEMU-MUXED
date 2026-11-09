@@ -378,3 +378,9 @@
 - SBEMU now streams the USB trace into SBDETAIL during USBPAD_Init ("USB live: ...", USBPAD_SetTraceHook), so the
   next hang shows the last USB step. Suspects: VKBC callbacks with real data (first time on real HW), LED SET_REPORT,
   the HID pad on low speed, the sound ISR (SC-55) running alongside.
+
+## beta.65-usb (2026-11-08): beta.64 SBDETAIL from the P5PE-VM: USBPAD_Init finished (all found, both OHCIs went
+## oslow), the hang is after it, before "Joystick mode" is logged.
+- In that stretch: 201h trap, INT 15h hook (JOYBIOS), KBC 60h/64h traps, and MAIN_JOY_On (USB polled + VKBC inject
+  from the sound ISR, with real data for the first time). Now each is a MAIN_Step, MAIN_JOY_On is set last, and
+  1 s of ISR polling runs before going on ("USB: 1 s of polling went fine"). QEMU: all steps pass.
