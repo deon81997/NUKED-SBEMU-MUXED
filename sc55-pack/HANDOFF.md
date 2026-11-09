@@ -392,3 +392,9 @@
 - arm_in oslow is now two-stage and never waits: stage 1 skips the ED and notes the frame (q->opend, q->ofn);
   poll_in does stage 2 (head + tail rewrite, unskip) once 2 frames have started. start_in arms synchronously
   (ArmSync; it has skipped + waited itself). QEMU with oslow forced: USBTEST all reports, SBEMU passes the 1 s check.
+
+## beta.67-usb (2026-11-08): EMM386 error 06 on the P5PE-VM = USBTEST run while SBEMU (beta.66) was resident
+- Both drive the same OHCI controllers (SBEMU from its sound ISR); USBTEST resets them and frees its schedule memory
+  under SBEMU's feet. beta.66 SBEMU itself loaded there (it got that far).
+- USBTEST refuses to start when an MPU-401 answers (mpu_find: SBEMU), /F overrides; README note. 86Box: runs before
+  SC55.BAT, refuses after.

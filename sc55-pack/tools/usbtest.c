@@ -1,4 +1,5 @@
 #include <pc.h>
+#include "mpuport.h"
 /* USBTEST - finds USB pads, keyboards and mice the same way SBEMU /JOY does, and shows every step.
  *   USBTEST            USB controllers found, what was done with each, what is on their ports, then live:
  *                      both pads (sticks, triggers, buttons), USB keys pressed, mouse movement, every plug /
@@ -116,11 +117,22 @@ int main(int argc, char** argv)
     int n, i, secs = 0;
     uint32_t ch = 0;
     unsigned lastb[2] = { 0xFFFFFFFF, 0xFFFFFFFF };
+    int force = 0;
     for (i = 1; i < argc; ++i)
     {
         if (!strncasecmp(argv[i], "/T:", 3)) secs = atoi(argv[i] + 3);
+        else if (!strcasecmp(argv[i], "/F")) force = 1;
         else if (argv[i][0] != '/') Log = fopen(argv[i], "w");
-        else { printf("USBTEST [logfile] [/T:seconds]\n"); return 1; }
+        else { printf("USBTEST [logfile] [/T:seconds] [/F]\n"); return 1; }
+    }
+    /* SBEMU resident drives the same USB controllers from its sound interrupt: both at once crashed the
+     * P5PE-VM (EMM386 error 06 after SC55, then USBTEST). Its MPU-401 answering = SBEMU (or a real MPU). */
+    if (!force && mpu_find(0))
+    {
+        printf("SBEMU (or an MPU-401) is answering: SBEMU is loaded and is already using the USB controllers.\n"
+               "Running USBTEST now can crash the PC. Restart, then run USBTEST BEFORE SC55.BAT.\n"
+               "(USBTEST /F runs it anyway, e.g. with a real MPU-401 card and no SBEMU.)\n");
+        return 2;
     }
     DPMI_Init();
     Ui = isatty(1);

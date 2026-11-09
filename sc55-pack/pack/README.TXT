@@ -872,6 +872,8 @@ CONTENTS
        writes it all to USBTEST.TXT - send that with a bug report. It shows
        USB keyboards and mice too (keys pressed, mouse movement). Esc quits
        (PS/2 or USB keyboard).
+       Since beta.67 USBTEST will not start while SBEMU is loaded: both
+       driving the same USB controllers crashed a PC (EMM386 error 06).
 
 
 =============================================================================
