@@ -7,7 +7,7 @@ DEBUG ?= 0
 # 0: original SBEMU build with the TinySoundFont SoundFont synth
 VSC55 ?= 1
 
-VERSION ?= 1.0.0-beta.71-usb-sc55
+VERSION ?= 1.0.0-beta.72-usb-sc55
 
 INCLUDES := -I./mpxplay -I./sbemu -I./drivers/include -I./sc55 -I./third_party/nuked-opl3-fast
 DEFINES := -D__DOS__ -DSBEMU -DDEBUG=$(DEBUG) -DSBEMU_VSC55=$(VSC55) -DMAIN_SBEMU_VER=\"$(VERSION)\"
@@ -238,10 +238,10 @@ output/timetest.exe: tools/timetest.c $(wildcard tools/*.h)
 	$(SILENTMSG) "CC\t$@\n"
 	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
 
-$(MIDPLAY): tools/midplay.c
+$(MIDPLAY): tools/midplay.c $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
-	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
+	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< -lm $(if $(filter 0,$(DEBUG)),-s,)
 
 output/tools/sbset.o: tools/sbset.c sc55/sc55synth.h
 	@mkdir -p $(dir $@)

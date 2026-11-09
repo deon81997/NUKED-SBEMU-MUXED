@@ -753,7 +753,7 @@ static void draw_menu(int row, const int* col)
     tui_fill(1, 24, 80, 1, 0x10, ' ');
     tui_putw(2, 24, 78, 0x1E, g_hint[row]);
     tui_fill(1, 25, 80, 1, 0x30, ' ');
-    tui_put(2, 25, 0x30, "\x18\x19 move   Enter select   F4 screen   Esc quit   Full reports: GTFULL.TXT");
+    tui_put(2, 25, 0x30, "\x18\x19 move  Enter select  F3 style  F4 screen  Esc quit  Full reports: GTFULL.TXT");
 }
 
 static void clear_results(void)
@@ -794,6 +794,7 @@ int main(int argc, char** argv)
         c = tui_key();
         if (c == K_ESC) break;
         if (c == 0x13E) { tui_pick_mode(g_home); continue; }                  /* F4: display mode */
+        if (c == K_F3) { tui_theme_next(g_home); continue; }                  /* F3: next style */
         if (c == K_UP) { row = row ? row - 1 : ROWS - 1; continue; }
         if (c == K_DOWN) { row = row < ROWS - 1 ? row + 1 : 0; continue; }
         if (c == K_LEFT || c == K_RIGHT)

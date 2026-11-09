@@ -192,8 +192,10 @@ CONTENTS
       Without a 640x480 VESA mode (no VESA BIOS / UNIVBE) MENU says so and
       stays in text.
       THE TEST PROGRAMS (JOYTEST, KMTEST, MPUTEST, USBTEST, TIMETEST,
-      SBDIAG) and MIDPLAY use the same style, letters and safe mode as MENU
-      (the test programs also its display mode; F4 there changes it). With
+      SBDIAG), MIDPLAY, SETTINGS, GAMETEST and the CD images screen use the
+      same style, letters and safe mode as MENU, and F3 in any of them
+      switches the style for all of them (the test programs also use its
+      display mode; F4 there changes it). With
       their output redirected (e.g. TIMETEST > FILE) the test programs write
       plain text instead.
       MOUSE (with a DOS mouse driver such as CTMOUSE loaded; a USB mouse
@@ -632,6 +634,16 @@ CONTENTS
                   out from the MIDI file: part, instrument, level, pan,
                   expression, reverb, chorus, pitch bend, note, and 16
                   part level bars with peak hold
+                  Third press: the 3D VIEW (640x480 VESA, like MENU's 3D
+                  menu): a module with the synth's live display and a
+                  knob that turns with the song, a keyboard lighting up
+                  the notes in each channel's colour, and 16 channel
+                  columns on the floor. F4 there switches full / half
+                  resolution. It needs CPU time MIDPLAY also uses to
+                  send the music: on slow PCs (it says so) use the text
+                  views. The playlist and file explorer stay text.
+     F3           next style (also in every other program since
+                  beta.72; saved for MENU and all of them)
      - and +      choose the part shown on the panel (worked-out panel)
      ESC or Q     quit
 

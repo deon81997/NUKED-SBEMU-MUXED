@@ -1,6 +1,8 @@
 /* Text and graphics fonts for the SC-55 pack screens: Terminus (Dimitar Zhekov, SIL Open Font Licence 1.1),
  * converted from its BDF files. Lines and blocks (B0-DF) are not included: they stay the VGA ones so frames
  * join up. Generated - do not edit. */
+#ifndef FONTDATA_INCLUDED
+#define FONTDATA_INCLUDED
 static const unsigned char tui_ter16n[95 * 16] = {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x00,0x10,0x10,0x00,0x00,0x00,0x00,
@@ -430,3 +432,4 @@ static const TUI_GFONT tui_gfonts_b[] __attribute__((unused)) = {
     { 14, 28, tui_g28b, tui_g28b_have },
     { 16, 32, tui_g32b, tui_g32b_have },
     { 0, 0, 0, 0 } };
+#endif

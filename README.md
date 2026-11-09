@@ -34,7 +34,7 @@
 </table>
 
 <b>Release counter:</b><br>
-<img src="docs/90s/counter.gif" alt="000071"><br>
+<img src="docs/90s/counter.gif" alt="000072"><br>
 <sub>betas and counting!</sub>
 
 <br><br>
@@ -66,6 +66,10 @@
 <div align="center"><img src="docs/90s/fd-marine-walk.gif" alt=""> <img src="docs/90s/ic-news.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-news.gif" alt=""> <img src="docs/90s/fd-serpentipede.gif" alt=""></div>
 
 ## ★ What's NEW!! ★
+
+<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.72.** MIDPLAY goes **3D**!! Press S until you get a
+little sound module with the synth's live display, a keyboard that lights up as the notes play, and dancing
+channel columns. And <kbd>F3</kbd> now switches the colour style in *every* program, not just the menu.
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.71.** CUE images with CD music can be taken out and
 swapped again! Before, they got stuck on drive M: until you rebooted. Oops.
@@ -165,7 +169,7 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 - Render-ahead buffer and automatic speed control keep the music smooth while games run
 - **Automatic setup** measures each ROM set on your CPU and picks the best one it can handle
 - **Front panel in games**: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>F12</kbd> shows the SC-55 / MT-32 display over the game
-- `MIDPLAY`: MIDI player with playlists, shuffle, a file browser and a live front panel
+- `MIDPLAY`: MIDI player with playlists, shuffle, a file browser, a live front panel and a 3D view
 - `SC55WAV` / `SC55LOG`: render an SC-55 demo to WAV and see how fast your PC runs each ROM set
 </details>
 
@@ -185,6 +189,7 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 - **MENU**: sound, settings, tests, games, CD-ROM and files in one place; shows whether SBEMU is loaded and the port, IRQ, DMA and MIDI port it really uses
 - **Games**: per-game profiles (SBEMU options, CD image, arguments)
 - **SETTINGS**: every option on one screen; changes apply to a running SBEMU straight away
+- <kbd>F3</kbd> in any program switches the colour style for all of them
 - **GAMETEST**: runs games by itself (Doom demos, Duke 3D), measures music timing and finds each game's best settings
 - Styles: Groovy, Classic, Sunset, Ocean, Neon, Candy, Midnight; a 3D menu (640×480, no 3D card needed); Terminus or VGA fonts; 80×25 up to 80×60 and your card's VESA text modes
 - `SBDIAG`, `MPUTEST`, `TIMETEST`, `JOYTEST`, `USBTEST`, `KMTEST`, `CPUMHZ`
@@ -356,7 +361,9 @@ works for some people.
 </tr>
 </table>
 
-<b>MIDPLAY</b>, the MIDI player, live off the SC-55:
+<b>MIDPLAY</b>, the MIDI player, live off the SC-55, now with a <b>3D view</b>:
+
+<img src="docs/shots/midplay-3d.png" width="640" alt="MIDPLAY's 3D view: a sound module, a lit keyboard and channel columns">
 
 <table>
 <tr>

@@ -138,6 +138,7 @@ TUI_FN int tu_poll(void)
     c = getch();
     if (c == 0 || c == 0xE0) c = 0x100 | getch();
     if (c == 0x13E && tu_home[0]) { tui_pick_mode(tu_home); tui_invalidate(); return 0; }   /* F4: display mode */
+    if (c == K_F3 && tu_home[0]) { tui_theme_next(tu_home); return 0; }                      /* F3: next style */
     return c;
 }
 /* a centred message window over the current screen, until a key */

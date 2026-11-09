@@ -434,18 +434,27 @@ static void ui_flush(int force)
         }
 }
 static char g_cfg[260];
+static int g_view = 1;          /* 0 channel table, 1 SC-55 panel, 2 3D; kept in MIDPLAY.CFG */
+static int mp3_enter(void); static void mp3_leave(void); static int mp3_is_on(void);   /* midplay3d.h */
+static char g_home[300];  /* MENU's folder: THEME.CFG lives there (F3 saves the style for every program) */
+static void ui_text_init(void);
 static void ui_begin(void)
 {
     static int loaded;
     if (!loaded)
     {   /* the style, letters and safe mode chosen in MENU (THEME.CFG next to MIDPLAY.EXE) */
-        char home[300]; char* e;
-        snprintf(home, sizeof home, "%s", g_cfg);
+        char* home = g_home; char* e;
+        snprintf(home, sizeof g_home, "%s", g_cfg);
         e = strrchr(home, '\\'); if (!e) e = strrchr(home, '/');
         if (e) *e = 0; else strcpy(home, ".");
         tui_theme_load(home);
         loaded = 1;
     }
+    if (g_view == 2) { if (mp3_is_on() || mp3_enter()) return; g_view = 0; }   /* 3D view: no VESA mode -> table */
+    ui_text_init();
+}
+static void ui_text_init(void)
+{
     textmode(C80);
     _setcursortype(_NOCURSOR);
     tui_apply_theme();
@@ -457,6 +466,7 @@ static void ui_begin(void)
 static void ui_end(void)
 {
     if (!g_ui) return;
+    mp3_leave();
     tui_font_restore();
     tui_plain();
     textattr(0x07); clrscr(); _setcursortype(_NORMALCURSOR);
@@ -479,7 +489,6 @@ static void fmt_time(char* out, unsigned long sec) { sprintf(out, "%lu:%02lu", s
 
 /* ---- SC-55 front panel view (S key): an amber LCD like the real module - the highlighted part's
  * instrument and settings, and the 16 part level bars with peak hold */
-static int g_view = 1;          /* 0 channel table, 1 SC-55 panel; kept in MIDPLAY.CFG */
 static int g_part;              /* highlighted part 0..15 (- and + keys) */
 static char g_cfg[260];
 static void view_load(const char* exe)
@@ -488,7 +497,7 @@ static void view_load(const char* exe)
     for (p = exe; *p; p++) if (*p == '/' || *p == '\\') cut = p;
     snprintf(g_cfg, sizeof g_cfg, "%.*sMIDPLAY.CFG", cut ? (int)(cut - exe + 1) : 0, exe);
     if (!(f = fopen(g_cfg, "r"))) return;
-    while (fgets(line, sizeof line, f)) if (!strncmp(line, "VIEW=", 5)) g_view = atoi(line + 5) ? 1 : 0;
+    while (fgets(line, sizeof line, f)) if (!strncmp(line, "VIEW=", 5)) { g_view = atoi(line + 5); if (g_view < 0 || g_view > 2) g_view = 1; }
     fclose(f);
 }
 static void view_save(void)
@@ -727,9 +736,12 @@ static void ui_draw(const Song* s, const char* name, uint64_t el_us, uint64_t to
 
     /* key help */
     fillrow(24, ' ', 0x70);
-    text(24, 1, "SPACE pause  N/P song  \x1B\x1A seek  TAB list  B files  R repeat  H shuffle  S view  ESC quit", 0x70, COLS - 2);
+    text(24, 1, "SPACE pause N/P song \x1B\x1A seek TAB list B files R rep H shuf S view F3 style ESC", 0x70, COLS - 2);
     ui_flush(0);
 }
+
+#include "midplay3d.h"
+static int mp3_is_on(void) { return mp3_on; }
 
 static uint64_t g_last_draw;
 static void ui_tick(const Song* s, const char* name, uint64_t el_us, uint64_t total, int paused, int done)
@@ -740,7 +752,8 @@ static void ui_tick(const Song* s, const char* name, uint64_t el_us, uint64_t to
     if (t - g_last_draw < 40000 && t >= g_last_draw) return;
     g_last_draw = t;
     viz_decay();
-    ui_draw(s, name, el_us, total, paused, done);
+    if (mp3_on) mp3_draw(s, name, el_us, total, paused, done);
+    else ui_draw(s, name, el_us, total, paused, done);
 }
 
 /* ---- keys: normal keys as is, extended keys as 256 + scan code */
@@ -1034,13 +1047,20 @@ static void seek_rel(long delta_s)
 }
 
 /* runs a modal screen without losing the song position */
-static void modal_begin(void) { silence(); P.p0 = now_us(); }
+static void modal_begin(void)
+{
+    silence(); P.p0 = now_us();
+#ifndef HOSTTEST
+    if (mp3_is_on()) { mp3_leave(); ui_text_init(); }      /* the list screens are text */
+#endif
+}
 static void modal_end(void)
 {
     if (!P.paused) P.start += now_us() - P.p0;
     g_last_draw = 0;
 #ifndef HOSTTEST
     memset(shown, 0xFF, sizeof shown); /* the list screen drew over everything: repaint every row */
+    if (g_view == 2 && !mp3_is_on() && !mp3_enter()) { g_view = 0; ui_text_init(); }
 #endif
 }
 
@@ -1066,7 +1086,36 @@ static int do_key(int k, int in_tail)
     case 'l': case 'L': g_rep = g_rep ? 0 : 1; break;
     case 'h': case 'H': g_shuf = !g_shuf; break;
 #ifndef HOSTTEST
-    case 's': case 'S': if (g_ui) { g_view = !g_view; view_save(); g_last_draw = 0; } break;
+    case 's': case 'S':
+        if (g_ui)
+        {
+#ifndef HOSTTEST
+            int old = g_view;
+            g_view = (g_view + 1) % 3;
+            if (old == 2) { mp3_leave(); ui_text_init(); }
+            if (g_view == 2 && !mp3_enter()) { g_view = 0; ui_text_init(); }   /* no 640x480 VESA mode */
+#else
+            g_view = !g_view;
+#endif
+            view_save(); g_last_draw = 0;
+        }
+        break;
+#ifndef HOSTTEST
+    case 0x13E:                                 /* F4 in the 3D view: full / half resolution */
+        if (mp3_is_on()) { m3_half = !m3_half; m3_rw = m3_half ? M3W / 2 : M3W; m3_rh = m3_half ? M3H / 2 : M3H; mp3_slow = 0; }
+        break;
+#endif
+#ifndef HOSTTEST
+    case 0x13D:                                 /* F3: next style, saved for MENU and every other program */
+        if (g_ui && !tui_safe)
+        {
+            tui_theme = (tui_theme + 1) % THEME_COUNT;
+            tui_theme_save(g_home);
+            tui_apply_theme();
+            memset(shown, 0xFF, sizeof shown); g_last_draw = 0;
+        }
+        break;
+#endif
     case '-': case '_': case ',': g_part = (g_part + 15) % 16; g_last_draw = 0; break;
     case '+': case '=': case '.': g_part = (g_part + 1) % 16; g_last_draw = 0; break;
 #endif

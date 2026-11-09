@@ -467,3 +467,19 @@
     EHCI 1.0: QH C flag on FS/LS control, Mult 1, hub addr/port from the nearest HS hub (ports 1-based), async split
     S-mask 0, periodic S-mask 01h / C-mask 1Ch (Linux's pattern), overlay split state zeroed, hub port speed bits
     9/10. Looks right; needs a real USB 2.0 hub (USBTEST shows the TT hub/port).
+
+## beta.72-usb (2026-11-09): F3 style everywhere, MIDPLAY 3D view
+- F3 = next style in every program, saved in THEME.CFG for all: MIDPLAY (own key handler, case 0x13D), SBSET
+  (getkey() wrapped as sb_getkey: F3 -> theme, returns 0 = redraw), CDGUI (had it), GAMETEST, and the toolui.h
+  programs (JOYTEST, KMTEST, MPUTEST, USBTEST, TIMETEST, SBDIAG) through tu_poll(). tui.h: tui_theme_next().
+  Safe mode (Shift) ignores it. Checked in 86Box: MIDPLAY Candy->Midnight->Groovy, SETTINGS, JOYTEST.
+- tools/m3core.h: the 640x480 CPU 3D core split out of menu3d.h (VBE, timing, colours, panels, text, rasterizer,
+  boxes, knob, sky, mirror floor); menu3d.h keeps the menu (scene data, cards, styles, loop). fontdata.h got an
+  include guard. MENU's Panels/Carousel/Module rechecked in 86Box.
+- tools/midplay3d.h: MIDPLAY's third view (S: table -> panel -> 3D, MIDPLAY.CFG VIEW=0..2). Original NUKED
+  SB-EMU module: LCD with the live SBEMU panel (part, instrument, 16x16 level dots; own meters for MT-32/SF2),
+  position knob + ring, a 63-white-key keyboard texture lit per note in its channel colour (g_viz.nl/ncol), 16
+  channel columns on the floor in front. <=16 fps; frame > 25 ms -> half resolution, still > 40 ms -> "slow PC"
+  note (MIDI events are sent from the same loop). F4 toggles half/full. TAB/B lists switch to text and back
+  (modal_begin/modal_end); no VESA -> table view. Makefile: midplay links -lm and depends on tools/*.h.
+- 86Box Celeron 366: works, half resolution, shows the slow-PC note (expected).

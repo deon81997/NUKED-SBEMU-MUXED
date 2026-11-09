@@ -59,6 +59,15 @@ static void (*tui_anim)(unsigned long tick);  /* called ~9 times a second while 
 
 static int tui_margin_dirty = 1;          /* the border around the 80x25 screen (bigger modes) needs drawing */
 TUI_FN void tui_invalidate(void) { memset(tui_shown, 0xFF, sizeof tui_shown); tui_margin_dirty = 1; } /* next flush redraws all */
+/* F3 in any program: the next style, saved in THEME.CFG for MENU and every other program (not in safe mode) */
+TUI_FN void tui_theme_next(const char* home)
+{
+    if (tui_safe) return;
+    tui_theme = (tui_theme + 1) % THEME_COUNT;
+    if (home && *home) tui_theme_save(home);
+    tui_apply_theme();
+    tui_invalidate();
+}
 
 /* ------------------------------------------------------------------ display modes (F4)
  * The screens are always laid out for 80x25; in a bigger text mode they are drawn centred, with a

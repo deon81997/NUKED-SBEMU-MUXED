@@ -140,6 +140,22 @@ static Field F[NF] = {
 };
 
 static char g_dir[160] = "C:\\SC55";
+
+/* F3 on any SBSET screen: the next style (saved in THEME.CFG for MENU and every other program); the screen
+ * redraws in the new colours on the next pass of its loop */
+static int sb_getkey(void)
+{
+    for (;;)
+    {
+        int k = getkey();
+        if (k != K_F3 || tui_safe) return k;
+        tui_theme = (tui_theme + 1) % THEME_COUNT;
+        tui_theme_save(g_dir);
+        tui_apply_theme();
+        if (!kbhit()) return 0;                   /* 0: no key - the caller's loop just redraws */
+    }
+}
+#define getkey sb_getkey
 static char g_sf[200] = "";           /* chosen SoundFont, "" = none */
 static int g_roms_found = -1;
 
