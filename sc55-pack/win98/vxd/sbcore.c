@@ -38,6 +38,12 @@ extern u32  __cdecl vxd_sys_vm(void);
 extern u32  __cdecl vxd_port_in(u32 port);
 extern void __cdecl vxd_port_out(u32 port, u32 val);
 extern int  __cdecl vxd_hook_int15(int on);
+extern int  __cdecl vxd_hook_int21(int on);
+extern u32  __cdecl vxd_kbd_owner(void);
+extern int  __cdecl vxd_force_keys(const u8 *codes, u32 n);
+extern void __cdecl vxd_nest_begin(u8 *save);
+extern void __cdecl vxd_nest_int21(void);
+extern void __cdecl vxd_nest_end(u8 *save);
 
 #ifndef BUILD_ID
 #define BUILD_ID 0
@@ -903,6 +909,96 @@ static int trap_range(u32 base, u32 n)
     return 1;
 }
 
+/* ====================================================================== */
+/* programs in DOS boxes (INT 21h EXEC), for the game pad layouts          */
+/* ====================================================================== */
+#define NVMS 8
+static struct { u32 vm, serial, depth; SC55W_PROG prog[SC55W_NPROG]; } vms[NVMS];
+static u32 prog_serial, hooked21;
+static int nest_busy;
+static u8 nest_save[256], dta_save[128];
+
+static u8 *v86(u32 vm, u32 seg, u32 off)
+{
+    return (u8 *)(*(u32 *)(vm + 4) + ((seg & 0xFFFF) << 4) + (off & 0xFFFF));   /* CB_High_Linear */
+}
+
+static int vm_slot(u32 vm, int make)
+{
+    int i, fr = -1;
+    for (i = 0; i < NVMS; i++) {
+        if (vms[i].vm == vm) return i;
+        if (!vms[i].vm && fr < 0) fr = i;
+    }
+    if (!make) return -1;
+    if (fr < 0) fr = (int)(prog_serial % NVMS);       /* full: reuse one */
+    mset(&vms[fr], 0, sizeof vms[fr]);
+    vms[fr].vm = vm;
+    return fr;
+}
+
+void __cdecl sc_vm_gone(u32 vm)
+{
+    int i = vm_slot(vm, 0);
+    if (i >= 0) vms[i].vm = 0;
+}
+
+/* AX=4B00h EXEC (before DOS runs it): full name and size with nested DOS calls */
+static void note_exec(u32 vm, u8 *cl)
+{
+    u32 *r_eax = (u32 *)(cl + 0x1C), *r_ecx = (u32 *)(cl + 0x18), *r_edx = (u32 *)(cl + 0x14),
+        *r_esi = (u32 *)(cl + 0x04), *r_edi = (u32 *)(cl + 0x00), *r_ebx = (u32 *)(cl + 0x10),
+        *r_es = (u32 *)(cl + 0x38), *r_ds = (u32 *)(cl + 0x3C), *r_efl = (u32 *)(cl + 0x2C);
+    u32 pseg = *r_ds & 0xFFFF, poff = *r_edx & 0xFFFF, dseg, doff, size = 0;
+    u8 *dta, full[128];
+    int i, ok = 0, slot;
+    if (nest_busy) return;
+    nest_busy = 1;
+    full[0] = 0;
+    vxd_nest_begin(nest_save);
+    *r_eax = 0x2F00;                                  /* DTA -> ES:BX */
+    vxd_nest_int21();
+    dseg = *r_es & 0xFFFF; doff = *r_ebx & 0xFFFF;
+    dta = v86(vm, dseg, doff);
+    mcpy(dta_save, dta, 128);
+    *r_eax = 0x6000; *r_ds = pseg; *r_esi = poff; *r_es = dseg; *r_edi = doff;   /* TRUENAME */
+    vxd_nest_int21();
+    if (!(*r_efl & 1)) { mcpy(full, dta, 128); full[127] = 0; }
+    *r_eax = 0x4E00; *r_ecx = 0x27; *r_ds = pseg; *r_edx = poff;                /* FINDFIRST */
+    vxd_nest_int21();
+    if (!(*r_efl & 1)) { size = *(u32 *)(dta + 0x1A); ok = full[0] != 0; }
+    mcpy(dta, dta_save, 128);
+    vxd_nest_end(nest_save);
+    nest_busy = 0;
+    if (!ok) return;
+    slot = vm_slot(vm, 1);
+    if (vms[slot].depth == SC55W_NPROG) {             /* deep: drop the oldest */
+        for (i = 1; i < SC55W_NPROG; i++) vms[slot].prog[i - 1] = vms[slot].prog[i];
+        vms[slot].depth--;
+    }
+    vms[slot].prog[vms[slot].depth].size = size;
+    mcpy(vms[slot].prog[vms[slot].depth].path, full, 128);
+    vms[slot].depth++;
+    vms[slot].serial = ++prog_serial;
+}
+
+/* from the asm INT 21h hook: AX=4B00h, AH=4Ch / 31h / 00h */
+void __cdecl sc_int21(u32 vm, u8 *cl)
+{
+    u32 ax = *(u32 *)(cl + 0x1C) & 0xFFFF;
+    int slot;
+    if (!hooked21 || vm == sys_vm) return;
+    if ((ax >> 8) == 0x4B) {
+        if ((ax & 0xFF) == 0) note_exec(vm, cl);
+        return;
+    }
+    slot = vm_slot(vm, 0);                            /* a program ends */
+    if (slot >= 0 && vms[slot].depth) {
+        vms[slot].depth--;
+        vms[slot].serial = ++prog_serial;
+    }
+}
+
 static void untrap_range(u32 base, u32 n)
 {
     u32 i;
@@ -921,6 +1017,7 @@ static void detach(void)
     if (trapped & ST_OK_DMA16) vxd_unvirt_dma(1);
     if (trapped & ST_OK_JOY) vxd_remove_io(0x201);
     if (trapped & ST_OK_JBIOS) vxd_hook_int15(0);
+    if (hooked21) { vxd_hook_int21(0); hooked21 = 0; }
     if (trapped) vxd_min_period(0);
     trapped = 0;
     if (sh) { vxd_unmap_block((u32)sh, sh_size); sh = 0; }
@@ -980,6 +1077,10 @@ static u32 attach(u32 user_addr)
     if (cfg.joy & 2) {
         if (vxd_hook_int15(1) == 0) st |= ST_OK_JBIOS; else st |= ST_ERR_JBIOS;
     }
+    if (cfg.joy & 4) {
+        mset(vms, 0, sizeof vms);
+        if (vxd_hook_int21(1) == 0) { st |= ST_OK_PROG; hooked21 = 1; } else st |= ST_ERR_PROG;
+    }
     trapped = st & 0xFF;
     if (trapped) vxd_min_period(1);
     s->attach_status = st;
@@ -1025,6 +1126,28 @@ int __cdecl sc_ioctl(u32 code, u8 *in, u32 inlen, u8 *out, u32 outlen)
         dsp_reset();
         mpu_uart = 0; mpu_qn = 0;
         return 0;
+    case IOCTL_SC55W_KEYS: {
+        u32 owner = vxd_kbd_owner(), r = 0;
+        if (owner && owner != vxd_sys_vm() && inlen) r = vxd_force_keys(in, inlen) ? 2 : 1;
+        if (outlen >= 4) { *(u32 *)out = r; return 4; }
+        return 0;
+    }
+    case IOCTL_SC55W_FOCUS: {
+        SC55W_FOCUS *f = (SC55W_FOCUS *)out;
+        u32 owner = vxd_kbd_owner();
+        int i;
+        if (outlen < sizeof(SC55W_FOCUS)) return -1;
+        mset(f, 0, sizeof *f);
+        f->vm = owner;
+        f->is_dos = owner && owner != vxd_sys_vm();
+        i = owner ? vm_slot(owner, 0) : -1;
+        if (i >= 0) {
+            f->serial = vms[i].serial;
+            f->depth = vms[i].depth;
+            mcpy(f->prog, vms[i].prog, sizeof f->prog);
+        }
+        return sizeof(SC55W_FOCUS);
+    }
     }
     return -1;
 }

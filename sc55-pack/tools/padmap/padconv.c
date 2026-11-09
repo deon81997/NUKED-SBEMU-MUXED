@@ -23,7 +23,14 @@ typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned long u32;
 
+#ifdef PADCONV_LIB        /* built into SC55W.EXE: errors return to padconv_run() */
+#include <setjmp.h>
+static jmp_buf die_jb;
+static const char* die_msg;
+static void die(const char* m) { die_msg = m; longjmp(die_jb, 1); }
+#else
 static void die(const char* m) { fprintf(stderr, "PADCONV: %s\n", m); exit(1); }
+#endif
 
 /* ---------------------------------------------------------------- raw inflate (RFC 1951) */
 typedef struct { const u8* in; long inlen, pos; u32 bitbuf; int bitcnt; u8* out; long outlen, outpos; } Inf;
@@ -290,17 +297,54 @@ static int cmp_title(const void* a, const void* b)
     return x->year != y->year ? x->year - y->year : (x->first < y->first ? -1 : 1);
 }
 
+static long convert(const char* in, const char* outname, long* nid_out);
+static void free_all(void);
+
+#ifdef PADCONV_LIB
+int padconv_run(const char* in, const char* out, char* msg, int msglen)
+{
+    long ng, nid = 0;
+    if (setjmp(die_jb)) {
+        free_all();
+        snprintf(msg, msglen, "%s", die_msg);
+        return 1;
+    }
+    ng = convert(in, out, &nid);
+    free_all();
+    snprintf(msg, msglen, "%ld games, %ld file ids", ng, nid);
+    return 0;
+}
+#else
 int main(int argc, char** argv)
 {
-    FILE* f;
-    Game* g;
-    long i, ng = 0, nid = 0;
+    long ng, nid = 0;
     if (argc != 3) {
         fprintf(stderr, "PADCONV keyb2joypad.cpp PADMAP.TXT\n"
                         "  turns DOSBox Pure's Keyb2Joypad game pad layouts into NUKED SB-EMU's PADMAP.TXT\n");
         return 2;
     }
-    f = fopen(argv[1], "rb");
+    ng = convert(argv[1], argv[2], &nid);
+    free_all();
+    printf("PADCONV: %ld games, %ld file ids -> %s\n", ng, nid, argv[2]);
+    return 0;
+}
+#endif
+
+static Game* g;
+static void free_all(void)
+{
+    int b;
+    free(src); src = NULL;
+    free(keys); keys = NULL;
+    free(g); g = NULL;
+    for (b = 0; b < NB; b++) { free(bk[b].ids); free(bk[b].maps); bk[b].ids = bk[b].maps = NULL; }
+}
+
+static long convert(const char* in, const char* outname, long* nid_out)
+{
+    FILE* f;
+    long i, ng = 0, nid = 0;
+    f = fopen(in, "rb");
     if (!f) die("cannot open the input file");
     fseek(f, 0, SEEK_END); srclen = ftell(f); fseek(f, 0, SEEK_SET);
     src = (char*)malloc(srclen + 1);
@@ -328,7 +372,7 @@ int main(int argc, char** argv)
     }
     qsort(g, ng, sizeof *g, cmp_title);
 
-    f = fopen(argv[2], "w");
+    f = fopen(outname, "w");
     if (!f) die("cannot create the output file");
     fprintf(f, "; PADMAP.TXT - game pad layouts for NUKED SB-EMU, %ld games.\n"
                "; Made by PADCONV from keyb2joypad.cpp: the Keyb2Joypad project by Jemy Murphy and bigjim,\n"
@@ -378,6 +422,6 @@ int main(int argc, char** argv)
         }
     }
     fclose(f);
-    printf("PADCONV: %ld games, %ld file ids -> %s\n", ng, nid, argv[2]);
-    return 0;
+    *nid_out = nid;
+    return ng;
 }

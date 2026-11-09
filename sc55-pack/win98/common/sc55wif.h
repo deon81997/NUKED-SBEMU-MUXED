@@ -27,7 +27,7 @@ typedef int32_t  s32;
 #endif
 
 #define SC55W_MAGIC      0x57353543UL   /* "C55W" */
-#define SC55W_IF_VERSION 5
+#define SC55W_IF_VERSION 6
 
 /* DeviceIoControl codes */
 #define IOCTL_SC55W_VERSION  0x10   /* out: u32 interface version            */
@@ -36,6 +36,23 @@ typedef int32_t  s32;
 #define IOCTL_SC55W_TIME     0x13   /* out: u32 VxD clock (microseconds)     */
 #define IOCTL_SC55W_MIDI     0x14   /* in: bytes; queued as MIDI events      */
 #define IOCTL_SC55W_RESET    0x15   /* DSP/mixer/OPL timer reset             */
+#define IOCTL_SC55W_KEYS     0x16   /* in: set-1 scan codes for the DOS box with the keyboard;
+                                       out: u32 1 = sent, 0 = Windows has the keyboard, 2 = queue full */
+#define IOCTL_SC55W_FOCUS    0x17   /* out: SC55W_FOCUS, the programs running in that DOS box */
+
+/* the program list of the DOS box that has the keyboard (IOCTL_SC55W_FOCUS) */
+#define SC55W_NPROG 4
+typedef struct {
+    u32  size;          /* file size in bytes                          */
+    char path[128];     /* full path (DOS TRUENAME), upper case 8.3     */
+} SC55W_PROG;
+typedef struct {
+    u32 is_dos;         /* 1 = a DOS box has the keyboard              */
+    u32 vm;             /* its VM handle                               */
+    u32 serial;         /* changes whenever its program list changes   */
+    u32 depth;          /* programs in prog[], prog[depth-1] = newest  */
+    SC55W_PROG prog[SC55W_NPROG];
+} SC55W_FOCUS;
 
 /* status bits returned by ATTACH (also in shared->attach_status) */
 #define ST_OK_SB        0x0001   /* SB ports trapped                        */
@@ -57,6 +74,8 @@ typedef int32_t  s32;
 #define ST_ERR_BUSY     0x10000  /* already attached                       */
 #define ST_ERR_JOYPORT  0x20000  /* 201h is owned by another driver        */
 #define ST_ERR_JBIOS    0x40000  /* could not hook INT 15h                 */
+#define ST_OK_PROG      0x80000  /* INT 21h watched: programs in DOS boxes  */
+#define ST_ERR_PROG     0x100000 /* could not hook INT 21h                 */
 
 /* event types in the event ring */
 #define EV_OPL      1   /* a = register (low 8 bits), b = value, c = bank (0/1) */
@@ -92,7 +111,8 @@ typedef struct {
     u8  sbtype;        /* 1..6 as SBEMU /T                          */
     u8  opl;           /* 1 = trap OPL ports (SB base + 388h)       */
     u8  fixtc;         /* 1 = snap time constants to 11/22/44 kHz   */
-    u8  joy;           /* bit0 = game port 201h, bit1 = INT 15h AH=84h */
+    u8  joy;           /* bit0 = game port 201h, bit1 = INT 15h AH=84h,
+                          bit2 = watch INT 21h EXEC (pad keys per game) */
     u8  reserved[5];
 } SC55W_CONFIG;
 

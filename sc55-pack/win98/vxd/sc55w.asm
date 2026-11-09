@@ -15,6 +15,16 @@
 @Hook_V86_Int_Chain         equ 0041h
 @Unhook_V86_Int_Chain       equ 0118h
 @_LinPageUnLock             equ 0064h
+@Begin_Nest_V86_Exec        equ 0082h
+@Exec_Int                   equ 0084h
+@End_Nest_Exec              equ 0086h
+@Save_Client_State          equ 008Dh
+@Restore_Client_State       equ 008Eh
+VKD_DEVICE_ID               equ 000Dh
+@VKD_Force_Keys             equ 0007h
+@VKD_Get_Kbd_Owner          equ 0008h
+Create_VM_Msg               equ 0007h
+Destroy_VM_Msg              equ 000Ch
 @VTD_Get_Real_Time          equ 0007h
 @VTD_Begin_Min_Int_Period   equ 0003h
 @VTD_End_Min_Int_Period     equ 0004h
@@ -26,6 +36,7 @@ PAGEMAPGLOBAL               equ 40000000h
 extern _sc_in:near, _sc_out:near, _sc_tick:near, _sc_dma_changed:near
 extern _sc_eoi:near, _sc_ioctl:near, _sc_exit:near, _sc_api_midi:near
 extern _sc_int15:near, _sc_api_volume:near
+extern _sc_int21:near, _sc_vm_gone:near
 
 public _vxd_time_us, _vxd_muldiv, _vxd_raise_irq, _vxd_lower_irq
 public _vxd_dma_get, _vxd_dma_set, _vxd_timer_arm
@@ -33,6 +44,8 @@ public _vxd_install_io, _vxd_remove_io, _vxd_virt_irq, _vxd_unvirt_irq
 public _vxd_virt_dma, _vxd_unvirt_dma, _vxd_map_block, _vxd_unmap_block
 public _vxd_min_period
 public _vxd_sys_vm, _vxd_port_in, _vxd_port_out, _vxd_hook_int15
+public _vxd_hook_int21, _vxd_kbd_owner, _vxd_force_keys
+public _vxd_nest_begin, _vxd_nest_int21, _vxd_nest_end
 public SC55W_DDB
 
 _LDATA  segment dword public 'LCODE'
@@ -62,6 +75,18 @@ SC55W_Control proc near
         je      ctl_ioctl
         cmp     eax, Sys_Dynamic_Device_Exit
         je      ctl_exit
+        cmp     eax, Create_VM_Msg
+        je      ctl_vm
+        cmp     eax, Destroy_VM_Msg
+        je      ctl_vm
+        clc
+        ret
+ctl_vm:                                 ; forget a VM's program list (EBX = VM)
+        pushad
+        push    ebx
+        call    _sc_vm_gone
+        add     esp, 4
+        popad
         clc
         ret
 ctl_exit:
@@ -582,6 +607,107 @@ i15_ret:
         pop     esi
         ret
 _vxd_hook_int15 endp
+
+;---------------------------------------------------------------------------
+; INT 21h hook (V86 chain): notes which program each DOS box runs (AX=4B00h
+; EXEC; AH=4Ch / 31h / 00h end one), so the helper can pick the game pad
+; layout. Never handles the call itself (always passes it on).
+;---------------------------------------------------------------------------
+Int21_Hook proc near
+        cmp     byte ptr [ebp+Client_EAX+1], 4Bh
+        je      i21_note
+        cmp     byte ptr [ebp+Client_EAX+1], 4Ch
+        je      i21_note
+        cmp     byte ptr [ebp+Client_EAX+1], 31h
+        je      i21_note
+        cmp     byte ptr [ebp+Client_EAX+1], 0
+        jne     i21_pass
+i21_note:
+        pushad
+        push    ebp
+        push    ebx
+        call    _sc_int21
+        add     esp, 8
+        popad
+i21_pass:
+        stc
+        ret
+Int21_Hook endp
+
+; int vxd_hook_int21(int on): 0 = ok
+_vxd_hook_int21 proc near
+        push    esi
+        mov     eax, 21h
+        mov     esi, offset Int21_Hook
+        cmp     dword ptr [esp+8], 0
+        je      i21_off
+        int 20h
+        dd (VMM_DEVICE_ID shl 16) + @Hook_V86_Int_Chain
+        jmp     i21_ret
+i21_off:
+        int 20h
+        dd (VMM_DEVICE_ID shl 16) + @Unhook_V86_Int_Chain
+i21_ret:
+        sbb     eax, eax
+        neg     eax
+        pop     esi
+        ret
+_vxd_hook_int21 endp
+
+; nested INT 21h calls in the current VM, from inside the INT 21h hook:
+;   vxd_nest_begin(save) ... vxd_nest_int21() (client registers in, out) ... vxd_nest_end(save)
+; save = buffer for the client state (256 bytes)
+_vxd_nest_begin proc near
+        push    edi
+        mov     edi, [esp+8]
+        int 20h
+        dd (VMM_DEVICE_ID shl 16) + @Save_Client_State
+        int 20h
+        dd (VMM_DEVICE_ID shl 16) + @Begin_Nest_V86_Exec
+        pop     edi
+        ret
+_vxd_nest_begin endp
+
+_vxd_nest_int21 proc near
+        mov     eax, 21h
+        int 20h
+        dd (VMM_DEVICE_ID shl 16) + @Exec_Int
+        ret
+_vxd_nest_int21 endp
+
+_vxd_nest_end proc near
+        push    esi
+        int 20h
+        dd (VMM_DEVICE_ID shl 16) + @End_Nest_Exec
+        mov     esi, [esp+8]
+        int 20h
+        dd (VMM_DEVICE_ID shl 16) + @Restore_Client_State
+        pop     esi
+        ret
+_vxd_nest_end endp
+
+; u32 vxd_kbd_owner(void): the VM that has the keyboard
+_vxd_kbd_owner proc near
+        push    ebx
+        int 20h
+        dd (VKD_DEVICE_ID shl 16) + @VKD_Get_Kbd_Owner
+        mov     eax, ebx
+        pop     ebx
+        ret
+_vxd_kbd_owner endp
+
+; int vxd_force_keys(const u8 *codes, u32 n): scan codes into the keyboard input; 0 = ok
+_vxd_force_keys proc near
+        push    esi
+        mov     esi, [esp+8]
+        mov     ecx, [esp+12]
+        int 20h
+        dd (VKD_DEVICE_ID shl 16) + @VKD_Force_Keys
+        sbb     eax, eax
+        neg     eax
+        pop     esi
+        ret
+_vxd_force_keys endp
 
 ; u32 vxd_sys_vm(void)
 _vxd_sys_vm proc near

@@ -478,6 +478,9 @@ int run_install(HINSTANCE inst)
     }
     // the Xbox 360 pad driver, so it is on the hard disk when the pad is first plugged in
     if (is_dir(join(src, "X360"))) copy_tree(join(src, "X360"), join(wdir, "X360"));
+    // the user's game pad layout download (FILES\PADMAP\keyb2joypad.cpp, see DOWNLOADS.TXT):
+    // SC55W.EXE turns it into PADMAP.TXT at its next start
+    if (is_dir(join(parent(src), "PADMAP"))) copy_tree(join(parent(src), "PADMAP"), join(base, "PADMAP"));
     // ROMs from the pack's FILES\ROMS (only the missing ones)
     int roms = 0;
     std::string rsrc = join(parent(src), "ROMS");

@@ -22,6 +22,7 @@
 #include "engine.h"
 #include "romscan.h"
 #include "install98.h"
+#include "pad.h"
 #include "resource.h"
 
 #ifndef BUILD_ID
@@ -200,7 +201,8 @@ static SC55W_CONFIG config_for(const Options& o)
     c.fixtc = (u8)(o.fixtc != 0);
     // DOS boxes get a game port (201h) and the BIOS joystick call (INT 15h AH=84h),
     // fed from the Windows joystick (SC55W.INI Joystick= / JoyBios=, 1 = on)
-    c.joy = (u8)((ini_int("Joystick", 1) ? 1 : 0) | (ini_int("JoyBios", 1) ? 2 : 0));
+    c.joy = (u8)((ini_int("Joystick", 1) ? 1 : 0) | (ini_int("JoyBios", 1) ? 2 : 0) |
+                 (ini_int("PadKeys", 1) ? 4 : 0));     // pad buttons -> keys, layout per game
     return c;
 }
 
@@ -770,9 +772,121 @@ static DWORD WINAPI x360_prompt(LPVOID)
     return 0;
 }
 
+// ---------------------------------------------------------------------------
+// game pad -> PadInput. SC55W.INI [Pad] says which Windows joystick button / axis is which pad
+// button (defaults: the Xbox 360 driver's order: A B X Y LB RB Back Start LS RS = buttons 1-10,
+// D-pad = POV hat, LT/RT = Z axis (LT up, RT down), right stick = U across, R down).
+struct PadMap { int btn[PB_COUNT]; char trig, rx, ry; };
+static PadMap g_padmap;
+static bool g_padkeys;
+static std::string g_pad_title = "Default", g_pad_prog, g_pad_last = "none yet";
+
+static void pad_map_load()
+{
+    static const int def[PB_COUNT] = {1, 2, 3, 4, 5, 6, 0, 0, 9, 10, 7, 8, 0, 0, 0, 0};
+    for (int i = 0; i < PB_COUNT; i++)
+        g_padmap.btn[i] = GetPrivateProfileIntA("Pad", pad_button_name(i), def[i], g_inipath.c_str());
+    char b[8];
+    GetPrivateProfileStringA("Pad", "Triggers", "Z", b, sizeof b, g_inipath.c_str());
+    g_padmap.trig = (char)toupper((unsigned char)b[0]);
+    GetPrivateProfileStringA("Pad", "RStickX", "U", b, sizeof b, g_inipath.c_str());
+    g_padmap.rx = (char)toupper((unsigned char)b[0]);
+    GetPrivateProfileStringA("Pad", "RStickY", "R", b, sizeof b, g_inipath.c_str());
+    g_padmap.ry = (char)toupper((unsigned char)b[0]);
+}
+
+static int axis_val(const JOYCAPSA& c, const JOYINFOEX& j, char a)
+{
+    DWORD v; UINT lo, hi; DWORD has;
+    switch (a) {
+    case 'X': v = j.dwXpos; lo = c.wXmin; hi = c.wXmax; has = 1; break;
+    case 'Y': v = j.dwYpos; lo = c.wYmin; hi = c.wYmax; has = 1; break;
+    case 'Z': v = j.dwZpos; lo = c.wZmin; hi = c.wZmax; has = c.wCaps & JOYCAPS_HASZ; break;
+    case 'R': v = j.dwRpos; lo = c.wRmin; hi = c.wRmax; has = c.wCaps & JOYCAPS_HASR; break;
+    case 'U': v = j.dwUpos; lo = c.wUmin; hi = c.wUmax; has = c.wCaps & JOYCAPS_HASU; break;
+    case 'V': v = j.dwVpos; lo = c.wVmin; hi = c.wVmax; has = c.wCaps & JOYCAPS_HASV; break;
+    default: return 0;
+    }
+    if (!has) return 0;
+    return (int)joy_scale(v, lo, hi) - 32768;
+}
+
+static void pad_read(const JOYCAPSA& c, const JOYINFOEX& j, PadInput& in)
+{
+    in.present = true;
+    for (int i = 0; i < PB_COUNT; i++) {
+        int n = g_padmap.btn[i];
+        if (n >= 1 && n <= 32) in.button[i] = (j.dwButtons >> (n - 1)) & 1;
+    }
+    if ((c.wCaps & JOYCAPS_HASPOV) && j.dwPOV <= 35900) {            // D-pad
+        DWORD p = j.dwPOV;
+        in.button[PB_DUP] |= p >= 31500 || p <= 4500;
+        in.button[PB_DRIGHT] |= p >= 4500 && p <= 13500;
+        in.button[PB_DDOWN] |= p >= 13500 && p <= 22500;
+        in.button[PB_DLEFT] |= p >= 22500 && p <= 31500;
+    }
+    if (g_padmap.trig && strchr("XYZRUV", g_padmap.trig)) {          // triggers on one axis
+        int t = axis_val(c, j, g_padmap.trig);
+        if (t > 12000) in.button[PB_LT] = true;
+        if (t < -12000) in.button[PB_RT] = true;
+    }
+    in.axis[PA_LX] = axis_val(c, j, 'X');
+    in.axis[PA_LY] = axis_val(c, j, 'Y');
+    in.axis[PA_RX] = axis_val(c, j, g_padmap.rx);
+    in.axis[PA_RY] = axis_val(c, j, g_padmap.ry);
+}
+
+// the last pad button pressed, for the status window (to check [Pad] and PADUSER.TXT)
+static void note_input(const PadInput& in, DWORD raw)
+{
+    static bool prev[PB_COUNT];
+    static DWORD prev_raw;
+    for (int i = 0; i < PB_COUNT; i++) {
+        if (in.button[i] && !prev[i]) {
+            char b[80];
+            DWORD nb = raw & ~prev_raw;
+            int n = 0;
+            for (int k = 0; k < 32; k++) if (nb >> k & 1) { n = k + 1; break; }
+            if (n) snprintf(b, sizeof b, "%s (Windows button %d)", pad_button_name(i), n);
+            else snprintf(b, sizeof b, "%s", pad_button_name(i));
+            EnterCriticalSection(&g_cs);
+            g_pad_last = b;
+            LeaveCriticalSection(&g_cs);
+        }
+        prev[i] = in.button[i];
+    }
+    prev_raw = raw;
+}
+
+// PADMAP.TXT from the user's keyb2joypad.cpp (in <pack>\PADMAP), when it is new
+static void pad_files_load()
+{
+    std::string cpp = path_join(path_join(g_base, "PADMAP"), "keyb2joypad.cpp");
+    std::string txt = path_join(g_base, "PADMAP.TXT"), tmp = path_join(g_base, "PADMAP.TMP");
+    WIN32_FILE_ATTRIBUTE_DATA a, b;
+    if (GetFileAttributesExA(cpp.c_str(), GetFileExInfoStandard, &a) &&
+        (!GetFileAttributesExA(txt.c_str(), GetFileExInfoStandard, &b) ||
+         CompareFileTime(&a.ftLastWriteTime, &b.ftLastWriteTime) > 0)) {
+        char msg[200];
+        if (padconv_run(cpp.c_str(), tmp.c_str(), msg, sizeof msg) == 0) {
+            DeleteFileA(txt.c_str());
+            MoveFileA(tmp.c_str(), txt.c_str());
+            logf("pad: PADMAP.TXT made from %s: %s", cpp.c_str(), msg);
+        } else {
+            DeleteFileA(tmp.c_str());
+            logf("pad: could not read %s: %s", cpp.c_str(), msg);
+        }
+    }
+    std::string log;
+    pad_load(txt, path_join(g_base, "PADUSER.TXT"), log);
+    logf("pad: %s", log.c_str());
+}
+
 static DWORD WINAPI joy_main(LPVOID)
 {
-    bool x360_asked = false;
+    bool x360_asked = false, focus_is_dos = false;
+    DWORD last_focus = 0;
+    u32 focus_vm = 0, focus_serial = 0xFFFFFFFFUL;
     JOYCAPSA cap[2];
     bool ok[2] = {false, false};
     DWORD last_check = 0;
@@ -817,8 +931,6 @@ static DWORD WINAPI joy_main(LPVOID)
             }
         }
         if (g_sh) {
-            u16 ax[4] = {32768, 32768, 32768, 32768};
-            u8 btn = 0, present = 0;
             JOYINFOEX ji[2];
             bool got[2] = {false, false};
             for (int j = 0; j < 2; j++) {
@@ -827,32 +939,59 @@ static DWORD WINAPI joy_main(LPVOID)
                 ji[j].dwFlags = JOY_RETURNALL;
                 got[j] = joyGetPosEx(j, &ji[j]) == JOYERR_NOERROR;
             }
-            if (got[0]) {
-                const JOYCAPSA& c = cap[0];
-                ax[0] = joy_scale(ji[0].dwXpos, c.wXmin, c.wXmax);
-                ax[1] = joy_scale(ji[0].dwYpos, c.wYmin, c.wYmax);
-                present |= 1;
-                btn |= (u8)(ji[0].dwButtons & 0x0F);
-                if (!got[1]) {
-                    bool hx = (c.wCaps & JOYCAPS_HASU) || (c.wCaps & JOYCAPS_HASZ), hy = (c.wCaps & JOYCAPS_HASR) != 0;
-                    if (hx && hy) {
-                        ax[2] = (c.wCaps & JOYCAPS_HASU) ? joy_scale(ji[0].dwUpos, c.wUmin, c.wUmax)
-                                                         : joy_scale(ji[0].dwZpos, c.wZmin, c.wZmax);
-                        ax[3] = joy_scale(ji[0].dwRpos, c.wRmin, c.wRmax);
-                        present |= 2;
+            PadInput in;
+            if (got[0]) pad_read(cap[0], ji[0], in);
+            if (in.present) note_input(in, ji[0].dwButtons);
+
+            // which game runs in the DOS box that has the keyboard (10 times a second)
+            bool focus_dos = false;
+            if (g_padkeys) {
+                if (now - last_focus >= 100) {
+                    last_focus = now;
+                    SC55W_FOCUS f;
+                    DWORD got_n = 0;
+                    if (DeviceIoControl(g_vxd, IOCTL_SC55W_FOCUS, NULL, 0, &f, sizeof f, &got_n, NULL) &&
+                        got_n == sizeof f) {
+                        focus_is_dos = f.is_dos != 0;
+                        if (f.is_dos && (f.vm != focus_vm || f.serial != focus_serial)) {
+                            focus_vm = f.vm; focus_serial = f.serial;
+                            std::vector<std::pair<std::string, uint32_t>> progs;
+                            for (u32 i = 0; i < f.depth && i < SC55W_NPROG; i++) {
+                                f.prog[i].path[127] = 0;
+                                progs.push_back({f.prog[i].path, f.prog[i].size});
+                            }
+                            std::string where, t = pad_select(progs, where);
+                            std::string prog = progs.empty() ? std::string("no program") : progs.back().first;
+                            if (t != g_pad_title || prog != g_pad_prog) {
+                                logf("pad: layout \"%s\" for %s%s%s", t.c_str(), prog.c_str(),
+                                     where.empty() ? "" : ", found by ", where.c_str());
+                                EnterCriticalSection(&g_cs);
+                                g_pad_title = t; g_pad_prog = prog;
+                                LeaveCriticalSection(&g_cs);
+                            }
+                        }
                     }
                 }
+                focus_dos = focus_is_dos;
             }
+            PadOutput out;
+            pad_step(in, focus_dos, out);
+            if (!out.scancodes.empty()) {
+                DWORD r = 0, got_n = 0;
+                DeviceIoControl(g_vxd, IOCTL_SC55W_KEYS, out.scancodes.data(), (DWORD)out.scancodes.size(),
+                                &r, 4, &got_n, NULL);
+            }
+            // a second Windows joystick still gives the DOS stick B and buttons 3-4
             if (got[1]) {
                 const JOYCAPSA& c = cap[1];
-                ax[2] = joy_scale(ji[1].dwXpos, c.wXmin, c.wXmax);
-                ax[3] = joy_scale(ji[1].dwYpos, c.wYmin, c.wYmax);
-                present |= 2;
-                btn |= (u8)((ji[1].dwButtons & 3) << 2);
+                out.joy_axis[2] = joy_scale(ji[1].dwXpos, c.wXmin, c.wXmax);
+                out.joy_axis[3] = joy_scale(ji[1].dwYpos, c.wYmin, c.wYmax);
+                out.joy_present |= 2;
+                out.joy_buttons |= (u8)((ji[1].dwButtons & 3) << 2);
             }
-            for (int i = 0; i < 4; i++) g_sh->joy_axis[i] = ax[i];
-            g_sh->joy_buttons = btn;
-            g_sh->joy_present = present;
+            for (int i = 0; i < 4; i++) g_sh->joy_axis[i] = out.joy_axis[i];
+            g_sh->joy_buttons = out.joy_buttons;
+            g_sh->joy_present = out.joy_present;
         }
         Sleep(10);
     }
@@ -892,6 +1031,13 @@ static std::string status_text()
                      (p.attach & ST_OK_JBIOS) ? " + BIOS" : "", g_sh ? (unsigned long)g_sh->joy_reads : 0UL, jd.c_str());
             s += b;
         } else if (!(p.attach & ST_ERR_JOYPORT)) s += "   Joystick: off (SC55W.INI Joystick=0)\r\n";
+        if (g_padkeys) {
+            EnterCriticalSection(&g_cs);
+            std::string t = g_pad_title, pr = g_pad_prog, la = g_pad_last;
+            LeaveCriticalSection(&g_cs);
+            s += "   Pad keys: layout \"" + t + "\"" + (pr.empty() ? std::string() : " (" + pr + ")") +
+                 ". Last button: " + la + "\r\n";
+        }
     }
     s += "MIDI synth: " + (p.synth_error.empty() ? p.synth : "none - " + p.synth_error) + "\r\n";
     if (p.st.midi_volume != 100) {
@@ -1439,7 +1585,10 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR cmd, int)
     push_options(g_opt);
     DWORD tid;
     g_thread = CreateThread(NULL, 0, audio_main, NULL, 0, &tid);
-    if (ini_int("Joystick", 1) || ini_int("JoyBios", 1)) {
+    g_padkeys = ini_int("PadKeys", 1) != 0 && g_vxd != INVALID_HANDLE_VALUE;
+    pad_map_load();
+    if (g_padkeys) pad_files_load();
+    if (ini_int("Joystick", 1) || ini_int("JoyBios", 1) || g_padkeys) {
         HANDLE jt = CreateThread(NULL, 0, joy_main, NULL, 0, &tid);
         if (jt) { SetThreadPriority(jt, THREAD_PRIORITY_ABOVE_NORMAL); CloseHandle(jt); }
     }
