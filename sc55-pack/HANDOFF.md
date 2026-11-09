@@ -1,5 +1,15 @@
 # SC-55 pack — handoff
 
+## VERSION NAMES - two Claude sessions work on this repo (read first)
+- DOS session: plain `beta.NN` (tag `v1.0.0-beta.NN-usb`, zip `NUKED-SB-EMU-1.0.0-beta.NN-usb.zip`).
+- Windows 98 session (win98/, pack/README98.TXT, FILES\WIN98): `beta.NN-w98.M` = Win98 update M built
+  on DOS beta.NN (tag `v1.0.0-beta.NN-w98.M-usb`, zip `NUKED-SB-EMU-1.0.0-beta.NN-w98.M-usb.zip`).
+  M counts up across the whole Win98 line (w98.1, w98.2, ...) and does not restart with a new beta.
+  Commits start with `w98:`; HANDOFF/README sections are titled `Win98 w98.M (on beta.NN)`.
+- Never reuse the other session's next number: pull before releasing; the DOS session takes the next
+  beta.NN, the Win98 session only ever adds -w98.M on top of the newest beta.NN. (beta.74 and beta.75
+  were Win98 releases from before this rule.)
+
 ## Current state (SBEMU 1.0.0-beta.51-usb-sc55, branch usb-xpad)
 - SBEMU + Nuked-SC55 (SC-55/mkII), Munt MT-32/CM-32L (/VMT32), SoundFont (/VSF); MPU side channel 0xA5-0xB0 (stats, SBDIAG, key player, triple-Esc, front panel/LCD + CPU load).
 - Key player holds each typed key 500 ms (vdiag.c key_tick); Duke 3D quit default `ESC W3 Q W2 Y W3 Y W3 ESC W3 Q W2 Y W3 Y` — verified in QEMU with Duke 3D Atomic 1.5 from logo, title and demo (GAMETEST /RUN, 20 s and 40 s tests).
