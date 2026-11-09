@@ -65,6 +65,39 @@ uint8_t PCM_ReadROM(pcm_t& pcm, uint32_t address)
     return 0;
 }
 
+// Bank table matching PCM_ReadROM case by case; rebuilt when config_reg_3d bit 5 or the model changes.
+static const uint8_t pcm_rom_zero[1] = {0};
+static void PCM_RomTable(pcm_t& pcm)
+{
+    const uint8_t key = (uint8_t)((pcm.config_reg_3d & 0x20) | (pcm.mcu->is_mk1 ? 1 : 0) | (pcm.mcu->is_jv880 ? 2 : 0));
+    if (key == pcm.rom_key)
+        return;
+    pcm.rom_key = key;
+    pcm.rom_shift = (pcm.config_reg_3d & 0x20) ? 21 : 19;
+    for (int b = 0; b < 8; b++)
+    {
+        pcm.rom_base[b] = pcm_rom_zero;
+        pcm.rom_mask[b] = 0;
+    }
+    pcm.rom_base[0] = pcm.waverom1;
+    pcm.rom_mask[0] = pcm.mcu->is_mk1 ? 0xfffff : 0x1fffff;
+    pcm.rom_base[1] = pcm.waverom2;
+    pcm.rom_mask[1] = !pcm.mcu->is_jv880 ? 0xfffff : 0x1fffff;
+    pcm.rom_base[2] = pcm.mcu->is_jv880 ? pcm.waverom_card : pcm.waverom3;
+    pcm.rom_mask[2] = pcm.mcu->is_jv880 ? 0x1fffff : 0xfffff;
+    if (pcm.mcu->is_jv880)
+        for (int b = 3; b <= 6; b++)
+        {
+            pcm.rom_base[b] = pcm.waverom_exp + (uint32_t)((b - 3) * 0x200000);
+            pcm.rom_mask[b] = 0x1fffff;
+        }
+}
+static inline uint8_t PCM_ReadROMFast(const pcm_t& pcm, uint32_t address)
+{
+    const uint32_t bank = (address >> pcm.rom_shift) & 7;
+    return pcm.rom_base[bank][address & pcm.rom_mask[bank]];
+}
+
 void PCM_Write(pcm_t& pcm, uint32_t address, uint8_t data)
 {
     address &= 0x3f;
@@ -580,6 +613,7 @@ void PCM_GetConfig(PCM_Config& config, uint8_t config_byte)
 
 void PCM_Update(pcm_t& pcm, uint64_t cycles)
 {
+    PCM_RomTable(pcm); // config_reg_3d only changes through PCM_Write, between calls
     while (pcm.cycles < cycles)
     {
         const uint32_t voice_active = pcm.voice_mask & pcm.voice_mask_pending;
@@ -1168,7 +1202,7 @@ void PCM_Update(pcm_t& pcm, uint64_t cycles)
                 wave_address += nibble_add - nibble_subtract;
             wave_address &= 0xfffff;
 
-            newnibble = PCM_ReadROM(pcm, (uint32_t)((hiaddr << 20) | wave_address));
+            newnibble = PCM_ReadROMFast(pcm, (uint32_t)((hiaddr << 20) | wave_address));
             const bool newnibble_sel = address_b4 ^ ((b6 || !nibble_cmp1) && okey);
             if (newnibble_sel)
                 newnibble = (newnibble >> 4) & 15;
@@ -1188,7 +1222,7 @@ void PCM_Update(pcm_t& pcm, uint64_t cycles)
 
             // address 0
             int address_cnt = address;
-            int samp0 = (int8_t)PCM_ReadROM(pcm, (uint32_t)((hiaddr << 20) | address_cnt)); // 18
+            int samp0 = (int8_t)PCM_ReadROMFast(pcm, (uint32_t)((hiaddr << 20) | address_cnt)); // 18
 
             cmp1 = address;
             cmp2 = address_cnt;
@@ -1214,7 +1248,7 @@ void PCM_Update(pcm_t& pcm, uint64_t cycles)
             address_cnt = address_cnt2 & 0xfffff; // 11
             b15 = b6 && (b15 ^ address_cmp); // 11
 
-            int samp1 = (int8_t)PCM_ReadROM(pcm, (uint32_t)((hiaddr << 20) | address_cnt)); // 20
+            int samp1 = (int8_t)PCM_ReadROMFast(pcm, (uint32_t)((hiaddr << 20) | address_cnt)); // 20
 
             cmp1 = address;
             cmp2 = address_cnt;
@@ -1243,7 +1277,7 @@ void PCM_Update(pcm_t& pcm, uint64_t cycles)
             address_cnt = address_cnt2 & 0xfffff; // 15
             b15 = b6 && (b15 ^ address_cmp); // 15
 
-            int samp2 = (int8_t)PCM_ReadROM(pcm, (uint32_t)((hiaddr << 20) | address_cnt)); // 1
+            int samp2 = (int8_t)PCM_ReadROMFast(pcm, (uint32_t)((hiaddr << 20) | address_cnt)); // 1
 
             cmp1 = address;
             cmp2 = address_cnt;
@@ -1272,7 +1306,7 @@ void PCM_Update(pcm_t& pcm, uint64_t cycles)
             address_cnt = address_cnt2 & 0xfffff; // 19
             b15 = b6 && (b15 ^ address_cmp); // 19
 
-            int samp3 = (int8_t)PCM_ReadROM(pcm, (uint32_t)((hiaddr << 20) | address_cnt)); // 5
+            int samp3 = (int8_t)PCM_ReadROMFast(pcm, (uint32_t)((hiaddr << 20) | address_cnt)); // 5
 
             cmp1 = address;
             cmp2 = address_cnt;

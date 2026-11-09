@@ -30,6 +30,7 @@ using TMR_Step_Table = std::array<uint16_t, 8>;
 struct frt_t
 {
     uint64_t deadline  = 0;
+    uint64_t due       = 0; // first tick that can do more than count (lazy clocking)
     uint8_t  tcr       = 0;
     uint8_t  tcsr      = 0;
     uint16_t frc       = 0;
@@ -44,6 +45,7 @@ struct frt_t
 struct tmr_t
 {
     uint64_t deadline  = static_cast<uint64_t>(-1);
+    uint64_t due       = static_cast<uint64_t>(-1);
     uint16_t stride    = 0;
     uint8_t  tcr       = 0;
     uint8_t  tcsr      = 0;

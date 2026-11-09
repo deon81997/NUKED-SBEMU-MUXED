@@ -97,15 +97,25 @@ constexpr uint64_t AlignForward(uint64_t value, uint64_t interval)
 // are brought up to date (TIMER_Sync) before any register access, so behaviour is bit-identical.
 namespace
 {
-inline bool FrtCond(const frt_t& f)
+// A tick has to be clocked one by one only if it can change something besides the counter: a compare match,
+// a wrap, or an enabled flag whose interrupt request is not raised yet. A request that is already pending
+// stays pending until a timer register write clears it, and every write syncs the timer first, so re-raising
+// it on each tick changes nothing (most ticks while the firmware has a timer interrupt waiting).
+inline bool FrtCond(const mcu_timer_t& timer, int i)
 {
-    return ((f.tcr & FRT_TCR_OVIE) && (f.tcsr & FRT_TCSR_OVF)) || ((f.tcr & FRT_TCR_OCIEA) && (f.tcsr & FRT_TCSR_OCFA))
-        || ((f.tcr & FRT_TCR_OCIEB) && (f.tcsr & FRT_TCSR_OCFB));
+    const frt_t& f = timer.frt[i];
+    const auto& p = timer.mcu->interrupt_pending;
+    return ((f.tcr & FRT_TCR_OVIE) && (f.tcsr & FRT_TCSR_OVF) && !p.Contains((MCU_Interrupt_Source)(INTERRUPT_SOURCE_FRT0_FOVI + i * 4)))
+        || ((f.tcr & FRT_TCR_OCIEA) && (f.tcsr & FRT_TCSR_OCFA) && !p.Contains((MCU_Interrupt_Source)(INTERRUPT_SOURCE_FRT0_OCIA + i * 4)))
+        || ((f.tcr & FRT_TCR_OCIEB) && (f.tcsr & FRT_TCSR_OCFB) && !p.Contains((MCU_Interrupt_Source)(INTERRUPT_SOURCE_FRT0_OCIB + i * 4)));
 }
-inline bool TmrCond(const tmr_t& t)
+inline bool TmrCond(const mcu_timer_t& timer)
 {
-    return ((t.tcr & TMR_TCR_OVIE) && (t.tcsr & TMR_TCSR_OVF)) || ((t.tcr & TMR_TCR_CMIEA) && (t.tcsr & TMR_TCSR_CMFA))
-        || ((t.tcr & TMR_TCR_CMIEB) && (t.tcsr & TMR_TCSR_CMFB));
+    const tmr_t& t = timer.tmr;
+    const auto& p = timer.mcu->interrupt_pending;
+    return ((t.tcr & TMR_TCR_OVIE) && (t.tcsr & TMR_TCSR_OVF) && !p.Contains(INTERRUPT_SOURCE_TIMER_OVI))
+        || ((t.tcr & TMR_TCR_CMIEA) && (t.tcsr & TMR_TCSR_CMFA) && !p.Contains(INTERRUPT_SOURCE_TIMER_CMIA))
+        || ((t.tcr & TMR_TCR_CMIEB) && (t.tcsr & TMR_TCSR_CMFB) && !p.Contains(INTERRUPT_SOURCE_TIMER_CMIB));
 }
 // number of consecutive quiet ticks starting from the current counter value
 inline uint32_t FrtQuiet(const frt_t& f)
@@ -128,22 +138,32 @@ void TIMER_Sync(mcu_timer_t& timer)
     TIMER_Advance(timer, timer.cycles);
 }
 
+static inline void TIMER_FrtDue(mcu_timer_t& timer, int i)
+{
+    frt_t& f = timer.frt[i];
+    f.due = FrtCond(timer, i) ? f.deadline : f.deadline + (uint64_t)FrtQuiet(f) * f.stride;
+}
+static inline void TIMER_TmrDue(mcu_timer_t& timer)
+{
+    tmr_t& t = timer.tmr;
+    if (t.deadline == static_cast<uint64_t>(-1))
+        t.due = t.deadline;
+    else
+        t.due = TmrCond(timer) ? t.deadline : t.deadline + (uint64_t)TmrQuiet(t) * t.stride;
+}
+static inline void TIMER_MinDue(mcu_timer_t& timer)
+{
+    uint64_t due = timer.tmr.due;
+    for (int i = 0; i < 3; i++)
+        if (timer.frt[i].due < due) due = timer.frt[i].due;
+    timer.next_due = due;
+}
 static void TIMER_RecomputeDue(mcu_timer_t& timer)
 {
-    uint64_t due = static_cast<uint64_t>(-1);
     for (int i = 0; i < 3; i++)
-    {
-        const frt_t& f = timer.frt[i];
-        uint64_t d = FrtCond(f) ? f.deadline : f.deadline + (uint64_t)FrtQuiet(f) * f.stride;
-        if (d < due) due = d;
-    }
-    const tmr_t& t = timer.tmr;
-    if (t.deadline != static_cast<uint64_t>(-1))
-    {
-        uint64_t d = TmrCond(t) ? t.deadline : t.deadline + (uint64_t)TmrQuiet(t) * t.stride;
-        if (d < due) due = d;
-    }
-    timer.next_due = due;
+        TIMER_FrtDue(timer, i);
+    TIMER_TmrDue(timer);
+    TIMER_MinDue(timer);
 }
 
 void TIMER_Init(mcu_timer_t& timer, mcu_t& mcu)
@@ -449,14 +469,20 @@ inline void TIMER_ClockTmr(mcu_timer_t& timer)
         MCU_Interrupt_SetRequest(*timer.mcu, INTERRUPT_SOURCE_TIMER_CMIB, 1);
 }
 
-static void TIMER_Advance(mcu_timer_t& timer, uint64_t target_cycles)
+// all = 1: bring every counter up to date (before a register access). all = 0: only the timers that have an
+// event before target; the others only count in between and catch up in bulk later, with the same result.
+// A timer's "due" depends only on its own registers and its own interrupt requests, so the timers that were
+// skipped keep theirs.
+static void TIMER_AdvanceSel(mcu_timer_t& timer, uint64_t target_cycles, int all)
 {
     for (int i = 0; i < 3; i++)
     {
         frt_t& f = timer.frt[i];
+        if (!all && f.due >= target_cycles)
+            continue;
         while (f.deadline < target_cycles)
         {
-            if (!FrtCond(f))
+            if (!FrtCond(timer, i))
             {
                 const uint64_t pending = ((target_cycles - 1 - f.deadline) >> Log2Stride(f.stride)) + 1;
                 const uint32_t quiet   = FrtQuiet(f);
@@ -471,27 +497,37 @@ static void TIMER_Advance(mcu_timer_t& timer, uint64_t target_cycles)
             TIMER_ClockFrt(timer, i);
             f.deadline += f.stride;
         }
+        TIMER_FrtDue(timer, i);
     }
 
     tmr_t& t = timer.tmr;
-    while (t.deadline < target_cycles)
+    if (all || t.due < target_cycles)
     {
-        if (!TmrCond(t))
+        while (t.deadline < target_cycles)
         {
-            const uint64_t pending = ((target_cycles - 1 - t.deadline) >> Log2Stride(t.stride)) + 1;
-            const uint32_t quiet   = TmrQuiet(t);
-            const uint32_t n       = pending < quiet ? (uint32_t)pending : quiet;
-            if (n)
+            if (!TmrCond(timer))
             {
-                t.tcnt     = (uint8_t)(t.tcnt + n);
-                t.deadline += (uint64_t)n * t.stride;
-                continue;
+                const uint64_t pending = ((target_cycles - 1 - t.deadline) >> Log2Stride(t.stride)) + 1;
+                const uint32_t quiet   = TmrQuiet(t);
+                const uint32_t n       = pending < quiet ? (uint32_t)pending : quiet;
+                if (n)
+                {
+                    t.tcnt     = (uint8_t)(t.tcnt + n);
+                    t.deadline += (uint64_t)n * t.stride;
+                    continue;
+                }
             }
+            TIMER_ClockTmr(timer);
+            t.deadline += t.stride;
         }
-        TIMER_ClockTmr(timer);
-        t.deadline += t.stride;
+        TIMER_TmrDue(timer);
     }
-    TIMER_RecomputeDue(timer);
+    TIMER_MinDue(timer);
+}
+
+static void TIMER_Advance(mcu_timer_t& timer, uint64_t target_cycles)
+{
+    TIMER_AdvanceSel(timer, target_cycles, 1);
 }
 
 void TIMER_Clock(mcu_timer_t& timer, uint64_t cycles)
@@ -501,7 +537,7 @@ void TIMER_Clock(mcu_timer_t& timer, uint64_t cycles)
     timer.cycles = target_cycles;
     if (target_cycles <= timer.next_due)
         return;
-    TIMER_Advance(timer, target_cycles);
+    TIMER_AdvanceSel(timer, target_cycles, 0);
 }
 
 // These tables are indexed by the low CKSn bits of the TCR.

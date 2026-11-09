@@ -911,9 +911,14 @@ void MCU_Step(mcu_t& mcu)
     // if (mcu.cycles % 24000000 == 0)
     //     fprintf(stderr, "seconds: %i\n", (int)(mcu.cycles / 24000000));
 
-    PCM_Update(*mcu.pcm, mcu.cycles);
+    // the PCM and timer calls only do work when their time has come; test that here (no call otherwise)
+    if (mcu.pcm->cycles < mcu.cycles)
+        PCM_Update(*mcu.pcm, mcu.cycles);
 
-    TIMER_Clock(*mcu.timer, mcu.cycles);
+    if ((mcu.cycles >> 1) > mcu.timer->next_due)
+        TIMER_Clock(*mcu.timer, mcu.cycles);
+    else
+        mcu.timer->cycles = mcu.cycles >> 1; // what TIMER_Clock does when nothing is due
 
     if (!mcu.is_mk1 && !mcu.is_jv880 && !mcu.is_scb55)
         SM_Update(*mcu.sm, mcu.cycles);
@@ -923,7 +928,8 @@ void MCU_Step(mcu_t& mcu)
         MCU_UpdateUART_TX(mcu);
     }
 
-    MCU_UpdateAnalog(mcu, mcu.cycles);
+    if ((mcu.dev_register[DEV_ADCSR] & 0x20) || mcu.analog_end_time != 0)
+        MCU_UpdateAnalog(mcu, mcu.cycles);
 
     if (mcu.is_mk1)
     {

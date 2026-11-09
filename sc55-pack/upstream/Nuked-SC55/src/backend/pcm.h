@@ -66,6 +66,11 @@ struct pcm_t
     int32_t  accum_r             = 0;
     int32_t  rcsum[2]{};
     uint16_t idle_run[32]{}; // consecutive unchanged passes of a key-off voice (see PCM_Update)
+    // wave ROM bank table for PCM_Update's sample reads (same bytes as PCM_ReadROM, without its branches)
+    const uint8_t* rom_base[8]{};
+    uint32_t rom_mask[8]{};
+    uint8_t  rom_shift = 19;
+    uint8_t  rom_key = 0xff; // which configuration the table is for, 0xff = not built
 
     PCM_Config config{};
 

@@ -411,3 +411,19 @@
   each slice spends its cost, slices shrink to the credit left, none when it is used up. /VSCAUTO:0 disables it.
   After: Test Music runs to the end and returns, keys work. Fast PCs never reach the ceiling.
 - Debug aids used (not in the build): /tmp/df-debug.patch (DOS STACKS probe, MPU access ring, ISR load gauge).
+
+## beta.69-usb (2026-11-09): SC-55 core ~20% faster, bit-exact
+- upstream/Nuked-SC55/src/backend (our fork), all output-identical (host bench FNV hash of every sample, mk1-v1.00,
+  mk1-v2.00, mk2-v1.01; FX on/off; voice limit 0/16; 60 s two-file run hash 14e29e60):
+  - mcu_timer: each FRT/TMR keeps `due` = next tick that changes state (overflow/compare/IRQ request); a tick whose
+    request is already pending counts as quiet. TIMER_Clock only steps timers that are due (TIMER_AdvanceSel);
+    MCU_Step skips the call entirely until next_due.
+  - pcm: wave ROM bank table (rom_base/rom_mask, rebuilt when cfg 0x20 changes) replaces PCM_ReadROM's
+    branches for the 5 sample reads per voice (PCM_ReadROMFast).
+  - mcu: MCU_Step calls PCM_Update / MCU_UpdateAnalog only when they have work.
+- Render path (callgrind, 32-bit -march=i686, 4 s of 19.mid): 6.34G -> 5.13G instructions (-19%).
+  Host: mk1 +7..45%, mk2 +10..18%. 86Box Celeron 366 SC55WAV (32 kHz): 0.28x -> 0.35x real time (+24%).
+- Dark Forces setup Test Music rechecked (86Box): runs closer to real time (bar 16 s -> ~6 s, music no longer
+  lags the game).
+- Remaining profile: PCM_Update 45% (20-bit DSP arithmetic, inherent), timers 14%, MCU_Step 11%, MCU_Read 7%.
+- Bench: /home/claude/bench (bench.cpp, build.sh, ir.sh; SC_SET=<romset> env picks the ROM set).

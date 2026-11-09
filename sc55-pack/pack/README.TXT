@@ -259,6 +259,8 @@ CONTENTS
       Boots the emulated SC-55 from your ROMs, renders a demo, measures
       speed ("x real time"; you want 1.5x or better) and writes the report
       to C:\SC55\SC55LOG.TXT. Options: see SC55WAV below.
+      Since beta.69 the SC-55 emulation is about 20% faster on the same PC
+      (same sound, sample for sample), so re-run it after updating.
 
   C:\SC55\MPUTEST.EXE [/P:330] [/L]
       Plays a short test tune through the running SBEMU. /P: MPU port (hex),
