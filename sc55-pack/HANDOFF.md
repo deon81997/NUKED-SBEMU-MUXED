@@ -10,6 +10,8 @@
   beta.NN, the Win98 session only ever adds -w98.M on top of the newest beta.NN. (beta.74 and beta.75
   were Win98 releases from before this rule.)
 - release/ holds one zip, the newest. Build the next zip from that one (it has both sessions' files).
+- README.md "What's NEW!!" shows the 5 newest entries; when adding one, move the oldest visible entry to the
+  top of the "Older news" <details> block under them.
 
 ## Current state (SBEMU 1.0.0-beta.51-usb-sc55, branch usb-xpad)
 - SBEMU + Nuked-SC55 (SC-55/mkII), Munt MT-32/CM-32L (/VMT32), SoundFont (/VSF); MPU side channel 0xA5-0xB0 (stats, SBDIAG, key player, triple-Esc, front panel/LCD + CPU load).
