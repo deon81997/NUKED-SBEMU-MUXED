@@ -332,7 +332,9 @@ CONTENTS
   SETTINGS uses the style chosen in MENU (F3). The ROM sets are recognised
   from C:\SC55\ROMS\ROMHASH.CAC (made the first time), so SETTINGS, SBEMU
   and TEST.BAT start without re-reading every ROM; a ROM file that changes
-  is checked again by itself.
+  is checked again by itself. (Before beta.73 the file dates were misread
+  on some starts, so all ROMs were checked again: about 6 s lost at
+  350 MHz.)
   SETTINGS /PAGE:SC, /PAGE:SF, /PAGE:VOL or /PAGE:ADV opens a sub-menu
   (the MENU's SETTINGS entries do this).
 
@@ -1081,9 +1083,10 @@ CONTENTS
   SBDETAIL.TXT is written every time SC55.BAT starts SBEMU: the command
   line, every option and whether you set it, DOS and Windows versions,
   the CPU, every PCI sound device with its IRQ, the card SBEMU chose,
-  each start-up step ("[step] ...") and every port trap. Each line is
+  each start-up step ("[step] ...") and every port trap. Each step is
   saved at once, so if the PC hangs while SBEMU starts, the last
-  "[step]" line shows where. SET SBEMUDETAIL=OFF turns it off.
+  "[step]" line shows where. At the end a table shows how long each
+  step took (since beta.73). SET SBEMUDETAIL=OFF turns it off.
 
   SBEMU SAYS "Not loaded" IN THE MENU: the line under the logo shows
   the first error from SBLOG.TXT.

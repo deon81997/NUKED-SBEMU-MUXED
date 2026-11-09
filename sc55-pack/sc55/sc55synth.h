@@ -15,7 +15,7 @@ typedef struct SC55_Config
     const char* romdir;      /* folder holding the ROM dumps (matched by SHA-256, names are irrelevant) */
     const char* romset;      /* "mk1-v1.21", ... ; NULL, "" or "auto" = first complete SC-55 set found */
     int gain_percent;        /* 0..1600, 100 = unity */
-    int boot_seconds;        /* emulated seconds to let the firmware boot, 0 = default (4) */
+    int boot_seconds;        /* emulated seconds to let the firmware boot, 0 = default (3) */
     int verbose;             /* print progress to stdout */
 } SC55_Config;
 

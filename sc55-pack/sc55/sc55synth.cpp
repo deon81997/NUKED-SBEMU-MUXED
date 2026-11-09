@@ -26,6 +26,9 @@ NullLCD g_null_lcd;
 
 #include <dirent.h>
 #include <sys/stat.h>
+#ifdef __DJGPP__
+#include <dos.h>
+#endif
 
 #include <cstdarg>
 #include <cstdio>
@@ -186,6 +189,25 @@ static void save_cache(const char* dir, const std::vector<CacheEntry>& entries)
     rename(tmp.c_str(), path.c_str());
 }
 
+// The file's date for the cache. Until beta.72 this was stat()'s st_mtime, but DJGPP's stat() gave the same
+// file different times depending on how SBEMU was started (seen in 86Box: Nov 7 23:30:08 from one batch file,
+// Dec 14 03:06:34 from another), so the cache missed and every ROM was hashed again: about 6 s of start-up on
+// a 350 MHz PC. On DOS the raw FAT date and time from the open handle (INT 21h AX=5700h) are used instead.
+static long file_stamp(const std::string& path, const struct stat& st)
+{
+#ifdef __DJGPP__
+    int h;
+    if (_dos_open(path.c_str(), 0 /* read */, &h) == 0)
+    {
+        unsigned int date = 0, time = 0;
+        const unsigned rc = _dos_getftime(h, &date, &time);
+        _dos_close(h);
+        if (rc == 0) return ((long)date << 16) | time;
+    }
+#endif
+    return (long)st.st_mtime;
+}
+
 // Hash every plausible ROM file in `dir` (or take the hash from the cache); contents are not retained.
 bool scan_folder(const char* dir, std::vector<Found>& found)
 {
@@ -207,9 +229,10 @@ bool scan_folder(const char* dir, std::vector<Found>& found)
         if (stat(path.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) continue;
         if (st.st_size < 512 || st.st_size > 16 * 1024 * 1024) continue;
         Found f;
+        const long mtime = file_stamp(path, st);
         const CacheEntry* hit = nullptr;
         for (const CacheEntry& c : cache)
-            if (!strcasecmp(c.name.c_str(), e->d_name) && c.size == (long)st.st_size && c.mtime == (long)st.st_mtime) { hit = &c; break; }
+            if (!strcasecmp(c.name.c_str(), e->d_name) && c.size == (long)st.st_size && c.mtime == mtime) { hit = &c; break; }
         if (hit) f.digest = hit->digest;
         else
         {
@@ -219,7 +242,7 @@ bool scan_folder(const char* dir, std::vector<Found>& found)
             changed = true;
         }
         f.path = path;
-        now.push_back(CacheEntry{ e->d_name, (long)st.st_size, (long)st.st_mtime, f.digest });
+        now.push_back(CacheEntry{ e->d_name, (long)st.st_size, mtime, f.digest });
         found.push_back(std::move(f));
     }
     closedir(d);
@@ -451,7 +474,7 @@ int SC55_Init(const SC55_Config* cfg)
         g_engine->set_gain_percent(cfg->gain_percent); // 0 is a valid (muted) gain
 
         // ---- let the firmware boot -------------------------------------------
-        const int boot = cfg->boot_seconds > 0 ? cfg->boot_seconds : 4;
+        const int boot = cfg->boot_seconds > 0 ? cfg->boot_seconds : 3; // measured: mk1 ready after ~2.3 s, mkII ~2 s
         if (verbose) printf("Booting SC-55 firmware (%d s of emulated time) ", boot);
         const uint32_t chunk = native_rate / 2;
         for (int i = 0; i < boot * 2; i++)

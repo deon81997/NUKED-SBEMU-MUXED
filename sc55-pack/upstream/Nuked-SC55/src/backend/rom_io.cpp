@@ -197,30 +197,45 @@ const char* legacy_rom_names[(size_t)ROMSET_COUNT][ROMLOCATION_COUNT] = {
     },
 };
 
+// Waverom unscrambling: the address bits and data bits are permuted. The permutations are applied with lookup
+// tables (two halves of the 20 address bits, and the data byte) instead of bit loops per byte - same result,
+// a fraction of the work (it was a third of SC-55 start-up on slow PCs).
 void unscramble(const uint8_t *src, uint8_t *dst, int len)
 {
+    static const int aa[] = {
+        2, 0, 3, 4, 1, 9, 13, 10, 18, 17, 6, 15, 11, 16, 8, 5, 12, 7, 14, 19
+    };
+    static const int dd[] = {
+        2, 0, 4, 5, 7, 6, 3, 1
+    };
+    static uint32_t lo_lut[1024], hi_lut[1024];
+    static uint8_t data_lut[256];
+    static bool ready = false;
+    if (!ready)
+    {
+        for (int v = 0; v < 1024; v++)
+        {
+            uint32_t lo = 0, hi = 0;
+            for (int j = 0; j < 10; j++)
+            {
+                if (v & (1 << j)) lo |= 1u << aa[j];
+                if (v & (1 << j)) hi |= 1u << aa[j + 10];
+            }
+            lo_lut[v] = lo; hi_lut[v] = hi;
+        }
+        for (int v = 0; v < 256; v++)
+        {
+            uint8_t data = 0;
+            for (int j = 0; j < 8; j++)
+                if (v & (1 << dd[j])) data |= (uint8_t)(1 << j);
+            data_lut[v] = data;
+        }
+        ready = true;
+    }
     for (int i = 0; i < len; i++)
     {
-        int address = i & ~0xfffff;
-        static const int aa[] = {
-            2, 0, 3, 4, 1, 9, 13, 10, 18, 17, 6, 15, 11, 16, 8, 5, 12, 7, 14, 19
-        };
-        for (int j = 0; j < 20; j++)
-        {
-            if (i & (1 << j))
-                address |= 1<<aa[j];
-        }
-        uint8_t srcdata = src[address];
-        uint8_t data = 0;
-        static const int dd[] = {
-            2, 0, 4, 5, 7, 6, 3, 1
-        };
-        for (int j = 0; j < 8; j++)
-        {
-            if (srcdata & (1 << dd[j]))
-                data |= 1<<j;
-        }
-        dst[i] = data;
+        const uint32_t address = ((uint32_t)i & ~0xfffffu) | lo_lut[i & 0x3ff] | hi_lut[(i >> 10) & 0x3ff];
+        dst[i] = data_lut[src[address]];
     }
 }
 

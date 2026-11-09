@@ -878,7 +878,10 @@ static void MAIN_PutStr(const char* t) { if(MAIN_LogOn) { for(; *t; ++t) if(*t !
  * the command line, every option and where it came from, DOS / Windows / memory managers, the CPU, all
  * PCI sound devices with their IRQs, the card it chose, each start-up step and every port trap. Each line
  * is committed to disk at once, so after a hang or a crash the last "[step]" line shows where it stopped.
- * Only written while starting (never from an interrupt); closed before SBEMU goes resident. */
+ * Only written while starting (never from an interrupt); closed before SBEMU goes resident.
+ * beta.73: a disk commit costs about 25 ms, and the option list alone is 70 lines (1.9 s of start-up).
+ * Plain lines are now only handed to DOS; the commit happens at every "[step]" line (before the step's
+ * risky work runs) and for every USB trace line, which is where hangs were seen. */
 static FILE* MAIN_Det;
 static const char* MAIN_DetStage = "start";
 static void MAIN_D(const char* fmt, ...)
@@ -886,17 +889,35 @@ static void MAIN_D(const char* fmt, ...)
     va_list ap;
     if(!MAIN_Det) return;
     va_start(ap, fmt); vfprintf(MAIN_Det, fmt, ap); va_end(ap);
-    fflush(MAIN_Det); fsync(fileno(MAIN_Det));
+    fflush(MAIN_Det);
 }
-static void MAIN_UsbTrace(const char* s) { MAIN_D("%s", s); }
+static void MAIN_DCommit(void) { if(MAIN_Det) { fflush(MAIN_Det); fsync(fileno(MAIN_Det)); } }
+static void MAIN_UsbTrace(const char* s) { MAIN_D("%s", s); MAIN_DCommit(); }
+/* beta.73: each step's start time (TSC), so the detail log shows where start-up time goes */
+static const char* MAIN_StepName[40];
+static uint64_t MAIN_StepTsc[40];
+static int MAIN_StepCount;
 static void MAIN_Step(const char* s)
 {
     MAIN_DetStage = s;
+    if(MAIN_StepCount < 40) { MAIN_StepName[MAIN_StepCount] = s; MAIN_StepTsc[MAIN_StepCount++] = DIAG_Tsc(); }
     MAIN_D("[step] %s\n", s);
+    MAIN_DCommit();
 }
 static void MAIN_DetClose(const char* why)
 {
     if(!MAIN_Det) return;
+    if(MAIN_StepCount > 1 && MAIN_TCps > 1000)
+    {
+        uint64_t end = DIAG_Tsc();
+        MAIN_D("Start-up time per step:\n");
+        for(int i = 0; i < MAIN_StepCount; ++i)
+        {
+            uint64_t d = (i + 1 < MAIN_StepCount ? MAIN_StepTsc[i+1] : end) - MAIN_StepTsc[i];
+            MAIN_D("  %6lu ms  %s\n", (unsigned long)(d / (MAIN_TCps / 1000)), MAIN_StepName[i]);
+        }
+        MAIN_D("  %6lu ms  total\n", (unsigned long)((end - MAIN_StepTsc[0]) / (MAIN_TCps / 1000)));
+    }
     MAIN_D("---- %s (last step: %s)\n", why, MAIN_DetStage);
     fclose(MAIN_Det); MAIN_Det = NULL;
 }
@@ -991,19 +1012,29 @@ static void MAIN_DetOptions(const char* title)
 }
 static void MAIN_CPrintf(int color, const char* fmt, ...)
 {
+    /* cprintf-style output does not turn '\n' into CR+LF. Until beta.72 only a '\n' at the very end got its
+     * CR, so a message with a line break in the middle (the USB pad hint) started its second line where the
+     * first one ended; and a message under 2 characters read buf[-1]. Every bare LF now becomes CR+LF. */
     char buf[2048]; //limit for cprintf (DJGPP): 2048
+    char out[2048 + 64];
     va_list aptr;
     va_start(aptr, fmt);
     int n = vsnprintf(buf, sizeof(buf), fmt, aptr);
     va_end(aptr);
-    int crlf = strcmp(buf+n-2,"\r\n") == 0 || strcmp(buf+n-2,"\n\r") == 0;
-    int lf = !crlf && buf[n-1] == '\n';
-    buf[n-2] = crlf ? '\0' : buf[n-2];
-    buf[n-1] = lf ? '\0' : buf[n-1];
+    if(n < 0) return;
+    if(n >= (int)sizeof(buf)) n = sizeof(buf) - 1;
+    int o = 0, tail = 0; /* tail: the message ends in a line break, printed after the colour is reset */
+    while(n > 0 && (buf[n-1] == '\n' || buf[n-1] == '\r')) { tail |= buf[n-1] == '\n'; --n; }
+    for(int i = 0; i < n && o < (int)sizeof(out) - 3; ++i)
+    {
+        if(buf[i] == '\n' && (i == 0 || buf[i-1] != '\r') && (i + 1 >= n || buf[i+1] != '\r')) out[o++] = '\r';
+        out[o++] = buf[i];
+    }
+    out[o] = '\0';
     textcolor(color);
-    MAIN_PutStr(buf); //more safe with a fmt string, incase buf contains any fmt.
+    MAIN_PutStr(out); //more safe with a fmt string, incase buf contains any fmt.
     textcolor(LIGHTGRAY);
-    if(crlf || lf) MAIN_PutStr("\r\n");
+    if(tail) MAIN_PutStr("\r\n");
 }
 
 static void

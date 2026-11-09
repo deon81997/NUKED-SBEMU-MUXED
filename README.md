@@ -67,6 +67,10 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.73.** SBEMU loads more than **twice as fast**!! On
+a 366 MHz Celeron it went from 15 seconds to under 7. A ROM check was being redone almost every time by
+mistake, and now it isn't. Plus a garbled line on the start screen is fixed.
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.72.** MIDPLAY goes **3D**!! Press S until you get a
 little sound module with the synth's live display, a keyboard that lights up as the notes play, and dancing
 channel columns. And <kbd>F3</kbd> now switches the colour style in *every* program, not just the menu.

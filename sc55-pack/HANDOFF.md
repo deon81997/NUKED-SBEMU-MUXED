@@ -483,3 +483,20 @@
   note (MIDI events are sent from the same loop). F4 toggles half/full. TAB/B lists switch to text and back
   (modal_begin/modal_end); no VESA -> table view. Makefile: midplay links -lm and depends on tools/*.h.
 - 86Box Celeron 366: works, half resolution, shows the slow-PC note (expected).
+
+## beta.73-usb (2026-11-09): faster start-up, two bug fixes
+- 86Box Celeron 366, SC55.BAT-style start (/VMPU, mk1 ROMs): 15.1 s -> 6.9 s; plain batch start 15.4 -> 6.1 s.
+- ROMHASH.CAC kept missing: DJGPP stat() returned different st_mtime for the same file depending on the start
+  (Nov 7 23:30:08 vs Dec 14 03:06:34 seen), so every ROM was SHA-256'd again (~6 s). sc55synth.cpp file_stamp()
+  now uses the raw FAT date/time from the handle (_dos_getftime) on DJGPP; stat() elsewhere. Old caches get
+  rewritten once (stamp format changed).
+- rom_io.cpp unscramble(): lookup tables for the address/data bit shuffles (810M -> 50M instructions, hashes same).
+- Firmware boot default 4 -> 3 emulated s (sc55synth.cpp; measured ready: mk1 ~2.3 s, mkII ~2 s).
+- SBDETAIL.TXT: the disk commit (fsync, ~25 ms) now only at [step] lines and USB trace lines; other lines are
+  only fflush'd (option list alone was 1.9 s). New "Start-up time per step" table at the end (TSC-based).
+- MAIN_CPrintf: bare LF inside a message now becomes CR+LF (USB "Not found? Run USBTEST" line started in the
+  column where the previous line ended); no more buf[-1] read for messages under 2 chars.
+- TIMETEST "No MPU-401" without ROMs: not reproducible; with /VSCROM:C:\EMPTY SBEMU warns, keeps the MPU-401
+  (silent) and TIMETEST runs normally.
+- Remaining start-up: ~3.9 s SC-55 init (firmware boot = MCU+PCM emulation, PCM_Update 43%), ~1 s USB poll check.
+  A boot snapshot would remove most of the 3.9 s (needs mcu/submcu/timer/lcd/pcm/engine state serialised).

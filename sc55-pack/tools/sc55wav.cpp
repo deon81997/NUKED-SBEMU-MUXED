@@ -8,7 +8,7 @@
 //
 // Usage:  SC55WAV <rom-folder> [out.wav] [/S:romset] [/R:rate] [/G:gain%] [/B:boot-seconds] [/V] [/N]
 //   /S:  ROM set name (default auto)       /R:  output rate (default 48000)
-//   /G:  gain in percent (default 100)     /B:  seconds of firmware boot (default 4)
+//   /G:  gain in percent (default 100)     /B:  seconds of firmware boot (default 3)
 //   /V   show the speed graph in VGA 320x200 graphics (DOS only; any key returns)
 //   /N   no text graph
 //
