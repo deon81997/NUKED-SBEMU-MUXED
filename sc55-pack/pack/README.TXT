@@ -693,9 +693,10 @@ CONTENTS
       list; F writes a corrected copy (DUKE3D_.CUE) that uses the short
       name. The original CUE is never changed. A CUE with several BIN
       files cannot be mounted by uCDD: join them first (e.g. binmerge).
-      If uCDD says "The drive is locked or in use" when a disc is taken
-      out, close the program that uses drive M:; if that does not help,
-      restart the PC to change discs.
+      Since beta.71 CUE images with CD music can be taken out and changed
+      like ISOs (before, uCDD said "The drive is locked or in use" and
+      only a restart helped). The music stops when the disc is taken out.
+      If it still says so, a program has files open on drive M: - close it.
 
   C:\CDSET\CDIMG.BAT
          CDIMG                 list the images

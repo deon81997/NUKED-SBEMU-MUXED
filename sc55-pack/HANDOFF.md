@@ -443,3 +443,27 @@
     text corrected. The "a SoundFont would suit this PC better" warning overflowed the dialog - two lines now.
   - TIMETEST: SBEMU statistics line wrapped mid-word - fits in two lines now.
 - Not a bug (checked): Automatic setup leaves /VSCAUTO on (value index 0 = "1").
+
+## beta.71-usb (2026-11-09): CUE images can be unmounted
+- Repro (86Box): CDIMG TEST (CUE with audio) -> UCDD -unmount: "The drive is locked or in use." right after the mount,
+  nothing open; ISO fine. Clean uCDD a2/a3 mount-only builds from source unmount fine, but have no SBCDA1 mailbox,
+  so SBEMU /VCDA finds nothing ("no SBCDA1 box", PLAY AUDIO 8103).
+- The pack's UCDD.EXE (40757 bytes, from the user's original pack; patch source not found anywhere) sets the unit's
+  AUDIO_ENTRY [si+16h] to its mailbox handler on mounting an image with audio, and clears it (plus box state=0,
+  cmd=4 stop, gen++) in clear_unit - but kept the non-resident build's guards `cmp dword [si+16h],0 / jnz` in the
+  control function (op 2 -> 8002h) and in the IOCTL eject. scripts/ucdd-unmount-fix.py NOPs both (payload 3C1h,
+  6D2h).
+- 86Box with SBEMU /VCDA: TEST.CUE track 2 plays, CDIMG /U mid-track (box state 0 cmd 4, music stops), CDIMG DUKE3D,
+  track 2 plays again; CUE/CUE/ISO mount-unmount cycles all fine.
+- GPL note: uCDD is GPL-3.0; the SBCDA1 mailbox patch's source is not in this repo - should be recreated against
+  vorvek/uCDD source (a3) at some point.
+- Also checked (QEMU 8.2, FreeDOS + JEMMEX NOEMS + HDPMI32I + SBEMU /JOY:1, fakepad lx=+max ly=-max rx=-max A):
+  - INT 15h AH=84h (/JOYBIOS): J15 -> vector 0000:CF2C (hooked), DX=0: CF=0 AL=E0 (button 1 down), DX=1: AX=00FF
+    BX=00FF CX=0000 DX=0080 - matches the pad. QEMU's mkdisk needs testrig/rufus (sparse clone of pbatard/rufus
+    src/ms-sys/inc; not committed).
+  - Pad behind hubs, J15 values correct on: UHCI+hub, OHCI+hub, xHCI+hub, ICH9 EHCI+UHCI companions with a hub on
+    the EHCI port (QEMU's FS hub goes to a companion), UHCI with two hubs deep.
+  - Not testable in QEMU/86Box: FS pad behind a HS (USB 2.0) hub on EHCI = split transactions. Reviewed against
+    EHCI 1.0: QH C flag on FS/LS control, Mult 1, hub addr/port from the nearest HS hub (ports 1-based), async split
+    S-mask 0, periodic S-mask 01h / C-mask 1Ch (Linux's pattern), overlay split state zeroed, hub port speed bits
+    9/10. Looks right; needs a real USB 2.0 hub (USBTEST shows the TT hub/port).
