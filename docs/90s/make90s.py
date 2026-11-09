@@ -12,8 +12,12 @@ F = lambda n, s: ImageFont.truetype(FD + n, s)
 random.seed(1996)
 
 
+SCALE = 2  # every graphic is drawn at 1x and stored at 2x with hard pixel edges (sharp on any screen)
+
+
 def save(frames, name, ms=120):
-    frames = [f.convert('P', palette=Image.ADAPTIVE, colors=64) if f.mode != 'P' else f for f in frames]
+    frames = [f.convert('RGB').resize((f.width * SCALE, f.height * SCALE), Image.NEAREST) for f in frames]
+    frames = [f.convert('P', palette=Image.ADAPTIVE, colors=64) for f in frames]
     frames[0].save(os.path.join(OUT, name), save_all=len(frames) > 1, append_images=frames[1:],
                    duration=ms, loop=0, optimize=True, disposal=2)
 

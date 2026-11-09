@@ -1,6 +1,11 @@
 <div align="center">
 
-<img src="docs/90s/title.gif" width="720" alt="NUKED SB-EMU">
+<table>
+<tr>
+<td align="center" valign="top"><img src="docs/90s/fd-marine-shoot.gif" alt="Freedoom marine"><br><br><img src="docs/90s/tux-waddle.gif" width="120" alt="Tux"><br><br><img src="docs/90s/fd-soulsphere.gif" alt="soul sphere"></td>
+<td align="center">
+
+<img src="docs/90s/title.gif" width="560" alt="NUKED SB-EMU">
 
 <h2>~*~ Welcome to my DOS Sound Page!!! ~*~</h2>
 
@@ -8,7 +13,7 @@
 
 <br><br>
 
-<img src="docs/90s/construction.gif" alt="Under construction">
+<img src="docs/90s/construction.gif" width="300" alt="Under construction">
 
 <br>
 
@@ -22,6 +27,11 @@
 <img src="docs/90s/btn-dos.gif" alt="Powered by DOS 7.1">
 
 <br><br>
+
+</td>
+<td align="center" valign="top"><img src="docs/90s/fd-serpentipede-attack.gif" alt="Freedoom serpentipede"><br><br><img src="docs/90s/mascot-canvaskid.gif" width="120" alt="Canvas Kid"><br><br><img src="docs/90s/fd-keycard.gif" alt="keycard"></td>
+</tr>
+</table>
 
 <b>Release counter:</b><br>
 <img src="docs/90s/counter.gif" alt="000071"><br>
@@ -41,6 +51,8 @@
 <a href="#-download-zone-">Downloads</a> |
 <a href="#-sign-my-guestbook-">Guestbook</a> ]</b>
 
+<img src="docs/90s/parade.gif" width="100%" alt="A parade of Freedoom monsters, the marine and Flopsy">
+
 <img src="docs/90s/bar.gif" width="600" alt="">
 
 </div>
@@ -51,7 +63,7 @@
 
 <div align="center"><sub><i>^^^ the main menu, running in plain DOS ^^^</i></sub></div>
 
----
+<div align="center"><img src="docs/90s/fd-marine-walk.gif" alt=""> <img src="docs/90s/ic-news.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-news.gif" alt=""> <img src="docs/90s/fd-serpentipede.gif" alt=""></div>
 
 ## ★ What's NEW!! ★
 
@@ -92,7 +104,7 @@ And since beta.68, with automatic speed control on (the default), the synth
 never takes more than about 60% of the CPU, so your game always gets the rest.
 </details>
 
-<div align="center"><img src="docs/90s/bar.gif" width="600" alt=""></div>
+<div align="center"><img src="docs/90s/fd-zombie.gif" alt=""> <img src="docs/90s/ic-sparkle.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-sparkle.gif" alt=""> <img src="docs/90s/mascot-flopsy.gif" alt=""></div>
 
 ## ★ What is this?? ★
 
@@ -116,7 +128,7 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 > **ROMs are NOT included!!** Bring your own SC-55 (and MT-32 / CM-32L) dumps.
 > They're recognised by what's inside them, so the file names don't matter.
 
-<div align="center"><img src="docs/90s/bar.gif" width="600" alt=""></div>
+<div align="center"><img src="docs/90s/fd-hatchling.gif" alt=""> <img src="docs/90s/ic-speaker.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-speaker.gif" alt=""> <img src="docs/90s/fd-soulsphere.gif" alt=""></div>
 
 ## ★ Cool Features ★
 
@@ -188,7 +200,7 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 - See [`README98.TXT`](sc55-pack/pack/README98.TXT)
 </details>
 
-<div align="center"><img src="docs/90s/bar.gif" width="600" alt=""></div>
+<div align="center"><img src="docs/90s/fd-worm.gif" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/fd-trilobite.gif" alt=""></div>
 
 ## ★ Will it run on my PC?? ★
 
@@ -223,7 +235,7 @@ emulated CPU, and that always runs at full speed.)
 | **DOS** | MS-DOS 6.22 / 7.x or FreeDOS, plain DOS | Windows 98 "Restart in MS-DOS mode" |
 | **Disk** | about 25 MB, more for disc images | |
 
-<div align="center"><img src="docs/90s/bar.gif" width="600" alt=""></div>
+<div align="center"><img src="docs/90s/fd-potion.gif" alt=""> <img src="docs/90s/ic-rocket.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-rocket.gif" alt=""> <img src="docs/90s/mascot-flopsy.gif" alt=""></div>
 
 ## ★ Getting Started ★
 
@@ -252,7 +264,7 @@ Duke-style games by itself.
 The `README.TXT` in the pack is the full manual.
 </details>
 
-<div align="center"><img src="docs/90s/bar.gif" width="600" alt=""></div>
+<div align="center"><img src="docs/90s/fd-marine-walk.gif" alt=""> <img src="docs/90s/ic-pad.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-pad.gif" alt=""> <img src="docs/90s/fd-keycard.gif" alt=""></div>
 
 ## ★ USB Gamepads in DOS?!? ★
 
@@ -274,7 +286,7 @@ ask the BIOS for the joystick get the pad too.
 Works on my D810. Hubs are tested in QEMU on every controller type; a pad
 behind a USB 2.0 hub on a USB 2.0 port still needs a real-hardware test.
 
-<div align="center"><img src="docs/90s/bar.gif" width="600" alt=""></div>
+<div align="center"><img src="docs/90s/mascot-canvaskid.gif" width="96" alt=""> <img src="docs/90s/ic-speaker.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-speaker.gif" alt=""> <img src="docs/90s/fd-serpentipede.gif" alt=""></div>
 
 ## ★ Supported Sound Chips ★
 
@@ -323,22 +335,78 @@ works for some people.
 > [!TIP]
 > Not sure what's in your PC? Boot DOS and run `SBEMU` once. It tells you the chip it found.
 
-<div align="center"><img src="docs/90s/bar.gif" width="600" alt=""></div>
+<div align="center"><img src="docs/90s/fd-hatchling.gif" alt=""> <img src="docs/90s/ic-camera.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-camera.gif" alt=""> <img src="docs/90s/fd-zombie.gif" alt=""></div>
 
 ## ★ Screenshots!! ★
 
+<div align="center">
+
+<b>The menu in all seven styles</b> (Groovy, Classic, Sunset, Ocean, Neon, Candy, Midnight)<br>
+<img src="docs/shots/menu-styles.gif" width="750" alt="The text menu cycling through its seven styles">
+
+<br><br>
+
+<b>...or in 3D!</b> 640×480 VESA, drawn by the CPU, no 3D card needed. <kbd>F3</kbd> switches the look:
+
 <table>
 <tr>
-<td align="center"><img src="docs/cd-images-groovy.png" width="400"><br><sub>CD images, <i>Groovy</i> style</sub></td>
-<td align="center"><img src="docs/cd-images-classic.png" width="400"><br><sub>Same screen, <i>Classic</i> style</sub></td>
-</tr>
-<tr>
-<td align="center"><img src="docs/cd-files.png" width="400"><br><sub>Files on a disc image, read without mounting it</sub></td>
-<td align="center"><img src="docs/win98-settings.png" width="400"><br><sub>Windows 98 settings, shared with DOS</sub></td>
+<td align="center"><img src="docs/shots/menu-3d-panels.png" width="280"><br><sub><i>Panels</i>: raised buttons</sub></td>
+<td align="center"><img src="docs/shots/menu-3d-carousel.png" width="280"><br><sub><i>Carousel</i>: cards on a turning ring</sub></td>
+<td align="center"><img src="docs/shots/menu-3d-module.png" width="280"><br><sub><i>Module</i>: a sound module whose LCD and knob are the menu</sub></td>
 </tr>
 </table>
 
-<div align="center"><img src="docs/90s/bar.gif" width="600" alt=""></div>
+<b>MIDPLAY</b>, the MIDI player, live off the SC-55:
+
+<table>
+<tr>
+<td align="center"><img src="docs/shots/midplay-panel.png" width="420"><br><sub>front panel view: the emulated SC-55 display, live</sub></td>
+<td align="center"><img src="docs/shots/midplay-channels.png" width="420"><br><sub>channel view: instruments, levels and held notes</sub></td>
+</tr>
+</table>
+
+<b>Settings, Automatic setup and the tests</b>:
+
+<table>
+<tr>
+<td align="center"><img src="docs/shots/settings.png" width="420"><br><sub>SETTINGS: every option on one screen</sub></td>
+<td align="center"><img src="docs/shots/automatic-setup.png" width="420"><br><sub>Automatic setup measures your CPU and picks the settings</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/shots/timetest.png" width="420"><br><sub>TIMETEST: timer and render-speed check</sub></td>
+<td align="center"><img src="docs/shots/sbdiag.png" width="420"><br><sub>SBDIAG: what SBEMU found and uses</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/shots/gametest.png" width="420"><br><sub>GAMETEST: runs your games and finds their best settings</sub></td>
+<td align="center"><img src="docs/main-menu.png" width="420"><br><sub>the main menu, <i>Sunset</i> style</sub></td>
+</tr>
+</table>
+
+<b>The virtual CD drive</b>:
+
+<table>
+<tr>
+<td align="center"><img src="docs/shots/cd-images-midnight.png" width="420"><br><sub>CD images, <i>Midnight</i> style: tracks, CD music, fixes</sub></td>
+<td align="center"><img src="docs/cd-images-groovy.png" width="420"><br><sub>CD images, <i>Groovy</i> style</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/cd-files.png" width="420"><br><sub>files on a disc image, read without mounting it</sub></td>
+<td align="center"><img src="docs/cd-images-classic.png" width="420"><br><sub>CD images, <i>Classic</i> style</sub></td>
+</tr>
+</table>
+
+<b>USB pads and Windows 98</b>:
+
+<table>
+<tr>
+<td align="center"><img src="docs/joytest.png" width="420"><br><sub>JOYTEST: what games see from your USB pad</sub></td>
+<td align="center"><img src="docs/win98-settings.png" width="420"><br><sub>Windows 98 settings, shared with DOS</sub></td>
+</tr>
+</table>
+
+</div>
+
+<div align="center"><img src="docs/90s/fd-potion.gif" alt=""> <img src="docs/90s/ic-cd.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-cd.gif" alt=""> <img src="docs/90s/fd-soulsphere.gif" alt=""></div>
 
 ## ★ Download Zone ★
 
@@ -362,7 +430,7 @@ works for some people.
 | **GSCDROM.SYS** (LG) | LG drives XCDROM doesn't like (optional) | [DOS Days](https://www.dosdays.co.uk/topics/Software/optical_downloads.php) | `FILES\GSCDROM` |
 | **QEMM 8 / 9** | `SC55QMM.BAT` only (optional) | Out of print; JEMMEX + QPIEMU (included) does the same job | `FILES\QEMM` |
 
-<div align="center"><img src="docs/90s/bar.gif" width="600" alt=""></div>
+<div align="center"><img src="docs/90s/mascot-flopsy.gif" alt=""> <img src="docs/90s/ic-news.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-news.gif" alt=""> <img src="docs/90s/fd-worm.gif" alt=""></div>
 
 ## ★ Sign My Guestbook! ★
 
@@ -379,7 +447,7 @@ settings, SBEMU's messages and test results. Attach it and tell me what you
 were doing. If SBEMU hung, the last `[step]` line in `SBDETAIL.TXT` shows
 exactly where.
 
-<div align="center"><img src="docs/90s/bar.gif" width="600" alt=""></div>
+<div align="center"><img src="docs/90s/fd-trilobite.gif" alt=""> <img src="docs/90s/ic-computer.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-computer.gif" alt=""> <img src="docs/90s/fd-marine-shoot.gif" alt=""></div>
 
 ## ★ For the Nerds: Source Code ★
 
@@ -413,7 +481,7 @@ needs MinGW-w64 i686, Open Watcom 2 and JWasm; see
 tested, what still needs real hardware. The 90s graphics on this page are
 drawn by [`docs/90s/make90s.py`](docs/90s/make90s.py).
 
-<div align="center"><img src="docs/90s/bar.gif" width="600" alt=""></div>
+<div align="center"><img src="docs/90s/tux-waddle.gif" width="96" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/mascot-canvaskid.gif" width="96" alt=""></div>
 
 ## ★ Thanks To My Friends ★
 
@@ -451,6 +519,17 @@ The whole thing is **GPL-2.0-or-later** ([`COPYING`](sc55-pack/COPYING)).
 | SHSUCDX | **Jason Hood** ([shsucd](https://github.com/adoxa/shsucd)), from v1.4b by **John McCoy** | freeware, source available |
 | XCDROM | **Jack R. Ellis** | GPL, source in the zip |
 | [CuteMouse](https://cutemouse.sourceforge.net/) 2.1b4 | **Nagy Daniel**, **Arkady V. Belousov**, 2.1 betas by **Eric Auer**, and contributors | GPL-2.0, source in the zip |
+</details>
+
+<details open>
+<summary><b>&gt;&gt; The characters on this page &lt;&lt;</b></summary>
+
+| Who | Authors | Licence |
+|---|---|---|
+| The marine, serpentipede, hatchling, zombie, trilobite, worm, soul sphere, potion and keycard | **Contributors to the [Freedoom](https://freedoom.github.io/) project** (sprites from [freedoom/freedoom](https://github.com/freedoom/freedoom)) | BSD-3-Clause, [`docs/90s/src/FREEDOOM-COPYING.txt`](docs/90s/src/FREEDOOM-COPYING.txt) |
+| Tux the penguin | **Larry Ewing** (lewing@isc.tamu.edu), made with The GIMP | free to use with credit, [`docs/90s/src/TUX-COPYING.txt`](docs/90s/src/TUX-COPYING.txt) |
+| Flopsy, the Canvas Kid, buttons, signs and icons | drawn for this page by [`make90s.py`](docs/90s/make90s.py) and [`sprites90s.py`](docs/90s/sprites90s.py) | GPL-2.0+ like the rest |
+
 </details>
 
 Not shipped, belonging to their owners: MSCDEX and MOUSE.COM (Microsoft),
