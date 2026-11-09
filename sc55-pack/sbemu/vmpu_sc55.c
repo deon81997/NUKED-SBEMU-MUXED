@@ -487,6 +487,9 @@ static int16_t Fifo[FIFO_FRAMES * 2];
 static int Fifo_Head, Fifo_Count, Fifo_Freq, Fifo_Synth = -1;
 static unsigned long Fifo_Underruns;     /* frames that had to be filled with silence */
 static int Fifo_TargetMs = 50, Fifo_BudgetUs = 2000;
+static unsigned long long Fifo_LastT0;   /* start of the previous render, for the CPU ceiling */
+static unsigned long Fifo_DutyCuts;      /* interrupts that stopped short of the sound that was due */
+static long long Fifo_Credit;            /* CPU cycles the synth may still use (CPU ceiling) */
 
 static void Fifo_RenderInto(int16_t* dst, int n, int freq)
 {
@@ -499,7 +502,7 @@ void VMPU_SetAhead(int ms) { Fifo_TargetMs = ms; Fifo_Head = Fifo_Count = 0; }
 
 void VMPU_GenSamples(int16_t* pcm16, int samples, int freq, BOOL domix)
 {
-    unsigned long long t0, deadline, spent = 0;
+    unsigned long long t0, deadline, hardline, spent = 0;
     int rendered = 0, target, i, slice;
     if (samples <= 0 || freq <= 0) return;
     if (VMPU_UseMT32 ? !MT32_IsLoaded() : (!VMPU_UseSF && !SC55_IsLoaded())) return;
@@ -559,6 +562,22 @@ void VMPU_GenSamples(int16_t* pcm16, int samples, int freq, BOOL domix)
 
     t0 = Gov_Tsc();
     deadline = t0 + (unsigned long long)(Gov_CyclesPerSec > 0 ? Gov_CyclesPerSec * Fifo_BudgetUs / 1e6 : 4e6);
+    hardline = deadline + (deadline - t0) / 2;
+    /* CPU ceiling: the budget above is a fixed time per interrupt, but interrupts can come every ~4 ms, and on
+     * a CPU too slow for the synth one 1 ms slice can cost 4 ms. The sound interrupt then took 98% of the CPU
+     * and the game hardly ran (Dark Forces' iMUSE setup, Test Music with the SC-55: it crawled and looked
+     * frozen, and a key press then overflowed DOS's interrupt stacks). So rendering runs on a credit: every
+     * interrupt earns 60% of the time since the previous one and each slice spends what it cost. When the
+     * credit is used up the interrupt renders nothing more - the music stutters and drags on such a PC, but
+     * the game keeps at least 40% of the CPU. Fast PCs never come near the limit. /VSCAUTO:0 turns it off. */
+    if (Fifo_LastT0 && t0 > Fifo_LastT0 && Gov_CyclesPerSec > 0 && t0 - Fifo_LastT0 < (unsigned long long)(Gov_CyclesPerSec / 10))
+    {
+        long long cap = (long long)(Gov_CyclesPerSec * 0.006);          /* save up at most 6 ms */
+        Fifo_Credit += (long long)((t0 - Fifo_LastT0) * 60 / 100);
+        if (Fifo_Credit > cap) Fifo_Credit = cap;
+    }
+    else Fifo_Credit = (long long)(Gov_CyclesPerSec > 0 ? Gov_CyclesPerSec * 0.004 : 0); /* start, or after a pause */
+    Fifo_LastT0 = t0;
     for (;;)
     {
         unsigned long long now = Gov_Tsc();
@@ -567,16 +586,24 @@ void VMPU_GenSamples(int16_t* pcm16, int samples, int freq, BOOL domix)
         int tail, contig, n;
         if (!want) break;
         if (!need && now >= deadline) break;      /* reserve is optional: keep the interrupt short */
-        if (need && now >= deadline + (deadline - t0) / 2) break; /* hopeless: give up, play silence */
+        if (need && now >= hardline) { ++Fifo_DutyCuts; break; } /* hopeless: give up, play silence */
         tail = (Fifo_Head + Fifo_Count) & (FIFO_FRAMES - 1);
         contig = FIFO_FRAMES - tail;
         n = target - Fifo_Count;
         if (n > slice) n = slice;
         if (n > contig) n = contig;
+        if (Gov_On && Gov_CyclesPerSec > 0 && Fifo_Credit <= 0) { if (need) ++Fifo_DutyCuts; break; } /* CPU ceiling (off with /VSCAUTO:0) */
+        if (Gov_On && Gov_CyclesPerSec > 0 && Cap_CyclesPerFrameQ8)   /* a smaller slice when little credit is left */
+        {
+            long long fit = (Fifo_Credit << 8) / (long long)Cap_CyclesPerFrameQ8;
+            if (fit < n) n = fit < 16 ? 16 : (int)fit;
+            if (n > contig) n = contig;
+        }
         {
             unsigned long long s0 = Gov_Tsc();
             Fifo_RenderInto(Fifo + 2 * tail, n, freq);
-            spent += Gov_Tsc() - s0;
+            s0 = Gov_Tsc() - s0;
+            spent += s0; Fifo_Credit -= (long long)s0;
         }
         Fifo_Count += n; rendered += n;
     }

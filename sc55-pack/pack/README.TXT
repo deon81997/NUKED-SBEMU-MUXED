@@ -513,7 +513,11 @@ CONTENTS
                            cannot render the SC-55 in real time, SBEMU sheds
                            reverb/chorus, so games keep their
                            timer (otherwise their music runs slow). It adds
-                           the load back when there is room. 0 = off
+                           the load back when there is room. On a PC much
+                           too slow for the SC-55 it also keeps the music to
+                           at most 60% of the CPU (since beta.68): the music
+                           stutters, but the game keeps running instead of
+                           crawling (Dark Forces' IMUSE setup froze). 0 = off
      /VSCAHEAD:ms          render the music this many ms ahead (default 50),
                            so each sound interrupt stays short and games keep
                            their timer. 0 = off (render inside each interrupt)

@@ -398,3 +398,16 @@
   under SBEMU's feet. beta.66 SBEMU itself loaded there (it got that far).
 - USBTEST refuses to start when an MPU-401 answers (mpu_find: SBEMU), /F overrides; README note. 86Box: runs before
   SC55.BAT, refuses after.
+
+## beta.68-usb (2026-11-09): Dark Forces IMUSE.EXE (setup) "freezes" with the SC-55
+- Repro (86Box, Celeron 366 and 533): General MIDI, port 330, Test Music -> never shows "Testing music"; a key
+  press then halts DOS with "Internal stack overflow" (8 nested BIOS INT 09 frames at F000:ADFC, DOS STACKS full).
+- Not the cause (each tested): /VTIMER:0, /JOY:0, PC-speaker traps, STACKS size, HDPMI (HDPMI alone + 86Box MPU
+  works), MPU semantics (SBEMU loaded with /P:300 + 86Box's own MPU at 330 works), /VSCVOICES:4.
+- Cause: once the SC-55 plays, the sound ISR took 98% of the CPU (on-screen gauge: 257 irq/s, up to 5.4 ms each;
+  idle 1%). One 1 ms render slice cost ~4 ms there; the FIFO's fixed 2-3 ms per-interrupt budget always allowed
+  it, so the game starved: iMUSE sent ~3 MIDI bytes/s, and its BIOS keyboard handler (EOI then STI) nested.
+- Fix (vmpu_sc55.c VMPU_GenSamples): CPU credit - each interrupt earns 60% of the time since the previous one,
+  each slice spends its cost, slices shrink to the credit left, none when it is used up. /VSCAUTO:0 disables it.
+  After: Test Music runs to the end and returns, keys work. Fast PCs never reach the ceiling.
+- Debug aids used (not in the build): /tmp/df-debug.patch (DOS STACKS probe, MPU access ring, ISR load gauge).
