@@ -89,6 +89,27 @@ static const uint8_t hid_cfg_desc[HID_CFG_LEN] = {
 };
 static const char *const hid_strings[] = { "DragonRise Inc.", "Generic   USB  Joystick" };
 
+/* USB boot mouse driven by the state file: lx / ly = movement per report, buttons = button bits (hex),
+   rx = how many reports to send after each change of the file (then quiet) */
+static const uint8_t ms_report_desc[] = {
+    0x05, 0x01, 0x09, 0x02, 0xa1, 0x01, 0x09, 0x01, 0xa1, 0x00, 0x05, 0x09, 0x19, 0x01, 0x29, 0x03,
+    0x15, 0x00, 0x25, 0x01, 0x95, 0x03, 0x75, 0x01, 0x81, 0x02, 0x95, 0x01, 0x75, 0x05, 0x81, 0x01,
+    0x05, 0x01, 0x09, 0x30, 0x09, 0x31, 0x15, 0x81, 0x25, 0x7f, 0x75, 0x08, 0x95, 0x02, 0x81, 0x06,
+    0xc0, 0xc0
+};
+static const uint8_t ms_dev_desc[18] = {
+    18, 0x01, 0x10, 0x01, 0x00, 0x00, 0x00, 8,
+    0x6d, 0x04, 0x77, 0xc0, 0x00, 0x01, 1, 2, 0, 1
+};
+#define MS_CFG_LEN (9 + 9 + 9 + 7)
+static const uint8_t ms_cfg_desc[MS_CFG_LEN] = {
+    9, 0x02, MS_CFG_LEN, 0x00, 1, 1, 0, 0xa0, 0x32,
+    9, 0x04, 0, 0, 1, 0x03, 0x01, 0x02, 0,
+    9, 0x21, 0x11, 0x01, 0x00, 0x01, 0x22, sizeof(ms_report_desc), 0x00,
+    7, 0x05, 0x81, 0x03, 0x04, 0x00, 10
+};
+static const char *const ms_strings[] = { "Logitech", "USB Optical Mouse" };
+
 typedef struct xpad_t {
     usb_dev_t usb;
     int       index;
@@ -103,6 +124,7 @@ typedef struct xpad_t {
     int       have_sent;
     int       kind;                     /* 0 Xbox 360, 1 Xbox One, 2 HID gamepad */
     int       started, seq, guide_sent; /* Xbox One: power-on packet received; packet counter; Xbox button sent */
+    int       gen, mgen, mleft;         /* mouse: file version, the one being sent, reports left */
 } xpad_t;
 
 static void
@@ -124,6 +146,7 @@ xpad_read_state(xpad_t *dev)
         return;
     buf[fread(buf, 1, sizeof(buf) - 1, f)] = 0;
     fclose(f);
+    dev->gen++;
     dev->lx = dev->ly = dev->rx = dev->ry = 0;
     dev->lt = dev->rt = 0;
     dev->buttons = 0;
@@ -151,6 +174,10 @@ xpad_control(usb_dev_t *usb, const uint8_t *setup, uint8_t *data)
 {
     xpad_t *dev = (xpad_t *) usb->priv;
 
+    if ((dev->kind == 3) && (setup[0] == 0x81) && (setup[1] == 0x06) && (setup[3] == 0x22)) {
+        memcpy(data, ms_report_desc, sizeof(ms_report_desc));
+        return sizeof(ms_report_desc);
+    }
     if ((dev->kind == 2) && (setup[0] == 0x81) && (setup[1] == 0x06) && (setup[3] == 0x22)) {
         memcpy(data, hid_report_desc, sizeof(hid_report_desc));     /* HID report descriptor */
         return sizeof(hid_report_desc);
@@ -172,6 +199,16 @@ xpad_data_in(usb_dev_t *usb, int ep, uint8_t *buf, UNUSED(int maxlen))
     if (ep != 1)
         return USB_DATA_NAK;
     xpad_read_state(dev);
+    if (dev->kind == 3) {
+        if (dev->mgen != dev->gen) { dev->mgen = dev->gen; dev->mleft = dev->rx; }
+        if (dev->mleft <= 0)
+            return USB_DATA_NAK;
+        dev->mleft--;
+        buf[0] = (uint8_t) (dev->buttons & 7);
+        buf[1] = (uint8_t) (int8_t) dev->lx;
+        buf[2] = (uint8_t) (int8_t) dev->ly;
+        return 3;
+    }
     if (dev->kind == 1) {
         uint8_t  g[18];
         uint16_t b = dev->buttons;
@@ -285,7 +322,7 @@ xpad_init(const device_t *info)
     snprintf(dev->path, sizeof(dev->path), "%s", p ? p : (dev->index ? "xpad2.st" : "xpad1.st"));
     dev->mtime = -1;
     p          = getenv(dev->index ? "XPAD_KIND2" : "XPAD_KIND");
-    dev->kind  = (p && !strcmp(p, "one")) ? 1 : (p && !strcmp(p, "hid")) ? 2 : 0;
+    dev->kind  = (p && !strcmp(p, "one")) ? 1 : (p && !strcmp(p, "hid")) ? 2 : (p && !strcmp(p, "mouse")) ? 3 : 0;
 
     dev->usb.name      = dev->index ? "Xbox 360 Controller 2" : "Xbox 360 Controller";
     dev->usb.low_speed = 0;
@@ -298,6 +335,12 @@ xpad_init(const device_t *info)
         dev->usb.dev_desc = one_dev_desc;
         dev->usb.cfg_desc = one_cfg_desc;
         dev->usb.cfg_len  = ONE_CFG_LEN;
+    } else if (dev->kind == 3) {
+        dev->usb.dev_desc  = ms_dev_desc;
+        dev->usb.cfg_desc  = ms_cfg_desc;
+        dev->usb.cfg_len   = MS_CFG_LEN;
+        dev->usb.strings   = ms_strings;
+        dev->usb.n_strings = 2;
     } else if (dev->kind == 2) {
         dev->usb.dev_desc  = hid_dev_desc;
         dev->usb.cfg_desc  = hid_cfg_desc;

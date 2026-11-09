@@ -63,6 +63,89 @@ index 7c9e06c..d328202 100644
      } else if (!strcmp(argv[0], "hold")) {
          held = 1;
          respond_ok_time();
+diff --git a/src/device/kbc_at.c b/src/device/kbc_at.c
+index 8d99a14..0b922a1 100644
+--- a/src/device/kbc_at.c
++++ b/src/device/kbc_at.c
+@@ -110,6 +110,7 @@ typedef struct atkbc_t {
+     uint8_t channel;
+     uint8_t stat_hi;
+     uint8_t pending;
++    uint64_t ob_ready_at;   /* test rig KBC_OB_DELAY_US: D2h/D3h byte not in the output buffer before this */
+     uint8_t irq_state;
+     uint8_t do_irq;
+     uint8_t aux_delay;
+@@ -454,6 +455,7 @@ kbc_delay_to_ob(atkbc_t *dev, uint8_t val, uint8_t channel, uint8_t stat_hi)
+ }
+ 
+ static void kbc_at_process_cmd(void *priv);
++static uint64_t kbc_ob_delay_us;   /* test rig: $KBC_OB_DELAY_US */
+ 
+ static void
+ set_enable_kbd(atkbc_t *dev, uint8_t enable)
+@@ -572,6 +574,18 @@ at_main_ibf:
+             }
+             break;
+         case STATE_KBC_DELAY_OUT:
++            if (dev->ob_ready_at && (tsc < dev->ob_ready_at)) {
++                /* Test rig model of a slow embedded controller (Dell D810): the D2h/D3h byte is still on its
++                   way while the status already reads idle; a new command in that gap loses it. */
++                if (dev->status & STAT_IFULL) {
++                    dev->pending = 0;
++                    dev->ob_ready_at = 0;
++                    dev->state = STATE_MAIN_IBF;
++                    kbc_ibf_process(dev);
++                }
++                break;
++            }
++            dev->ob_ready_at = 0;
+             /* Keyboard controller command want to output a single byte. */
+             kbc_at_log("ATkbc: %02X coming from channel %i with high status %02X\n", dev->val, dev->channel, dev->stat_hi);
+             kbc_send_to_ob(dev, dev->val, dev->channel, dev->stat_hi);
+@@ -716,6 +730,18 @@ kbc_at_poll_ps2(atkbc_t *dev)
+                 dev->state = STATE_MAIN_AUX;
+             break;
+         case STATE_KBC_DELAY_OUT:
++            if (dev->ob_ready_at && (tsc < dev->ob_ready_at)) {
++                /* Test rig model of a slow embedded controller (Dell D810): the D2h/D3h byte is still on its
++                   way while the status already reads idle; a new command in that gap loses it. */
++                if (dev->status & STAT_IFULL) {
++                    dev->pending = 0;
++                    dev->ob_ready_at = 0;
++                    dev->state = STATE_MAIN_IBF;
++                    kbc_ibf_process(dev);
++                }
++                break;
++            }
++            dev->ob_ready_at = 0;
+             /* Keyboard controller command want to output a single byte. */
+             kbc_at_log("ATkbc: %02X coming from channel %i with high status %02X\n", dev->val, dev->channel, dev->stat_hi);
+             kbc_send_to_ob(dev, dev->val, dev->channel, dev->stat_hi);
+@@ -2678,11 +2704,13 @@ kbc_at_process_cmd(void *priv)
+             case 0xd2: /* write to keyboard output buffer */
+                 kbc_at_log("ATkbc: write to keyboard output buffer\n");
+                 kbc_delay_to_ob(dev, dev->ib, 0, 0x00);
++                if (kbc_ob_delay_us) dev->ob_ready_at = tsc + kbc_ob_delay_us * TIMER_USEC;
+                 break;
+ 
+             case 0xd3: /* write to auxiliary output buffer */
+                 kbc_at_log("ATkbc: write to auxiliary output buffer\n");
+                 kbc_delay_to_ob(dev, dev->ib, 2, 0x00);
++                if (kbc_ob_delay_us) dev->ob_ready_at = tsc + kbc_ob_delay_us * TIMER_USEC;
+                 break;
+ 
+             case 0xd4: /* write to auxiliary port */
+@@ -3000,6 +3028,10 @@ kbc_at_set_p2_write_hook(void *priv,
+ static void *
+ kbc_at_init(const device_t *info)
+ {
++    {   /* test rig: a slow D2h/D3h like the Dell D810's embedded controller */
++        const char *e = getenv("KBC_OB_DELAY_US");
++        kbc_ob_delay_us = e ? (uint64_t) atoi(e) : 0;
++    }
+     atkbc_t *dev;
+     int max_ports;
+ 
 diff --git a/src/include/86box/usb.h b/src/include/86box/usb.h
 index d321550..0bedf6a 100644
 --- a/src/include/86box/usb.h

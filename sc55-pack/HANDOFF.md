@@ -690,3 +690,14 @@
     The VxD rebuilt byte-identical to the committed WIP one, so the toolchain matches.
 - Next: real pad on the D810 / P5PE-VM (button numbers via the status line); DOS session: feed pad.cpp's format
   from usbpad.c and inject through vkbc.c (PLANNED, SHARED above).
+
+## mouse-flight-fix (paused 2026-11-09, not merged, not released)
+- vkbc.c fix (wait until a D2h/D3h byte has arrived and been read, or 4 ms) builds clean with DJGPP; not yet shown
+  to work: the 86Box test could not move the mouse at all, with or without the fix.
+- 86Box rig additions (testrig/86box): XPAD_KIND2=mouse = file-driven USB boot mouse (lx/ly per report, buttons hex,
+  rx = reports per file change; works in USBTEST), KBC_OB_DELAY_US = slow D2h/D3h model of the D810 (byte arrives
+  late while status reads idle; a new command in the gap loses it). VM u3 = u1 with JEMMEX only (no QPIEMU).
+- Open: under SBEMU (BIOS path in u3 and trap path in u1) the file-driven USB mouse never moved CTMOUSE/KMTEST, while
+  the PS/2 "touchpad" did. Next: count VKBC_UsbMouse calls / injected packets (debug build writing to INT 15h stub
+  bytes 12/15, read with a small COM), find why, then compare old vs fixed SBEMU at KBC_OB_DELAY_US=300.
+- Then: merge into main, next free beta number (pull first: beta.77 is the newest), release zip from release/.
