@@ -146,6 +146,18 @@ Windows-only options, in C:\SC55\WIN98\SC55W.INI under [SC55W]:
      BlockMs=10         size of each buffer block (5-50).
      RecordWav=C:\X.WAV also record everything played to a WAV file
                         (troubleshooting).
+     CpuMax=60          most of the CPU (percent, 20-95) the synth may use.
+                        When it cannot keep up the music lags or breaks up
+                        instead of Windows slowing down.
+     StartDelay=15      when it starts with Windows: seconds to wait before
+                        starting the synth, so the other startup programs
+                        get the CPU first (0 = start at once).
+
+If Windows froze while NUKED SB-EMU was starting, the next start with Windows
+is skipped and a message tells you at which step it stopped (in
+SC55W.INI [State] Step=). Start C:\SC55\WIN98\SC55W.EXE by hand, and if
+Windows freezes again, send C:\SC55\WIN98\SC55W.LOG: for its first minute
+it writes the load and priority every 5 seconds.
 
 
 -----------------------------------------------------------------------------

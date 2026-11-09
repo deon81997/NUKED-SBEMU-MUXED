@@ -474,7 +474,7 @@ int run_install(HINSTANCE inst)
         reg_set_str(HKEY_CURRENT_USER, MIDIMAP_KEY, "CurrentInstrument", MIDI_NAME);
         reg_set_dword(HKEY_CURRENT_USER, MIDIMAP_KEY, "UseScheme", 0);
     }
-    if (flags & 1) reg_set_str(HKEY_LOCAL_MACHINE, RUN_KEY, "SC55W", exe);
+    if (flags & 1) reg_set_str(HKEY_LOCAL_MACHINE, RUN_KEY, "SC55W", exe + " /BOOT");
     else reg_del_value(HKEY_LOCAL_MACHINE, RUN_KEY, "SC55W");
     if (flags & 4) {
         DWORD start = 0;

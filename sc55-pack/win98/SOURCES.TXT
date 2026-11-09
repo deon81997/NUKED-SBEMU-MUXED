@@ -12,8 +12,10 @@ SC55W - source code of the Windows 98 part of NUKED SB-EMU (GPL v2+)
              TinySoundFont tsf.h (MIT), as used from the SBEMU sources
 
 Also used, unmodified (get them from their projects):
-  Nuked-SC55, jcmoyer fork  https://github.com/jcmoyer/Nuked-SC55
-                            commit 66d12727cc43000d38094aaf2f76dc30cc93f448
+  Nuked-SC55               this repository's sc55-pack/upstream/Nuked-SC55
+                            (jcmoyer's fork 0.7.0 with our bit-exact speed-ups
+                            and ROM cache; build its src/backend/*.cpp and
+                            sha/sha224-256.c into $N/build98/*.o)
   Munt mt32emu              https://github.com/munt/munt
                             commit d885a95a2485ea6ebf723d7861244fb70aa2ab35
 

@@ -500,3 +500,22 @@
   (silent) and TIMETEST runs normally.
 - Remaining start-up: ~3.9 s SC-55 init (firmware boot = MCU+PCM emulation, PCM_Update 43%), ~1 s USB poll check.
   A boot snapshot would remove most of the 3.9 s (needs mcu/submcu/timer/lcd/pcm/engine state serialised).
+
+## beta.74-usb (2026-11-09): Windows 98 part catches up (first update since beta.38)
+- SC55W.EXE built against our Nuked-SC55 fork (beta.69 speed-ups + beta.73 ROM cache) instead of upstream jcmoyer.
+- CPU credit in the audio thread (like /VSCAUTO's beta.68 one in DOS): render time capped at CpuMax% (SC55W.INI,
+  default 60); render thread priority by load (HIGHEST < 50%, ABOVE_NORMAL < 85%, else NORMAL; was HIGHEST always).
+- Run key starts SC55W.EXE /BOOT: synth start waits StartDelay s (default 15) so Windows' startup isn't competing.
+- Freeze guard: SC55W.INI [State] Step= (vxd, attach, synth, wave, ok; INI flushed each time). A /BOOT start with
+  Step != ok is skipped with a message naming the step (then Step=ok so the next boot tries again). Normal exits
+  and Windows shutdown set ok. First 60 s: "trace:" line every 5 s (load, priority, throttled, underruns).
+- D810 "freezes a few seconds after boot" since beta.67 (user report): Win98 binaries were byte-identical since at
+  least beta.55, so the cause is on the machine (settings, other drivers). Not reproduced: 86Box P2-400 (SB16 PnP,
+  Daemon Tools 3.47, SC-55 at 160-365% load) stays responsive with the old and new build (resp.py: Notepad in
+  2.8-3.3 s). Waiting for the D810's SC55W.LOG; the guard now stops a boot loop and logs the step.
+- Build without the old /home/claude toolchain: MinGW-w64 from Ubuntu; Munt 2.8.5 (d885a95) static lib built by
+  hand (b98/config.h written by hand); SC-55 core from upstream/Nuked-SC55 (backend/config.h by hand). VxD and
+  SC55MIDI.DRV unchanged (Open Watcom/JWasm not set up this session) - reuse the beta.73 binaries.
+- Test rig: 86Box P2B-LS + SB16 PnP Win98 SE (QuickInstall stock image), emulation on 240/300; test builds with
+  -march=pentium2 (86Box has no SSE2 CPU). PLAYMID.EXE (no-CRT MIDI file player), resp.py (Start>Run notepad timer).
+  QEMU -cpu coreduo Win98 hung at the logo after hardware redetection (not pursued).

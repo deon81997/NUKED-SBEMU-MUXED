@@ -86,6 +86,21 @@ static void find_paths()
 // Windows-only settings (not SBEMU options, so they stay out of SBOPTS.TXT)
 static int ini_int(const char* key, int def) { return GetPrivateProfileIntA("SC55W", key, def, g_inipath.c_str()); }
 
+// Start-up step, kept in SC55W.INI [State] Step= and flushed to disk at once. If Windows
+// froze during a start, the step is still set at the next boot: that start is skipped
+// (no freeze loop) and the user is told where it stopped.
+static void set_step(const char* step)
+{
+    WritePrivateProfileStringA("State", "Step", step, g_inipath.c_str());
+    WritePrivateProfileStringA(NULL, NULL, NULL, g_inipath.c_str());   // flush the INI cache
+}
+static std::string get_step()
+{
+    char b[64];
+    GetPrivateProfileStringA("State", "Step", "", b, sizeof b, g_inipath.c_str());
+    return b;
+}
+
 // ---------------------------------------------------------------------------
 // shared state
 static HINSTANCE g_inst;
@@ -94,6 +109,7 @@ static CRITICAL_SECTION g_cs;
 static Options g_opt;                 // current saved options (UI thread)
 static Options g_pending;             // handed to the audio thread
 static volatile LONG g_have_pending, g_panic, g_quit;
+static bool g_boot;                 // started from the Run key (/BOOT): let Windows finish starting first
 static HANDLE g_vxd = INVALID_HANDLE_VALUE;
 static SC55W_SHARED* g_sh;
 static DWORD g_vxd_build;
@@ -339,6 +355,19 @@ static DWORD WINAPI audio_main(LPVOID)
     QueryPerformanceFrequency(&qf);
     std::string wave_err;
     int buf_ms = ini_int("BufferMs", 80);
+    // CPU credit (as SBEMU's /VSCAUTO in DOS, beta.68): the render thread may use at most
+    // CpuMax % of the time, so a synth that cannot keep up makes the music lag or break up
+    // instead of starving Windows (SC55W.INI CpuMax=, 20-95, default 60)
+    int cpu_max = ini_int("CpuMax", 60);
+    if (cpu_max < 20) cpu_max = 20;
+    if (cpu_max > 95) cpu_max = 95;
+    double credit = 0.1;                        // seconds of render time we may still spend
+    LARGE_INTEGER credit_t;
+    QueryPerformanceCounter(&credit_t);
+    int prio = THREAD_PRIORITY_NORMAL;
+    unsigned throttled = 0;
+    DWORD trace_start = GetTickCount(), trace_last = 0;
+    DWORD step_ok_at = 0;                       // 20 s after the sound runs the start counts as good
     if (buf_ms < 20) buf_ms = 20;
     if (buf_ms > 500) buf_ms = 500;
 
@@ -350,6 +379,7 @@ static DWORD WINAPI audio_main(LPVOID)
             SC55W_CONFIG a = config_for(want), b = config_for(cur);
             if (!have || memcmp(&a, &b, sizeof a)) {
                 publish_state("Connecting the Sound Blaster");
+                set_step("attach");
                 DWORD st = vxd_attach(want);
                 sh = attach_ok(st) ? g_sh : NULL;
                 EnterCriticalSection(&g_cs);
@@ -362,7 +392,19 @@ static DWORD WINAPI audio_main(LPVOID)
             Options eo = engine_opts(want);
             if (!have || want.rate != cur.rate || !eng.apply_live(eo)) {
                 wave_close();
+                if (g_boot && !have) {
+                    // started with Windows: the SC-55 boot is heavy, so let the other startup
+                    // programs finish first (SC55W.INI StartDelay=, seconds, 0 = off)
+                    int d = ini_int("StartDelay", 15);
+                    if (d > 120) d = 120;
+                    if (d > 0) {
+                        publish_state("Waiting for Windows to finish starting");
+                        logf("start delay %d s", d);
+                        for (int i = 0; i < d * 4 && !g_quit; i++) Sleep(250);
+                    }
+                }
                 publish_state("Starting the synth");
+                set_step("synth");
                 SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
                 eng.setup(eo, resolve(want.scrom), want.rate, eo.scahead);
                 rec_open(want.rate);
@@ -398,6 +440,7 @@ static DWORD WINAPI audio_main(LPVOID)
                 continue;
             }
             last_wave_try = now;
+            if (step_ok_at == 0) set_step("wave");
             if (!wave_open(cur.rate, buf_ms, wave_err)) {
                 if (wave_err != g_pub.wave_error) logf("%s", wave_err.c_str());
                 EnterCriticalSection(&g_cs);
@@ -411,7 +454,8 @@ static DWORD WINAPI audio_main(LPVOID)
             g_pub.buf_ms = buf_ms;
             LeaveCriticalSection(&g_cs);
             publish_state("Running");
-            SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+            prio = THREAD_PRIORITY_ABOVE_NORMAL;
+            SetThreadPriority(GetCurrentThread(), prio);
         }
 
         if (InterlockedExchange(&g_panic, 0)) {
@@ -428,10 +472,20 @@ static DWORD WINAPI audio_main(LPVOID)
             if (!(h.dwFlags & WHDR_DONE)) continue;
             LARGE_INTEGER t0, t1;
             QueryPerformanceCounter(&t0);
+            credit += (double)(t0.QuadPart - credit_t.QuadPart) / qf.QuadPart * cpu_max / 100.0;
+            credit_t = t0;
+            if (credit > 0.1) credit = 0.1;
+            if (credit < 0) {                           // used up: give the time back to Windows
+                throttled++;
+                DWORD ms = (DWORD)(-credit * 1000 * 100 / cpu_max) + 1;
+                Sleep(ms > 50 ? 50 : ms);
+                break;                                  // the waveOut event wakes us again
+            }
             eng.render(sh, vxd_now(), g_buf[i].data(), g_blk);
             QueryPerformanceCounter(&t1);
             rec_write(g_buf[i].data(), g_blk);
             double used = (double)(t1.QuadPart - t0.QuadPart) / qf.QuadPart;
+            credit -= used;
             double l = used * cur.rate / g_blk;
             load = load * 0.97 + l * 0.03;
             h.dwFlags &= ~WHDR_DONE;
@@ -458,8 +512,21 @@ static DWORD WINAPI audio_main(LPVOID)
             shed = false;
         }
         eng.st.fx_shed = shed;
-        // the CPU cannot keep up: always leave some time for everything else
-        if (load > 0.9) Sleep(load > 1.2 ? 10 : 2);
+        // priority by load: "highest" only while the synth is light, so a heavy one can
+        // never lock Windows up (the credit above caps the time it takes in any case)
+        if (g_wo) {
+            int want = load < 0.5 ? THREAD_PRIORITY_HIGHEST : load < 0.85 ? THREAD_PRIORITY_ABOVE_NORMAL
+                                                                          : THREAD_PRIORITY_NORMAL;
+            if (want != prio) { prio = want; SetThreadPriority(GetCurrentThread(), prio); }
+        }
+        if (g_wo && !step_ok_at) step_ok_at = now + 20000;
+        if (step_ok_at > 1 && (int32_t)(now - step_ok_at) >= 0) { set_step("ok"); step_ok_at = 1; logf("start-up complete"); }
+        // the first minute after start: a trace every 5 s (a freeze then leaves its last line)
+        if (now - trace_start < 60000 && now - trace_last >= 5000) {
+            trace_last = now;
+            logf("trace: load %d%%, priority %d, throttled %u, underruns %u, %s", (int)(load * 100), prio, throttled,
+                 underruns, eng.st.midi_idle ? "synth idle" : "synth running");
+        }
 
         {   // every 30 s, when something went wrong since the last line: a trace in SC55W.LOG
             static DWORD last_log; static unsigned lu, ll, lr;
@@ -540,7 +607,7 @@ static void autostart_set(bool on)
     if (on) {
         char b[MAX_PATH];
         GetModuleFileNameA(NULL, b, sizeof b);
-        std::string v = short_path(b);
+        std::string v = short_path(b) + " /BOOT";
         RegSetValueExA(k, "SC55W", 0, REG_SZ, (const BYTE*)v.c_str(), (DWORD)v.size() + 1);
     } else {
         RegDeleteValueA(k, "SC55W");
@@ -1026,6 +1093,7 @@ static void shutdown_all()
     g_stopped = true;
     InterlockedExchange(&g_quit, 1);
     logf("exit requested");
+    set_step("ok");             // a normal exit (or Windows shutting down) is not a freeze
     if (g_thread) {
         SetEvent(g_wev);
         if (WaitForSingleObject(g_thread, 5000) == WAIT_TIMEOUT) { logf("audio thread did not stop"); TerminateThread(g_thread, 0); }
@@ -1101,6 +1169,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR cmd, int)
                : c.find("/EXIT") != std::string::npos ? 3 : 0;
 
     if (c.find("/INSTALL") != std::string::npos) return run_install(inst);
+    g_boot = c.find("/BOOT") != std::string::npos;
     if (c.find("/UNINSTALL") != std::string::npos) return run_uninstall(inst);
 
     // one copy only; a second start forwards its request to the first
@@ -1142,6 +1211,24 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR cmd, int)
         n = midiOutGetNumDevs();
         for (UINT i = 0; i < n; i++) { MIDIOUTCAPSA c; if (midiOutGetDevCapsA(i, &c, sizeof c) == 0) logf("MIDI out %u: %s", i, c.szPname); }
     }
+    {   // did the last start freeze Windows?
+        std::string last = get_step();
+        if (!last.empty() && last != "ok") {
+            logf("the last start did not finish (stopped at: %s)", last.c_str());
+            if (g_boot) {
+                set_step("ok");     // next boot tries again
+                logf("skipped this start so Windows can start");
+                MessageBoxA(NULL, ("NUKED SB-EMU did not finish starting last time (it stopped at: " + last +
+                    "), so it was not started with Windows this time.\r\n\r\nStart it from C:\\SC55\\WIN98\\SC55W.EXE "
+                    "when you need it, and if Windows freezes again, send C:\\SC55\\WIN98\\SC55W.LOG.").c_str(),
+                    APP_TITLE, MB_ICONEXCLAMATION | MB_SETFOREGROUND);
+                NOTIFYICONDATAA nd; memset(&nd, 0, sizeof nd); nd.cbSize = sizeof nd; nd.hWnd = g_wnd; nd.uID = 1;
+                Shell_NotifyIconA(NIM_DELETE, &nd);
+                return 0;
+            }
+        }
+    }
+    set_step("vxd");
     if (vxd_open()) logf("SC55W.VXD loaded, build %lu", g_vxd_build);
     else logf("VxD: %s", g_vxd_error.c_str());
     g_wev = CreateEventA(NULL, FALSE, FALSE, NULL);

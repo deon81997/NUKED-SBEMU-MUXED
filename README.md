@@ -67,6 +67,11 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.74.** The **Windows 98 part** gets its first update in ages!!
+It now has the faster SC-55 too, and it can't hog the CPU any more: when the synth can't keep up, the music lags
+instead of Windows. Started with Windows, it waits 15 seconds so Windows can finish starting first. And if Windows
+ever freezes while it's starting, the next boot skips it and tells you where it got stuck.
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.73.** SBEMU loads more than **twice as fast**!! On
 a 366 MHz Celeron it went from 15 seconds to under 7. A ROM check was being redone almost every time by
 mistake, and now it isn't. Plus a garbled line on the start screen is fixed.
