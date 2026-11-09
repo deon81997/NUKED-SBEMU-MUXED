@@ -612,3 +612,25 @@
 - makefile: cdgui and gametest link -lm; sbset.o, sc55menu and cdgui depend on tools/*.h.
 - 86Box (Celeron 366, Panels full / Carousel+Module auto half): all three in all styles, pick list, message,
   input, F8 both ways, help/results text and back, Esc out.
+
+## PLANNED, SHARED (Win98 + DOS): gamepad buttons -> keyboard keys per game (Win98 session started it)
+- Data: DOSBox Pure's Keyb2Joypad database (Jemy Murphy and bigjim; eXoDOS community; shipped in DOSBox Pure, GPL-2).
+  tools/padmap/k2j.py decodes DOSBox Pure 0.9.9's keyb2joypad.cpp (data only, raw-deflate tables) to JSON:
+  3557 games, 4232 file ids, every bind has an action name ("Jump", "Pogo"). Newer data is on
+  codeberg.org/schelling/dosbox-pure (blocked from the container; user may attach it). Data terms: no explicit
+  license found yet - check before shipping the data.
+- Game id = FNV-1a 32 over the UPPERCASE 8.3 file name, then ^= (file size << 3)
+  (verified: WOLF3D.EXE 98402, PRINCE.EXE 123335, KEEN4E.EXE 103224/105108). Ids also cover data files
+  (GAMEMAPS.WL6), so match the started EXE first, then the files in its folder.
+- Button names in the data are RetroArch/SNES positions: B = bottom (Xbox A), A = right (Xbox B), Y = left (Xbox X),
+  X = top (Xbox Y), L/R = LB/RB, L2/R2 = LT/RT, L3/R3 = stick clicks, Select = Back. Ids 16-19 = LX LY RX RY
+  (two keys each: negative/positive). Key codes = DOSBox KBD_* enum; 200-225 = mouse/joystick/hat specials
+  (JoyButton1-4, Joy1Up.. -> send to the game port instead of a key).
+- Proposed shared files (same format and lookup code for SC55W and the DOS USB layer):
+  PADMAP.TXT  readable, generated (one section per game, Xbox button names, "key:action" values, id= list);
+  PADUSER.TXT the user's own sections/overrides, same format, wins over PADMAP;
+  PADMAP.BIN  compiled from both: sorted (u32 id, u16 entry) table + entries, so DOS reads only the matched entry.
+  Lookup when a program starts (DOS: EXEC hook; Win98: program running in the DOS box), else [default]
+  (D-pad = arrows, Start = Enter, Back = Esc, A/B/X/Y = game port buttons 1-4).
+- Split: Win98 session = format, converter, engine (C, shared), SC55W + VxD key injection (VKD_Force_Keys).
+  DOS session = feed the engine from its USB pad code and inject through its existing 60h/64h traps.
