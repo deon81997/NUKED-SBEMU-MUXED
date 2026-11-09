@@ -384,3 +384,11 @@
 - In that stretch: 201h trap, INT 15h hook (JOYBIOS), KBC 60h/64h traps, and MAIN_JOY_On (USB polled + VKBC inject
   from the sound ISR, with real data for the first time). Now each is a MAIN_Step, MAIN_JOY_On is set last, and
   1 s of ISR polling runs before going on ("USB: 1 s of polling went fine"). QEMU: all steps pass.
+
+## beta.66-usb (2026-11-08): the P5PE-VM lock = oslow waiting inside the sound ISR
+- beta.65 SBDETAIL: last step "USB: polling from the sound interrupt on", the 1 s check never ended. arm_in (oslow)
+  busy-waited up to 1.2 ms for a frame start per report; in SBEMU's ISR (SC-55 running, 360 pad reporting
+  continuously) the ISR never got out.
+- arm_in oslow is now two-stage and never waits: stage 1 skips the ED and notes the frame (q->opend, q->ofn);
+  poll_in does stage 2 (head + tail rewrite, unskip) once 2 frames have started. start_in arms synchronously
+  (ArmSync; it has skipped + waited itself). QEMU with oslow forced: USBTEST all reports, SBEMU passes the 1 s check.

@@ -260,6 +260,7 @@ static Dev       D[MAX_DEV];
 typedef struct
 {
     int used, type, dev, hc, ifc, ep, mps, intv, tog, ocur, outep, outmps, otog, pad, wireless, wlpresent, watched;
+    int opend; uint32_t ofn;            /* oslow OHCI: ED skipped at frame ofn, new TD goes in 2 frames later */
     int kind, gseq;                     /* PK_*; Xbox One: sequence number of the packets sent */
     volatile uint32_t* td;              /* its IN TD(s): UHCI 1, OHCI 2, EHCI 2 (used in turn) */
     uint8_t *ibuf, *obuf;
@@ -1481,6 +1482,7 @@ static int send_out(int k, const uint8_t* data, int len)
 static volatile uint32_t* o_tdi(const Pipe* q, int i) { return q->td + i * 4; }
 static volatile uint32_t* e_tdi(const Pipe* q, int i) { return q->td + i * 16; }
 
+static int ArmSync;   /* arm_in: oslow rewrite right now (start_in has skipped the ED and waited already) */
 static void arm_in(int k)
 {
     Pipe* q = &P[k];
@@ -1504,14 +1506,16 @@ static void arm_in(int k)
 #ifdef OSLOWFORCE
         HC[h].oslow = 1;
 #endif
+        if (HC[h].oslow && !ArmSync)
+        {   /* stage 1 (no waiting - this runs in SBEMU's sound interrupt, and a 1 ms wait per report there
+             * locked the P5PE-VM in beta.63/64): skip the ED now, poll_in finishes it 2 frames later */
+            if (!q->opend) { e[0] |= ED_SKIP; fl(e, 16); q->ofn = ord(h, 0x3C) & 0xFFFF; q->opend = 1; }
+            break;
+        }
         if (HC[h].oslow)
-        {   /* skip the ED, let a frame start (the HC drops what it read of it), then point head AND tail at
-             * the new TD / new empty tail - keeping the toggle carry */
-            uint32_t f0, tog;
-            int n;
-            e[0] |= ED_SKIP; fl(e, 16);
-            f0 = ord(h, 0x3C) & 0xFFFF;
-            for (n = 0; n < 12 && ((ord(h, 0x3C) - f0) & 0xFFFF) < 1; ++n) wait_us(100);
+        {   /* stage 2 / start_in: the HC has dropped what it read of the ED; point head AND tail at the new
+             * TD / new empty tail, keeping the toggle carry */
+            uint32_t tog;
             fl(e, 16);
             tog = e[2] & 2;
             zero(nt, 4);
@@ -1570,7 +1574,8 @@ static void start_in(int k)
         e[1] = PHYS(o_tdi(q, 0));
         e[2] = PHYS(o_tdi(q, 0));                                 /* e[3]: next ED, set at reset */
         fl(e, 16); fl(q->td, 32);
-        arm_in(k);
+        q->opend = 0;
+        ArmSync = 1; arm_in(k); ArmSync = 0;
         e[0] &= ~ED_SKIP;
         fl(e, 16);
         return;
@@ -1646,6 +1651,11 @@ static int poll_in(int k)
     {
         volatile uint32_t* t = o_tdi(q, q->ocur ^ 1);
         uint32_t cc;
+        if (q->opend)
+        {   /* oslow stage 2, once two frames have started since the ED was skipped */
+            if (((ord(h, 0x3C) - q->ofn) & 0xFFFF) >= 2) { q->opend = 0; ArmSync = 1; arm_in(k); ArmSync = 0; }
+            return 0;
+        }
         fl(q->td, 32);
         cc = OTD_CC(t[0]);
         if (cc >= 0xE)
