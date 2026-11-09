@@ -46,12 +46,30 @@ static void apush(uint8_t b)
     if (n != At) { Aq[Ah] = b; Ah = n; }
 }
 
+/* A byte put in with D2h/D3h is "in flight" until it has shown up in the output buffer and been read.
+ * Real keyboard controllers (the D810's embedded controller) take a while to move it there: status
+ * then reads idle (bits 0 and 1 clear) although the byte has not arrived yet, and a next D3h in that
+ * gap loses or overwrites it - the driver's 3-byte packets slip and it sees random moves and clicks.
+ * Emulators are instant, so they never showed it. */
+static int Flight, FlightSeen;
+static uint64_t FlightT;
+
 static void kbc_put(int aux, uint8_t b)
 {
     int n;
     UntrappedIO_OUT(0x64, aux ? 0xD3 : 0xD2);
     for (n = 0; n < 2000 && (UntrappedIO_IN(0x64) & 2); ++n) {}
     UntrappedIO_OUT(0x60, b);
+    Flight = 1; FlightSeen = 0; FlightT = tsc();
+}
+
+/* 1 = the last byte put in is still on its way or unread */
+static int in_flight(uint8_t st, uint64_t t)
+{
+    if (!Flight) return 0;
+    if (st & 1) FlightSeen = 1;                                  /* arrived: wait until it is read */
+    else if (FlightSeen || t - FlightT > ms2c(4)) Flight = 0;    /* read (or long enough to have been) */
+    return Flight;
 }
 
 /* ---------------------------------------------------------------- PS/2 mouse */
@@ -125,10 +143,13 @@ static void ms_cmd(uint8_t b)
 /* one byte into the controller if it is idle; mouse answers first */
 static void inject(void)
 {
+    uint8_t st;
+    uint64_t t;
     CLIS();
-    if ((UntrappedIO_IN(0x64) & 3) == 0)
+    st = (uint8_t)UntrappedIO_IN(0x64);
+    t = tsc();
+    if (!in_flight(st, t) && (st & 3) == 0)
     {
-        uint64_t t = tsc();
         int ha, hk;
         if (Ah == At && MsOn && MsStream && !MsRemote && MDirty && t - MsLast >= Cps / (uint64_t)MsRate)
         { MsLast = t; ms_packet(); }
