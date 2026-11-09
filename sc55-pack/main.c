@@ -164,24 +164,41 @@ static void MAIN_Int15(void)
     }
     else r->w.flags |= 1;
 }
-static BOOL MAIN_HookInt15(void)
+/* INT 15h stub (source: sbemu/int15.asm, nasm -f bin). Data at 0..15, entry at 10h:
+ *  AH=84h DX=0/1 with joy on -> SBEMU callback (BIOS joystick from the USB pad); other AH=84h -> the BIOS.
+ *  AH=C2h (PS/2 mouse BIOS services) -> the BIOS, and when it succeeds the stub notes what the mouse driver did:
+ *  byte 9 = mouse enabled (C200h BH=1), 10 = packet size (C205h), 11 = resolution (C203h). Since beta.76 a
+ *  USB mouse is sent through the BIOS this way when real-mode port traps are not there (no JEMM/QEMM): the
+ *  mouse drivers (CTMOUSE, MOUSE.COM) run in real mode, so their port 60h/64h use cannot be trapped by HDPMI
+ *  alone, and the USB mouse never got used - the D810's touchpad answered the driver instead. */
+static uint32_t MAIN_I15Lin;   /* linear address of the stub (its data bytes), 0 = not hooked */
+static const uint8_t MAIN_I15Stub[149] = {
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x80, 0xFC, 0xC2, 0x74,
+        0x24, 0x80, 0xFC, 0x84, 0x75, 0x1A, 0x2E, 0xF6, 0x06, 0x08, 0x00, 0x01, 0x74, 0x12, 0x83, 0xFA, 0x01, 0x77, 0x0D, 0x55,
+        0x89, 0xE5, 0x80, 0x66, 0x06, 0xFE, 0x5D, 0x2E, 0xFF, 0x2E, 0x04, 0x00, 0x2E, 0xFF, 0x2E, 0x00, 0x00, 0x2E, 0xA2, 0x0C,
+        0x00, 0x2E, 0x88, 0x3E, 0x0D, 0x00, 0x2E, 0xFE, 0x06, 0x0E, 0x00, 0x9C, 0x2E, 0xFF, 0x1E, 0x00, 0x00, 0x72, 0x43, 0x50,
+        0x2E, 0xA0, 0x0C, 0x00, 0x3C, 0x00, 0x75, 0x0C, 0x2E, 0xA0, 0x0D, 0x00, 0x24, 0x01, 0x2E, 0xA2, 0x09, 0x00, 0xEB, 0x2C,
+        0x3C, 0x01, 0x74, 0x0C, 0x3C, 0x05, 0x75, 0x16, 0x2E, 0xA0, 0x0D, 0x00, 0x2E, 0xA2, 0x0A, 0x00, 0x2E, 0xC6, 0x06, 0x09,
+        0x00, 0x00, 0x2E, 0xC6, 0x06, 0x0B, 0x00, 0x02, 0xEB, 0x0E, 0x3C, 0x03, 0x75, 0x0A, 0x2E, 0xA0, 0x0D, 0x00, 0x24, 0x03,
+        0x2E, 0xA2, 0x0B, 0x00, 0x58, 0xF8, 0xCA, 0x02, 0x00,
+};
+static BOOL MAIN_HookInt15(int joy)
 {
-    /* cmp ah,84h / jne old / cmp dx,1 / ja old (other subfunctions: the BIOS) / clear CF in the caller's flags
-     * (the callback returns with the flags the INT pushed) / jmp far callback / old: jmp far old vector */
-    static const uint8_t stub[28] = { 0x80, 0xFC, 0x84, 0x75, 0x12, 0x83, 0xFA, 0x01, 0x77, 0x0D, 0x55, 0x89, 0xE5,
-        0x80, 0x66, 0x06, 0xFE, 0x5D, 0xEA, 0, 0, 0, 0, 0xEA, 0, 0, 0, 0 };
-    uint32_t cb = DPMI_AllocateRMCB_IRET(&MAIN_Int15, &MAIN_I15REG), mem;
-    uint8_t code[28];
+    uint32_t cb = joy ? DPMI_AllocateRMCB_IRET(&MAIN_Int15, &MAIN_I15REG) : 0, mem;
+    uint8_t code[sizeof(MAIN_I15Stub)];
     uint16_t seg, old_off, old_seg;
-    if(!cb || (mem = DPMI_HighMalloc(2, TRUE)) == 0) return FALSE;
+    if(MAIN_I15Lin) return TRUE;
+    if((joy && !cb) || (mem = DPMI_HighMalloc((sizeof(code) + 15) / 16, TRUE)) == 0) return FALSE;
     seg = (uint16_t)mem;
-    memcpy(code, stub, sizeof code);
+    memcpy(code, MAIN_I15Stub, sizeof code);
     old_off = DPMI_LoadW(0x15 * 4); old_seg = DPMI_LoadW(0x15 * 4 + 2);
-    code[19] = (uint8_t)cb; code[20] = (uint8_t)(cb >> 8); code[21] = (uint8_t)(cb >> 16); code[22] = (uint8_t)(cb >> 24);
-    memcpy(code + 24, &old_off, 2); memcpy(code + 26, &old_seg, 2);
+    memcpy(code + 0, &old_off, 2); memcpy(code + 2, &old_seg, 2);
+    memcpy(code + 4, &cb, 4);
+    code[8] = joy ? 1 : 0;
     DPMI_LMemcpy(DPMI_SEGOFF2L(seg, 0), DPMI_PTR2L(code), sizeof(code));
+    MAIN_I15Lin = DPMI_SEGOFF2L(seg, 0);
     CLIS();
-    DPMI_StoreW(0x15 * 4, 0); DPMI_StoreW(0x15 * 4 + 2, seg);
+    DPMI_StoreW(0x15 * 4, 0x10); DPMI_StoreW(0x15 * 4 + 2, seg);
     STIL();
     return TRUE;
 }
@@ -581,7 +598,7 @@ struct MAIN_OPT
     "/JOYDZ", "Stick dead zone in percent (0-90)", 10, MAIN_SETCMD_BASE10,
     "/JOYMODE", "Gameport stick type: 0=standard, 1=CH Flightstick Pro (D-pad = hat), 2=Thrustmaster FCS (D-pad = hat on axis 4), 3=Gravis GamePad Pro digital (GrIP, all buttons, 2 pads), 4=none (real gameport stays usable)", 0, MAIN_SETCMD_BASE10,
     "/USBKB", "USB keyboard typed through the PC's keyboard controller (1=on, 0=off; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
-    "/USBMS", "USB mouse as a PS/2 mouse for a DOS mouse driver loaded after SBEMU (1=if one is plugged in at start, 2=always, 0=off; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
+    "/USBMS", "USB mouse for a DOS mouse driver loaded after SBEMU (1=auto, 2=always, 0=off; needs /JOY:1). Without JEMM/QEMM it goes through the BIOS, next to the touchpad", 1, MAIN_SETCMD_BASE10,
     "/JOYBIOS", "BIOS joystick calls (INT 15h AH=84h) answered from the USB pad too (1=on, 0=off; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
     NULL, NULL, 0,
 };
@@ -1977,11 +1994,26 @@ int main(int argc, char* argv[])
                     printf("Joystick (Port 201)%s: ", md >= 0 && md <= 3 ? modes[md] : "");
                     MAIN_Print_Enabled_Newline(MAIN_JOY_RM || MAIN_JOY_PM);
                     MAIN_Step("USB: INT 15h joystick hook");
-                    if(MAIN_Options[OPT_JOYBIOS].value && !MAIN_HookInt15())
+                    if(MAIN_Options[OPT_JOYBIOS].value && !MAIN_HookInt15(1))
                         MAIN_CPrintf(YELLOW, "  BIOS joystick (INT 15h AH=84h) not hooked: no memory.\n");
                 }
                 MAIN_CPrintf(LIGHTGRAY, "  USB: %s.\n", msg);
-                if(MAIN_Options[OPT_USBMS].value == 2 || (MAIN_Options[OPT_USBMS].value == 1 && (USBPAD_Have() & USBPAD_HAVE_MOUSE)))
+                if(MAIN_Options[OPT_USBMS].value && !enableRM)
+                {
+                    /* no real-mode traps: the mouse driver's own port I/O can't be seen, so the USB mouse goes
+                     * through the BIOS mouse services it uses (see MAIN_I15Stub); the touchpad / PS/2 mouse
+                     * keeps working beside it, and a USB mouse plugged in later works too */
+                    MAIN_Step("USB: mouse through the BIOS (INT 15h C2h)");
+                    if(MAIN_HookInt15(0))
+                    {
+                        VKBC_SetBios(MAIN_I15Lin);
+                        printf("USB mouse (through the BIOS mouse services): ");
+                        MAIN_Print_Enabled_Newline(TRUE);
+                        MAIN_CPrintf(LIGHTGRAY, "  Load the mouse driver (CTMOUSE, MOUSE.COM) after SBEMU. The touchpad works too.\n");
+                    }
+                    else MAIN_CPrintf(YELLOW, "  USB mouse: INT 15h not hooked (no memory).\n");
+                }
+                else if(MAIN_Options[OPT_USBMS].value == 2 || (MAIN_Options[OPT_USBMS].value == 1 && (USBPAD_Have() & USBPAD_HAVE_MOUSE)))
                 {
                     MAIN_Step("USB: keyboard controller traps (60h/64h)");
                     VKBC_Init(MAIN_TCps, 1);

@@ -67,6 +67,10 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.76.** Laptop gamers rejoice!! A **USB mouse now
+works right next to your touchpad** in plain DOS, no JEMM needed. Before, the mouse driver found the touchpad
+and the USB mouse just sat there. You can even plug it in while a game is running.
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.75.** **Joysticks in DOS boxes!!** Any controller Windows 98
 knows about now works in DOS games inside Windows too, on the game port and through the BIOS, so a 360 pad with its
 Windows driver can play your DOS games without leaving Windows. And Windows games' music volume sliders now work

@@ -11,6 +11,7 @@ void VKBC_UsbMouse(int buttons, int dx, int dy, int dw); /* USB mouse movement (
 void VKBC_Tick(void);                       /* sound interrupt: puts queued bytes into the controller, key repeat */
 uint32_t VKBC_IOHandler(uint32_t port, uint32_t val, uint32_t out);    /* ports 60h, 64h */
 int  VKBC_Leds(void);                       /* BIOS lock keys as USB LED bits */
+void VKBC_SetBios(uint32_t lin);            /* USB mouse through the BIOS mouse services: lin = INT 15h stub data */
 int  VKBC_MouseSeen(void);                  /* a program has enabled the emulated PS/2 mouse */
 
 #endif

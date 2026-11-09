@@ -59,6 +59,10 @@ static int MsOn, MsSeen, AuxNext, MsArg, MsStream, MsRemote, MsWrap, MsRate = 10
 static uint8_t MsRates[3];
 static volatile int MDx, MDy, MDw, MB, MDirty;
 static uint64_t MsLast;
+/* BIOS mode (beta.76, no real-mode traps): the INT 15h stub's data bytes tell whether the mouse driver has
+ * enabled the BIOS mouse (C200h) and its resolution; USB movement is then put into the controller as 3-byte
+ * PS/2 packets with D3h, and the BIOS's IRQ 12 handler passes them to the driver like the touchpad's own. */
+static uint32_t BiosLin;
 
 static void ms_defaults(void) { MsRate = 100; MsRes = 2; MsScale = 0; MsStream = 0; MsRemote = 0; }
 
@@ -128,6 +132,17 @@ static void inject(void)
         int ha, hk;
         if (Ah == At && MsOn && MsStream && !MsRemote && MDirty && t - MsLast >= Cps / (uint64_t)MsRate)
         { MsLast = t; ms_packet(); }
+        else if (Ah == At && BiosLin && MDirty && t - MsLast >= Cps / 100)
+        {
+            const uint8_t on = DPMI_LoadB(BiosLin + 9), ps = DPMI_LoadB(BiosLin + 10);
+            if ((on & 1) && (ps == 0 || ps == 3))
+            {
+                const int r = DPMI_LoadB(BiosLin + 11) & 3;
+                if (r != MsRes) { MDx = MDx >> MsRes << r; MDy = MDy >> MsRes << r; MsRes = r; }
+                MsId = 0; MsLast = t; ms_packet();
+            }
+            else { MDx = MDy = MDw = 0; MDirty = 0; }                  /* no driver listening: drop it */
+        }
         ha = Ah != At;
         hk = Kh != Kt && t >= Hold;
         if (ha && (!hk || !LastAux)) { kbc_put(1, Aq[At]); At = (At + 1) % AQN; LastAux = 1; }
@@ -198,7 +213,7 @@ void VKBC_UsbKeys(int id, const uint8_t* r)
 
 void VKBC_UsbMouse(int b, int dx, int dy, int dw)
 {
-    if (!MsOn) return;
+    if (!MsOn && !BiosLin) return;
     CLIS();
     MDx += dx * (1 << MsRes); MDy += dy * (1 << MsRes); MDw += dw;
     if (b != MB || dx || dy || dw) MDirty = 1;
@@ -212,7 +227,9 @@ int VKBC_Leds(void)
     return ((f & 0x20) ? 1 : 0) | ((f & 0x40) ? 2 : 0) | ((f & 0x10) ? 4 : 0);
 }
 
-int VKBC_MouseSeen(void) { return MsSeen; }
+int VKBC_MouseSeen(void) { return MsSeen || (BiosLin && (DPMI_LoadB(BiosLin + 9) & 1)); }
+
+void VKBC_SetBios(uint32_t lin) { BiosLin = lin; MsRes = 2; }
 
 void VKBC_Tick(void)
 {
@@ -261,7 +278,7 @@ void VKBC_Init(uint64_t cps, int mouse)
     Kh = Kt = Ah = At = 0;
     memset(KPrev, 0, sizeof(KPrev));
     Rep = 0;
-    MsOn = mouse; MsSeen = 0; AuxNext = 0; MsArg = 0; MsWrap = 0; MsId = 0;
+    MsOn = mouse; MsSeen = 0; BiosLin = 0; AuxNext = 0; MsArg = 0; MsWrap = 0; MsId = 0;
     ms_defaults();
     MDx = MDy = MDw = MB = MDirty = 0;
 }

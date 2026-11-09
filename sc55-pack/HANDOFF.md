@@ -545,3 +545,21 @@
   VOLTEST.EXE: NUKED SB-EMU support 3, set 0x80004000 reads back, SC55W.LOG "left 25%, right 50%".
 - Pending: the user's Xbox 360 Windows 98 drivers (X360DrvWin98SE.7z, x360c.w98.x86.en.zip - attached in another
   chat) to bundle as the Windows-side pad driver; status window (SC-55 LCD/meters); MS-DOS-mode shortcuts.
+
+## beta.76-usb (2026-11-09): USB mouse without JEMM (D810: touchpad + USB mouse)
+- User report (D810): with the USB mouse plugged in, the touchpad worked and the USB mouse was ignored. Cause: the
+  normal launchers run without QPIEMU/QEMM (enableRM = 0), so only PM port traps exist; CTMOUSE / MOUSE.COM are
+  real-mode, their 60h/64h I/O went to the real KBC and found the touchpad. The USB mouse only ever worked
+  with SC55JEM / SC55QMM.
+- Fix: INT 15h stub (sbemu/int15.asm, bytes in main.c MAIN_I15Stub; entry now at 10h, data at 0..15) also
+  passes AH=C2h (PS/2 BIOS mouse services, which CTMOUSE and MOUSE.COM 8.20 use) to the BIOS and records on
+  success: byte 9 enabled (C200h BH), 10 packet size (C205h), 11 resolution (C203h). Without enableRM and
+  /USBMS != 0, SBEMU hooks INT 15h (joystick part only if /JOYBIOS) and VKBC_SetBios(lin): vkbc.c inject()
+  sends 3-byte packets with D3h when the BIOS mouse is enabled and packet size is 3 (or unset); the BIOS IRQ 12
+  handler hands them to the driver like the touchpad's. No KBC traps in this mode; hot-plug works; no wheel.
+  With JEMM/QEMM the old trap path is unchanged.
+- Known limit: USB and touchpad moving at the very same moment can interleave bytes (one odd packet).
+- QEMU (SeaBIOS; USB mouse hot-added after POST so SeaBIOS's own USB mouse support stays out; PS/2 mouse =
+  "touchpad"; /tmp/mq run2.sh + MT.EXE INT 33h logger): CTMOUSE 2.1b4 and MOUSE.COM 8.20 both get USB moves +
+  left button and PS/2 moves + right button alternately. beta.73 control: PS/2 only. J15 (BIOS joystick) same
+  answers as beta.71 (vector offset 0000 -> 0010 only).

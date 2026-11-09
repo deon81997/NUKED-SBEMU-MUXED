@@ -136,7 +136,7 @@ static Field F[NF] = {
     { "Keys",            "/JOYKEY",  { "ST:1C,BK:01", "ST:1C,BK:01,LB:39,RB:1D", "ST:1C,BK:01,DU:E048,DD:E050,DL:E04B,DR:E04D", "-" }, 4, 0, 0, "Pad buttons typed as keyboard keys, for menus and games without joystick support.", {0}, 0 },
     { "Dead zone",       "/JOYDZ",   { "10", "0", "5", "15", "20", "25" }, 6, 0, 0, "Stick movement ignored around the centre (stops drift).", {0}, 0 },
     { "USB keyboard",    "/USBKB",   { "1", "0" }, 2, 0, 0, "USB keyboard typed through the PC's keyboard controller (it stops working without this once SBEMU takes USB).", {0}, 0 },
-    { "USB mouse",       "/USBMS",   { "1", "2", "0" }, 3, 0, 0, "USB mouse as a PS/2 mouse. Load CTMOUSE / MOUSE.COM after SBEMU. Auto = only if plugged in when SBEMU starts.", {0}, 0 },
+    { "USB mouse",       "/USBMS",   { "1", "2", "0" }, 3, 0, 0, "USB mouse for CTMOUSE / MOUSE.COM loaded after SBEMU, next to the touchpad. With JEMM: Auto = plugged in at start.", {0}, 0 },
 };
 
 static char g_dir[160] = "C:\\SC55";

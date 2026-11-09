@@ -802,12 +802,17 @@ CONTENTS
   joystick through the BIOS (INT 15h function 84h) instead of port 201h
   get the pad too: buttons, and the four axes as 0..255 (centre about
   128; 0 = no stick there). /JOYBIOS:0 leaves INT 15h alone.
-  USB mouse (/USBMS:1, default "auto"): a DOS mouse driver (CTMOUSE,
-  MOUSE.COM) loaded AFTER SBEMU finds a PS/2 mouse - SBEMU answers its
-  commands and sends the USB mouse's movement as PS/2 packets (the wheel
-  too, for drivers that ask). Auto = only when a USB mouse is plugged in
-  as SBEMU starts (a real PS/2 mouse is then not used); 2 = always; 0 =
-  off. Test with MENU > Tests > Keyboard / mouse test (KMTEST).
+  USB mouse (/USBMS:1, default "auto"): load a DOS mouse driver (CTMOUSE,
+  MOUSE.COM) AFTER SBEMU (SC55.BAT does). Two ways, chosen by itself:
+   - SC55.BAT and the other launchers without JEMM/QEMM (since beta.76):
+     the USB mouse goes through the BIOS mouse services the driver uses,
+     next to the touchpad / PS/2 mouse - both move the pointer. It can
+     be plugged in any time. The wheel is not passed on this way.
+   - SC55JEM.BAT / SC55QMM.BAT: SBEMU answers the driver's PS/2 mouse
+     commands itself (the wheel works too). Auto = only when a USB mouse
+     is plugged in as SBEMU starts (the touchpad is then not used);
+     2 = always.
+  0 = off. Test with MENU > Tests > Keyboard / mouse test (KMTEST).
 
   Test without a game:  MENU > Tests > Joystick test (JOYTEST), or run
   JOYTEST.EXE. Move the sticks: about 24 = left/up, 575 = centre and 1124
@@ -879,7 +884,10 @@ CONTENTS
        and touchpad are not USB). Don't use it together with USBDDOS or
        another DOS USB driver.
      * USB mouse: load the mouse driver after SBEMU (put it after SC55.BAT
-       in your batch file). If the driver says no mouse found, check that
+       in your batch file). Before beta.76 it only worked with JEMM/QEMM
+       (SC55JEM.BAT, SC55QMM.BAT): with plain SC55.BAT the driver found
+       the D810's touchpad and the USB mouse did nothing. Now both work.
+       With SC55JEM / SC55QMM: if the driver says no mouse found, check
        the USB mouse was plugged in when SBEMU started (or use /USBMS:2).
      * It works for protected-mode games (HDPMI) and, with SC55JEM.BAT or
        SC55QMM.BAT, real-mode games too - the same as the sound.
