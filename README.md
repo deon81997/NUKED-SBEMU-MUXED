@@ -2,7 +2,7 @@
 
 <table>
 <tr>
-<td align="center" valign="top"><img src="docs/90s/fd-marine-shoot.gif" alt="Freedoom marine"><br><br><img src="docs/90s/tux-waddle.gif" width="120" alt="Tux"><br><br><img src="docs/90s/fd-soulsphere.gif" alt="soul sphere"></td>
+<td align="center" valign="top"><img src="docs/90s/fd-marine-shoot.gif" alt="Freedoom marine"><br><br><img src="docs/90s/tux-waddle.gif" width="120" alt="Tux"><br><br><img src="docs/90s/fd-soulsphere.gif" alt="soul sphere"><br><br><img src="docs/90s/port220-small.gif" width="96" alt="Port 220"></td>
 <td align="center">
 
 <img src="docs/90s/title.gif" width="560" alt="NUKED SB-EMU">
@@ -10,6 +10,10 @@
 <h2>~*~ Welcome to my DOS Sound Page!!! ~*~</h2>
 
 <i>A Roland Sound Canvas for your DOS games. No MIDI hardware needed!!</i>
+
+<br><br>
+
+<img src="docs/90s/port220-hello.gif" width="440" alt="Port 220, the NUKED SB-EMU mascot, says hi">
 
 <br><br>
 
@@ -166,7 +170,7 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 > **ROMs are NOT included!!** Bring your own SC-55 (and MT-32 / CM-32L) dumps.
 > They're recognised by what's inside them, so the file names don't matter.
 
-<div align="center"><img src="docs/90s/fd-hatchling.gif" alt=""> <img src="docs/90s/ic-speaker.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-speaker.gif" alt=""> <img src="docs/90s/fd-soulsphere.gif" alt=""></div>
+<div align="center"><img src="docs/90s/fd-hatchling.gif" alt=""> <img src="docs/90s/ic-speaker.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-speaker.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
 ## ★ Cool Features ★
 
@@ -239,7 +243,7 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 - See [`README98.TXT`](sc55-pack/pack/README98.TXT)
 </details>
 
-<div align="center"><img src="docs/90s/fd-worm.gif" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/fd-trilobite.gif" alt=""></div>
+<div align="center"><img src="docs/90s/fd-worm.gif" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
 ## ★ Will it run on my PC?? ★
 
@@ -303,7 +307,7 @@ Duke-style games by itself.
 The `README.TXT` in the pack is the full manual.
 </details>
 
-<div align="center"><img src="docs/90s/fd-marine-walk.gif" alt=""> <img src="docs/90s/ic-pad.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-pad.gif" alt=""> <img src="docs/90s/fd-keycard.gif" alt=""></div>
+<div align="center"><img src="docs/90s/fd-marine-walk.gif" alt=""> <img src="docs/90s/ic-pad.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-pad.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
 ## ★ USB Gamepads in DOS?!? ★
 
@@ -374,7 +378,7 @@ works for some people.
 > [!TIP]
 > Not sure what's in your PC? Boot DOS and run `SBEMU` once. It tells you the chip it found.
 
-<div align="center"><img src="docs/90s/fd-hatchling.gif" alt=""> <img src="docs/90s/ic-camera.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-camera.gif" alt=""> <img src="docs/90s/fd-zombie.gif" alt=""></div>
+<div align="center"><img src="docs/90s/fd-hatchling.gif" alt=""> <img src="docs/90s/ic-camera.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-camera.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
 ## ★ Screenshots!! ★
 
@@ -457,7 +461,7 @@ works for some people.
 
 </div>
 
-<div align="center"><img src="docs/90s/fd-potion.gif" alt=""> <img src="docs/90s/ic-cd.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-cd.gif" alt=""> <img src="docs/90s/fd-soulsphere.gif" alt=""></div>
+<div align="center"><img src="docs/90s/fd-potion.gif" alt=""> <img src="docs/90s/ic-cd.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-cd.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
 ## ★ Download Zone ★
 
@@ -498,7 +502,7 @@ settings, SBEMU's messages and test results. Attach it and tell me what you
 were doing. If SBEMU hung, the last `[step]` line in `SBDETAIL.TXT` shows
 exactly where.
 
-<div align="center"><img src="docs/90s/fd-trilobite.gif" alt=""> <img src="docs/90s/ic-computer.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-computer.gif" alt=""> <img src="docs/90s/fd-marine-shoot.gif" alt=""></div>
+<div align="center"><img src="docs/90s/port220-small.gif" width="96" alt=""> <img src="docs/90s/ic-computer.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-computer.gif" alt=""> <img src="docs/90s/fd-marine-shoot.gif" alt=""></div>
 
 ## ★ For the Nerds: Source Code ★
 
@@ -591,6 +595,8 @@ VIDE-CDD (Acer / BenQ), GSCDROM (LG), QEMM (Quarterdeck). Built with
 
 <div align="center">
 
+<img src="docs/90s/port220-hop.gif" width="100%" alt="Port 220 hopping across the page">
+
 <img src="docs/90s/bar.gif" width="600" alt="">
 
 <h3>~ DOS Sound WebRing ~</h3>
@@ -611,6 +617,8 @@ VIDE-CDD (Acer / BenQ), GSCDROM (LG), QEMM (Quarterdeck). Built with
 <br><br>
 
 <sub>Last updated: November 9, 2026 &nbsp;·&nbsp; made for fun on a Dell D810 &nbsp;·&nbsp; bring your own ROMs!!</sub>
+
+<sub>Built together with <b>Claude</b> (Anthropic), who also drew <b>Port 220</b> <img src="docs/90s/port220-small.gif" width="48" alt="" align="absmiddle"></sub>
 
 <sub>Roland, SC-55, MT-32 and CM-32L are trademarks of Roland Corporation. Sound Blaster is a trademark of Creative Technology. Xbox is a trademark of Microsoft. NUKED SB-EMU is not affiliated with any of them.</sub>
 
