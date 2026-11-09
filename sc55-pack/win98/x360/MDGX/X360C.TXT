@@ -1,0 +1,48 @@
+Unofficial XBox 360 Controller WDM Driver for Windows 98/98 SP1/98 SE/ME
+
+IMPORTANT:
+Make sure your XBox controller is already connected to your computer BEFORE you install this Driver!
+
+This Driver should work with all XBox controllers brands/models.
+
+CAUTION:
+In case your XBox controller does not work or was not detected properly after installing this driver, try this:
+Download this ZIP file (English):
+http://www.katch.ne.jp/~morii/driver/x360c/files/20100111/x360c.w98.x86.en.zip
+from this web page (Japanese):
+http://www.katch.ne.jp/~morii/driver/x360c/
+Extract all files from ZIP above into the same directory/folder using your favorite unZIPping tool:
+http://www.mdgx.com/toy.htm#ZIP
+Then do this: Start button -> Settings -> Control Panel -> Device Manager -> select your XBox controller name (as detected by Windows) -> click the Update / Install driver button -> Browse to the location where you extracted the files from ZIP above -> select (double-click) the INF file [x360c.inf] -> Apply/OK.
+Reboot if prompted.
+
+Everything here applies only to English editions.
+
+NOTE:
+Provided 'as is', without any warranties, expressed or implied.
+Use at your own risk!
+
+FYI:
+Some of the text strings in X360CSA.EXE are in Japanese. [?]
+
+MORE INFO:
+- Unofficial XBox 360 Controller WDM Driver for Windows 98/98 SP1/98 SE/ME:
+http://www.mdgx.com/drv.htm#DTM
+- Unofficial XBox 360 Controller Driver for Windows 98/ME forum:
+http://www.msfn.org/board/index.php?showtopic=119841
+- More info (Japanese):
+http://www.katch.ne.jp/~morii/driver/x360c/
+- Microsoft XBox 360 Wireless + Wired Controller WDM Driver 32 + 64 bit for Windows 2000/XP/2003/Vista/2008/7 (English):
+http://www.microsoft.com/hardware/download/download.aspx?category=Gaming
+XBox 360 Controller 64-bit Driver for Windows XP Professional/2003/Vista/2008/7 64-bit (x64) [18.2 MB]:
+http://download.microsoft.com/download/0/0/f/00f2a67b-e10b-43b1-8cca-3deb12218f75/Xbox360_64Eng.exe
+XBox 360 Controller 32-bit Driver for Windows XP/2003/Vista/2008/7 32-bit (x86) [17.9 MB]:
+http://download.microsoft.com/download/0/0/f/00f2a67b-e10b-43b1-8cca-3deb12218f75/Xbox360_32Eng.exe
+OLD XBox 360 Controller 32-bit Driver for Windows 2000 [3.16 MB]:
+http://download.microsoft.com/download/A/C/8/AC8CA87C-4F5B-49D6-9E0A-C0BBA2E96663/XBOX360Eng.exe
+More info:
+http://www.microsoft.com/hardware/windows7/openfile.aspx?type=xbox
+- XBox 360 Controller WDM Driver Install Guide:
+http://download.microsoft.com/download/2/1/4/2149274a-21d3-407b-8e44-19c1077180eb/ENG_Readme.txt
+- Unofficial XMouse360 Driver + Tool for Windows XP/2003/Vista/2008/7 (free):
+http://www.fantasticbytes.com/labs/xmouse360/

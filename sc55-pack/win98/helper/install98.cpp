@@ -2,7 +2,8 @@
 //
 // Install (SC55W.EXE /INSTALL, run from the pack's FILES\WIN98 folder):
 //   - copies SC55W.EXE, SC55W.VXD, SC55MIDI.DRV, README98.TXT to <pack>\WIN98
-//     and any ROMs that are missing to <pack>\ROMS (from FILES\ROMS)
+//     and any ROMs that are missing to <pack>\ROMS (from FILES\ROMS), and the Xbox 360 pad
+//     driver folder X360 (installed by the user through Windows, see README98)
 //   - SC55MIDI.DRV to WINDOWS\SYSTEM, registered in SYSTEM.INI [drivers] and
 //     under MediaResources\midi, so it is the MIDI device "NUKED SB-EMU"
 //   - optional: start with Windows, default MIDI device (MIDI Mapper), turn
@@ -168,6 +169,48 @@ static void wininit_line(const std::string& line)
     }
     f = fopen(p.c_str(), "wb");
     if (f) { fwrite(t.data(), 1, t.size(), f); fclose(f); }
+}
+
+// copy a folder tree (the bundled X360 driver) next to the program; existing files are replaced
+static int copy_tree(const std::string& src, const std::string& dst)
+{
+    int n = 0;
+    CreateDirectoryA(dst.c_str(), NULL);
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(join(src, "*.*").c_str(), &fd);
+    if (h == INVALID_HANDLE_VALUE) return 0;
+    do {
+        std::string f = fd.cFileName;
+        if (f == "." || f == "..") continue;
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) n += copy_tree(join(src, f), join(dst, f));
+        else if (CopyFileA(join(src, f).c_str(), join(dst, f).c_str(), FALSE)) {
+            SetFileAttributesA(join(dst, f).c_str(), FILE_ATTRIBUTE_NORMAL);
+            n++;
+        }
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+    return n;
+}
+
+// delete a folder tree; what cannot go now goes at the next start
+static void delete_tree(const std::string& dir)
+{
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(join(dir, "*.*").c_str(), &fd);
+    if (h != INVALID_HANDLE_VALUE) {
+        do {
+            std::string f = fd.cFileName;
+            if (f == "." || f == "..") continue;
+            std::string p = join(dir, f);
+            if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) delete_tree(p);
+            else {
+                SetFileAttributesA(p.c_str(), FILE_ATTRIBUTE_NORMAL);
+                if (!DeleteFileA(p.c_str())) wininit_line("NUL=" + shortp(p));
+            }
+        } while (FindNextFileA(h, &fd));
+        FindClose(h);
+    }
+    RemoveDirectoryA(dir.c_str());
 }
 
 static bool copy_file(const std::string& src, const std::string& dst, std::string& log)
@@ -433,6 +476,8 @@ int run_install(HINSTANCE inst)
         }
         ok &= copy_file(s, join(wdir, f), log);
     }
+    // the Xbox 360 pad driver, so it is on the hard disk when the pad is first plugged in
+    if (is_dir(join(src, "X360"))) copy_tree(join(src, "X360"), join(wdir, "X360"));
     // ROMs from the pack's FILES\ROMS (only the missing ones)
     int roms = 0;
     std::string rsrc = join(parent(src), "ROMS");
@@ -564,6 +609,7 @@ int run_uninstall(HINSTANCE)
         SetFileAttributesA(p.c_str(), FILE_ATTRIBUTE_NORMAL);
         if (!DeleteFileA(p.c_str())) wininit_line("NUL=" + shortp(p));
     }
+    delete_tree(join(wdir, "X360"));
     MessageBoxA(NULL, ("The NUKED SB-EMU has been removed from Windows. The last files are deleted when Windows "
                        "restarts; the empty folder " + wdir + " can then be deleted.").c_str(), TITLE, MB_ICONINFORMATION);
     return 0;

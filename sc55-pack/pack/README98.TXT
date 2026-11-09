@@ -16,8 +16,8 @@ inside Windows 98:
     follows Windows (games' music sliders, midiOutSetVolume).
   * DOS programs also get a joystick: a game port at 201h and the BIOS
     joystick call (INT 15h AH=84h), fed by the joystick Windows knows
-    (Control Panel > Game Controllers) - e.g. an Xbox 360 pad with its
-    Windows 98 driver.
+    (Control Panel > Game Controllers) - e.g. an Xbox 360 pad with the
+    Windows 98 driver that comes with the pack (WIN98\X360).
   * The settings are the DOS pack's: C:\SC55\SBOPTS.TXT. What you set in
     DOS (SETTINGS.BAT) applies in Windows and the other way round.
 
@@ -106,6 +106,14 @@ C:\SC55\WIN98\SC55W.INI and the uninstaller puts it back.
   Status shows the joystick Windows found and how often DOS read it.
   Windows' own programs keep using the joystick through Windows as before.
 
+  Xbox 360 controller: Windows 98 has no driver for it, so the pack has an
+  unofficial one in WIN98\X360 (copied there by Setup; FILES\WIN98\X360 in
+  the pack). Plug the pad in and point the Add New Hardware Wizard to that
+  folder - X360.TXT has the steps. Then the left stick is DOS stick 1, the
+  right stick DOS stick 2, and A B X Y buttons 1-4. When a 360 pad is
+  plugged in without a driver, NUKED SB-EMU says so once and offers to show
+  the steps (SC55W.INI X360Prompt=0 stops that).
+
   Command line (Start > Run):
      C:\SC55\WIN98\SC55W.EXE              start (or show the status)
      C:\SC55\WIN98\SC55W.EXE /SETTINGS    open the settings
@@ -165,6 +173,8 @@ Windows-only options, in C:\SC55\WIN98\SC55W.INI under [SC55W]:
      Joystick=1         game port 201h for DOS programs (0 = off, e.g. for a
                         real game port card that DOS should read directly).
      JoyBios=1          BIOS joystick call INT 15h AH=84h (0 = off).
+     X360Prompt=1       0 = do not offer the Xbox 360 driver when a 360 pad
+                        without a driver is plugged in.
      CpuMax=60          most of the CPU (percent, 20-95) the synth may use.
                         When it cannot keep up the music lags or breaks up
                         instead of Windows slowing down.

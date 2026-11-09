@@ -1,0 +1,173 @@
+[Version]
+Signature=$CHICAGO$
+AdvancedINF=2.5
+[DefaultInstall]
+AddReg=AR
+CopyFiles=CS,XC,XF
+UpdateInis=XI
+[XF]
+X360CSA.EXE
+X360CCP.DLL
+X360CFF.DLL
+X360C.SYS
+X2.INF
+X360C.INF
+[CS]
+X360CSA.EXE
+X360CCP.DLL
+X360CFF.DLL
+[XC]
+X360C.SYS
+HIDCLASS.SYS
+HIDPARSE.SYS
+[XI]
+SETUP.INI,progman.groups,,"XBT=XBox Tools"
+SETUP.INI,XBT,,"""XBox 360 Controller Status"","%11%\X360CSA.EXE",,,,"%11%",,"""""
+[AR]
+HKR,,DevLoader,,*ntkern
+HKR,,NTMPDriver,,X360C.SYS
+HKLM,%OID_028E%,OEMName,,%P_MSFT%
+HKCR,CLSID\%C_P_CLS%,,,"%C_P%"
+HKCR,CLSID\%C_P_CLS%\InProcServer32,,,"%11%\X360CCP.DLL"
+HKCR,CLSID\%C_P_CLS%\InProcServer32,ThreadingModel,,Apartment
+HKLM,%PRM%,"Support Device Count",0x00010001,20
+HKLM,%PRM%,"Support Device Attribute 0",0x00010001,73269902
+HKLM,%PRM%,"Support Device Attribute 1",0x00010001,252510218
+HKLM,%PRM%,"Support Device Attribute 2",0x00010001,252510219
+HKLM,%PRM%,"Support Device Attribute 3",0x00010001,252510220
+HKLM,%PRM%,"Support Device Attribute 4",0x00010001,252510221
+HKLM,%PRM%,"Support Device Attribute 5",0x00010001,252510223
+HKLM,%PRM%,"Support Device Attribute 6",0x00010001,252510257
+HKLM,%PRM%,"Support Device Attribute 7",0x00010001,252510230
+HKLM,%PRM%,"Support Device Attribute 8",0x00010001,464385280
+HKLM,%PRM%,"Support Device Attribute 9",0x00010001,464385284
+HKLM,%PRM%,"Support Device Attribute 10",0x00010001,74302018
+HKLM,%PRM%,"Support Device Attribute 11",0x00010001,121128726
+HKLM,%PRM%,"Support Device Attribute 12",0x00010001,121128728
+HKLM,%PRM%,"Support Device Attribute 13",0x00010001,121128742
+HKLM,%PRM%,"Support Device Attribute 14",0x00010001,121128744
+HKLM,%PRM%,"Support Device Attribute 15",0x00010001,121128758
+HKLM,%PRM%,"Support Device Attribute 16",0x00010001,121128760
+HKLM,%PRM%,"Support Device Attribute 17",0x00010001,464384041
+HKLM,%PRM%,"Support Device Attribute 18",0x00010001,464384057
+HKLM,%PRM%,"Support Device Attribute 19",0x00010001,121162498
+HKLM,%OID_028E%,ConfigCLSID,,%C_P_CLS%
+HKCR,CLSID\%FFD_CLS%,,,"%FFD%"
+HKCR,CLSID\%FFD_CLS%\InProcServer32,,,"%11%\X360CFF.DLL"
+HKCR,CLSID\%FFD_CLS%\InProcServer32,ThreadingModel,,Both
+HKLM,%OID_028E%\Axes\0,Attributes,1,01,00,00,00,01,00,30,00
+HKLM,%OID_028E%\Axes\0,FFAttributes,1,0A,00,00,00,00,01,00,00
+HKLM,%OID_028E%\Axes\1,Attributes,1,01,00,00,00,01,00,31,00
+HKLM,%OID_028E%\Axes\1,FFAttributes,1,0A,00,00,00,00,01,00,00
+HKLM,%OID_028E%\OEMForceFeedback,Attributes,1,00,00,00,00,E8,03,00,00,E8,03,00,00
+HKLM,%OID_028E%\OEMForceFeedback,CLSID,,"%FFD_CLS%"
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%CNSF_CLS%,,,"%CNSF%"
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%CNSF_CLS%,Attributes,1,00,00,00,00,01,86,00,00,FD,03,00,00,FD,03,00,00,20,00,00,00
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%RampForce_CLS%,,,"%RampForce%"
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%RampForce_CLS%,Attributes,1,01,00,00,00,02,86,00,00,FD,03,00,00,FD,03,00,00,20,00,00,00
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%Square_CLS%,,,"%Square%"
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%Square_CLS%,Attributes,1,02,00,00,00,03,86,00,00,FD,03,00,00,FD,03,00,00,20,00,00,00
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%Sine_CLS%,,,"%Sine%"
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%Sine_CLS%,Attributes,1,03,00,00,00,03,86,00,00,FD,03,00,00,FD,03,00,00,20,00,00,00
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%Triangle_CLS%,,,"%Triangle%"
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%Triangle_CLS%,Attributes,1,04,00,00,00,03,86,00,00,FD,03,00,00,FD,03,00,00,20,00,00,00
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%SawtoothUp_CLS%,,,"%SawtoothUp%"
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%SawtoothUp_CLS%,Attributes,1,05,00,00,00,03,86,00,00,FD,03,00,00,FD,03,00,00,20,00,00,00
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%SawtoothDown_CLS%,,,"%SawtoothDown%"
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%SawtoothDown_CLS%,Attributes,1,06,00,00,00,03,86,00,00,FD,03,00,00,FD,03,00,00,20,00,00,00
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%Spring_CLS%,,,"%Spring%"
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%Spring_CLS%,Attributes,1,07,00,00,00,04,C8,00,00,65,03,00,00,65,03,00,00,20,00,00,00
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%Damper_CLS%,,,"%Damper%"
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%Damper_CLS%,Attributes,1,08,00,00,00,04,C8,00,00,65,03,00,00,65,03,00,00,20,00,00,00
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%Inertia_CLS%,,,"%Inertia%"
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%Inertia_CLS%,Attributes,1,09,00,00,00,04,C8,00,00,65,03,00,00,65,03,00,00,20,00,00,00
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%Friction_CLS%,,,"%Friction%"
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%Friction_CLS%,Attributes,1,0A,00,00,00,04,C8,00,00,65,03,00,00,65,03,00,00,20,00,00,00
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%CF_CLS%,,,"%CF%"
+HKLM,%OID_028E%\OEMForceFeedback\Effects\%CF_CLS%,Attributes,1,0B,00,00,00,05,C8,00,00,FD,03,00,00,FD,03,00,00,20,00,00,00
+[Strings]
+Provider=Microsoft
+V_MSFT=Microsoft
+V_HORI=HORI
+V_LOGI=Logitech
+V_MDCZ="Mad Catz"
+V_SITK=Saitek
+P_MSFT="Microsoft Xbox 360 Controller"
+P_H_O1="HORI DEAD OR ALIVE 4 STICK"
+P_H_O2="HORI STEERING CONTROLLER EX"
+P_H_O3="HORI HORIPAD EX TURBO"
+P_H_O4="HORI Virtua Fighter Live Arena Stick"
+P_H_O5="HORI FLIGHT STICK EX"
+P_H_O6="HORI REAL ARCADE PRO. EX"
+P_H_O7="HORI HYPER STICK PRO"
+P_H_O8="HORI TWIN STICK EX"
+P_H_O9="HORI HORIPAD EX2 TURBO"
+P_H_OA="HORI TEKKEN 6 REAL ARCADE PRO. EX"
+P_LOGI="Logitech ChillStream"
+P_MDCZ1="Mad Catz Xbox 360 Game Pad"
+P_MDCZ2="Mad Catz Street Fighter IV Arcade FightStick"
+P_MDCZ3="Mad Catz Xbox 360 Game Pad Pro"
+P_MDCZ4="Mad Catz Street Fighter IV FightPad"
+P_MDCZ5="Mad Catz Xbox 360 MicroCon Game Pad Pro"
+P_MDCZ6="Mad Catz Street Fighter IV Arcade FightStick Tournament Edition"
+P_MDCZ7="Mad Catz FightPad"
+P_MDCZ8="Mad Catz Arcade FightStick Tournament Edition"
+P_SITK="Saitek Cyborg Rumble Pad"
+Service="Xbox 360 Controller"
+PRM="System\CurrentControlSet\Services\Xbox360Controller\Parameters"
+OID_028E="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_045E&PID_028E"
+OID_000A="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_0F0D&PID_000A"
+OID_000B="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_0F0D&PID_000B"
+OID_000C="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_0F0D&PID_000C"
+OID_000D="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_0F0D&PID_000D"
+OID_000F="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_0F0D&PID_000F"
+OID_0016="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_0F0D&PID_0016"
+OID_0031="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_0F0D&PID_0031"
+OID_F500="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_1BAD&PID_F500"
+OID_F501="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_1BAD&PID_F501"
+OID_F504="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_1BAD&PID_F504"
+OID_C242="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_046D&PID_C242"
+OID_4716="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_0738&PID_4716"
+OID_4718="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_0738&PID_4718"
+OID_4726="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_0738&PID_4726"
+OID_4728="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_0738&PID_4728"
+OID_4736="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_0738&PID_4736"
+OID_4738="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_0738&PID_4738"
+OID_F029="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_1BAD&PID_F029"
+OID_F039="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_1BAD&PID_F039"
+OID_CB02="System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\VID_0738&PID_CB02"
+C_P="Control Panel for Microsoft Xbox 360 Controller"
+C_P_CLS={FFB0C361-5623-49AA-BD51-B321DB9625CE}
+FFD="Force Feedback Driver for Microsoft Xbox 360 Controller"
+FFD_CLS={FFB0C360-5623-49AA-BD51-B321DB9625CE}
+CNSF="Constant Force"
+CNSF_CLS={13541C20-8E33-11D0-9AD0-00A0C9A06E35}
+RampForce="Ramp Force"
+RampForce_CLS={13541C21-8E33-11D0-9AD0-00A0C9A06E35}
+Square=Square
+Square_CLS={13541C22-8E33-11D0-9AD0-00A0C9A06E35}
+Sine=Sine
+Sine_CLS={13541C23-8E33-11D0-9AD0-00A0C9A06E35}
+Triangle=Triangle
+Triangle_CLS={13541C24-8E33-11D0-9AD0-00A0C9A06E35}
+SawtoothUp="Sawtooth Up"
+SawtoothUp_CLS={13541C25-8E33-11D0-9AD0-00A0C9A06E35}
+SawtoothDown="Sawtooth Down"
+SawtoothDown_CLS={13541C26-8E33-11D0-9AD0-00A0C9A06E35}
+Spring=Spring
+Spring_CLS={13541C27-8E33-11D0-9AD0-00A0C9A06E35}
+Damper=Damper
+Damper_CLS={13541C28-8E33-11D0-9AD0-00A0C9A06E35}
+Inertia=Inertia
+Inertia_CLS={13541C29-8E33-11D0-9AD0-00A0C9A06E35}
+Friction=Friction
+Friction_CLS={13541C2A-8E33-11D0-9AD0-00A0C9A06E35}
+CF="Custom Force"
+CF_CLS={13541C2B-8E33-11D0-9AD0-00A0C9A06E35}
+[DestinationDirs]
+XC=10,SYSTEM32\DRIVERS
+CS=11
+XF=17
+[SourceDisksNames]
+1=,,0
+;

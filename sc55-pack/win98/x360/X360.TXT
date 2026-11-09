@@ -1,0 +1,110 @@
+=============================================================================
+  XBOX 360 CONTROLLER DRIVER FOR WINDOWS 98 SE / ME  (unofficial)
+=============================================================================
+
+Windows 98 has no driver for the Xbox 360 controller. This folder holds one:
+Microsoft's Windows XP Xbox 360 controller driver (x360c.sys 5.2.3790),
+changed by morii (http://www.katch.ne.jp/~morii/driver/x360c/) so that it
+loads on Windows 98 SE and ME. It is not from Microsoft and not part of
+NUKED SB-EMU; use it at your own risk.
+
+Once it is installed the pad is a normal Windows joystick (Control Panel >
+Game Controllers), so Windows games can use it, and NUKED SB-EMU passes it
+on to DOS games in DOS boxes (game port 201h and INT 15h, see README98.TXT):
+     DOS stick 1  = left stick
+     DOS stick 2  = right stick
+     buttons 1-4  = A, B, X, Y
+The NUKED SB-EMU status window says "Windows joystick 1: ..." when it sees it.
+
+Works with: Microsoft Xbox 360 Controller (wired - not the wireless one
+with the PC wireless receiver), Logitech ChillStream, Saitek Cyborg Rumble Pad, Mad Catz Xbox 360 pads and
+FightSticks/FightPads, HORI pads and arcade sticks.
+
+Needs: Windows 98 SE (or ME), DirectX 9.0c recommended, a working USB port.
+
+
+-----------------------------------------------------------------------------
+ INSTALLING
+-----------------------------------------------------------------------------
+
+  1. Plug the controller into a USB port.
+  2. The "Add New Hardware Wizard" opens: Next.
+  3. "Search for the best driver for your device": Next.
+  4. Tick only "Specify a location", Browse, pick this folder
+     (C:\SC55\WIN98\X360, or FILES\WIN98\X360 in the pack): OK, Next.
+  5. It finds "Microsoft Xbox 360 Controller" (or your pad's name): Next.
+     If it asks for the Windows 98 CD (for HIDCLASS.SYS / HIDPARSE.SYS),
+     insert it, or point it to C:\WINDOWS\OPTIONS\CABS if you have that.
+  6. Finish. Restart Windows if it asks.
+  7. Control Panel > Game Controllers: the pad is listed with status OK.
+     Check it on Properties > Test.
+
+Plugged it in earlier and cancelled the wizard (or it found no driver)?
+Control Panel > System > Device Manager: open "Other devices", select the
+controller, Properties > Driver > Update Driver, then follow steps 3-6.
+(NUKED SB-EMU tells you when it sees a 360 pad without a driver.)
+
+Pads from HORI or Mad Catz not found by step 5: use "Display a list of all
+the drivers...", Have Disk, Browse, and pick X360HORI.INF or
+X360MDCZ.INF in this folder.
+
+Updating from an older x360c driver: Device Manager > Sound, video and game
+controllers > Microsoft Xbox 360 Controller > Properties > Driver > Update
+Driver > "Display a list of all the drivers..." > Have Disk > this folder.
+
+
+-----------------------------------------------------------------------------
+ IF THAT DOES NOT WORK: THE MDGX VERSION (folder MDGX)
+-----------------------------------------------------------------------------
+
+The MDGX folder has the same driver files with a combined, "fixed" INF from
+the MDGX site (see MDGX\X360C.TXT). With the controller plugged in, right-
+click MDGX\X360C.INF and choose Install; it also adds an "XBox Tools" Start
+menu group with the status tool. Use one version or the other, not both.
+
+
+-----------------------------------------------------------------------------
+ TIPS (from the driver's Japanese README.JP)
+-----------------------------------------------------------------------------
+
+  * The pad's own control panel: Game Controllers > Properties. Under
+    "Advanced" you can change how Z axis / Z rotation / slider (triggers and
+    right stick) are reported, and a "compatibility mode" that limits the
+    POV hats and buttons for games that do not start with so many.
+  * A game keeps turning or accelerating by itself: in Advanced, set the
+    Z axis / Z rotation / slider to "centre based", shift the centre, or
+    invert it; failing that, use compatibility mode.
+  * A game does not see the pad: untick "polling" in Advanced (this turns
+    off the turbo function).
+  * DirectInput calibration is off: rename C:\WINDOWS\SYSTEM\X360CCP.DLL
+    (e.g. to X360CCP.BAK), calibrate in Game Controllers, then rename it
+    back.
+  * Another pad driver (Ruling Technologies or its OEM versions) is
+    installed: uninstall it, the two do not get on.
+  * X360CSA.EXE sits in the tray: left-click lists the saved settings,
+    double-click opens the control panel, right-click has automatic
+    switching (a setting named like a program, e.g. NOTEPAD.EXE, is used
+    while that program runs) and Exit.
+  * After standby the pad may not be found: unplug and replug it, or
+    restart.
+  * Not supported: friction, damper, inertia, spring and custom force-
+    feedback effects, effect direction, XInput, the Xbox 360 headset.
+
+
+-----------------------------------------------------------------------------
+ REMOVING
+-----------------------------------------------------------------------------
+
+  1. Device Manager > Sound, video and game controllers > the controller >
+     Remove. Unplug the controller.
+  2. REGEDIT: delete
+       HKEY_CLASSES_ROOT\CLSID\{FFB0C360-5623-49AA-BD51-B321DB9625CE}
+       HKEY_CLASSES_ROOT\CLSID\{FFB0C361-5623-49AA-BD51-B321DB9625CE}
+       HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\Xbox360Controller
+     and under HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\
+     MediaProperties\PrivateProperties both
+       DirectInput\VID_045E&PID_028E  and  Joystick\OEM\VID_045E&PID_028E
+     (other pads: their own VID_xxxx&PID_xxxx, listed in README.JP 5.2).
+  3. Delete C:\WINDOWS\SYSTEM\X360CCP.DLL, X360CFF.DLL,
+     C:\WINDOWS\SYSTEM32\DRIVERS\X360C.SYS and the x360c INF that Windows
+     copied to C:\WINDOWS\INF\OTHER. Restart.

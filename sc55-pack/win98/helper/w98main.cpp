@@ -697,8 +697,82 @@ static u16 joy_scale(DWORD v, UINT lo, UINT hi)
     return (u16)((uint64_t)(v - lo) * 65535 / (hi - lo));
 }
 
+// Xbox 360 pads (and the third-party pads the bundled X360 driver knows) have no driver in
+// Windows 98 itself. A plugged-in one without a driver gives "no joystick", so look for it in
+// the Configuration Manager's list of present devices (HKEY_DYN_DATA) and point to the driver
+// in WIN98\X360. Returns the pad's USB id ("VID_045E&PID_028E") or "".
+#if X360_TEST                    // test builds: 86Box has no USB pads, so use the PCI host bridge
+#define X360_PREFIX "PCI\\"         // (X360_TEST=2: pretend it has no driver)
+#define X360_DRVVAL (X360_TEST == 2 ? "NoSuchValue" : "Driver")
+#else
+#define X360_PREFIX "USB\\"
+#define X360_DRVVAL "Driver"
+#endif
+static const char* const X360_IDS[] = {
+#if X360_TEST
+    "VEN_8086&DEV_7190",
+#endif
+    "VID_045E&PID_028E", "VID_046D&PID_C242", "VID_0738&PID_4716", "VID_0738&PID_4718", "VID_0738&PID_4726",
+    "VID_0738&PID_4728", "VID_0738&PID_4736", "VID_0738&PID_4738", "VID_0738&PID_A728", "VID_0738&PID_CB02",
+    "VID_0F0D&PID_000A", "VID_0F0D&PID_000B", "VID_0F0D&PID_000C", "VID_0F0D&PID_000D", "VID_0F0D&PID_000F",
+    "VID_0F0D&PID_0016", "VID_0F0D&PID_0031", "VID_1BAD&PID_F028", "VID_1BAD&PID_F029", "VID_1BAD&PID_F039",
+    "VID_1BAD&PID_F500", "VID_1BAD&PID_F501", "VID_1BAD&PID_F502", "VID_1BAD&PID_F504", "VID_1BAD&PID_F506"};
+
+static std::string x360_without_driver()
+{
+    HKEY root;
+    if (RegOpenKeyExA(HKEY_DYN_DATA, "Config Manager\\Enum", 0, KEY_READ, &root) != ERROR_SUCCESS) return "";
+    std::string found;
+    char name[64];
+    for (DWORD i = 0; found.empty(); i++) {
+        DWORD nl = sizeof name;
+        if (RegEnumKeyExA(root, i, name, &nl, NULL, NULL, NULL, NULL) != ERROR_SUCCESS) break;
+        HKEY dn;
+        if (RegOpenKeyExA(root, name, 0, KEY_READ, &dn) != ERROR_SUCCESS) continue;
+        char hw[256] = "";
+        DWORD hl = sizeof hw - 1, problem = 0, pl = sizeof problem;
+        RegQueryValueExA(dn, "HardWareKey", NULL, NULL, (BYTE*)hw, &hl);
+        RegQueryValueExA(dn, "Problem", NULL, NULL, (BYTE*)&problem, &pl);
+        RegCloseKey(dn);
+        std::string h = hw;
+        for (auto& ch : h) ch = (char)toupper((unsigned char)ch);
+        if (h.compare(0, strlen(X360_PREFIX), X360_PREFIX)) continue;
+        for (const char* id : X360_IDS) {
+            if (h.find(id) == std::string::npos) continue;
+            // driver installed = the device's Enum key names one and the devnode has no problem
+            HKEY ek;
+            char drv[128] = "";
+            DWORD dl = sizeof drv - 1;
+            if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, ("Enum\\" + std::string(hw)).c_str(), 0, KEY_READ, &ek) == ERROR_SUCCESS) {
+                RegQueryValueExA(ek, X360_DRVVAL, NULL, NULL, (BYTE*)drv, &dl);
+                RegCloseKey(ek);
+            }
+            if (!drv[0] || problem) found = id;
+            break;
+        }
+    }
+    RegCloseKey(root);
+    return found;
+}
+
+static DWORD WINAPI x360_prompt(LPVOID)
+{
+    std::string dir = path_join(g_exedir, "X360");
+    int r = MessageBoxA(NULL, (std::string(
+        "An Xbox 360 controller is plugged in, but Windows 98 has no driver for it, so neither Windows "
+        "nor DOS games can use it.\r\n\r\nThis pack comes with an unofficial Windows 98 driver for it "
+        "(folder ") + dir + ").\r\n\r\nShow how to install it?\r\n(No = do not ask again)").c_str(),
+        APP_TITLE, MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND);
+    if (r == IDYES) {
+        ShellExecuteA(NULL, "open", path_join(dir, "X360.TXT").c_str(), NULL, dir.c_str(), SW_SHOWNORMAL);
+        ShellExecuteA(NULL, "open", dir.c_str(), NULL, NULL, SW_SHOWNORMAL);
+    } else WritePrivateProfileStringA("SC55W", "X360Prompt", "0", g_inipath.c_str());
+    return 0;
+}
+
 static DWORD WINAPI joy_main(LPVOID)
 {
+    bool x360_asked = false;
     JOYCAPSA cap[2];
     bool ok[2] = {false, false};
     DWORD last_check = 0;
@@ -721,7 +795,18 @@ static DWORD WINAPI joy_main(LPVOID)
                     d += b;
                 }
             }
-            if (d.empty()) d = "none found in Windows (Control Panel > Game Controllers)";
+            if (d.empty()) {
+                std::string x = x360_without_driver();
+                if (!x.empty()) {
+                    d = "none - an Xbox 360 controller (" + x + ") is plugged in without a driver: "
+                        "install it from WIN98\\X360 (X360.TXT)";
+                    if (!x360_asked && ini_int("X360Prompt", 1)) {
+                        x360_asked = true;
+                        HANDLE t = CreateThread(NULL, 0, x360_prompt, NULL, 0, NULL);
+                        if (t) CloseHandle(t);
+                    }
+                } else d = "none found in Windows (Control Panel > Game Controllers)";
+            }
             if (d != last_desc) {
                 logf("joystick: %s", d.c_str());
                 last_desc = d;
