@@ -38,8 +38,12 @@
 </table>
 
 <b>Release counter:</b><br>
-<img src="docs/90s/counter.gif" alt="000072"><br>
+<img src="docs/90s/counter.gif" alt="000082"><br>
 <sub>betas and counting!</sub>
+
+<br><br>
+
+<a href="#-whats-new-"><img src="docs/90s/ticker.gif" width="600" alt="NEW!! beta.82: virtual CDs work like a real disc"></a>
 
 <br><br>
 
@@ -47,13 +51,14 @@
 
 <br>
 
-<b>[ <a href="#-whats-new-">What's New</a> |
-<a href="#-what-is-this-">What Is This?</a> |
-<a href="#-cool-features-">Features</a> |
-<a href="#-will-it-run-on-my-pc-">Will It Run?</a> |
-<a href="#-getting-started-">Get Started</a> |
-<a href="#-download-zone-">Downloads</a> |
-<a href="#-sign-my-guestbook-">Guestbook</a> ]</b>
+<b>~ SITE MAP ~</b> <sub>(click a button!!)</sub>
+
+<table>
+<tr><td><a href="#-whats-new-"><img src="docs/90s/nav-news.gif" width="88" alt="What's new"></a></td><td><a href="#-what-is-this-"><img src="docs/90s/nav-what.gif" width="88" alt="What is this?"></a></td><td><a href="#-cool-features-"><img src="docs/90s/nav-features.gif" width="88" alt="Features"></a></td><td><a href="#-will-it-run-on-my-pc-"><img src="docs/90s/nav-run.gif" width="88" alt="Will it run?"></a></td></tr>
+<tr><td><a href="#-my-test-lab-"><img src="docs/90s/nav-lab.gif" width="88" alt="My test lab"></a></td><td><a href="#-getting-started-"><img src="docs/90s/nav-start.gif" width="88" alt="Getting started"></a></td><td><a href="#-usb-gamepads-in-dos-"><img src="docs/90s/nav-pads.gif" width="88" alt="USB gamepads"></a></td><td><a href="#-supported-sound-chips-"><img src="docs/90s/nav-chips.gif" width="88" alt="Sound chips"></a></td></tr>
+<tr><td><a href="#-screenshots-"><img src="docs/90s/nav-shots.gif" width="88" alt="Screenshots"></a></td><td><a href="#-hall-of-fame-"><img src="docs/90s/nav-fame.gif" width="88" alt="Hall of fame"></a></td><td><a href="#-built-with-claude-"><img src="docs/90s/nav-claude.gif" width="88" alt="Built with Claude"></a></td><td><a href="#-100-homemade-"><img src="docs/90s/nav-home.gif" width="88" alt="100% homemade"></a></td></tr>
+<tr><td><a href="#-download-zone-"><img src="docs/90s/nav-download.gif" width="88" alt="Downloads"></a></td><td><a href="#-sign-my-guestbook-"><img src="docs/90s/nav-guest.gif" width="88" alt="Guestbook"></a></td><td><a href="#-for-the-nerds-source-code-"><img src="docs/90s/nav-source.gif" width="88" alt="Source code"></a></td><td><a href="#-thanks-to-my-friends-"><img src="docs/90s/nav-thanks.gif" width="88" alt="Thanks"></a></td></tr>
+</table>
 
 <img src="docs/90s/parade.gif" width="100%" alt="A parade of Freedoom monsters, the marine and Flopsy">
 
@@ -194,6 +199,8 @@ never takes more than about 60% of the CPU, so your game always gets the rest.
 
 </details>
 
+<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+
 <div align="center"><img src="docs/90s/fd-zombie.gif" alt=""> <img src="docs/90s/ic-sparkle.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-sparkle.gif" alt=""> <img src="docs/90s/mascot-flopsy.gif" alt=""></div>
 
 ## ★ What is this?? ★
@@ -218,6 +225,8 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 > **ROMs are NOT included!!** Bring your own SC-55 (and MT-32 / CM-32L) dumps.
 > They're recognised by what's inside them, so the file names don't matter.
 
+<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+
 <div align="center"><img src="docs/90s/fd-hatchling.gif" alt=""> <img src="docs/90s/ic-speaker.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-speaker.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
 ## ★ Cool Features ★
@@ -226,7 +235,7 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 <tr><td>🔊</td><td><b>Sound Blaster 1.x / 2.0 / Pro / 16 + OPL3 FM</b> in pure DOS, on your PCI sound chip</td></tr>
 <tr><td>🎹</td><td><b>Roland SC-55 and SC-55mkII</b>: the real firmware, from your ROMs</td></tr>
 <tr><td>🎼</td><td><b>Roland MT-32 / CM-32L</b> (Munt), or any <code>.SF2</code> SoundFont</td></tr>
-<tr><td>💿</td><td><b>Virtual CD drive M:</b>: ISO, CUE/BIN, multi-disc, with CD music mixed in</td></tr>
+<tr><td>💿</td><td><b>Virtual CD drive M:</b> that works like a real disc: ISO, CUE/BIN, multi-disc, CD music played by the drive and mixed in</td></tr>
 <tr><td>🎮</td><td><b>USB game pads</b> as gameport joysticks (up to two), plus USB keyboard and a USB mouse right next to your touchpad</td></tr>
 <tr><td>🕹️</td><td><b>The pad presses each game's own keys</b>: jump, fire, pogo, menu, for over 3500 DOS games, in DOS and Windows 98</td></tr>
 <tr><td>🪟</td><td><b>Windows 98</b>: SB / OPL3 / MPU for DOS boxes, a "NUKED SB-EMU" MIDI device, a joystick + game port for every game, and barely any CPU while idle</td></tr>
@@ -263,7 +272,9 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 <details>
 <summary><b>&gt;&gt; Virtual CD drive and CD music &lt;&lt;</b></summary>
 
-- Mounts `.ISO`, `.CUE/.BIN` (raw or 2048-byte) and multi-disc games on drive **M:** (uCDD + SHSUCDX)
+- Mounts `.ISO`, `.CUE/.BIN` (raw or 2048-byte) and multi-disc games on drive **M:** (uCDD 0.9.5-a3 + SHSUCDX 3.09, both built from source)
+- **M: is the first CD drive**, even when a real CD-ROM drive is there too, so games find the disc instead of your empty drive
+- **The drive plays CD music by itself** like a real one: play, pause, resume, track time, "busy" until the track ends, PREGAP in CUE sheets
 - **CD music played through your sound card**, mixed with the game (`HYBRID.BAT`)
 - Swap discs while SBEMU runs; the music stops when a disc comes out
 - CD images screen: disc label and date, track list with lengths, file list without mounting, run a disc's installer, fix broken CUE files
@@ -295,6 +306,8 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 - Rests when nothing plays: about **0.25% CPU** while idle on a Pentium II
 - See [`README98.TXT`](sc55-pack/pack/README98.TXT)
 </details>
+
+<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
 <div align="center"><img src="docs/90s/fd-worm.gif" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
@@ -330,6 +343,8 @@ emulated CPU, and that always runs at full speed.)
 | **Sound** | a PCI / onboard chip from the [big list](#-supported-sound-chips-) | Intel AC'97 or HD Audio |
 | **DOS** | MS-DOS 6.22 / 7.x or FreeDOS, plain DOS | Windows 98 "Restart in MS-DOS mode" |
 | **Disk** | about 25 MB, more for disc images | |
+
+<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
 <div align="center"><img src="docs/90s/fd-potion.gif" alt=""> <img src="docs/90s/ic-rocket.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-rocket.gif" alt=""> <img src="docs/90s/mascot-flopsy.gif" alt=""></div>
 
@@ -367,6 +382,8 @@ Every release gets tried on real iron here, plus a whole fleet of emulated PCs:
 **Emulated:** 86Box (Celeron 366 for "how slow can it go?", Pentium II with Windows 98 SE) and QEMU, with custom
 add-ons: a fake USB Xbox 360 pad, a joystick driven from a file and scripted keys and screenshots.
 
+<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+
 <div align="center"><img src="docs/90s/port220-small.gif" width="96" alt=""> <img src="docs/90s/ic-computer.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-computer.gif" alt=""> <img src="docs/90s/fd-potion.gif" alt=""></div>
 
 ## ★ Getting Started ★
@@ -395,6 +412,8 @@ Duke-style games by itself.
 
 The `README.TXT` in the pack is the full manual.
 </details>
+
+<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
 <div align="center"><img src="docs/90s/fd-marine-walk.gif" alt=""> <img src="docs/90s/ic-pad.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-pad.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
@@ -431,6 +450,8 @@ but the pad: [see all the screenshots](docs/padkeys-tests/README.md)!
 
 Works on my D810. Hubs are tested in QEMU on every controller type; a pad
 behind a USB 2.0 hub on a USB 2.0 port still needs a real-hardware test.
+
+<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
 <div align="center"><img src="docs/90s/mascot-canvaskid.gif" width="96" alt=""> <img src="docs/90s/ic-speaker.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-speaker.gif" alt=""> <img src="docs/90s/fd-serpentipede.gif" alt=""></div>
 
@@ -480,6 +501,8 @@ works for some people.
 
 > [!TIP]
 > Not sure what's in your PC? Boot DOS and run `SBEMU` once. It tells you the chip it found.
+
+<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
 <div align="center"><img src="docs/90s/fd-hatchling.gif" alt=""> <img src="docs/90s/ic-camera.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-camera.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
@@ -579,6 +602,8 @@ works for some people.
 
 </div>
 
+<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+
 <div align="center"><img src="docs/90s/fd-potion.gif" alt=""> <img src="docs/90s/ic-cd.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-cd.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
 ## ★ Hall of Fame!! ★
@@ -593,9 +618,11 @@ Stuff this little pack pulled off that I'm REALLY proud of:
 - 🏆 **USB mouse right next to a laptop touchpad**, no memory manager needed, by talking to the BIOS's own mouse services
 - 🏆 **Your pad presses each game's own keys** in over 3500 DOS games: SBEMU watches which program DOS starts and picks that game's layout. 13 shareware games, Doom II and the full Wolf3D were all played with nothing but the pad
 - 🏆 **Our own Windows 98 drivers**: a virtual Sound Blaster / OPL3 / MPU-401 for DOS boxes, a MIDI driver, a joystick driver and a virtual game port, **idling at 0.25% of the CPU**
-- 🏆 **CD music from CUE/BIN images mixed into the game's sound**, plus a patch so the virtual CD drive can let go of CUE images again
+- 🏆 **A virtual CD drive that acts like a real one**: rebuilt from source with our own CD-audio part, first in line for games, and CD music from CUE/BIN images mixed into the game's sound
 - 🏆 **3D menus drawn by the CPU** at 640×480, with no 3D card, that still run on a 366 MHz Celeron
 - 🏆 **Tested like crazy** on emulated PCs: custom 86Box builds with a fake USB pad, a file-driven joystick and a strict keyboard controller, QEMU with a fake Xbox 360 pad, and real games driven by scripts
+
+<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
 <div align="center"><img src="docs/90s/port220-small.gif" width="96" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/fd-keycard.gif" alt=""></div>
 
@@ -610,16 +637,16 @@ MPXPlay drivers, **Japheth**'s HX and Jemm, **vorvek**'s uCDD and everyone in [T
 
 Everything new on top of them was written by **Claude**, Anthropic's AI: the code, the bug hunting, the emulated
 test PCs, the docs and Port 220. My part was the ideas, the direction and the testing on my own PCs. The numbers (from this repo's
-history, November 4 - 10, 2026):
+history, November 4 - 10, 2026, at beta.82):
 
 <div align="center">
 
 | | |
 |---|---|
-| 🧑‍💻 **commits co-written by Claude** | **118 of 124** |
-| 📦 **releases** | **47** |
+| 🧑‍💻 **commits co-written by Claude** | **122 of 128** |
+| 📦 **releases** | **48** |
 | 📜 **new code** | **about 30,000 lines**: DOS programs, SBEMU additions, Windows 98 drivers, test rigs |
-| 📖 **docs** | a 1,350-line manual (README.TXT) and a 900-line dev diary (HANDOFF.md) |
+| 📖 **docs** | a 1,370-line manual (README.TXT) and a 940-line dev diary (HANDOFF.md) |
 | 🎨 **art** | Port 220 and every animated GIF on this page |
 
 </div>
@@ -627,6 +654,8 @@ history, November 4 - 10, 2026):
 Highlights of what that means: a USB host for DOS from scratch, a 20% faster SC-55 that still plays every sample
 the same, Windows 98 drivers, 3D menus, the pad-keys-per-game system, and dozens of bugs found in emulators
 before they ever reached my real hardware.
+
+<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
 <div align="center"><img src="docs/90s/fd-hatchling.gif" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
@@ -665,6 +694,7 @@ drivers we bundle and the Xbox 360 driver for Windows 98 come from their origina
 | `MPUTEST`, `JOYTEST`, `KMTEST`, `USBTEST` | MIDI port, joystick, keyboard / mouse and USB step-by-step checks |
 | `SC55WAV`, `SC55LOG` | render the SC-55 to WAV and measure its speed on your PC |
 | `PADCONV` | turns the free Keyb2Joypad download into the pad layouts |
+| CD-audio part of `UCDD`, `SHSUCDX /P` | the virtual drive plays CD music like a real one, and goes first in the list of CD drives |
 | `SETUP`, `CDINST`, `CLEANUP`, `UNINSTAL`, `BUGREP` | install, remove and one-key bug reports, without touching CONFIG.SYS or AUTOEXEC.BAT |
 | `SC55`, `SC55JEM`, `SC55QMM`, `HYBRID`... | launchers for protected-mode, real-mode and CD-music games |
 </details>
@@ -690,9 +720,11 @@ drivers we bundle and the Xbox 360 driver for Windows 98 come from their origina
 | Windows 98 test VM | scripts that install and drive Windows 98 for the driver tests |
 | Host benchmark | runs the SC-55 core on a normal PC to make it faster without changing its sound |
 | `k2j.py` | reads DOSBox Pure's button layouts |
-| `ucdd-unmount-fix.py` | the patch that lets uCDD unmount CUE images |
+| uCDD + SHSUCDX build scripts | the CD drivers rebuilt from their sources with our changes |
 | `make90s.py`, `port220.py` | every animated GIF on this page, Port 220 included |
 </details>
+
+<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
 <div align="center"><img src="docs/90s/fd-trilobite.gif" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
@@ -718,6 +750,8 @@ drivers we bundle and the Xbox 360 driver for Windows 98 come from their origina
 | **GSCDROM.SYS** (LG) | LG drives XCDROM doesn't like (optional) | [DOS Days](https://www.dosdays.co.uk/topics/Software/optical_downloads.php) | `FILES\GSCDROM` |
 | **QEMM 8 / 9** | `SC55QMM.BAT` only (optional) | Out of print; JEMMEX + QPIEMU (included) does the same job | `FILES\QEMM` |
 
+<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+
 <div align="center"><img src="docs/90s/mascot-flopsy.gif" alt=""> <img src="docs/90s/ic-news.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-news.gif" alt=""> <img src="docs/90s/fd-worm.gif" alt=""></div>
 
 ## ★ Sign My Guestbook! ★
@@ -734,6 +768,8 @@ In DOS, open **MENU → Files → Make a bug report** (or run `BUGREP` in
 settings, SBEMU's messages and test results. Attach it and tell me what you
 were doing. If SBEMU hung, the last `[step]` line in `SBDETAIL.TXT` shows
 exactly where.
+
+<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
 <div align="center"><img src="docs/90s/port220-small.gif" width="96" alt=""> <img src="docs/90s/ic-computer.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-computer.gif" alt=""> <img src="docs/90s/fd-marine-shoot.gif" alt=""></div>
 
@@ -769,6 +805,8 @@ needs MinGW-w64 i686, Open Watcom 2 and JWasm; see
 tested, what still needs real hardware. The 90s graphics on this page are
 drawn by [`docs/90s/make90s.py`](docs/90s/make90s.py).
 
+<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+
 <div align="center"><img src="docs/90s/tux-waddle.gif" width="96" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/mascot-canvaskid.gif" width="96" alt=""></div>
 
 ## ★ Thanks To My Friends ★
@@ -803,8 +841,8 @@ The whole thing is **GPL-2.0-or-later** ([`COPYING`](sc55-pack/COPYING)).
 |---|---|---|
 | HDPMI32i, HDPMI16I | **Japheth (Andreas Grech)** ([HX](https://github.com/Baron-von-Riedesel/HX)); port-trap API and IOPL0 build by **crazii** ([crazii/HX](https://github.com/crazii/HX)); HDPMI16I built from crazii/HX with a two-line patch ([notes](sc55-pack/third_party/hdpmi16/README.TXT)) | freeware, source available |
 | JEMMEX, JEMM386, JLOAD, QPIEMU | **Japheth** ([Jemm](https://github.com/Baron-von-Riedesel/Jemm)) | see `JEMMLIC.TXT` |
-| μCDD 0.9.5-a2 | **[vorvek](https://github.com/vorvek/uCDD)**; this copy adds a CD-audio link for SBEMU and the beta.71 unmount fix ([`scripts/ucdd-unmount-fix.py`](sc55-pack/scripts/ucdd-unmount-fix.py)) | GPL-3.0 |
-| SHSUCDX | **Jason Hood** ([shsucd](https://github.com/adoxa/shsucd)), from v1.4b by **John McCoy** | freeware, source available |
+| μCDD 0.9.5-a3 | **[vorvek](https://github.com/vorvek/uCDD)**; built from source with this pack's CD-audio part and SBEMU link ([`third_party/ucdd`](sc55-pack/third_party/ucdd)) | GPL-3.0 |
+| SHSUCDX 3.09 | **Jason Hood** ([shsucd](https://github.com/adoxa/shsucd)), from v1.4b by **John McCoy**; built from source with a new `/P` option ([`third_party/shsucdx`](sc55-pack/third_party/shsucdx)) | zlib-style, see its LICENSE |
 | XCDROM | **Jack R. Ellis** | GPL, source in the zip |
 | [CuteMouse](https://cutemouse.sourceforge.net/) 2.1b4 | **Nagy Daniel**, **Arkady V. Belousov**, 2.1 betas by **Eric Auer**, and contributors | GPL-2.0, source in the zip |
 </details>
