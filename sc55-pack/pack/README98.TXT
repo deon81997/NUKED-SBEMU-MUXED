@@ -259,6 +259,13 @@ Windows-only options, in C:\SC55\WIN98\SC55W.INI under [SC55W]:
      BufferMs=80        sound output buffer (20-500). Raise it if the
                         sound breaks up; lower it for less delay.
      BlockMs=10         size of each buffer block (5-50).
+     BufferAuto=1       when a DOS game plays sound and the output keeps
+                        running dry (full-screen games leave Windows
+                        programs only short turns), the buffer grows to
+                        160, then 300 ms; back to BufferMs after a
+                        minute without DOS sound. 0 = off.
+     TraceFile=0        1 = write the driver's DMA/IRQ events to
+                        SC55W.TRC (troubleshooting).
      OutputSleep=1      stop the sound output while nothing makes a sound
                         (saves CPU; it starts again within about 20 ms).
                         0 = keep it running, if your sound card's driver
@@ -334,6 +341,11 @@ normal rate unless a DOS program plays sound or reads the joystick.
      Multimedia > MIDI, or pick "NUKED SB-EMU" in the program.
   Stuck notes:   tray icon > All notes off.
   Sound breaks up: raise BufferMs (section 3), lower the sample rate.
+  A DOS game's sound comes in short bursts with gaps (Blood, Sound
+                 Blaster 16 at 44 kHz, before beta.89-w98.5): Windows gave
+                 our sound program too little time while the game ran full
+                 screen. Fixed with BufferAuto (above); on older versions
+                 set BufferMs=300.
   C:\SC55\WIN98\SC55W.LOG shows what happened at the last start.
 
 

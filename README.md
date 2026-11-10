@@ -76,6 +76,13 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.89-w98.5.** **Blood sounds right in Windows 98!!** Blood's effects
+(Sound Blaster 16, 44 kHz) came out in short bursts with gaps in a Windows DOS box. Recorded in our Windows 98 test PC:
+only about 40 ms of sound in every 120 ms. The cause: a full-screen DOS game gets most of the CPU, and Windows then
+runs our sound program only in short turns, so its 80 ms buffer ran dry in between. Now the buffer grows by itself
+(160, then 300 ms) while a DOS game plays sound and the output keeps running dry, and shrinks back a minute later.
+Gaps in the Blood test: 56% of the time before, 1% now (the game's own pauses).
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.89.** **The SC-55 needs 11-14% less CPU, same sound bit for bit!!**
 The SC-55 emulation is now built with profile-guided optimization: we ran an instrumented build in DOS to record which
 code paths are hot, and the compiler used that to lay out the code. 86Box, Pentium II 450: SC55WAV renders 13.6% faster
@@ -99,17 +106,17 @@ Panels' moving background now uses whole-number math (it did a slow float conver
 Carousel's see-through mirror floor is drawn row by row like MIDPLAY's. 86Box, Pentium II 450 at full 640x480:
 Panels 8.5 -> 10.1 frames a second, Carousel 8.6 -> 11.4.
 
+<details>
+<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
+
+<br>
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.85.** **MIDPLAY's 3D view, 3x smoother!!** On the D810 it showed
 only 5-6 pictures a second. It used to rest between frames to leave the CPU to the music, which is no longer needed
 since beta.83 sends the music while drawing: now it draws as fast as the PC allows, up to 60 a second. The grid floor
 (half of every frame) is now drawn row by row, about 3x faster, and the 3D menus get that too. 86Box, Pentium II 450
 with the SC-55 busy: 41 frames in 30 s before, 140 now, music still on time. The playlist now shows the file name
 first, then the title.
-
-<details>
-<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
-
-<br>
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.84.** **A hidden bug squashed: 3D games and SBEMU get along!!**
 Thin black lines across MIDPLAY's new 3D view led us to an old bug: SBEMU's sound interrupt and its Sound Blaster,

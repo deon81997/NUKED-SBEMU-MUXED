@@ -1081,3 +1081,25 @@ resampler, USB polling.
 - Queue after this (user): Blood sound broken in Windows 98 (reported with beta.85; game files in user upload
   BLOOD.zip: SB16 A220 I7 D1 H5, 44 kHz 16-bit stereo, FX and music on SB/OPL); MMX 3D renderer; Win98 DOS-box
   performance, Windows bug sweep, DOS/Windows feature parity.
+
+## beta.89-w98.5 (2026-11-10): Blood's sound in Windows 98 (RELEASED, tag v1.0.0-beta.89-w98.5-usb)
+User: "Blood's sound is broken in Windows" (beta.85; game = user upload BLOOD.zip, BLOOD.CFG SB16 type 6, 16-bit
+stereo 44000, I7 D1 H5, FX + music on SB/OPL).
+- Rig: 86Box Win98 VM /home/claude/padtest/w86 (P2B-LS PII-450 dynarec, ESS Solo-1; its legacy SB holds 220/388/330 and
+  DMA 1 -> tests used /A:240 /I:7 /D:3 /H:7 /T:6 /P:300 and BLOOD.CFG to match; FM 388 stays on the ESS). D: disk
+  built from /home/claude/w98blood (BLOOD\, SET240*.BAT, UPD.BAT, INIRESET.BAT, BUF300.BAT, TRON.BAT); /tmp/w86run.sh
+  types into Start > Run (Win+R = key 0x15b + 0x13). 86Box "audio start DIR" records main.wav (the card's PCM);
+  /tmp/gaps.py measures silent gaps. SC55W for the VM: ARCH="-march=pentium2 -O2" OBJ=build98p2 LIB=b98p2.
+- Measured gaps (share of the time between first and last sound): SB16 16-bit 49-56% (median gap 80 ms, ~40 ms of
+  sound in every ~120 ms), SB Pro 8-bit 5%. SC55W.LOG: resyncs 307 in 30 s.
+- Cause: not DMA - a full-screen DOS VM gets most of the time slices (WinTimeSlice 100,50), SC55W (system VM) runs in
+  short turns and the 80 ms waveOut buffer runs dry between them; pcm_render then also dropped the backlog
+  (avail > 4 x target). BufferMs=300 by hand: 7% gaps (= the game's own pauses).
+- Fix (helper only, VxD unchanged): w98main.cpp BufferAuto (default 1): while sh->dma_active (or < 1 s ago) and >= 3
+  underruns within 3 s, buffer 80 -> 160 -> 300 ms (wave reopened, logged); back to BufferMs after 60 s without DMA.
+  engine pcm_slack_ms: the drop threshold is also >= 1.5 x the buffer. Result: 1% gaps, no settings.
+- Also new: SC55W.INI TraceFile=1 -> SC55W.TRC (VxD trace ring every 100 ms, file reopened each time - Windows only
+  updates a file's size on close). NOTE: while a DOS game runs full screen even SC55W.LOG writes may sit in the cache.
+- Possible better fix later: let the VxD boost the system VM (Adjust_Exec_Priority / Call_Priority_VM_Event) while DOS
+  DMA sound plays, for low latency without the bigger buffer.
+Zip = beta.89 zip + FILES\WIN98\SC55W.EXE (Pentium M build), SOURCE.ZIP, README98.TXT (x2).

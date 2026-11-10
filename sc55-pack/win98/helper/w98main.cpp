@@ -389,6 +389,13 @@ static DWORD WINAPI audio_main(LPVOID)
     if (buf_ms < 20) buf_ms = 20;
     if (buf_ms > 500) buf_ms = 500;
     const bool out_sleep = ini_int("OutputSleep", 1) != 0;
+    // A DOS game full screen gets most of the CPU in time slices; this thread then only runs in short turns
+    // and an 80 ms output buffer runs dry between them (Blood: ~40 ms of sound, ~80 ms of silence). While
+    // DOS DMA sound plays and the output keeps running dry, the buffer steps up to 160, then 300 ms; a minute
+    // without DMA sound brings it back. SC55W.INI BufferAuto=0 keeps BufferMs as it is.
+    const int buf_base = buf_ms;
+    const bool buf_auto = ini_int("BufferAuto", 1) != 0;
+    DWORD dry_t = 0, last_dma = 0; unsigned dry_u = 0;
 
     while (!g_quit) {
         if (InterlockedExchange(&g_have_pending, 0)) {
@@ -551,6 +558,23 @@ static DWORD WINAPI audio_main(LPVOID)
 
         // /VSCAUTO: shed the SC-55's reverb/chorus when the CPU cannot keep up
         DWORD now = GetTickCount();
+        if (sh && sh->dma_active) last_dma = now;
+        if (g_wo && buf_auto && sh && now - last_dma < 1000) {
+            if (!dry_t || now - dry_t > 3000) { dry_t = now; dry_u = underruns; }
+            else if (underruns - dry_u >= 3 && buf_ms < 300) {
+                buf_ms = buf_ms < 160 ? 160 : 300;
+                eng.pcm_slack_ms = buf_ms;
+                logf("audio: the output ran dry while a DOS program played (Windows runs us in short turns "
+                     "then) - buffer now %d ms", buf_ms);
+                wave_close(); last_wave_try = 0; dry_t = 0;
+                continue;
+            }
+        }
+        if (buf_ms > buf_base && now - last_dma > 60000) {
+            buf_ms = buf_base; eng.pcm_slack_ms = 0;
+            logf("audio: no DOS sound for a minute - buffer back to %d ms", buf_ms);
+            if (g_wo) { wave_close(); last_wave_try = 0; continue; }
+        }
         if (cur.scauto && eng.midi && !eng.st.midi_idle) {
             if (!shed && load > 0.70) {
                 eng.midi->set_fx(false);
@@ -580,6 +604,24 @@ static DWORD WINAPI audio_main(LPVOID)
             if (vs && (v != last_vol || vs != last_set))
                 logf("Windows MIDI volume: left %u%%, right %u%%", (unsigned)((v & 0xFFFF) * 100 / 65535), (unsigned)((v >> 16) * 100 / 65535));
             last_vol = v; last_set = vs;
+        }
+        if (g_sh) {                         // TraceFile=1 in SC55W.INI: the VxD's DMA/IRQ/DSP trace into SC55W.TRC
+            static int tr_on = -1; static FILE* trf; static uint32_t tr_last; static std::string tr_path; static DWORD tr_t;
+            if (tr_on < 0) {
+                tr_on = ini_int("TraceFile", 0);
+                if (tr_on) { std::string p = g_inipath.substr(0, g_inipath.find_last_of("\\") + 1) + "SC55W.TRC"; trf = fopen(p.c_str(), "w"); if (trf) fclose(trf); trf = trf ? (FILE*)1 : NULL; tr_path = p; tr_last = g_sh->tr_head; }
+            }
+            if (trf && now - tr_t >= 100 && (tr_t = now, true)) {
+                FILE* f = fopen(tr_path.c_str(), "a");          // closed every time: Windows only updates the size then
+                uint32_t h = g_sh->tr_head;
+                if (!f) h = tr_last;
+                if (h - tr_last > TRACE_SIZE) { fprintf(f, "-- %u lost\n", (unsigned)(h - tr_last - TRACE_SIZE)); tr_last = h - TRACE_SIZE; }
+                for (; tr_last != h; tr_last++) {
+                    const uint32_t* e = (const uint32_t*)g_sh->tr[tr_last & (TRACE_SIZE - 1)];
+                    fprintf(f, "%10u %2u %08X %08X\n", (unsigned)e[0], (unsigned)e[1], (unsigned)e[2], (unsigned)e[3]);
+                }
+                if (f) fclose(f);
+            }
         }
         // the first minute after start: a trace every 5 s (a freeze then leaves its last line)
         if (now - trace_start < 60000 && now - trace_last >= 5000) {

@@ -20,6 +20,7 @@ class Engine {
 public:
     Options opt;
     int rate = 44100;            // output rate
+    int pcm_slack_ms = 0;        // a bigger output buffer: DMA sound may pile up this much before it is dropped
     int latency_ms = 50;         // events are rendered this long after they happen
     std::unique_ptr<MidiSynth> midi;
     std::unique_ptr<Opl> opl;

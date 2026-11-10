@@ -132,7 +132,8 @@ void Engine::pcm_render(SC55W_SHARED* sh, float* out, int frames)
     if (err > 1) err = 1;
     if (err < -1) err = -1;
     double step = pcm_rate / rate * (1.0 + 0.01 * err);
-    if (avail > target * 4) {                   // far behind (e.g. after a stall): drop the excess
+    uint32_t slack = (uint32_t)(pcm_rate * (double)pcm_slack_ms / 1000.0 * 1.5);
+    if (avail > target * 4 && avail > slack) {  // far behind (e.g. after a stall): drop the excess
         sh->pcm_tail += avail - target;
         st.resyncs++;
     }
