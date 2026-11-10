@@ -57,7 +57,12 @@ static int tui_mouse = -1, tui_mx = 40, tui_my = 13, tui_mbtn, tui_mshow;
 static uint16_t tui_scr[TUI_H][TUI_W], tui_shown[TUI_H][TUI_W];
 static void (*tui_anim)(unsigned long tick);  /* called ~9 times a second while waiting for a key (Groovy) */
 
-static int tui_margin_dirty = 1;          /* the border around the 80x25 screen (bigger modes) needs drawing */
+static int tui_margin_dirty = 1;
+/* called often while the screen is drawn and while waiting for keys (between rows, between scan lines in VESA
+ * graphics, in the retrace wait): MIDPLAY sends the MIDI events that are due from it, so drawing never delays
+ * the music. NULL in the other programs. */
+static void (*tui_hook)(void);
+#define TUI_HOOK() do { if (tui_hook) tui_hook(); } while (0)          /* the border around the 80x25 screen (bigger modes) needs drawing */
 TUI_FN void tui_invalidate(void) { memset(tui_shown, 0xFF, sizeof tui_shown); tui_margin_dirty = 1; } /* next flush redraws all */
 /* F3 in any program: the next style, saved in THEME.CFG for MENU and every other program (not in safe mode) */
 TUI_FN void tui_theme_next(const char* home)
@@ -88,6 +93,7 @@ static int tui_gw, tui_gh, tui_gpitch, tui_gsel, tui_gwinseg, tui_ggran, tui_gba
 static unsigned long tui_gphys, tui_glin;
 static unsigned char tui_gfont[256 * 16];               /* ROM 8x16 font with the chosen letters on top */
 static unsigned char* tui_gglyph;                        /* scaled glyphs: 256 x cw x ch, 1 = ink */
+static unsigned char* tui_gline;                         /* per glyph line: 0 = no ink, 1 = all ink, 2 = mixed */
 TUI_FN void tui_geometry(void)
 {
     if (tui_in_gfx) { tui_cols = tui_gw; tui_rows = tui_gh; tui_ox = tui_oy = 0; tui_margin_dirty = 1; return; }
@@ -198,7 +204,7 @@ static void tui_gfx_font(void)
         for (; l->w; l++) if (l->w <= tui_cw && l->h <= tui_ch) gf = l;
         if (gf) { gw = gf->w; gh = gf->h; ox = (tui_cw - gw) / 2; oy = (tui_ch - gh) / 2; }
     }
-    free(tui_gglyph);
+    free(tui_gglyph); free(tui_gline); tui_gline = NULL;
     tui_gglyph = (unsigned char*)malloc((size_t)256 * tui_cw * tui_ch);
     if (!tui_gglyph) return;
     for (i = 0; i < 256; i++)
@@ -234,6 +240,15 @@ static void tui_gfx_font(void)
             }
         }
     }
+    /* which glyph lines are empty or full (drawn with one memset) */
+    tui_gline = (unsigned char*)malloc((size_t)256 * tui_ch);
+    if (tui_gline)
+        for (i = 0; i < 256 * tui_ch; i++)
+        {
+            const unsigned char* g = tui_gglyph + (size_t)i * tui_cw; int ink = 0;
+            for (x = 0; x < tui_cw; x++) ink += g[x] != 0;
+            tui_gline[i] = (unsigned char)(ink == 0 ? 0 : ink == tui_cw ? 1 : 2);
+        }
     tui_invalidate();
 }
 /* writes n bytes at offset off of the frame buffer */
@@ -256,8 +271,8 @@ static void tui_gclear(void)
     memset(line, tui_dacidx[TUI_FANCY ? 1 : 0], sizeof line);
     for (y = 0; y < tui_gh; y++) tui_gput((unsigned long)y * tui_gpitch, line, tui_gw);
 }
-/* draws text row r of the buffer */
-static void tui_grow(int r)
+/* draws cells c0..c1 of text row r of the buffer (only what changed: see tui_flush_now) */
+static void tui_grow_span(int r, int c0, int c1)
 {
     static unsigned char buf[2048];
     int y, c, x;
@@ -265,16 +280,24 @@ static void tui_grow(int r)
     for (y = 0; y < tui_ch; y++)
     {
         unsigned char* d = buf;
-        for (c = 0; c < TUI_W; c++)
+        TUI_HOOK();
+        for (c = c0; c <= c1; c++)
         {
             uint16_t v = tui_scr[r][c];
-            const unsigned char* g = tui_gglyph + ((size_t)(v & 255) * tui_ch + y) * tui_cw;
+            size_t gi = (size_t)(v & 255) * tui_ch + y;
             unsigned char fg = tui_dacidx[(v >> 8) & 15], bg = tui_dacidx[(v >> 12) & 15];
-            for (x = 0; x < tui_cw; x++) *d++ = g[x] ? fg : bg;
+            int kind = tui_gline ? tui_gline[gi] : 2;
+            if (kind == 0) { memset(d, bg, tui_cw); d += tui_cw; continue; }      /* most glyph lines are empty */
+            if (kind == 1) { memset(d, fg, tui_cw); d += tui_cw; continue; }      /* block characters */
+            {
+                const unsigned char* g = tui_gglyph + gi * tui_cw;
+                for (x = 0; x < tui_cw; x++) *d++ = g[x] ? fg : bg;
+            }
         }
-        tui_gput((unsigned long)(tui_gy0 + r * tui_ch + y) * tui_gpitch + tui_gx0, buf, TUI_W * tui_cw);
+        tui_gput((unsigned long)(tui_gy0 + r * tui_ch + y) * tui_gpitch + tui_gx0 + c0 * tui_cw, buf, (c1 - c0 + 1) * tui_cw);
     }
 }
+static __attribute__((unused)) void tui_grow(int r) { tui_grow_span(r, 0, TUI_W - 1); }
 static void tui_gfx_off(void)
 {
     if (tui_gsel) { __dpmi_free_ldt_descriptor(tui_gsel); tui_gsel = 0; }
@@ -594,13 +617,21 @@ TUI_FN void tui_flush_now(void)
     {
         if (tui_margin_dirty) { tui_margin_dirty = 0; tui_gclear(); }
         for (r = 0; r < TUI_H; ++r)
-            if (memcmp(tui_scr[r], tui_shown[r], sizeof tui_scr[r])) { tui_grow(r); memcpy(tui_shown[r], tui_scr[r], sizeof tui_scr[r]); }
+        {
+            int c0 = 0, c1 = TUI_W - 1;
+            while (c0 < TUI_W && tui_scr[r][c0] == tui_shown[r][c0]) c0++;
+            if (c0 == TUI_W) continue;
+            while (c1 > c0 && tui_scr[r][c1] == tui_shown[r][c1]) c1--;
+            tui_grow_span(r, c0, c1);                               /* only the cells that changed */
+            memcpy(tui_shown[r], tui_scr[r], sizeof tui_scr[r]);
+        }
         return;
     }
     if (tui_margin_dirty) tui_draw_margins();
     for (r = 0; r < TUI_H; ++r)
         if (memcmp(tui_scr[r], tui_shown[r], sizeof tui_scr[r]))
         {
+            TUI_HOOK();
             dosmemput(tui_scr[r], TUI_W * 2, 0xB8000 + ((tui_oy + r) * tui_cols + tui_ox) * 2);
             memcpy(tui_shown[r], tui_scr[r], sizeof tui_scr[r]);
         }
@@ -619,8 +650,8 @@ TUI_FN void tui_flush(void)
     for (r = 0; r < TUI_H && !any; ++r) any = memcmp(tui_scr[r], tui_shown[r], sizeof tui_scr[r]) != 0;
     if (any)
     {   /* wait for the start of a vertical retrace (bounded, in case the port does not exist) */
-        for (i = 0; i < 100000L && (inportb(0x3DA) & 8); ++i) {}
-        for (i = 0; i < 100000L && !(inportb(0x3DA) & 8); ++i) {}
+        for (i = 0; i < 100000L && (inportb(0x3DA) & 8); ++i) TUI_HOOK();
+        for (i = 0; i < 100000L && !(inportb(0x3DA) & 8); ++i) TUI_HOOK();
         tui_flush_now();
     }
     if (ptr) tui_scr[my][mx] = keep;
@@ -676,7 +707,7 @@ TUI_FN int tui_key(void)
             if (anim && t != last && (t & 1) == 0) { last = t; tui_anim(t >> 1); tui_flush(); }
             else if (t != last) last = t;
             if (ox != tui_mx || oy != tui_my) tui_flush();
-            __dpmi_yield();
+            if (tui_hook) tui_hook(); else __dpmi_yield();
         }
     }
     c = getch();

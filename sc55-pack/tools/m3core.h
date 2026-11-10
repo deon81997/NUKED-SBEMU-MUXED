@@ -37,6 +37,9 @@ static unsigned long m3_lin;
 static __dpmi_meminfo m3_map;
 static unsigned char m3_line[M3W * 4];
 static double    m3_tsc_us = 0;     /* TSC ticks per microsecond */
+/* called between scan lines while a frame is drawn (MIDPLAY sends its due MIDI events from it); NULL elsewhere */
+static void (*m3_hook)(void);
+#define M3_HOOK() do { if (m3_hook) m3_hook(); } while (0)
 static unsigned long long m3_t0;
 
 /* ------------------------------------------------------------------------------------------- VBE */
@@ -54,13 +57,18 @@ static void m3_put(unsigned long off, const void* src, int n)
     }
 }
 
-static int m3_vbe_open(void)
+/* the VBE controller info and the best 640x480 mode are looked up once (about a hundred BIOS calls) and kept:
+ * MIDPLAY calls m3_vbe_probe() before the music starts, so switching to 3D later costs only the mode set */
+static unsigned char m3_vi[512]; static int m3_vbest = -2;
+static void m3_vbe_probe(void)
 {
-    __dpmi_regs r; unsigned char vi[512], mi[256]; unsigned short modes[256]; int n = 0, i, best = -1, bestscore = 0;
-    unsigned long lp;
+    __dpmi_regs r; unsigned char mi[256]; unsigned short modes[256]; int n = 0, i, best = -1, bestscore = 0;
+    unsigned long lp; unsigned char* vi = m3_vi;
+    if (m3_vbest != -2) return;
+    m3_vbest = -1;
     memset(&r, 0, sizeof r); dosmemput("VBE2", 4, __tb);
     r.x.ax = 0x4F00; r.x.es = __tb >> 4; r.x.di = __tb & 15; __dpmi_int(0x10, &r);
-    if (r.x.ax != 0x004F) return 0;
+    if (r.x.ax != 0x004F) return;
     dosmemget(__tb, 512, vi);
     lp = ((unsigned long)(vi[0x10] | (vi[0x11] << 8)) << 4) + (vi[0x0E] | (vi[0x0F] << 8));
     while (n < 255) { unsigned short m; dosmemget(lp + n * 2, 2, &m); if (m == 0xFFFF) break; modes[n++] = m; }
@@ -79,6 +87,13 @@ static int m3_vbe_open(void)
         if ((attr & 0x80) && (vi[5] >= 2)) score += 5;                  /* linear frame buffer */
         if (score > bestscore) { bestscore = score; best = modes[i]; }
     }
+    m3_vbest = best;
+}
+static int m3_vbe_open(void)
+{
+    __dpmi_regs r; unsigned char mi[256]; int best; unsigned char* vi = m3_vi;
+    m3_vbe_probe();
+    best = m3_vbest;
     if (best < 0) return 0;
     memset(&r, 0, sizeof r); r.x.ax = 0x4F01; r.x.cx = best; r.x.es = __tb >> 4; r.x.di = __tb & 15; __dpmi_int(0x10, &r);
     dosmemget(__tb, 256, mi);
@@ -105,7 +120,7 @@ static int m3_vbe_open(void)
         }
     }
     if (!m3_lfb && !(mi[2] & 4)) return 0;                             /* window A not writable */
-    memset(&r, 0, sizeof r); r.x.ax = 0x4F02; r.x.bx = (unsigned short)(best | (m3_lfb ? 0x4000 : 0)); __dpmi_int(0x10, &r);
+    memset(&r, 0, sizeof r); r.x.ax = 0x4F02; r.x.bx = (unsigned short)(best | (m3_lfb ? 0x4000 : 0) | 0x8000);   /* 8000h: the BIOS does not clear (slow); every frame is drawn whole */ __dpmi_int(0x10, &r);
     if (r.x.ax != 0x004F) { if (m3_lfb) { __dpmi_free_ldt_descriptor(m3_sel); __dpmi_free_physical_address_mapping(&m3_map); } m3_lfb = 0; return 0; }
     m3_bank = -1;
     return 1;
@@ -124,6 +139,7 @@ static void m3_present(void)
     for (y = 0; y < M3H; y++)
     {
         const uint32_t* s = m3_fb + y * M3W;
+        if (!(y & 7)) M3_HOOK();
         if (m3_bpp == 32 && m3_rp == 16 && m3_gp == 8 && m3_bp == 0) { m3_put((unsigned long)y * m3_pitch, s, M3W * 4); continue; }
         if (m3_bpp == 32)
             for (x = 0; x < M3W; x++) { uint32_t c = s[x]; ((uint32_t*)m3_line)[x] = ((c >> 16 & 255) << m3_rp) | ((c >> 8 & 255) << m3_gp) | ((c & 255) << m3_bp); }
@@ -291,6 +307,7 @@ static void m3_tri_raster(const M3S* a0, const M3S* b0, const M3S* c0, const M3S
     {
         float fy = (float)y, tl = (fy - a->sy) / (c->sy - a->sy), ts;
         M3S L, R; const M3S *p, *q; int x, xs, xe; float dx, iz, uz, vz, lz, diz, duz, dvz, dlz;
+        if (!(y & 7)) M3_HOOK();
         L.sx = a->sx + (c->sx - a->sx) * tl; L.iz = a->iz + (c->iz - a->iz) * tl; L.uz = a->uz + (c->uz - a->uz) * tl;
         L.vz = a->vz + (c->vz - a->vz) * tl; L.lz = a->lz + (c->lz - a->lz) * tl;
         if (fy < b->sy) { p = a; q = b; } else { p = b; q = c; }
@@ -454,6 +471,7 @@ static void m3_upscale(void)
     for (y = m3_rh - 1; y >= 0; y--)
     {
         const uint32_t* s = m3_fb + y * M3W;
+        if (!(y & 15)) M3_HOOK();
         uint32_t* d0 = m3_fb + (2 * y) * M3W; uint32_t* d1 = d0 + M3W;
         for (x = m3_rw - 1; x >= 0; x--) { uint32_t c = s[x]; d1[2 * x] = d1[2 * x + 1] = c; d0[2 * x + 1] = c; d0[2 * x] = c; }
     }
@@ -467,6 +485,7 @@ static void m3_sky(void)
     for (y = 0; y < m3_rh; y++)
     {
         uint32_t c = m3_lerpc(0x02030C, 0x1A1040, y * 256 / m3_rh);
+        if (!(y & 15)) M3_HOOK();
         uint32_t* p = m3_fb + y * M3W; for (i = 0; i < m3_rw; i++) p[i] = c;
         memset(m3_zb + y * M3W, 0, m3_rw * sizeof(float));
     }

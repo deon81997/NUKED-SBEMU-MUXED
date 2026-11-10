@@ -1,15 +1,19 @@
-/* MIDPLAY - plays Standard MIDI Files (.MID, format 0 and 1) through the MPU-401 at
- * port 330h, i.e. through the running SBEMU + SC-55 emulation.
- * SBEMU must already be loaded (run SC55.BAT); this is a protected-mode DJGPP program.
+/* MIDPLAY - plays Standard MIDI Files (.MID .MIDI .RMI .KAR, format 0 and 1) through the MPU-401 at port 330h,
+ * i.e. through the running SBEMU + SC-55 (or MT-32 / SoundFont) emulation. SBEMU must be loaded (SC55.BAT).
  *
- *   MIDPLAY [options] file.mid [file2.mid ...]      (wildcards work: MIDPLAY *.MID)
- *     /P:330   MPU base port in hex          /L   loop the playlist until ESC
- *     /GM      send GM System On first       /N   send no reset at all
- *              (default is a GS reset, which the SC-55 and SC-55mkII both understand)
- *     /S       plain one-line display (no full-screen player)
- *   Keys: SPACE pause, N next song, P previous song, S SC-55 panel / channel table, - + part, ESC or Q quit.
- *   The full-screen player shows the song, a progress bar, all 16 MIDI channels (instrument,
- *   volume, pan, activity, notes) and a 88-key note visualizer.
+ *   MIDPLAY [options] [file.mid ...]     (wildcards work: MIDPLAY *.MID; no files = the last playlist, or every
+ *                                         MIDI file in MIDPLAY's folder - see Options)
+ *     /D:dir  play that folder   /B file explorer first   /L repeat all   /R1 repeat one   /H shuffle
+ *     /GM GM On instead of the GS reset   /N no reset   /P:330 MPU port   /S plain one-line display
+ *     test rig: /X no MPU (nothing sent)  /T:file timing statistics  /Q:sec quit after sec  /V:n view
+ *
+ * Pages (TAB / Shift+TAB, F1 help, F2 options): Player (channel table, SC-55 front panel or 3D), Playlist,
+ * Files. The music keeps playing on every page; the next song starts by itself.
+ *
+ * Timing: the MIDI events are sent by mp_pump(), which runs from the main loop AND from inside every drawing
+ * loop (tui_hook / m3_hook: between screen rows, VESA scan lines and 3D scan lines), so a slow frame never makes
+ * the music late. The clock is the CPU's time stamp counter, re-synchronised to the BIOS timer every tick (SBEMU
+ * reprograms the PIT, so uclock() is unreliable under it, and reading the PIT is slow).
  *
  * GPL-2.0-or-later. */
 #include <stdio.h>
@@ -19,36 +23,125 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <ctype.h>
 
 #ifdef HOSTTEST
 /* host build: virtual clock, MIDI bytes are printed with their time instead of sent */
 static uint64_t g_now_us;
 static void out_byte(unsigned char b) { printf("%llu %02X\n", (unsigned long long)g_now_us, b); }
 static uint64_t now_us(void) { return g_now_us; }
-static void idle(void) { g_now_us += 500; }
-static void sleep_ms(int ms) { g_now_us += (uint64_t)ms * 1000; }
-static int key_pressed(void) { return 0; }
-static int key_get(void) { return 0; }
+static __attribute__((unused)) void sleep_ms(int ms) { g_now_us += (uint64_t)ms * 1000; }
 #else
 #include <pc.h>
 #include <conio.h>
 #include <time.h>
 #include <dos.h>
 #include <dir.h>
+#include "tui.h"
 #include "mpuport.h"
-#include "theme.h"
+
 static int base = 0x330;
-static uint64_t now_us(void) { return (uint64_t)uclock() * 1000000ULL / UCLOCKS_PER_SEC; }
-static void idle(void) {}
-static void sleep_ms(int ms) { uint64_t t = now_us() + (uint64_t)ms * 1000; while (now_us() < t) {} }
+static int g_dry;               /* /X: no MPU (timing tests): nothing is sent */
+
+/* ---- clock: the CPU's time stamp counter. Its rate is measured against the BIOS tick (54.9254 ms) over
+ * windows of ~1 s; a different rate is taken only when two windows in a row agree (SpeedStep), so a timer
+ * interrupt held off for a while (video BIOS calls) or a torn read of the BIOS counter cannot fool it. The
+ * TSC keeps counting while interrupts are off, so the music never stalls or jumps. Without a TSC: uclock(). */
+static int g_tsc;
+static struct { uint64_t tsc0, last, wtsc; double base, per_us, cand; uint32_t wtick; } CK;
+static uint64_t rdtsc64(void) { uint64_t t; asm volatile("rdtsc" : "=A"(t)); return t; }
+static int cpu_has_tsc(void)
+{
+    uint32_t f1, f2, a, b, c, d;
+    asm volatile("pushfl; pushfl; popl %0; movl %0, %1; xorl $0x200000, %0; pushl %0; popfl; pushfl; popl %0; popfl"
+                 : "=&r"(f1), "=&r"(f2));
+    if (!((f1 ^ f2) & 0x200000)) return 0;                      /* no CPUID (486 and older) */
+    asm volatile("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "a"(1));
+    return (d >> 4) & 1;
+}
+static uint32_t bios_tick(void) { return _farpeekl(_dos_ds, 0x46C); }
+static void clock_init(void)
+{
+    uint32_t t; uint64_t a;
+    g_tsc = cpu_has_tsc();
+    if (!g_tsc) return;
+    t = bios_tick(); while (bios_tick() == t) {}
+    t = bios_tick(); a = rdtsc64();
+    while (bios_tick() - t < 3 && bios_tick() >= t) {}
+    CK.per_us = (double)(rdtsc64() - a) / (3 * 54925.4);
+    if (CK.per_us < 1) CK.per_us = 1;
+    CK.tsc0 = CK.wtsc = rdtsc64(); CK.base = 0; CK.last = 0; CK.wtick = bios_tick(); CK.cand = 0;
+}
+static uint64_t now_us(void)
+{
+    uint64_t c, u; uint32_t t;
+    if (!g_tsc) return (uint64_t)uclock() * 1000000ULL / UCLOCKS_PER_SEC;
+    c = rdtsc64(); t = bios_tick();
+    if (t > CK.wtick && t - CK.wtick >= 18)
+    {
+        if (t - CK.wtick < 200)
+        {
+            double r = (double)(c - CK.wtsc) / ((t - CK.wtick) * 54925.4), dev = r / CK.per_us - 1;
+            if (dev < 0) dev = -dev;
+            if (dev > 0.002 && r > 1)
+            {   /* a new rate: right away if small, after a second window agreeing if large */
+                double cd = CK.cand ? r / CK.cand - 1 : 1; if (cd < 0) cd = -cd;
+                if (dev < 0.05 || cd < 0.05)
+                {
+                    CK.base += (double)(c - CK.tsc0) / CK.per_us; CK.tsc0 = c;   /* continuous at the change */
+                    CK.per_us = r; CK.cand = 0;
+                }
+                else CK.cand = r;
+            }
+            else CK.cand = 0;
+        }
+        CK.wtick = t; CK.wtsc = c;
+    }
+    else if (t < CK.wtick && CK.wtick - t > 1000) { CK.wtick = t; CK.wtsc = c; }   /* midnight: a new window */
+    u = (uint64_t)(CK.base + (double)(c - CK.tsc0) / CK.per_us);
+    if (u < CK.last) u = CK.last;
+    CK.last = u;
+    return u;
+}
+static __attribute__((unused)) void sleep_ms(int ms) { uint64_t t = now_us() + (uint64_t)ms * 1000; while (now_us() < t) {} }
+
+/* ---- keys: the BIOS buffer is looked at directly (no mode switch per loop); INT 16h AH=10h reads them, so
+ * Ctrl+arrows, F11/F12 and the grey keys arrive too. Normal keys as is, extended keys as 0x100 | scan code. */
+#define K_DEL    0x153
+#define K_INS    0x152
+#define K_CUP    0x18D
+#define K_CDOWN  0x191
+#define K_CLEFT  0x173
+#define K_CRIGHT 0x174
+#define K_F4     0x13E
+#define K_F5     0x13F
+#define K_F6     0x140
+#define K_F7     0x141
+#define K_F8     0x142
+#define K_F9     0x143
+#define K_F10    0x144
+#define K_BKSP   8
+#define K_CS     0x13      /* Ctrl+S */
+#define K_CO     0x0F      /* Ctrl+O */
+#define K_CA     0x01      /* Ctrl+A */
+#define K_CP     0x10      /* Ctrl+P */
+static int key_pressed(void) { return _farpeekw(_dos_ds, 0x41A) != _farpeekw(_dos_ds, 0x41C); }
+static int key_read(void)
+{
+    __dpmi_regs r;
+    memset(&r, 0, sizeof r); r.h.ah = 0x10; __dpmi_int(0x16, &r);
+    if (r.h.al == 0 || (r.h.al == 0xE0 && r.h.ah)) return 0x100 | r.h.ah;
+    return r.h.al;
+}
+
 static void out_byte(unsigned char b)
 {
-    uint64_t end = now_us() + 1000000;
+    uint64_t end;
+    if (g_dry) return;
+    end = now_us() + 1000000;
     while ((inportb(base + 1) & 0x40) && now_us() < end) {} /* DRR busy */
     outportb(base, b);
 }
-static int key_pressed(void) { return kbhit(); }
-static int key_get(void) { return getch(); }
 static int mpu_detect(void)
 {
     uint64_t end;
@@ -364,6 +457,114 @@ static void viz_decay(void)
     }
 }
 
+
+/* ---- song info without loading the song: title, length, format, tracks (for the lists; ~1 ms per file) ---- */
+typedef struct { int ok; long ms; char title[48]; int fmt, trk; long size; } SongInfo;
+typedef struct { uint32_t tick, tempo; } TempoPt;
+static int song_info(const char* path, SongInfo* si)
+{
+    FILE* f; unsigned char* d; long n; const unsigned char *p, *end;
+    int division, ntp = 0, ctp = 0, i;
+    TempoPt* tp = NULL; uint32_t maxtick = 0;
+    uint64_t us = 0;
+    memset(si, 0, sizeof *si); si->ok = -1;
+    if (!(f = fopen(path, "rb"))) return 0;
+    fseek(f, 0, SEEK_END); n = ftell(f); fseek(f, 0, SEEK_SET);
+    si->size = n;
+    if (n < 14 || n > 8L * 1024 * 1024 || !(d = (unsigned char*)malloc((size_t)n))) { fclose(f); return 0; }
+    if ((long)fread(d, 1, (size_t)n, f) != n) { fclose(f); free(d); return 0; }
+    fclose(f);
+    p = d; end = d + n;
+    if (!memcmp(p, "RIFF", 4) && n > 20 && !memcmp(p + 8, "RMID", 4) && !memcmp(p + 12, "data", 4)) p += 20;
+    if (end - p < 14 || memcmp(p, "MThd", 4)) { free(d); return 0; }
+    {
+        uint32_t hl = be32(p + 4);
+        if (hl < 6 || p + 8 + hl > end) { free(d); return 0; }
+        si->fmt = be16(p + 8); si->trk = be16(p + 10); division = be16(p + 12);
+        p += 8 + hl;
+    }
+    while (end - p >= 8)
+    {
+        uint32_t len = be32(p + 4), tick = 0, dt, l;
+        const unsigned char* q = p + 8; const unsigned char* te;
+        int running = 0;
+        if ((uint64_t)len > (uint64_t)(end - q)) len = (uint32_t)(end - q);
+        te = q + len;
+        if (!memcmp(p, "MTrk", 4))
+            while (q < te)
+            {
+                int st;
+                if (!varlen(&q, te, &dt) || q >= te) break;
+                tick += dt;
+                st = *q;
+                if (st >= 0x80) { q++; if (st < 0xF0) running = st; }
+                else { st = running; if (!st) break; }
+                if (st == 0xFF)
+                {
+                    int type;
+                    if (q >= te) break;
+                    type = *q++;
+                    if (!varlen(&q, te, &l) || q + l > te) break;
+                    if (type == 0x2F) break;
+                    if (type == 0x51 && l == 3)
+                    {
+                        if (ntp == ctp) { TempoPt* t2 = (TempoPt*)realloc(tp, (size_t)(ctp = ctp ? ctp * 2 : 16) * sizeof *tp); if (!t2) break; tp = t2; }
+                        tp[ntp].tick = tick; tp[ntp].tempo = ((uint32_t)q[0] << 16) | (q[1] << 8) | q[2]; ntp++;
+                    }
+                    else if (type == 0x03 && !si->title[0] && l > 0)
+                    {
+                        uint32_t k, m = 0;
+                        for (k = 0; k < l && m < sizeof si->title - 1; k++) si->title[m++] = (q[k] >= 32 && q[k] < 127) ? (char)q[k] : ' ';
+                        si->title[m] = 0;
+                    }
+                    q += l;
+                    if (tick > maxtick) maxtick = tick;
+                }
+                else if (st == 0xF0 || st == 0xF7)
+                {
+                    running = 0;
+                    if (!varlen(&q, te, &l) || q + l > te) break;
+                    q += l;
+                    if (tick > maxtick) maxtick = tick;
+                }
+                else if (st >= 0xF0) break;
+                else
+                {
+                    q += ((st & 0xF0) == 0xC0 || (st & 0xF0) == 0xD0) ? 1 : 2;
+                    if (tick > maxtick) maxtick = tick;
+                }
+            }
+        p += 8 + len;
+    }
+    if (division & 0x8000)
+    {
+        int fps = 256 - ((division >> 8) & 0xFF), tpf = division & 0xFF;
+        uint64_t tf = fps == 29 ? (uint64_t)tpf * 29970 / 1000 : (uint64_t)tpf * fps;
+        us = tf ? (uint64_t)maxtick * 1000000ULL / tf : 0;
+    }
+    else
+    {
+        uint32_t last = 0, tempo = 500000; int dv = division ? division : 96;
+        /* tempo points by tick (insertion sort: there are few, usually already in order) */
+        for (i = 1; i < ntp; i++) { TempoPt x = tp[i]; int j = i - 1; while (j >= 0 && tp[j].tick > x.tick) { tp[j + 1] = tp[j]; j--; } tp[j + 1] = x; }
+        for (i = 0; i < ntp && tp[i].tick <= maxtick; i++)
+        {
+            us += (uint64_t)(tp[i].tick - last) * tempo / dv;
+            last = tp[i].tick;
+            if (tp[i].tempo) tempo = tp[i].tempo;
+        }
+        us += (uint64_t)(maxtick - last) * tempo / dv;
+    }
+    free(tp); free(d);
+    si->ms = (long)(us / 1000);
+    si->ok = 1;
+    return 1;
+}
+
+/* ------------------------------------------------------------------ sending */
+static uint16_t g_mute, g_solo;          /* channel bits: muted / solo (solo wins) */
+static int audible(int ch) { return g_solo ? (g_solo >> ch) & 1 : !((g_mute >> ch) & 1); }
+
 static void silence(void)
 {
     int ch;
@@ -375,13 +576,20 @@ static void silence(void)
         out_byte((unsigned char)(0xB0 | ch)); out_byte(120); out_byte(0);  /* all sound off */
     }
 }
+static void channel_quiet(int ch)
+{
+    out_byte((unsigned char)(0xB0 | ch)); out_byte(64); out_byte(0);
+    out_byte((unsigned char)(0xB0 | ch)); out_byte(123); out_byte(0);
+}
 
 static void send_event(const Song* s, const Event* e)
 {
     int i;
     if (e->kind == EV_SHORT)
     {
-        out_byte((unsigned char)(e->arg & 0xFF));
+        int st = (int)(e->arg & 0xFF);
+        if ((st & 0xF0) == 0x90 && ((e->arg >> 16) & 0x7F) && !audible(st & 15)) return;   /* muted: no note-on */
+        out_byte((unsigned char)st);
         if (e->len > 1) out_byte((unsigned char)((e->arg >> 8) & 0x7F));
         if (e->len > 2) out_byte((unsigned char)((e->arg >> 16) & 0x7F));
     }
@@ -392,89 +600,371 @@ static void send_event(const Song* s, const Event* e)
     }
 }
 
-static void send_reset(int mode)
+static void send_reset_bytes(int mode)
 {
     static const unsigned char gs[] = {0xF0, 0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7F, 0x00, 0x41, 0xF7};
     static const unsigned char gm[] = {0xF0, 0x7E, 0x7F, 0x09, 0x01, 0xF7};
     int i;
-    if (mode == 0) { for (i = 0; i < (int)sizeof gs; i++) out_byte(gs[i]); sleep_ms(250); }
-    else if (mode == 1) { for (i = 0; i < (int)sizeof gm; i++) out_byte(gm[i]); sleep_ms(250); }
+    if (mode == 0) for (i = 0; i < (int)sizeof gs; i++) out_byte(gs[i]);
+    else if (mode == 1) for (i = 0; i < (int)sizeof gm; i++) out_byte(gm[i]);
 }
 
-/* ------------------------------------------------------------------ full-screen text UI (DOS only) */
-static int g_ui = 0;          /* 1 = full-screen player */
-static char** g_pl; static int g_npl, g_cap, g_cur, g_jump;
-static int g_rep = 0, g_shuf = 0;     /* repeat: 0 off, 1 all, 2 one */
-static const char* base_of(const char* name);
+/* ------------------------------------------------------------------ timing statistics (/T:file) */
+static struct { unsigned long n, late1, late2, late5, late10, late20; uint64_t sum, max; unsigned long frames; uint64_t dsum, dmax; } g_st;
+static char g_stfile[260]; static long g_quit_s;
+static void st_late(uint64_t late)
+{
+    g_st.n++; g_st.sum += late; if (late > g_st.max) g_st.max = late;
+    if (late >= 1000) g_st.late1++;
+    if (late >= 2000) g_st.late2++;
+    if (late >= 5000) g_st.late5++;
+    if (late >= 10000) g_st.late10++;
+    if (late >= 20000) g_st.late20++;
+}
+static void st_frame(uint64_t d) { g_st.frames++; g_st.dsum += d; if (d > g_st.dmax) g_st.dmax = d; }
+static void st_write(const char* label)
+{
+    FILE* f;
+    if (!g_stfile[0] || !(f = fopen(g_stfile, "a"))) return;
+    fprintf(f, "%s: events %lu late avg %.2f ms max %.1f ms  >=1ms %lu >=2 %lu >=5 %lu >=10 %lu >=20 %lu | frames %lu draw avg %.2f max %.1f ms\n",
+            label, g_st.n, g_st.n ? g_st.sum / 1000.0 / g_st.n : 0, g_st.max / 1000.0, g_st.late1, g_st.late2, g_st.late5, g_st.late10, g_st.late20,
+            g_st.frames, g_st.frames ? g_st.dsum / 1000.0 / g_st.frames : 0, g_st.dmax / 1000.0);
+    fclose(f);
+}
+
+/* ------------------------------------------------------------------ the player
+ * Song time runs at speed/100 of real time from (base_real, base_song). Events whose time has come are sent by
+ * mp_pump(), from the main loop and from inside the drawing loops. */
+static struct
+{
+    Song s; int loaded;                 /* the current song */
+    long i;                             /* next event */
+    uint64_t base_real, base_song, total, tail_until, paused_song;
+    int paused, ending, speed, busy;
+} P = { .speed = 100 };
+
+static uint64_t song_time(void)
+{
+    uint64_t t;
+    if (!P.loaded) return 0;
+    if (P.paused) return P.paused_song;
+    t = now_us();
+    if (t < P.base_real) return P.base_song;                    /* the reset is still settling */
+    return P.base_song + (t - P.base_real) * (uint64_t)P.speed / 100;
+}
+static void set_speed(int sp)
+{
+    uint64_t t = song_time();
+    if (sp < 25) sp = 25;
+    if (sp > 400) sp = 400;
+    P.speed = sp; P.base_song = t; P.base_real = now_us();
+}
+
+/* sends every event that is due */
+static void mp_pump(void)
+{
+    uint64_t t;
+    if (!P.loaded || P.paused || P.busy || P.i >= P.s.nev) return;
+    P.busy = 1;
+    t = song_time();
+    while (P.i < P.s.nev && P.s.ev[P.i].us <= t)
+    {
+        const Event* e = &P.s.ev[P.i];
+        st_late((t - e->us) * 100 / P.speed);
+        send_event(&P.s, e);
+        viz_event(e);
+        P.i++;
+    }
+    if (P.i >= P.s.nev && !P.ending) { P.ending = 1; P.tail_until = now_us() + 1200000; }   /* let the last notes ring */
+    P.busy = 0;
+}
+/* microseconds until the next event (real time), 0 if due, large if none */
+static uint64_t mp_next_in(void)
+{
+    uint64_t t, e;
+    if (!P.loaded || P.paused || P.i >= P.s.nev) return 1000000;
+    t = song_time(); e = P.s.ev[P.i].us;
+    return e > t ? (e - t) * 100 / P.speed : 0;
+}
+
+static void mp_pause(int on)
+{
+    if (!P.loaded || P.ending) return;
+    if (on && !P.paused) { P.paused_song = song_time(); P.paused = 1; silence(); }
+    else if (!on && P.paused) { P.paused = 0; P.base_song = P.paused_song; P.base_real = now_us(); }
+}
+/* seek: silence, reset controllers, replay everything but the notes up to t */
+static void mp_seek(uint64_t t)
+{
+    long k; int ch;
+    if (!P.loaded) return;
+    if (t >= P.total) t = P.total > 1000 ? P.total - 1000 : 0;
+    P.busy = 1;
+    silence();
+    for (ch = 0; ch < 16; ch++) { out_byte((unsigned char)(0xB0 | ch)); out_byte(121); out_byte(0); }
+    viz_reset();
+    for (k = 0; k < P.s.nev && P.s.ev[k].us < t; k++)
+    {
+        const Event* e = &P.s.ev[k];
+        if (e->kind == EV_SHORT && ((e->arg & 0xF0) == 0x80 || (e->arg & 0xF0) == 0x90)) continue;
+        send_event(&P.s, e);
+        viz_event(e);
+    }
+    P.i = k; P.ending = 0;
+    if (P.paused) P.paused_song = t;
+    else { P.base_song = t; P.base_real = now_us(); }
+    P.busy = 0;
+}
+static void mp_seek_rel(long sec)
+{
+    long long t = (long long)song_time() + (long long)sec * 1000000LL;
+    mp_seek(t < 0 ? 0 : (uint64_t)t);
+}
+static void mp_unload(void)
+{
+    if (!P.loaded) return;
+    P.busy = 1; silence(); P.busy = 0;
+    song_free(&P.s); P.loaded = 0; P.paused = 0; P.ending = 0;
+}
+/* load and start a song; the reset SysEx gets 250 ms before the first event */
+static int mp_start(const char* path, int reset_mode, char* err, size_t errsz)
+{
+    mp_unload();
+    if (!song_load(&P.s, path, err, errsz)) return 0;
+    P.loaded = 1; P.i = 0; P.paused = 0; P.ending = 0;
+    P.total = P.s.ev[P.s.nev - 1].us;
+    viz_reset();
+    send_reset_bytes(reset_mode);
+    P.base_song = 0; P.base_real = now_us() + (reset_mode == 2 ? 0 : 250000);
+    return 1;
+}
+/* 1 when the song has finished (and its last notes have rung out) */
+static int mp_finished(void) { return P.loaded && P.ending && now_us() >= P.tail_until; }
+
 
 #ifndef HOSTTEST
-#define ROWS 25
-#define COLS 80
-static uint16_t scr[ROWS][COLS], shown[ROWS][COLS];
+/* ================================================================== the screens (tui.h: every display mode) */
+enum { PG_PLAYER, PG_LIST, PG_FILES, PG_OPTIONS, PG_HELP };
+static int g_page = PG_PLAYER, g_back = PG_PLAYER;
+static int g_ui = 1;                   /* 0 = /S plain one-line display */
+static char g_home[260], g_cfg[300], g_m3u[300];
+/* options, kept in MIDPLAY.CFG */
+static int g_view = 0;                 /* player: 0 channel table, 1 SC-55 front panel, 2 3D */
+static int g_rep = 0, g_shuf = 0;      /* repeat: 0 off, 1 all, 2 one */
+static int g_reset = 0;                /* before each song: 0 GS reset, 1 GM On, 2 nothing */
+static int g_startlast = 1;            /* no files given: 1 the last playlist (and song), 0 MIDPLAY's folder */
+static int g_gap = 0;                  /* seconds of silence between songs */
+static char g_lastdir[260];
+static long g_last_index = -1, g_last_pos;   /* resume point (seconds) */
+static int g_chsel;                    /* selected channel / SC-55 part */
+static char g_msg[90]; static uint64_t g_msg_until;
+static int g_act, g_jump;              /* main loop request: 1 next, 2 quit, 3 previous, 4 jump to g_jump */
 
-static void cell(int r, int c, int ch, int at)
+static void msg(const char* fmt, ...)
 {
-    if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
-    scr[r][c] = (uint16_t)((at << 8) | (ch & 255));
+    va_list ap; va_start(ap, fmt); vsnprintf(g_msg, sizeof g_msg, fmt, ap); va_end(ap);
+    g_msg_until = now_us() + 3000000;
 }
-static void fillrow(int r, int ch, int at) { int c; for (c = 0; c < COLS; c++) cell(r, c, ch, at); }
+
+/* ---- the playlist: paths plus what song_info() found (filled in the background) */
+typedef struct { char* path; SongInfo si; int have; } PE;
+static PE* g_pl; static int g_npl, g_cap, g_cur = -1;
+/* DOS style for the screen: upper case, backslashes (DJGPP gives c:/sc55) */
+static void dosify(char* s) { for (; *s; s++) { if (*s == '/') *s = '\\'; else *s = (char)toupper((unsigned char)*s); } }
+static const char* base_of(const char* name)
+{
+    const char* b = name, *p;
+    for (p = name; *p; p++) if (*p == '\\' || *p == '/' || *p == ':') b = p + 1;
+    return b;
+}
+static int is_midi_name(const char* n)
+{
+    const char* e = strrchr(n, '.');
+    if (!e) return 0;
+    return !stricmp(e, ".mid") || !stricmp(e, ".midi") || !stricmp(e, ".rmi") || !stricmp(e, ".kar");
+}
+static int is_m3u_name(const char* n) { const char* e = strrchr(n, '.'); return e && (!stricmp(e, ".m3u") || !stricmp(e, ".lst")); }
+static void pl_add(const char* p)
+{
+    char full[300];
+    if (g_npl == g_cap)
+    {
+        PE* n = (PE*)realloc(g_pl, (size_t)(g_cap ? g_cap * 2 : 64) * sizeof(PE));
+        if (!n) return;
+        g_pl = n; g_cap = g_cap ? g_cap * 2 : 64;
+    }
+    full[0] = 0; _fixpath(p, full);
+    memset(&g_pl[g_npl], 0, sizeof(PE));
+    g_pl[g_npl].path = strdup(full[0] ? full : p);
+    if (g_pl[g_npl].path) g_npl++;
+}
+static void pl_remove(int i)
+{
+    if (i < 0 || i >= g_npl) return;
+    free(g_pl[i].path);
+    memmove(&g_pl[i], &g_pl[i + 1], (size_t)(g_npl - i - 1) * sizeof(PE));
+    g_npl--;
+    if (i < g_cur) g_cur--;
+    else if (i == g_cur) g_cur = -2 - i;           /* the playing song left the list: keep playing, next is i */
+}
+static void pl_clear(void) { int i; for (i = 0; i < g_npl; i++) free(g_pl[i].path); g_npl = 0; g_cur = -1; }
+static int pl_find(const char* path) { int i; for (i = 0; i < g_npl; i++) if (!stricmp(g_pl[i].path, path)) return i; return -1; }
+static const char* pl_name(int i) { return g_pl[i].have && g_pl[i].si.title[0] ? g_pl[i].si.title : base_of(g_pl[i].path); }
+static int cmp_str(const void* a, const void* b) { return stricmp(*(char* const*)a, *(char* const*)b); }
+/* every MIDI file in dir, sorted; returns how many were added */
+static int scan_dir(const char* dir)
+{
+    DIR* d = opendir(dir); struct dirent* de;
+    char** names = NULL; int n = 0, cap = 0, i; char path[300]; size_t dl = strlen(dir);
+    if (!d) return 0;
+    while ((de = readdir(d)) != NULL)
+    {
+        struct stat st;
+        if (!is_midi_name(de->d_name)) continue;
+        snprintf(path, sizeof path, "%s%s%s", dir, (dl && dir[dl - 1] != '/' && dir[dl - 1] != '\\' && dir[dl - 1] != ':') ? "\\" : "", de->d_name);
+        if (stat(path, &st) || S_ISDIR(st.st_mode)) continue;
+        if (n == cap) { char** t = (char**)realloc(names, (size_t)(cap ? cap * 2 : 64) * sizeof(char*)); if (!t) break; names = t; cap = cap ? cap * 2 : 64; }
+        if ((names[n] = strdup(path))) n++;
+    }
+    closedir(d);
+    if (n > 1) qsort(names, (size_t)n, sizeof(char*), cmp_str);
+    for (i = 0; i < n; i++) { pl_add(names[i]); free(names[i]); }
+    free(names);
+    return n;
+}
+/* M3U: one path per line, '#' comments; relative paths are relative to the list */
+static int pl_load_m3u(const char* file)
+{
+    FILE* f = fopen(file, "r"); char line[300], dir[300], p[600]; int n = 0; char* e;
+    if (!f) return -1;
+    snprintf(dir, sizeof dir, "%s", file); e = strrchr(dir, '\\'); if (!e) e = strrchr(dir, '/'); if (e) e[1] = 0; else dir[0] = 0;
+    while (fgets(line, sizeof line, f))
+    {
+        line[strcspn(line, "\r\n")] = 0;
+        if (!line[0] || line[0] == '#') continue;
+        if (line[1] == ':' || line[0] == '\\' || line[0] == '/') snprintf(p, sizeof p, "%s", line);
+        else snprintf(p, sizeof p, "%s%s", dir, line);
+        pl_add(p); n++;
+    }
+    fclose(f);
+    return n;
+}
+static int pl_save_m3u(const char* file)
+{
+    FILE* f = fopen(file, "w"); int i;
+    if (!f) return 0;
+    fprintf(f, "#EXTM3U\n");
+    for (i = 0; i < g_npl; i++)
+    {
+        char p[300]; char* c;
+        snprintf(p, sizeof p, "%s", g_pl[i].path);
+        for (c = p; *c; c++) if (*c == '/') *c = '\\';
+        if (g_pl[i].have && g_pl[i].si.ok > 0) fprintf(f, "#EXTINF:%ld,%s\n", (g_pl[i].si.ms + 500) / 1000, pl_name(i));
+        fprintf(f, "%s\n", p);
+    }
+    fclose(f);
+    return 1;
+}
+/* the info of one playlist entry, in the background: only when the next MIDI event is far enough away */
+static void pl_info_step(int prefer)
+{
+    static int scan = 0; int i, k;
+    if (mp_next_in() < 20000) return;
+    if (prefer >= 0 && prefer < g_npl && !g_pl[prefer].have) k = prefer;
+    else
+    {
+        for (i = 0, k = -1; i < g_npl; i++) { int j = (scan + i) % g_npl; if (!g_pl[j].have) { k = j; break; } }
+        if (k < 0) return;
+        scan = k + 1;
+    }
+    song_info(g_pl[k].path, &g_pl[k].si); g_pl[k].have = 1;
+}
+
+/* ---- options file */
+static void cfg_load(void)
+{
+    FILE* f = fopen(g_cfg, "r"); char line[300];
+    if (!f) return;
+    while (fgets(line, sizeof line, f))
+    {
+        char* v = strchr(line, '='); int n;
+        if (!v) continue;
+        *v++ = 0; v[strcspn(v, "\r\n")] = 0; n = atoi(v);
+        if (!strcmp(line, "VIEW")) g_view = n >= 0 && n <= 2 ? n : 0;
+        else if (!strcmp(line, "REPEAT")) g_rep = n >= 0 && n <= 2 ? n : 0;
+        else if (!strcmp(line, "SHUFFLE")) g_shuf = n != 0;
+        else if (!strcmp(line, "RESET")) g_reset = n >= 0 && n <= 2 ? n : 0;
+        else if (!strcmp(line, "START")) g_startlast = n != 0;
+        else if (!strcmp(line, "GAP")) g_gap = n >= 0 && n <= 10 ? n : 0;
+        else if (!strcmp(line, "SPEED")) P.speed = n >= 25 && n <= 400 ? n : 100;
+        else if (!strcmp(line, "DIR")) snprintf(g_lastdir, sizeof g_lastdir, "%s", v);
+        else if (!strcmp(line, "LAST")) g_last_index = atol(v);
+        else if (!strcmp(line, "POS")) g_last_pos = atol(v);
+    }
+    fclose(f);
+}
+static void cfg_save(void)
+{
+    FILE* f = fopen(g_cfg, "w");
+    if (!f) return;
+    fprintf(f, "VIEW=%d\nREPEAT=%d\nSHUFFLE=%d\nRESET=%d\nSTART=%d\nGAP=%d\nSPEED=%d\nDIR=%s\nLAST=%d\nPOS=%lu\n",
+            g_view, g_rep, g_shuf, g_reset, g_startlast, g_gap, P.speed, g_lastdir, g_cur,
+            P.loaded ? (unsigned long)(song_time() / 1000000ULL) : 0UL);
+    fclose(f);
+}
+
+/* ---- drawing helpers (0-based row/column wrappers for the panel code, plus the common bands) */
+static void cell(int r, int c, int ch, int at) { tui_cell(c + 1, r + 1, at, ch); }
+static void fillrow(int r, int ch, int at) { tui_fill(1, r + 1, 80, 1, at, ch); }
 static void text(int r, int c, const char* s, int at, int maxw)
 {
     int n = 0;
     while (*s && n < maxw) { cell(r, c + n, (unsigned char)*s, at); s++; n++; }
 }
-static void ui_flush(int force)
+static void fmt_time(char* out, unsigned long sec) { sprintf(out, "%lu:%02lu", sec / 60, sec % 60); }
+static void fmt_ms(char* out, const PE* e)
 {
-    int r;
-    for (r = 0; r < ROWS; r++)
-        if (force || memcmp(scr[r], shown[r], sizeof scr[r]))
-        {
-            puttext(1, r + 1, COLS, r + 1, scr[r]);
-            memcpy(shown[r], scr[r], sizeof scr[r]);
-        }
+    if (!e->have) strcpy(out, "  ...");
+    else if (e->si.ok <= 0) strcpy(out, "    ?");
+    else { unsigned long s = (unsigned long)((e->si.ms + 500) / 1000); sprintf(out, "%2lu:%02lu", s / 60, s % 60); }
 }
-static char g_cfg[260];
-static int g_view = 1;          /* 0 channel table, 1 SC-55 panel, 2 3D; kept in MIDPLAY.CFG */
-static int mp3_enter(void); static void mp3_leave(void); static int mp3_is_on(void);   /* midplay3d.h */
-static char g_home[300];  /* MENU's folder: THEME.CFG lives there (F3 saves the style for every program) */
-static void ui_text_init(void);
-static void ui_begin(void)
+/* key bar: "~F1~ Help  ~TAB~ Lists ..." - the parts between ~ are keys */
+static void keybar(const char* s)
 {
-    static int loaded;
-    if (!loaded)
-    {   /* the style, letters and safe mode chosen in MENU (THEME.CFG next to MIDPLAY.EXE) */
-        char* home = g_home; char* e;
-        snprintf(home, sizeof g_home, "%s", g_cfg);
-        e = strrchr(home, '\\'); if (!e) e = strrchr(home, '/');
-        if (e) *e = 0; else strcpy(home, ".");
-        tui_theme_load(home);
-        loaded = 1;
+    int x = 2, key = 0;
+    tui_fill(1, 25, 80, 1, 0x30, ' ');
+    for (; *s && x <= 79; s++)
+    {
+        if (*s == '~') { key = !key; continue; }
+        tui_cell(x++, 25, key ? 0x3E : 0x30, (unsigned char)*s);
     }
-    if (g_view == 2) { if (mp3_is_on() || mp3_enter()) return; g_view = 0; }   /* 3D view: no VESA mode -> table */
-    ui_text_init();
 }
-static void ui_text_init(void)
+static void hintline(const char* s)
 {
-    textmode(C80);
-    _setcursortype(_NOCURSOR);
-    tui_apply_theme();
-    tui_font_loaded = 0; tui_font_apply();
-    textattr(0x07); clrscr();
-    memset(scr, 0, sizeof scr);
-    memset(shown, 0xFF, sizeof shown); /* the screen was cleared: repaint every row */
+    tui_fill(1, 24, 80, 1, 0x10, ' ');
+    if (g_msg[0] && now_us() < g_msg_until) tui_putw(2, 24, 78, 0x1E, g_msg);
+    else if (s) tui_putw(2, 24, 78, 0x17, s);
 }
-static void ui_end(void)
+static void header(const char* what)
 {
-    if (!g_ui) return;
-    mp3_leave();
-    tui_font_restore();
-    tui_plain();
-    textattr(0x07); clrscr(); _setcursortype(_NORMALCURSOR);
+    char b[100], t1[16], t2[16]; int x;
+    tui_fill(1, 1, 80, 1, 0x30, ' ');
+    x = 2 + tui_put(2, 1, 0x3F, "MIDPLAY");
+    tui_cell(x + 1, 1, 0x30, 0xB3);
+    tui_putw(x + 3, 1, 46, 0x30, what);
+    if (P.loaded)
+    {
+        fmt_time(t1, (unsigned long)(song_time() > P.total ? P.total : song_time()) / 1000000UL);
+        fmt_time(t2, (unsigned long)(P.total / 1000000ULL));
+        snprintf(b, sizeof b, "%c %s / %s", P.paused ? 0xBA : P.ending ? 0xFE : 0x10, t1, t2);
+    }
+    else snprintf(b, sizeof b, "\xFE stopped");
+    tui_put(80 - (int)strlen(b), 1, P.paused ? 0x3E : 0x3F, b);
 }
 
+/* ---- the player page */
 static const char* const note_nm[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
-static const unsigned char chan_col[16] = {9, 10, 11, 12, 13, 14, 2, 3, 4, 15, 5, 6, 1, 7, 10, 12};
-
+static const unsigned char chan_col[16] = {11, 10, 14, 12, 13, 9, 15, 11, 10, 14, 12, 13, 9, 15, 11, 10};
 static const char* drum_kit(int p)
 {
     switch (p)
@@ -483,27 +973,6 @@ static const char* drum_kit(int p)
     case 25: return "TR-808 Kit";     case 32: return "Jazz Kit";    case 40: return "Brush Kit";
     case 48: return "Orchestra Kit";  case 56: return "SFX Kit";     default: return "Standard Kit";
     }
-}
-
-static void fmt_time(char* out, unsigned long sec) { sprintf(out, "%lu:%02lu", sec / 60, sec % 60); }
-
-/* ---- SC-55 front panel view (S key): an amber LCD like the real module - the highlighted part's
- * instrument and settings, and the 16 part level bars with peak hold */
-static int g_part;              /* highlighted part 0..15 (- and + keys) */
-static char g_cfg[260];
-static void view_load(const char* exe)
-{
-    const char* cut = NULL; const char* p; FILE* f; char line[64];
-    for (p = exe; *p; p++) if (*p == '/' || *p == '\\') cut = p;
-    snprintf(g_cfg, sizeof g_cfg, "%.*sMIDPLAY.CFG", cut ? (int)(cut - exe + 1) : 0, exe);
-    if (!(f = fopen(g_cfg, "r"))) return;
-    while (fgets(line, sizeof line, f)) if (!strncmp(line, "VIEW=", 5)) { g_view = atoi(line + 5); if (g_view < 0 || g_view > 2) g_view = 1; }
-    fclose(f);
-}
-static void view_save(void)
-{
-    FILE* f = fopen(g_cfg, "w");
-    if (f) { fprintf(f, "VIEW=%d\n", g_view); fclose(f); }
 }
 
 #define LCD 0x60               /* black "segments" on the amber LCD */
@@ -518,10 +987,11 @@ static void lcd_query(void)
 {
     int i;
     uint64_t t = now_us();
+    if (g_dry) { g_lcd_ok = 0; g_lcd_load = -1; return; }
     if (t < g_lcd_next) return;
     g_lcd_next = t + 100000;             /* 10 times a second: 150 trapped port reads each */
     outportb(base + 1, 0xB0);
-    for (i = 0; i < 150; i++) g_lcd[i] = (unsigned char)inportb(base);
+    for (i = 0; i < 150; i++) g_lcd[i] = (unsigned char)inportb(base);   /* not interrupted: one MPU conversation */
     g_lcd_ok = g_lcd[0] == 'L' && (g_lcd[2] == 0 || g_lcd[2] == 2);
     g_lcd_load = g_lcd[0] == 'L' ? g_lcd[3] | (g_lcd[4] << 8) : -1;
 }
@@ -543,21 +1013,21 @@ static void sc55_panel(void)
 {
     static int peak[16], hold[16];
     char b[64];
-    int r, c, p = g_part, x;
+    int r, c, p = g_chsel, x;
     lcd_query();
     for (r = 4; r <= 20; r++) fillrow(r, ' ', 0x07);
     /* case */
-    for (c = 1; c < COLS - 1; c++) { cell(4, c, 0xDC, 0x08); cell(20, c, 0xDF, 0x08); }
-    for (r = 5; r <= 19; r++) { cell(r, 1, 0xDB, 0x08); cell(r, COLS - 2, 0xDB, 0x08); }
+    for (c = 1; c < 80 - 1; c++) { cell(4, c, 0xDC, 0x08); cell(20, c, 0xDF, 0x08); }
+    for (r = 5; r <= 19; r++) { cell(r, 1, 0xDB, 0x08); cell(r, 80 - 2, 0xDB, 0x08); }
     text(5, 4, "Roland", 0x0F, 6);
     text(5, 12, "SOUND Canvas", 0x07, 12);
     text(5, 26, "SC-55", 0x0F, 5);
-    text(5, COLS - 26, "GS", 0x0E, 2);
-    text(5, COLS - 22, "\xFE POWER", 0x0A, 7);
-    text(5, COLS - 13, "MIDI \xFE", g_viz.count[p] ? 0x0C : 0x08, 6);
+    text(5, 80 - 26, "GS", 0x0E, 2);
+    text(5, 80 - 22, "\xFE POWER", 0x0A, 7);
+    text(5, 80 - 13, "MIDI \xFE", g_viz.count[p] ? 0x0C : 0x08, 6);
     /* LCD */
-    for (r = 7; r <= 17; r++) for (c = 4; c <= COLS - 5; c++) cell(r, c, ' ', LCD);
-    for (c = 4; c <= COLS - 5; c++) { cell(6, c, 0xDC, 0x06); cell(18, c, 0xDF, 0x06); }
+    for (r = 7; r <= 17; r++) for (c = 4; c <= 80 - 5; c++) cell(r, c, ' ', LCD);
+    for (c = 4; c <= 80 - 5; c++) { cell(6, c, 0xDC, 0x06); cell(18, c, 0xDF, 0x06); }
     text(7, 6, "PART", LCDL, 4);  sprintf(b, "A%02d", p + 1); text(7, 13, b, LCD, 3);
     text(8, 6, "INSTRUMENT", LCDL, 10);
     sprintf(b, "%03d %-12.12s", (g_viz.prog[p] & 127) + 1, p == 9 ? drum_kit(g_viz.prog[p]) : gm_names[g_viz.prog[p] & 127]);
@@ -634,699 +1104,920 @@ static void sc55_panel(void)
     text(19, 16, " \x11 INSTRUMENT \x10 ", 0x70, 16);
     text(19, 34, "  ALL  ", 0x70, 7);
     text(19, 43, " MUTE ", 0x70, 6);
-    text(19, 52, g_lcd_ok && g_lcd[2] == 0 ? "S table view" : "- + part   S table view", 0x08, 26);
+    text(19, 52, g_lcd_ok && g_lcd[2] == 0 ? "S next view" : "\x18\x19 part   S next view", 0x08, 26);
 }
 
-static void ui_draw(const Song* s, const char* name, uint64_t el_us, uint64_t total_us, int paused, int done)
+/* rows 2-4: what is playing */
+static void now_playing(void)
 {
-    char b[200], t1[16], t2[16];
-    int r, c, n, w;
-    const char* base_name = base_of(name);
-
-    /* title bar */
-    fillrow(0, ' ', 0x1F);
-    text(0, 2, "MIDPLAY", 0x1F, 7);
-    text(0, 10, "\xC4 SC-55 MIDI player", 0x1B, 40);
-    sprintf(b, "MPU-401 %Xh", base);
-    text(0, COLS - 2 - (int)strlen(b), b, 0x1E, 20);
-
-    /* song info */
-    fillrow(1, ' ', 0x07);
-    text(1, 1, "File", 0x03, 4);
-    text(1, 6, base_name, 0x0F, 20);
-    if (s->title[0]) { text(1, 28, "Title", 0x03, 5); text(1, 34, s->title, 0x0F, 30); }
-    if (paused) text(1, COLS - 12, " PAUSED ", 0x4F, 8);
-    else if (done) text(1, COLS - 12, "  DONE  ", 0x2F, 8);
-
-    fillrow(2, ' ', 0x07);
-    fmt_time(t1, (unsigned long)(total_us / 1000000ULL));
-    sprintf(b, "Format %d \xFA %d trk \xFA %s \xFA %ld BPM", s->format, s->ntrks, t1, g_viz.bpm10 / 10);
-    text(2, 1, b, 0x07, 40);
-    sprintf(b, "Song %d/%d \xFA Repeat %s \xFA Shuffle %s", g_cur + 1, g_npl, g_rep == 0 ? "off" : g_rep == 1 ? "all" : "one", g_shuf ? "on" : "off");
-    text(2, COLS - 1 - (int)strlen(b), b, 0x07, 40);
-
-    /* progress bar */
-    fillrow(3, ' ', 0x07);
+    char b[160], t1[16], t2[16], t3[16]; int w, x, i, half;
+    const char* title = P.loaded ? (P.s.title[0] ? P.s.title : base_of(g_cur >= 0 && g_cur < g_npl ? g_pl[g_cur].path : "")) : "Nothing playing";
+    tui_fill(1, 2, 80, 3, 0x10, ' ');
+    tui_cell(2, 2, P.paused ? 0x1E : 0x1A, P.paused ? 0xBA : P.loaded ? 0x10 : 0xFE);
+    tui_putw(4, 2, 56, 0x1F, title);
+    if (g_npl) { snprintf(b, sizeof b, "Song %d of %d", g_cur >= 0 ? g_cur + 1 : 0, g_npl); tui_put(80 - (int)strlen(b), 2, 0x17, b); }
+    if (P.loaded)
     {
-        unsigned long el = (unsigned long)(el_us / 1000000ULL);
-        if (el_us > total_us) el = (unsigned long)(total_us / 1000000ULL);
-        fmt_time(t2, el);
-        text(3, 1, t2, 0x0F, 6);
-        w = 60;
-        n = total_us ? (int)((el_us > total_us ? total_us : el_us) * (uint64_t)w / total_us) : 0;
-        cell(3, 8, '[', 0x08);
-        for (c = 0; c < w; c++) cell(3, 9 + c, c < n ? 0xDB : 0xB0, c < n ? 0x0A : 0x08);
-        cell(3, 9 + w, ']', 0x08);
-        text(3, 11 + w, t1, 0x0F, 6);
+        char fn[16]; snprintf(fn, sizeof fn, "%.12s", base_of(g_pl[g_cur >= 0 ? g_cur : 0].path)); dosify(fn);
+        snprintf(b, sizeof b, "%s \xFA Format %d \xFA %d track%s \xFA %ld BPM%s", fn, P.s.format,
+                 P.s.ntrks, P.s.ntrks == 1 ? "" : "s", g_viz.bpm10 / 10, "");
+        tui_putw(4, 3, 50, 0x13, g_cur >= 0 ? b : "");
     }
+    x = 55;
+    snprintf(b, sizeof b, "%s", g_rep == 1 ? "\x1D all" : g_rep == 2 ? "\x1D one" : "");
+    if (b[0]) { tui_put(x, 3, 0x1B, b); }
+    if (g_shuf) tui_put(62, 3, 0x1B, "\x1A shuf");
+    if (P.speed != 100) { snprintf(b, sizeof b, "%d%%", P.speed); tui_put(69, 3, 0x1E, b); }
+    if (g_mute || g_solo) tui_put(75, 3, 0x1C, g_solo ? "SOLO" : "MUTE");
+    /* progress: time, a bar with half-cell steps, length, time left */
+    {
+        uint64_t el = P.loaded ? song_time() : 0, tot = P.loaded ? P.total : 0;
+        if (el > tot) el = tot;
+        fmt_time(t1, (unsigned long)(el / 1000000ULL)); fmt_time(t2, (unsigned long)(tot / 1000000ULL));
+        snprintf(t3, sizeof t3, "-%s", t1); fmt_time(t3 + 1, (unsigned long)((tot - el) / 1000000ULL));
+        tui_putw(2, 4, 6, 0x1F, t1);
+        w = 58; half = tot ? (int)(el * (uint64_t)(w * 2) / tot) : 0;
+        for (i = 0; i < w; i++)
+        {
+            int fill = half - i * 2;
+            if (fill >= 2) tui_cell(9 + i, 4, 0x1A, 0xDB);
+            else if (fill == 1) tui_cell(9 + i, 4, 0x8A, 0xDD);   /* left half lit on a slate cell */
+            else tui_cell(9 + i, 4, 0x18, 0xC4);
+        }
+        tui_put(68, 4, 0x17, t2);
+        tui_put(74, 4, 0x18, t3);
+    }
+}
 
-    if (g_view) sc55_panel();
-    else {
-    /* channel table */
-    fillrow(4, ' ', 0x1B);
-    text(4, 1, "Ch", 0x1B, 2); text(4, 4, "Instrument", 0x1B, 10); text(4, 27, "Vol", 0x1B, 3);
-    text(4, 31, "Pan", 0x1B, 3); text(4, 36, "Activity", 0x1B, 8); text(4, 65, "Note", 0x1B, 4); text(4, 71, "Held", 0x1B, 4);
+/* rows 5-21: the 16 channels */
+static void channel_table(void)
+{
+    char b[64]; int r, c;
+    tui_fill(1, 5, 80, 1, 0x80, ' ');
+    tui_put(2, 5, 0x8F, "Ch"); tui_put(7, 5, 0x8F, "Instrument"); tui_put(30, 5, 0x8F, "Level");
+    tui_put(57, 5, 0x8F, "Vol"); tui_put(61, 5, 0x8F, "Pan"); tui_put(67, 5, 0x8F, "Note"); tui_put(72, 5, 0x8F, "Keys");
+    tui_put(77, 5, 0x8F, "Rv");
     for (r = 0; r < 16; r++)
     {
-        int row = 5 + r, used = g_viz.last_note[r] >= 0, act = g_viz.count[r] > 0;
-        int col = chan_col[r], lv = g_viz.level[r], pan = g_viz.pan[r] - 64, full;
-        int namecol = used ? col : 0x08;
-        fillrow(row, ' ', 0x07);
-        sprintf(b, "%2d", r + 1);
-        text(row, 1, b, used ? 0x0F : 0x08, 2);
-        text(row, 4, r == 9 ? drum_kit(g_viz.prog[r]) : gm_names[g_viz.prog[r] & 127], namecol, 22);
-        sprintf(b, "%3d", g_viz.vol[r]);
-        text(row, 27, b, used ? 0x07 : 0x08, 3);
-        if (pan >= -2 && pan <= 2) strcpy(b, "  C"); else sprintf(b, "%c%2d", pan < 0 ? 'L' : 'R', (pan < 0 ? -pan : pan) > 63 ? 63 : (pan < 0 ? -pan : pan));
-        text(row, 31, b, used ? 0x07 : 0x08, 3);
-        full = lv * 28 / 127; if (lv > 0 && full == 0) full = 1;
-        for (c = 0; c < 28; c++)
+        int y = 6 + r, used = g_viz.last_note[r] >= 0 || g_viz.prog[r], act = g_viz.count[r] > 0, sel = r == g_chsel;
+        int bg = sel ? 0x50 : 0x10, lv = g_viz.level[r] * g_viz.vol[r] / 127 * g_viz.expr[r] / 127, halfs, pos;
+        int dim = !audible(r);
+        tui_fill(1, y, 80, 1, bg, ' ');
+        if (sel) tui_cell(1, y, bg | 0x0E, 0x10);
+        snprintf(b, sizeof b, "%2d", r + 1); tui_put(2, y, bg | (used ? 0x0F : 0x08), b);
+        if (g_solo >> r & 1) tui_cell(5, y, 0xA0, 'S');
+        else if (g_mute >> r & 1 || (g_solo && dim)) tui_cell(5, y, 0xC0 | 0x0F, 'M');
+        tui_putw(7, y, 22, bg | (dim ? 0x08 : used ? chan_col[r] : 0x08), r == 9 ? drum_kit(g_viz.prog[r]) : gm_names[g_viz.prog[r] & 127]);
+        /* level: 26 LED segments, green -> yellow -> pink */
+        halfs = lv * 26 / 127; if (lv > 0 && halfs == 0) halfs = 1;
+        for (c = 0; c < 26; c++)
         {
-            if (c < full) cell(row, 36 + c, 0xDB, c < 17 ? 0x0A : c < 24 ? 0x0E : 0x0C);
-            else cell(row, 36 + c, 0xFA, 0x08);
+            int col = dim ? 0x08 : c < 16 ? 0x0A : c < 22 ? 0x0E : 0x0C;
+            if (c < halfs) tui_cell(30 + c, y, bg | col, 0xFE);
+            else tui_cell(30 + c, y, bg | 0x08, 0xFA);
         }
-        if (used)
+        snprintf(b, sizeof b, "%3d", g_viz.vol[r]); tui_put(57, y, bg | (used ? 0x07 : 0x08), b);
+        /* pan: a small slider */
+        pos = g_viz.pan[r] * 5 / 128;
+        for (c = 0; c < 5; c++) tui_cell(61 + c, y, bg | (c == pos ? 0x0F : 0x08), c == pos ? 0x07 : 0xC4);
+        if (used && g_viz.last_note[r] >= 0)
         {
             int nt = g_viz.last_note[r];
-            sprintf(b, "%s%d", note_nm[nt % 12], nt / 12 - 1);
-            text(row, 65, b, act ? 0x0F : 0x07, 4);
+            snprintf(b, sizeof b, "%s%d", note_nm[nt % 12], nt / 12 - 1); tui_putw(67, y, 4, bg | (act ? 0x0F : 0x07), b);
         }
-        if (act) { sprintf(b, "%2d", g_viz.count[r]); text(row, 72, b, 0x0E, 2); }
+        if (act) { snprintf(b, sizeof b, "%3d", g_viz.count[r]); tui_put(72, y, bg | 0x0E, b); }
+        if (g_viz.bend[r]) tui_cell(76, y, bg | 0x0D, g_viz.bend[r] > 0 ? 0x18 : 0x19);
+        if (used) { snprintf(b, sizeof b, "%2d", g_viz.rev[r] * 99 / 127); tui_put(77, y, bg | 0x03, b); }
     }
-    }
+}
 
-    /* note visualizer: 80 columns = notes 24..103 (C1..G7), 2 rows tall, half-block resolution */
-    fillrow(21, ' ', 0x1B);
-    text(21, 1, "Notes", 0x1B, 5);
-    for (c = 0; c < COLS; c += 12)
+/* rows 22-23: a keyboard, notes 24..103 (C1..G7), lit in the colour of the channel that plays them */
+static void keyboard(void)
+{
+    int c;
+    for (c = 0; c < 80; c++)
     {
-        int nt = 24 + c;
-        sprintf(b, "%s%d", note_nm[nt % 12], nt / 12 - 1);
-        if (c) text(21, c, b, 0x1B, 3);
+        int nt = 24 + c, lv = g_viz.nl[nt], k = nt % 12, black = k == 1 || k == 3 || k == 6 || k == 8 || k == 10;
+        int col = chan_col[g_viz.ncol[nt] & 15];
+        if (black)
+        {
+            tui_cell(c + 1, 22, lv > 20 ? (col << 4) | col : 0x00, lv > 20 ? 0xDB : ' ');
+            tui_cell(c + 1, 23, 0x70, k == 1 || k == 6 ? 0xB3 : ' ');
+        }
+        else
+        {
+            int lit = lv > 20, hi = lv > 70;
+            tui_cell(c + 1, 22, lit ? (col << 4) | 0x0F : 0x70, k == 0 && !lit ? 0xFA : ' ');
+            tui_cell(c + 1, 23, lit ? (col << 4) | 0x00 : 0x70, hi ? 0xDF : (k == 4 || k == 11) ? 0xB3 : ' ');
+        }
     }
-    for (c = 0; c < COLS; c++)
-    {
-        int nt = 24 + c, lv = g_viz.nl[nt], h = lv > 0 ? 1 + lv * 3 / 127 : 0, col = chan_col[g_viz.ncol[nt] & 15];
-        int blk = ((nt % 12) == 1 || (nt % 12) == 3 || (nt % 12) == 6 || (nt % 12) == 8 || (nt % 12) == 10);
-        int top = h >= 4 ? 0xDB : h == 3 ? 0xDC : ' ';
-        int bot = h >= 2 ? 0xDB : h == 1 ? 0xDC : (blk ? ' ' : 0xFA);
-        cell(22, c, top, top == ' ' ? 0x07 : col);
-        cell(23, c, bot, h ? col : 0x08);
-    }
-
-    /* key help */
-    fillrow(24, ' ', 0x70);
-    text(24, 1, "SPACE pause N/P song \x1B\x1A seek TAB list B files R rep H shuf S view F3 style ESC", 0x70, COLS - 2);
-    ui_flush(0);
 }
 
-#include "midplay3d.h"
-static int mp3_is_on(void) { return mp3_on; }
-
-static uint64_t g_last_draw;
-static void ui_tick(const Song* s, const char* name, uint64_t el_us, uint64_t total, int paused, int done)
+/* ================================================================== list pages */
+#define LROWS 19                         /* rows 3..21 */
+static char g_find[32]; static uint64_t g_find_t;
+static int find_active(void) { return g_find[0] && now_us() - g_find_t < 2000000; }
+static void list_keep(int* sel, int* top, int n)
 {
-    uint64_t t;
-    if (!g_ui) return;
-    t = now_us();
-    if (t - g_last_draw < 40000 && t >= g_last_draw) return;
-    g_last_draw = t;
-    viz_decay();
-    if (mp3_on) mp3_draw(s, name, el_us, total, paused, done);
-    else ui_draw(s, name, el_us, total, paused, done);
+    if (*sel >= n) *sel = n - 1;
+    if (*sel < 0) *sel = 0;
+    if (*sel < *top) *top = *sel;
+    if (*sel >= *top + LROWS) *top = *sel - LROWS + 1;
+    if (*top < 0) *top = 0;
 }
-
-/* ---- keys: normal keys as is, extended keys as 256 + scan code */
-enum { K_HOME = 256 + 71, K_UP = 256 + 72, K_PGUP = 256 + 73, K_LEFT = 256 + 75, K_RIGHT = 256 + 77,
-       K_END = 256 + 79, K_DOWN = 256 + 80, K_PGDN = 256 + 81, K_DEL = 256 + 83 };
-static int get_key(void)
-{
-    int k = key_get();
-    if (k == 0 || k == 224) return 256 + key_get();
-    return k;
-}
-
-/* ---- playlist */
-static void pl_add(const char* p)
-{
-    if (g_npl == g_cap)
-    {
-        char** n = (char**)realloc(g_pl, (size_t)(g_cap ? g_cap * 2 : 64) * sizeof(char*));
-        if (!n) return;
-        g_pl = n; g_cap = g_cap ? g_cap * 2 : 64;
-    }
-    g_pl[g_npl] = (char*)malloc(strlen(p) + 1);
-    if (g_pl[g_npl]) { strcpy(g_pl[g_npl], p); g_npl++; }
-}
-static void pl_remove(int i)
-{
-    if (i < 0 || i >= g_npl || i == g_cur) return;
-    free(g_pl[i]);
-    memmove(&g_pl[i], &g_pl[i + 1], (size_t)(g_npl - i - 1) * sizeof(char*));
-    g_npl--;
-    if (i < g_cur) g_cur--;
-}
-static const char* base_of(const char* name)
-{
-    const char* b = name, *p;
-    for (p = name; *p; p++) if (*p == '\\' || *p == '/' || *p == ':') b = p + 1;
-    return b;
-}
-static int is_midi_name(const char* n)
-{
-    const char* e = strrchr(n, '.');
-    if (!e) return 0;
-    return !stricmp(e, ".mid") || !stricmp(e, ".midi") || !stricmp(e, ".rmi") || !stricmp(e, ".kar");
-}
-static int cmp_str(const void* a, const void* b) { return stricmp(*(char* const*)a, *(char* const*)b); }
-
-/* adds every MIDI file in dir to the playlist (sorted); returns how many */
-static int scan_dir(const char* dir)
-{
-    DIR* d = opendir(dir);
-    struct dirent* de;
-    char** names = NULL; int n = 0, cap = 0, i;
-    char path[300];
-    size_t dl = strlen(dir);
-    if (!d) return 0;
-    while ((de = readdir(d)) != NULL)
-    {
-        struct stat st;
-        if (!is_midi_name(de->d_name)) continue;
-        sprintf(path, "%s%s%s", dir, (dl && dir[dl - 1] != '/' && dir[dl - 1] != '\\' && dir[dl - 1] != ':') ? "/" : "", de->d_name);
-        if (stat(path, &st) || S_ISDIR(st.st_mode)) continue;
-        if (n == cap) { char** t = (char**)realloc(names, (size_t)(cap ? cap * 2 : 64) * sizeof(char*)); if (!t) break; names = t; cap = cap ? cap * 2 : 64; }
-        names[n] = (char*)malloc(strlen(path) + 1);
-        if (names[n]) strcpy(names[n++], path);
-    }
-    closedir(d);
-    if (n > 1) qsort(names, (size_t)n, sizeof(char*), cmp_str);
-    for (i = 0; i < n; i++) { pl_add(names[i]); free(names[i]); }
-    free(names);
-    return n;
-}
-
-/* ---- list screens (file browser and playlist) share a small helper */
-#define LIST_TOP 3
-#define LIST_ROWS 20
 static int list_nav(int k, int* sel, int* top, int n)
 {
     int s = *sel;
     if (k == K_UP) s--; else if (k == K_DOWN) s++;
-    else if (k == K_PGUP) s -= LIST_ROWS - 1; else if (k == K_PGDN) s += LIST_ROWS - 1;
+    else if (k == K_PGUP) s -= LROWS - 1; else if (k == K_PGDN) s += LROWS - 1;
     else if (k == K_HOME) s = 0; else if (k == K_END) s = n - 1;
     else return 0;
-    if (s >= n) s = n - 1;
-    if (s < 0) s = 0;
-    *sel = s;
-    if (s < *top) *top = s;
-    if (s >= *top + LIST_ROWS) *top = s - LIST_ROWS + 1;
+    *sel = s; list_keep(sel, top, n);
     return 1;
 }
-static void list_frame(const char* title, const char* sub, const char* help)
+static int ci_prefix(const char* s, const char* p) { while (*p) { if (tolower((unsigned char)*s) != *p) return 0; s++; p++; } return 1; }
+static int ci_contains(const char* s, const char* p) { for (; *s; s++) if (ci_prefix(s, p)) return 1; return 0; }
+/* type to find: letters jump to the first entry whose name (or title) starts with what was typed, else contains it */
+static int find_key(int k, int n, const char* (*nm1)(int), const char* (*nm2)(int), int* sel, int* top)
 {
-    int r;
-    for (r = 0; r < ROWS; r++) fillrow(r, ' ', 0x07);
-    fillrow(0, ' ', 0x1F);
-    text(0, 2, "MIDPLAY", 0x1F, 7);
-    text(0, 10, title, 0x1B, 60);
-    text(1, 1, sub, 0x0F, COLS - 2);
-    fillrow(2, ' ', 0x1B);
-    fillrow(24, ' ', 0x70);
-    text(24, 1, help, 0x70, COLS - 2);
+    size_t l; int i;
+    if (k == K_BKSP && find_active()) { g_find[strlen(g_find) - 1] = 0; g_find_t = now_us(); if (!g_find[0]) return 1; }
+    else if (k > 32 && k < 127)
+    {
+        if (!find_active()) g_find[0] = 0;
+        l = strlen(g_find);
+        if (l < sizeof g_find - 1) { g_find[l] = (char)tolower(k); g_find[l + 1] = 0; }
+        g_find_t = now_us();
+    }
+    else return 0;
+    for (i = 0; i < n; i++) if (ci_prefix(nm1(i), g_find) || (nm2 && ci_prefix(nm2(i), g_find))) break;
+    if (i == n) for (i = 0; i < n; i++) if (ci_contains(nm1(i), g_find) || (nm2 && ci_contains(nm2(i), g_find))) break;
+    if (i < n) { *sel = i; list_keep(sel, top, n); }
+    return 1;
+}
+static void find_line(void)
+{
+    tui_fill(1, 23, 80, 1, 0x10, ' ');
+    if (find_active()) { tui_put(2, 23, 0x1B, "Find:"); tui_put(8, 23, 0x1E, g_find); tui_cell(8 + (int)strlen(g_find), 23, 0x1E, '_'); }
 }
 
-/* playlist screen: returns the index to play, or -1 */
-static int playlist_view(void)
+/* ---- Playlist */
+static int pl_sel, pl_top, pl_sort;
+static const char* pl_nm_file(int i) { return base_of(g_pl[i].path); }
+static const char* pl_nm_title(int i) { return g_pl[i].have ? g_pl[i].si.title : ""; }
+static int pl_idx_cmp_mode;
+static int pe_cmp(const void* a, const void* b)
 {
-    int sel = g_cur, top = 0, r, k;
-    char b[200];
-    list_nav(K_END, &sel, &top, g_npl); sel = g_cur; if (sel < top) top = sel; if (sel >= top + LIST_ROWS) top = sel - LIST_ROWS + 1;
-    for (;;)
+    const PE* x = (const PE*)a; const PE* y = (const PE*)b;
+    if (pl_idx_cmp_mode == 1) { int c = stricmp(x->si.title[0] ? x->si.title : base_of(x->path), y->si.title[0] ? y->si.title : base_of(y->path)); if (c) return c; }
+    if (pl_idx_cmp_mode == 2 && x->si.ms != y->si.ms) return x->si.ms < y->si.ms ? -1 : 1;
+    return stricmp(base_of(x->path), base_of(y->path));
+}
+static void pl_sort_now(int mode)
+{
+    char cur[300] = "", selp[300] = ""; int i;
+    if (g_npl < 2) return;
+    if (g_cur >= 0) snprintf(cur, sizeof cur, "%s", g_pl[g_cur].path);
+    snprintf(selp, sizeof selp, "%s", g_pl[pl_sel].path);
+    if (mode >= 1) for (i = 0; i < g_npl; i++) if (!g_pl[i].have) { mp_pump(); song_info(g_pl[i].path, &g_pl[i].si); g_pl[i].have = 1; }
+    if (mode == 3) { for (i = g_npl - 1; i > 0; i--) { int j = rand() % (i + 1); PE t = g_pl[i]; g_pl[i] = g_pl[j]; g_pl[j] = t; } }
+    else { pl_idx_cmp_mode = mode; qsort(g_pl, (size_t)g_npl, sizeof(PE), pe_cmp); }
+    if (cur[0]) g_cur = pl_find(cur);
+    pl_sel = pl_find(selp); if (pl_sel < 0) pl_sel = 0;
+    list_keep(&pl_sel, &pl_top, g_npl);
+}
+static void page_playlist(void)
+{
+    char b[120], t[16]; int r, i, unknown = 0; long total = 0;
+    for (i = 0; i < g_npl; i++) { if (!g_pl[i].have) unknown++; else if (g_pl[i].si.ok > 0) total += g_pl[i].si.ms; }
+    fmt_time(t, (unsigned long)(total / 1000));
+    snprintf(b, sizeof b, "Playlist \xFA %d song%s \xFA %s%s", g_npl, g_npl == 1 ? "" : "s", t, unknown ? " so far" : "");
+    tui_fill(1, 2, 80, 22, 0x10, ' ');
+    header(b);
+    tui_fill(1, 2, 80, 1, 0x80, ' ');
+    tui_put(2, 2, 0x8F, " No"); tui_put(8, 2, 0x8F, "Title"); tui_put(48, 2, 0x8F, "File"); tui_put(62, 2, 0x8F, " Time"); tui_put(69, 2, 0x8F, "Fmt Trk");
+    list_keep(&pl_sel, &pl_top, g_npl);
+    for (r = 0; r < LROWS && pl_top + r < g_npl; r++)
     {
-        sprintf(b, "Playlist \xFA %d song%s \xFA repeat %s \xFA shuffle %s", g_npl, g_npl == 1 ? "" : "s",
-                g_rep == 0 ? "off" : g_rep == 1 ? "all" : "one", g_shuf ? "on" : "off");
-        list_frame("\xC4 Playlist", b, "ENTER play   DEL remove   R repeat   H shuffle   TAB/ESC back");
-        text(2, 1, " No  File", 0x1B, 20);
-        for (r = 0; r < LIST_ROWS && top + r < g_npl; r++)
+        int i2 = pl_top + r, y = 3 + r, sel = i2 == pl_sel, cur = i2 == g_cur;
+        int bg = sel ? 0x70 : 0x10, fg = sel ? 0x00 : cur ? 0x0E : 0x07;
+        PE* e = &g_pl[i2];
+        tui_fill(1, y, 80, 1, bg, ' ');
+        snprintf(b, sizeof b, "%3d", i2 + 1); tui_put(2, y, bg | (sel ? 0x08 : 0x08), b);
+        if (cur) tui_cell(6, y, bg | (P.paused ? 0x0E : 0x0A), P.paused ? 0xBA : 0x10);
+        tui_putw(8, y, 39, bg | fg, e->have && e->si.title[0] ? e->si.title : base_of(e->path));
+        { char fn[80]; snprintf(fn, sizeof fn, "%s", base_of(e->path)); dosify(fn); tui_putw(48, y, 13, bg | (sel ? 0x01 : 0x03), fn); }
+        fmt_ms(t, e); tui_put(62, y, bg | (e->have && e->si.ok <= 0 ? 0x0C : fg), t);
+        if (e->have && e->si.ok > 0) { snprintf(b, sizeof b, " %d  %3d", e->si.fmt, e->si.trk); tui_put(69, y, bg | (sel ? 0x08 : 0x08), b); }
+    }
+    if (!g_npl) tui_put(8, 5, 0x18, "The playlist is empty: TAB (or Ins) opens the files to add songs.");
+    if (g_npl && pl_sel < g_npl) { char pp[300]; snprintf(pp, sizeof pp, "%s", g_pl[pl_sel].path); dosify(pp); tui_putw(2, 22, 78, 0x13, pp); }
+    find_line();
+    hintline(pl_sort ? "Sorted - F5 sorts again: name, title, length, shuffled" : "Type a name to jump to it. The music keeps playing while you look around.");
+    keybar("~ENTER~ Play ~DEL~ Remove ~^\x18\x19~ Move ~F5~ Sort ~^S~ Save ~^O~ Open ~INS~ Add ~TAB~ Page");
+}
+static void pl_open_dialog(void)
+{
+    char f[260];
+    snprintf(f, sizeof f, "%s\\PLAYLIST.M3U", g_home);
+    if (!tui_input("Open a playlist", "File name of the playlist (.M3U):", f, sizeof f, 1)) return;
+    {
+        int keep = g_npl && !tui_yesno("Replace the playlist with it? (No: add its songs at the end)");
+        int was = g_npl, n;
+        if (!keep) { mp_unload(); pl_clear(); }
+        n = pl_load_m3u(f);
+        if (n < 0) { msg("Cannot open %s", f); return; }
+        msg("%d song%s from %s", n, n == 1 ? "" : "s", base_of(f));
+        if (!keep && g_npl) { g_jump = 0; g_act = 4; }
+        else pl_sel = was;
+    }
+}
+static void pl_save_dialog(void)
+{
+    char f[260];
+    snprintf(f, sizeof f, "%s\\PLAYLIST.M3U", g_home);
+    if (!tui_input("Save the playlist", "File name (.M3U) - MIDPLAY /D or Ctrl+O on the Playlist page opens it again:", f, sizeof f, 1)) return;
+    if (pl_save_m3u(f)) msg("Saved %d songs to %s", g_npl, f); else msg("Cannot write %s", f);
+}
+static void key_playlist(int k)
+{
+    if (find_key(k, g_npl, pl_nm_file, pl_nm_title, &pl_sel, &pl_top)) return;
+    if (list_nav(k, &pl_sel, &pl_top, g_npl)) return;
+    if (k == K_ENTER && g_npl) { g_jump = pl_sel; g_act = 4; }
+    else if (k == K_DEL && g_npl) { pl_remove(pl_sel); list_keep(&pl_sel, &pl_top, g_npl); }
+    else if ((k == K_CUP || k == K_CDOWN) && g_npl > 1)
+    {
+        int j = pl_sel + (k == K_CUP ? -1 : 1);
+        if (j >= 0 && j < g_npl)
         {
-            int i = top + r, at = i == sel ? 0x70 : (i == g_cur ? 0x0E : 0x07);
-            int c;
-            if (i == sel) for (c = 0; c < COLS; c++) cell(LIST_TOP + r, c, ' ', 0x70);
-            sprintf(b, "%3d", i + 1);
-            text(LIST_TOP + r, 1, b, at, 3);
-            if (i == g_cur) cell(LIST_TOP + r, 5, 0x10, at);
-            text(LIST_TOP + r, 7, base_of(g_pl[i]), at, 40);
-            text(LIST_TOP + r, 49, g_pl[i], i == sel ? 0x70 : 0x08, 30);
+            PE t = g_pl[pl_sel]; g_pl[pl_sel] = g_pl[j]; g_pl[j] = t;
+            if (g_cur == pl_sel) g_cur = j; else if (g_cur == j) g_cur = pl_sel;
+            pl_sel = j; list_keep(&pl_sel, &pl_top, g_npl);
         }
-        ui_flush(0);
-        k = get_key();
-        if (list_nav(k, &sel, &top, g_npl)) continue;
-        if (k == 27 || k == 9) return -1;
-        if (k == 13) return sel;
-        if (k == K_DEL) { pl_remove(sel); if (sel >= g_npl) sel = g_npl - 1; }
-        if (k == 'r' || k == 'R') g_rep = (g_rep + 1) % 3;
-        if (k == 'h' || k == 'H') g_shuf = !g_shuf;
+    }
+    else if (k == K_F5) { pl_sort = (pl_sort % 4) + 1; pl_sort_now(pl_sort - 1); msg("Sorted by %s", (const char*[]){"file name", "title", "length", "chance (shuffled)"}[pl_sort - 1]); }
+    else if (k == K_CS) pl_save_dialog();
+    else if (k == K_CO) pl_open_dialog();
+    else if (k == K_INS) g_page = PG_FILES;
+    else if (k == K_MOUSE && tui_my >= 3 && tui_my < 3 + LROWS && pl_top + tui_my - 3 < g_npl)
+    {
+        int i = pl_top + tui_my - 3;
+        if (i == pl_sel) { g_jump = i; g_act = 4; } else pl_sel = i;
     }
 }
 
-/* ---- file browser */
-typedef struct { char name[80]; int dir; long size; int mark; } Ent;
+/* ---- Files */
+typedef struct { char name[80]; int kind; long size; int mark; } Ent;    /* kind: 0 file, 1 folder, 2 drive, 3 playlist */
+static Ent* fl_e; static int fl_n, fl_sel, fl_top, fl_loaded;
+static SongInfo fl_si; static char fl_si_name[300]; static int fl_si_have;
 static int ent_cmp(const void* a, const void* b)
 {
     const Ent* x = (const Ent*)a, *y = (const Ent*)b;
-    if (x->dir != y->dir) return y->dir - x->dir;
+    int kx = x->kind == 1 ? 0 : x->kind == 2 ? 3 : 1, ky = y->kind == 1 ? 0 : y->kind == 2 ? 3 : 1;
+    if (kx != ky) return kx - ky;
+    if (x->kind == 1 && !strcmp(x->name, "..")) return -1;
+    if (y->kind == 1 && !strcmp(y->name, "..")) return 1;
     return stricmp(x->name, y->name);
 }
-static Ent* load_dir(int* n)
+static int drive_exists(int d)                    /* 0 = A: ; INT 21h 4408h: no disk access, no "not ready" */
 {
-    DIR* d = opendir(".");
-    struct dirent* de;
-    Ent* e = NULL; int cnt = 0, cap = 0;
-    *n = 0;
-    if (!d) return NULL;
-    while ((de = readdir(d)) != NULL)
-    {
-        struct stat st;
-        int isd;
-        if (!strcmp(de->d_name, ".")) continue;
-        if (stat(de->d_name, &st)) continue;
-        isd = S_ISDIR(st.st_mode) ? 1 : 0;
-        if (!isd && !is_midi_name(de->d_name)) continue;
-        if (cnt == cap) { Ent* t = (Ent*)realloc(e, (size_t)(cap ? cap * 2 : 64) * sizeof(Ent)); if (!t) break; e = t; cap = cap ? cap * 2 : 64; }
-        strncpy(e[cnt].name, de->d_name, sizeof e[cnt].name - 1); e[cnt].name[sizeof e[cnt].name - 1] = 0;
-        e[cnt].dir = isd; e[cnt].size = isd ? 0 : (long)st.st_size; e[cnt].mark = 0;
-        cnt++;
-    }
-    closedir(d);
-    if (cnt > 1) qsort(e, (size_t)cnt, sizeof(Ent), ent_cmp);
-    *n = cnt;
-    return e;
+    __dpmi_regs r; memset(&r, 0, sizeof r); r.x.ax = 0x4408; r.h.bl = (unsigned char)(d + 1); __dpmi_int(0x21, &r);
+    if (!(r.x.flags & 1)) return 1;
+    return r.x.ax != 0x0F;                        /* "invalid function" (CD-ROM, network) still means it exists */
 }
-static void add_cwd_file(const char* name)
+static void fl_add(const char* name, int kind, long size)
 {
-    char cwd[260], path[340];
+    static int cap;
+    if (fl_n == cap) { Ent* t = (Ent*)realloc(fl_e, (size_t)(cap = cap ? cap * 2 : 128) * sizeof(Ent)); if (!t) return; fl_e = t; }
+    snprintf(fl_e[fl_n].name, sizeof fl_e[fl_n].name, "%s", name); dosify(fl_e[fl_n].name); fl_e[fl_n].kind = kind; fl_e[fl_n].size = size; fl_e[fl_n].mark = 0; fl_n++;
+}
+static void fl_load(void)
+{
+    DIR* d = opendir("."); struct dirent* de; int i;
+    fl_n = 0; fl_sel = fl_top = 0; fl_si_have = 0; fl_si_name[0] = 0;
+    if (d)
+    {
+        while ((de = readdir(d)) != NULL)
+        {
+            struct stat st;
+            if (!strcmp(de->d_name, ".") || stat(de->d_name, &st)) continue;
+            if (S_ISDIR(st.st_mode)) fl_add(de->d_name, 1, 0);
+            else if (is_midi_name(de->d_name)) fl_add(de->d_name, 0, (long)st.st_size);
+            else if (is_m3u_name(de->d_name)) fl_add(de->d_name, 3, (long)st.st_size);
+        }
+        closedir(d);
+    }
+    for (i = 2; i < 26; i++) if (drive_exists(i)) { char n[4] = { (char)('A' + i), ':', 0 }; fl_add(n, 2, 0); }
+    if (fl_n > 1) qsort(fl_e, (size_t)fl_n, sizeof(Ent), ent_cmp);
+    fl_loaded = 1;
+    { char cwd[260]; if (getcwd(cwd, sizeof cwd)) snprintf(g_lastdir, sizeof g_lastdir, "%s", cwd); }
+}
+static const char* fl_nm(int i) { return fl_e[i].name; }
+static void fl_full(int i, char* out, size_t sz)
+{
+    char cwd[260];
     if (!getcwd(cwd, sizeof cwd)) cwd[0] = 0;
-    sprintf(path, "%s%s%s", cwd, (cwd[0] && cwd[strlen(cwd) - 1] != '/' && cwd[strlen(cwd) - 1] != '\\') ? "/" : "", name);
-    pl_add(path);
+    snprintf(out, sz, "%s%s%s", cwd, (cwd[0] && cwd[strlen(cwd) - 1] != '/' && cwd[strlen(cwd) - 1] != '\\') ? "/" : "", fl_e[i].name);
 }
-
-/* file explorer: folders, drives (D), multi-select (SPACE), add folder (A). Adds files to the playlist;
- * returns how many were added (the first new one is at index g_npl - added). */
-static int browse_midi(void)
+static void page_files(void)
 {
-    int n = 0, sel = 0, top = 0, added = 0, i, r, k, nd;
-    Ent* e = load_dir(&n);
-    char cwd[260], b[200], keep[260];
-    int keep_disk = getdisk();
-    if (!getcwd(keep, sizeof keep)) keep[0] = 0;
-    for (;;)
+    char cwd[260], b[120], t[16]; int r, i, marked = 0, x = 52;
+    if (!fl_loaded) fl_load();
+    for (i = 0; i < fl_n; i++) marked += fl_e[i].mark;
+    if (!getcwd(cwd, sizeof cwd)) strcpy(cwd, "?");
+    dosify(cwd);
+    snprintf(b, sizeof b, "Files \xFA %s", cwd);
+    tui_fill(1, 2, 80, 22, 0x10, ' ');
+    header(b);
+    tui_fill(1, 2, 50, 1, 0x80, ' ');
+    tui_put(4, 2, 0x8F, "Name"); tui_put(40, 2, 0x8F, "Size");
+    list_keep(&fl_sel, &fl_top, fl_n);
+    for (r = 0; r < LROWS && fl_top + r < fl_n; r++)
     {
-        int marked = 0;
-        for (i = 0; i < n; i++) marked += e[i].mark;
-        if (!getcwd(cwd, sizeof cwd)) strcpy(cwd, "?");
-        list_frame("\xC4 Select MIDI files", cwd, "ENTER open/add  SPACE mark  A add folder  BKSP up  D drive  ESC done");
-        text(2, 1, "Name", 0x1B, 4); text(2, 40, "Size", 0x1B, 4);
-        for (r = 0; r < LIST_ROWS && top + r < n; r++)
+        Ent* e = &fl_e[fl_top + r]; int y = 3 + r, sel = fl_top + r == fl_sel, bg = sel ? 0x70 : 0x10;
+        char path[300]; int inpl;
+        tui_fill(1, y, 50, 1, bg, ' ');
+        if (e->mark) tui_cell(2, y, bg | 0x0E, 0xFB);
+        if (e->kind == 1) { snprintf(b, sizeof b, "\x10%s", e->name); tui_putw(4, y, 34, bg | (sel ? 0x01 : 0x0B), b); tui_put(40, y, bg | 0x08, "folder"); }
+        else if (e->kind == 2) { snprintf(b, sizeof b, "%s  drive", e->name); tui_putw(4, y, 34, bg | (sel ? 0x05 : 0x0D), b); }
+        else
         {
-            Ent* x = &e[top + r];
-            int ii = top + r, at = ii == sel ? 0x70 : (x->dir ? 0x0B : 0x0F), c;
-            if (ii == sel) for (c = 0; c < COLS; c++) cell(LIST_TOP + r, c, ' ', 0x70);
-            if (x->mark) cell(LIST_TOP + r, 1, 0xFB, ii == sel ? 0x74 : 0x0E);
-            if (x->dir) { sprintf(b, "[%s]", x->name); text(LIST_TOP + r, 3, b, at, 36); }
-            else
-            {
-                text(LIST_TOP + r, 3, x->name, at, 36);
-                sprintf(b, "%ld KB", (x->size + 1023) / 1024);
-                text(LIST_TOP + r, 40, b, ii == sel ? 0x70 : 0x07, 12);
-            }
-        }
-        if (!n) text(LIST_TOP + 1, 3, "(no folders or MIDI files here)", 0x08, 40);
-        sprintf(b, "%d marked   %d added to playlist", marked, added);
-        text(23, 1, b, 0x0E, 60);
-        ui_flush(0);
-        k = get_key();
-        if (list_nav(k, &sel, &top, n)) continue;
-        if (k == 27) break;
-        if (k == ' ' && n && !e[sel].dir) { e[sel].mark = !e[sel].mark; if (sel < n - 1) list_nav(K_DOWN, &sel, &top, n); }
-        else if (k == 'a' || k == 'A')
-        {
-            for (i = 0; i < n; i++) if (!e[i].dir) { add_cwd_file(e[i].name); added++; }
-        }
-        else if (k == 8 || (k == 13 && n && e[sel].dir && !strcmp(e[sel].name, "..")))
-        {
-            if (!chdir("..")) { free(e); e = load_dir(&n); sel = top = 0; }
-        }
-        else if (k == 13 && n)
-        {
-            if (e[sel].dir)
-            {
-                if (!chdir(e[sel].name)) { free(e); e = load_dir(&n); sel = top = 0; }
-            }
-            else
-            {
-                if (marked) { for (i = 0; i < n; i++) if (e[i].mark) { add_cwd_file(e[i].name); added++; e[i].mark = 0; } }
-                else { add_cwd_file(e[sel].name); added++; }
-                break;
-            }
-        }
-        else if (k == 'd' || k == 'D')
-        {
-            nd = setdisk(getdisk());
-            for (i = 1; i <= 26; i++)
-            {
-                int dsk = (getdisk() + i) % 26;
-                DIR* t;
-                if (dsk < 2 || dsk >= nd) continue;           /* skip A: and B: (floppy prompts) */
-                setdisk(dsk);
-                t = opendir(".");
-                if (t) { closedir(t); break; }
-            }
-            free(e); e = load_dir(&n); sel = top = 0;
+            fl_full(fl_top + r, path, sizeof path); inpl = pl_find(path) >= 0;
+            tui_putw(4, y, 34, bg | (e->kind == 3 ? (sel ? 0x02 : 0x0A) : sel ? 0x00 : inpl ? 0x0E : 0x0F), e->name);
+            snprintf(b, sizeof b, "%5ld KB", (e->size + 1023) / 1024); tui_put(40, y, bg | 0x08, b);
+            if (inpl) tui_cell(49, y, bg | 0x0E, 0x0D);
         }
     }
-    free(e);
-    setdisk(keep_disk);
-    if (keep[0]) chdir(keep);
-    return added;
-}
-
-/* ---- seek: silence, reset controllers, replay everything except notes up to time t */
-static struct
-{
-    const Song* s; long i; uint64_t start, total, p0; int paused, skip;
-} P;
-
-static void seek_to(uint64_t t)
-{
-    long k;
-    int ch;
-    const Song* s = P.s;
-    if (t >= P.total) t = P.total > 1000 ? P.total - 1000 : 0;
-    silence();
-    for (ch = 0; ch < 16; ch++) { out_byte((unsigned char)(0xB0 | ch)); out_byte(121); out_byte(0); }
-    viz_reset();
-    for (k = 0; k < s->nev && s->ev[k].us < t; k++)
+    if (!fl_n) tui_put(4, 4, 0x18, "(nothing here)");
+    /* the side panel: what the selected song is */
+    tui_panel(x, 3, 29, 19, 1, 0x1F, "Selected");
+    if (fl_n && (fl_e[fl_sel].kind == 0))
     {
-        const Event* e = &s->ev[k];
-        if (e->kind == EV_SHORT && ((e->arg & 0xF0) == 0x80 || (e->arg & 0xF0) == 0x90)) continue;
-        send_event(s, e);
-        viz_event(e);
+        char path[300]; fl_full(fl_sel, path, sizeof path);
+        if (strcmp(path, fl_si_name)) { snprintf(fl_si_name, sizeof fl_si_name, "%s", path); fl_si_have = 0; }
+        if (!fl_si_have && mp_next_in() >= 20000) { song_info(path, &fl_si); fl_si_have = 1; }
+        tui_wrap(x + 2, 5, 25, 3, 0x1F, fl_si_have && fl_si.title[0] ? fl_si.title : fl_e[fl_sel].name);
+        if (fl_si_have && fl_si.ok > 0)
+        {
+            fmt_time(t, (unsigned long)((fl_si.ms + 500) / 1000));
+            tui_printf(x + 2, 9, 0x17, "Length   %s", t);
+            tui_printf(x + 2, 10, 0x17, "Format   %d, %d track%s", fl_si.fmt, fl_si.trk, fl_si.trk == 1 ? "" : "s");
+            tui_printf(x + 2, 11, 0x17, "Size     %ld KB", (fl_si.size + 1023) / 1024);
+        }
+        else if (fl_si_have) tui_put(x + 2, 9, 0x1C, "Not a MIDI file it can play");
+        else tui_put(x + 2, 9, 0x18, "reading...");
+        if (pl_find(path) >= 0) tui_put(x + 2, 13, 0x1E, "\x0D In the playlist");
+        tui_put(x + 2, 15, 0x1B, "ENTER  play it now");
+        tui_put(x + 2, 16, 0x1B, "INS    mark / unmark");
+        tui_put(x + 2, 17, 0x1B, "^A     add this folder");
+        tui_put(x + 2, 18, 0x1B, "^P     play this folder");
     }
-    P.i = k;
-    P.skip = 1;
-    if (P.paused) { P.p0 = now_us(); P.start = P.p0 - t; }
-    else P.start = now_us() - t;
+    else if (fl_n && fl_e[fl_sel].kind == 3) { tui_wrap(x + 2, 5, 25, 2, 0x1F, fl_e[fl_sel].name); tui_wrap(x + 2, 8, 25, 4, 0x17, "A playlist (M3U). ENTER opens it."); }
+    else if (fl_n && fl_e[fl_sel].kind == 2) tui_wrap(x + 2, 5, 25, 4, 0x17, "ENTER switches to this drive.");
+    else if (fl_n) tui_wrap(x + 2, 5, 25, 4, 0x17, "ENTER opens the folder, BACKSPACE goes up one.");
+    snprintf(b, sizeof b, "%d marked \xFA %d in the list", marked, g_npl);
+    tui_putw(52, 22, 29, 0x13, b);
+    find_line();
+    hintline(marked ? "ENTER adds the marked songs (and plays the first of them)." : "Type a name to jump to it. \x0D = already in the playlist.");
+    keybar("~ENTER~ Play/Open ~INS~ Mark ~^A~ Add folder ~^P~ Play folder ~BKSP~ Up ~TAB~ Page");
 }
-static uint64_t elapsed_us(void) { return P.paused ? P.p0 - P.start : now_us() - P.start; }
-static void seek_rel(long delta_s)
+static void fl_enter_dir(const char* d) { if (!chdir(d)) fl_load(); }
+static void key_files(int k)
 {
-    long long t = (long long)elapsed_us() + (long long)delta_s * 1000000LL;
-    if (t < 0) t = 0;
-    seek_to((uint64_t)t);
+    int i, first = -1;
+    if (!fl_loaded) fl_load();
+    if (!(k == K_BKSP && !find_active()) && find_key(k, fl_n, fl_nm, NULL, &fl_sel, &fl_top)) return;
+    if (list_nav(k, &fl_sel, &fl_top, fl_n)) return;
+    if (k == K_BKSP) { fl_enter_dir(".."); return; }
+    if (k == K_MOUSE && tui_my >= 3 && tui_my < 3 + LROWS && tui_mx <= 50 && fl_top + tui_my - 3 < fl_n)
+    {
+        int j = fl_top + tui_my - 3;
+        if (j != fl_sel) { fl_sel = j; return; }
+        k = K_ENTER;
+    }
+    if (!fl_n) return;
+    if (k == K_INS) { if (fl_e[fl_sel].kind == 0) fl_e[fl_sel].mark = !fl_e[fl_sel].mark; list_nav(K_DOWN, &fl_sel, &fl_top, fl_n); }
+    else if (k == K_CA || k == K_CP)
+    {
+        if (k == K_CP) { mp_unload(); pl_clear(); }
+        for (i = 0; i < fl_n; i++) if (fl_e[i].kind == 0)
+        {
+            char p[300]; fl_full(i, p, sizeof p);
+            if (pl_find(p) < 0) { pl_add(p); if (first < 0) first = g_npl - 1; }
+        }
+        msg(first < 0 ? "No new songs here" : "Added the songs of this folder");
+        if (k == K_CP && g_npl) { g_jump = 0; g_act = 4; g_page = PG_PLAYER; }
+    }
+    else if (k == K_ENTER)
+    {
+        Ent* e = &fl_e[fl_sel];
+        if (e->kind == 1) fl_enter_dir(e->name);
+        else if (e->kind == 2) { setdisk(e->name[0] - 'A'); fl_load(); }
+        else if (e->kind == 3)
+        {
+            char p[300]; int was = g_npl, keep, n;
+            fl_full(fl_sel, p, sizeof p);
+            keep = g_npl && !tui_yesno("Replace the playlist with this one? (No: add its songs at the end)");
+            if (!keep) { mp_unload(); pl_clear(); was = 0; }
+            n = pl_load_m3u(p);
+            msg("%d song%s from %s", n, n == 1 ? "" : "s", e->name);
+            if (n > 0) { g_jump = was; g_act = 4; g_page = PG_PLAYER; }
+        }
+        else
+        {
+            int marked = 0;
+            for (i = 0; i < fl_n; i++) if (fl_e[i].mark)
+            {
+                char p[300]; int at; fl_full(i, p, sizeof p);
+                at = pl_find(p); if (at < 0) { pl_add(p); at = g_npl - 1; }
+                if (first < 0) first = at;
+                fl_e[i].mark = 0; marked++;
+            }
+            if (!marked)
+            {
+                char p[300]; fl_full(fl_sel, p, sizeof p);
+                first = pl_find(p); if (first < 0) { pl_add(p); first = g_npl - 1; }
+            }
+            if (first >= 0) { g_jump = first; g_act = 4; g_page = PG_PLAYER; }
+        }
+    }
 }
 
-/* runs a modal screen without losing the song position */
-static void modal_begin(void)
+/* ---- Options */
+static const char* const opt_name[] = { "Player view", "Repeat", "Shuffle", "Reset before each song", "Speed",
+                                        "Pause between songs", "Started without files", "Display mode", "Style", "Letters" };
+static const char* const opt_help[] = {
+    "S on the Player page switches it too. 3D needs a 640x480 VESA mode with 15-32 bit colour.",
+    "R on the Player page. One = the same song again and again.",
+    "H on the Player page. Plays the songs in a random order, each once.",
+    "GS reset suits the SC-55 and SC-55mkII. GM On for other General MIDI synths. None: what the last song left.",
+    "[ and ] on the Player page, BACKSPACE back to 100%. Slower or faster, same pitch.",
+    "Seconds of silence after a song before the next one starts.",
+    "MIDPLAY with no file names: the last playlist (at the song and time you left), or every MIDI file next to MIDPLAY.EXE.",
+    "The screen mode chosen in MENU (F4 anywhere). Bigger text modes show the screen in the middle.",
+    "The colours (F3 anywhere); shared with MENU and the other programs.",
+    "The font of the text (F7 anywhere); shared with MENU and the other programs." };
+static int op_sel;
+#define OP_N 10
+static void opt_value(int i, char* b, size_t n)
 {
-    silence(); P.p0 = now_us();
-#ifndef HOSTTEST
-    if (mp3_is_on()) { mp3_leave(); ui_text_init(); }      /* the list screens are text */
-#endif
+    switch (i)
+    {
+    case 0: snprintf(b, n, "%s", (const char*[]){"Channel table", "SC-55 front panel", "3D"}[g_view]); break;
+    case 1: snprintf(b, n, "%s", (const char*[]){"Off", "All songs", "One song"}[g_rep]); break;
+    case 2: snprintf(b, n, "%s", g_shuf ? "On" : "Off"); break;
+    case 3: snprintf(b, n, "%s", (const char*[]){"GS reset (SC-55)", "GM System On", "None"}[g_reset]); break;
+    case 4: snprintf(b, n, "%d%%", P.speed); break;
+    case 5: snprintf(b, n, g_gap ? "%d s" : "None", g_gap); break;
+    case 6: snprintf(b, n, "%s", g_startlast ? "Last playlist" : "MIDI files in MIDPLAY's folder"); break;
+    case 7: snprintf(b, n, "%s", tui_mode_id); break;
+    case 8: snprintf(b, n, "%s", tui_theme_name[tui_theme]); break;
+    case 9: snprintf(b, n, "%s", tui_font_name[tui_font]); break;
+    }
 }
-static void modal_end(void)
+static void page_options(void)
 {
-    if (!P.paused) P.start += now_us() - P.p0;
-    g_last_draw = 0;
-#ifndef HOSTTEST
-    memset(shown, 0xFF, sizeof shown); /* the list screen drew over everything: repaint every row */
-    if (g_view == 2 && !mp3_is_on() && !mp3_enter()) { g_view = 0; ui_text_init(); }
-#endif
+    char b[80]; int i;
+    tui_fill(1, 2, 80, 22, 0x10, ' ');
+    header("Options \xFA kept in MIDPLAY.CFG");
+    tui_panel(8, 3, 66, OP_N + 4, 1, 0x1F, "Options");
+    for (i = 0; i < OP_N; i++)
+    {
+        int y = 5 + i, sel = i == op_sel, bg = sel ? 0x70 : 0x10;
+        tui_fill(10, y, 62, 1, bg, ' ');
+        tui_put(11, y, bg | (sel ? 0x00 : 0x07), opt_name[i]);
+        opt_value(i, b, sizeof b);
+        tui_cell(36, y, bg | 0x08, 0x11); tui_putw(38, y, 31, bg | (sel ? 0x01 : 0x0E), b); tui_cell(70, y, bg | 0x08, 0x10);
+    }
+    tui_wrap(10, OP_N + 8, 62, 3, 0x1B, opt_help[op_sel]);
+    hintline("LEFT / RIGHT or ENTER change the setting. ESC goes back.");
+    keybar("~\x18\x19~ Choose  ~\x1B\x1A~ Change  ~ENTER~ Next value  ~ESC~ Back  ~F1~ Help");
+}
+static void opt_change(int i, int d)
+{
+    switch (i)
+    {
+    case 0: g_view = (g_view + 3 + d) % 3; break;
+    case 1: g_rep = (g_rep + 3 + d) % 3; break;
+    case 2: g_shuf = !g_shuf; break;
+    case 3: g_reset = (g_reset + 3 + d) % 3; break;
+    case 4: set_speed(P.speed + d * 5); break;
+    case 5: g_gap = (g_gap + 11 + d) % 11; break;
+    case 6: g_startlast = !g_startlast; break;
+    case 7: tui_pick_mode(g_home); tui_invalidate(); break;
+    case 8: tui_theme_next(g_home); break;
+    case 9: tui_font = (tui_font + 1) % FONT_COUNT; tui_theme_save(g_home); tui_font_loaded = 0; tui_font_apply(); tui_invalidate(); break;
+    }
+    cfg_save();
+}
+static void key_options(int k)
+{
+    if (k == K_UP) op_sel = (op_sel + OP_N - 1) % OP_N;
+    else if (k == K_DOWN) op_sel = (op_sel + 1) % OP_N;
+    else if (k == K_LEFT) opt_change(op_sel, -1);
+    else if (k == K_RIGHT || k == K_ENTER) opt_change(op_sel, 1);
+    else if (k == K_MOUSE && tui_my >= 5 && tui_my < 5 + OP_N) { if (op_sel == tui_my - 5) opt_change(op_sel, 1); else op_sel = tui_my - 5; }
 }
 
-/* handles one key; returns 0 to carry on or a play() result (1 next, 2 quit, 3 prev, 4 jump) */
-static int do_key(int k, int in_tail)
+/* ---- Help */
+static void page_help(void)
+{
+    static const char* const h[] = {
+        "~ON EVERY PAGE~",
+        "  SPACE pause / play      < >  previous / next song    ^\x1B ^\x1A  seek 10 s",
+        "  TAB   next page         F1 help   F2 options   F3 style   F4 display mode",
+        "  ESC   back (on the Player page: quit)",
+        "~PLAYER~",
+        "  \x1B \x1A   seek 10 s      PGUP PGDN  seek 60 s      HOME  start of the song",
+        "  N P   next / previous   R  repeat off/all/one    H  shuffle",
+        "  \x18 \x19   choose a channel (or the SC-55 part)  M mute it  O solo it  U all on",
+        "  [ ]   slower / faster, BACKSPACE = 100%     B  the files     Q  quit",
+        "  S     channels \x1A SC-55 front panel \x1A 3D   (F4 in 3D: full / half resolution)",
+        "~PLAYLIST~   (type a name to jump to it)",
+        "  ENTER play   DEL remove   ^\x18 ^\x19 move   F5 sort: name, title, length, shuffle",
+        "  ^S save it as .M3U   ^O open a .M3U   INS add songs",
+        "~FILES~      (type a name to jump to it)",
+        "  ENTER play the song now, or open the folder, drive or .M3U   BACKSPACE up",
+        "  INS mark songs (ENTER adds them)   ^A add this folder   ^P play this folder",
+        "~MOUSE~  click: choose, click again: play or open. Wheel scrolls. Click the time",
+        "  bar to seek. Right click: back. The playlist, song and time are remembered.",
+        NULL };
+    int i, y = 3;
+    tui_fill(1, 2, 80, 22, 0x10, ' ');
+    header("Help");
+    for (i = 0; h[i]; i++, y++)
+    {
+        const char* s = h[i]; int x = 3, hl = 0;
+        for (; *s; s++) { if (*s == '~') { hl = !hl; continue; } tui_cell(x++, y, hl ? 0x1E : 0x17, (unsigned char)*s); }
+    }
+    hintline("The music goes to SBEMU's MPU-401: SC-55, MT-32 or SoundFont, as set in SETTINGS.");
+    keybar("~ESC~ Back  ~F2~ Options  ~TAB~ Next page");
+}
+
+/* ================================================================== the 3D view, frames, keys, main */
+#include "midplay3d.h"
+
+static uint64_t g_next_frame, g_decay_t, g_draw_us;
+static int want_3d(void) { return g_ui && g_page == PG_PLAYER && g_view == 2; }
+static void to_text(void)
+{
+    if (!mp3_on) return;
+    mp3_leave();
+    tui_set_saved_mode();
+    _setcursortype(_NOCURSOR);
+    tui_font_loaded = 0; tui_font_apply(); tui_apply_theme();
+    tui_invalidate();
+}
+static void screen_sync(void)
+{
+    if (want_3d()) { if (!mp3_on && !mp3_enter()) { g_view = 0; msg("The 3D view needs a 640x480 VESA mode with 15 to 32 bit colour."); } }
+    else to_text();
+}
+/* the text screen to video memory, with the mouse pointer (an inverted cell) */
+static void mp_flush(void)
+{
+    int mx = tui_mx - 1, my = tui_my - 1, ptr = tui_mshow && mx >= 0 && mx < TUI_W && my >= 0 && my < TUI_H;
+    uint16_t keep = 0;
+    if (ptr)
+    {
+        uint16_t c = keep = tui_scr[my][mx];
+        tui_scr[my][mx] = (uint16_t)((c & 0x00FF) | ((c & 0x0F00) << 4) | ((c & 0xF000) >> 4) | (((c >> 12) == ((c >> 8) & 15)) ? 0x7000 : 0));
+    }
+    tui_flush_now();
+    if (ptr) tui_scr[my][mx] = keep;
+}
+static void draw_player(void)
+{
+    static const char* const vname[3] = { "Channels", "SC-55 front panel", "3D" };
+    char b[120];
+    snprintf(b, sizeof b, "SC-55 MIDI player \xFA %s \xFA MPU-401 %Xh%s", vname[g_view], base, g_dry ? " (test: nothing sent)" : "");
+    header(b);
+    now_playing();
+    if (g_view == 1) sc55_panel(); else channel_table();
+    keyboard();
+    hintline(g_view == 1 ? "\x18\x19 choose the part shown. The panel is the module's real display while SBEMU sends it."
+                         : "\x18\x19 channel: M mute, O solo, U all on   [ ] speed   R repeat   H shuffle");
+    keybar("~F1~ Help ~F2~ Options ~SPACE~ Pause ~\x1B\x1A~ Seek ~N P~ Song ~S~ View ~TAB~ Lists ~ESC~ Quit");
+}
+/* one frame, if it is time: paced so drawing takes at most ~25% of the time (text) */
+static void ui_frame(void)
+{
+    uint64_t t = now_us(), t1;
+    int n;
+    if (!g_ui || t < g_next_frame) return;
+    n = (int)((t - g_decay_t) / 40000); if (n > 6) n = 6;
+    if (n > 0) { g_decay_t = t; while (n--) viz_decay(); }
+    screen_sync();
+    if (mp3_on)
+    {
+        mp3_draw(&P.s, g_cur >= 0 && g_cur < g_npl ? g_pl[g_cur].path : "", song_time(), P.total, P.paused, P.ending);
+        g_next_frame = t + 10000;                       /* mp3_draw paces itself */
+        return;
+    }
+    if (g_page == PG_PLAYER) draw_player();
+    else if (g_page == PG_LIST) page_playlist();
+    else if (g_page == PG_FILES) page_files();
+    else if (g_page == PG_OPTIONS) page_options();
+    else page_help();
+    mp_flush();
+    if (tui_fade_pending) { tui_fade_pending = 0; tui_fade(1); }   /* Groovy styles fade in after the first frame */
+    t1 = now_us();
+    g_draw_us = t1 - t;
+    st_frame(g_draw_us);
+    g_next_frame = t + (g_draw_us * 4 > 40000 ? g_draw_us * 4 : 40000);
+}
+
+static void go_page(int p)
+{
+    if (p == g_page) return;
+    if (p == PG_FILES)
+    {   /* the folder of the song that plays (else the last one looked at) */
+        char d[300] = ""; char* e;
+        if (g_cur >= 0 && g_cur < g_npl) { snprintf(d, sizeof d, "%s", g_pl[g_cur].path); e = strrchr(d, '/'); if (!e) e = strrchr(d, '\\'); if (e) { if (e == d + 2) e[1] = 0; else *e = 0; } else d[0] = 0; }
+        if (!d[0]) snprintf(d, sizeof d, "%s", g_lastdir);
+        if (d[0] && !chdir(d)) { if (d[1] == ':') setdisk(toupper((unsigned char)d[0]) - 'A'); fl_loaded = 0; }
+    }
+    if (p == PG_LIST && g_cur >= 0) { pl_sel = g_cur; list_keep(&pl_sel, &pl_top, g_npl); }
+    if ((p == PG_OPTIONS || p == PG_HELP) && g_page != PG_OPTIONS && g_page != PG_HELP) g_back = g_page;
+    g_page = p; g_find[0] = 0; g_next_frame = 0;
+}
+static void key_player(int k)
 {
     switch (k)
     {
-    case 27: case 'q': case 'Q': return 2;
-    case 'n': case 'N': case K_END: return 1;
-    case 'p': case 'P': return 3;
-    case ' ':
-        if (in_tail) break;
-        if (!P.paused) { P.paused = 1; P.p0 = now_us(); silence(); }
-        else { P.paused = 0; P.start += now_us() - P.p0; }
-        break;
-    case K_LEFT: seek_rel(-10); break;
-    case K_RIGHT: seek_rel(10); break;
-    case K_PGUP: seek_rel(-60); break;
-    case K_PGDN: seek_rel(60); break;
-    case K_HOME: seek_to(0); break;
-    case 'r': case 'R': g_rep = (g_rep + 1) % 3; break;
-    case 'l': case 'L': g_rep = g_rep ? 0 : 1; break;
-    case 'h': case 'H': g_shuf = !g_shuf; break;
-#ifndef HOSTTEST
+    case 'n': case 'N': case K_END: g_act = 1; break;
+    case 'p': case 'P': g_act = 3; break;
+    case 'q': case 'Q': g_act = 2; break;
+    case K_LEFT: mp_seek_rel(-10); break;
+    case K_RIGHT: mp_seek_rel(10); break;
+    case K_PGUP: mp_seek_rel(-60); break;
+    case K_PGDN: mp_seek_rel(60); break;
+    case K_HOME: mp_seek(0); break;
+    case K_UP: case '-': case '_': case ',': g_chsel = (g_chsel + 15) % 16; break;
+    case K_DOWN: case '+': case '=': case '.': g_chsel = (g_chsel + 1) % 16; break;
+    case 'm': case 'M': g_mute ^= (uint16_t)(1 << g_chsel); if (!audible(g_chsel)) channel_quiet(g_chsel);
+        msg("Channel %d %s", g_chsel + 1, g_mute >> g_chsel & 1 ? "muted" : "on"); break;
+    case 'o': case 'O':
+        g_solo ^= (uint16_t)(1 << g_chsel);
+        { int c; for (c = 0; c < 16; c++) if (!audible(c)) channel_quiet(c); }
+        msg(g_solo ? "Solo: only the channels marked S play" : "Solo off"); break;
+    case 'u': case 'U': g_mute = g_solo = 0; msg("All channels on"); break;
+    case '[': set_speed(P.speed - 5); msg("Speed %d%%", P.speed); break;
+    case ']': set_speed(P.speed + 5); msg("Speed %d%%", P.speed); break;
+    case K_BKSP: set_speed(100); msg("Speed 100%%"); break;
+    case 'r': case 'R': g_rep = (g_rep + 1) % 3; msg("Repeat %s", (const char*[]){"off", "all songs", "one song"}[g_rep]); break;
+    case 'l': case 'L': g_rep = g_rep ? 0 : 1; msg("Repeat %s", g_rep ? "all songs" : "off"); break;
+    case 'h': case 'H': g_shuf = !g_shuf; msg("Shuffle %s", g_shuf ? "on" : "off"); break;
     case 's': case 'S':
-        if (g_ui)
-        {
-#ifndef HOSTTEST
-            int old = g_view;
-            g_view = (g_view + 1) % 3;
-            if (old == 2) { mp3_leave(); ui_text_init(); }
-            if (g_view == 2 && !mp3_enter()) { g_view = 0; ui_text_init(); }   /* no 640x480 VESA mode */
-#else
-            g_view = !g_view;
-#endif
-            view_save(); g_last_draw = 0;
-        }
-        break;
-#ifndef HOSTTEST
-    case 0x13E:                                 /* F4 in the 3D view: full / half resolution */
-        if (mp3_is_on()) { m3_half = !m3_half; m3_rw = m3_half ? M3W / 2 : M3W; m3_rh = m3_half ? M3H / 2 : M3H; mp3_slow = 0; }
-        break;
-#endif
-#ifndef HOSTTEST
-    case 0x13D:                                 /* F3: next style, saved for MENU and every other program */
-        if (g_ui && !tui_safe)
-        {
-            tui_theme = (tui_theme + 1) % THEME_COUNT;
-            tui_theme_save(g_home);
-            tui_apply_theme();
-            memset(shown, 0xFF, sizeof shown); g_last_draw = 0;
-        }
-        break;
-#endif
-    case '-': case '_': case ',': g_part = (g_part + 15) % 16; g_last_draw = 0; break;
-    case '+': case '=': case '.': g_part = (g_part + 1) % 16; g_last_draw = 0; break;
-#endif
-    case 9:
-        if (!g_ui) break;
-        {
-            int j;
-            modal_begin(); j = playlist_view(); modal_end();
-            if (j >= 0) { g_jump = j; return 4; }
-        }
-        break;
-    case 'b': case 'B':
-        if (!g_ui) break;
-        {
-            int a;
-            modal_begin(); a = browse_midi(); modal_end();
-            if (a > 0) { g_jump = g_npl - a; return 4; }
-        }
+        g_view = (g_view + 1) % 3; screen_sync(); cfg_save(); break;
+    case 'b': case 'B': go_page(PG_FILES); break;
+    case K_F4: if (mp3_on) { m3_half = !m3_half; m3_rw = m3_half ? M3W / 2 : M3W; m3_rh = m3_half ? M3H / 2 : M3H; mp3_slow = 0; return; } break;
+    case K_MOUSE:
+        if (tui_my == 4 && tui_mx >= 9 && tui_mx < 67 && P.loaded) mp_seek(P.total * (uint64_t)(tui_mx - 9) / 58);
+        else if (g_view == 0 && tui_my >= 6 && tui_my < 22) { if (tui_mx == 5 && g_chsel == tui_my - 6) key_player('m'); g_chsel = tui_my - 6; }
         break;
     default: break;
     }
+}
+static void handle_key(int k)
+{
+    /* everywhere */
+    if (k == K_F1) { if (g_page == PG_HELP) go_page(g_back); else go_page(PG_HELP); return; }
+    if (k == K_F2) { if (g_page == PG_OPTIONS) go_page(g_back); else go_page(PG_OPTIONS); return; }
+    if (k == K_F3) { to_text(); tui_theme_next(g_home); return; }
+    if (k == K_F4 && !mp3_on) { tui_pick_mode(g_home); tui_invalidate(); return; }
+    if (k == K_F7 && !mp3_on) { tui_font = (tui_font + 1) % FONT_COUNT; tui_theme_save(g_home); tui_font_loaded = 0; tui_font_apply(); tui_invalidate(); return; }
+    if (k == ' ') { mp_pause(!P.paused); return; }
+    if (k == '<') { g_act = 3; return; }
+    if (k == '>') { g_act = 1; return; }
+    if (k == K_CLEFT) { mp_seek_rel(-10); return; }
+    if (k == K_CRIGHT) { mp_seek_rel(10); return; }
+    if (k == K_TAB) { go_page(g_page == PG_PLAYER ? PG_LIST : g_page == PG_LIST ? PG_FILES : PG_PLAYER); return; }
+    if (k == K_STAB) { go_page(g_page == PG_PLAYER ? PG_FILES : g_page == PG_FILES ? PG_LIST : PG_PLAYER); return; }
+    if (k == K_ESC || k == K_RCLICK)
+    {
+        if (g_page == PG_OPTIONS || g_page == PG_HELP) go_page(g_back);
+        else if (g_page != PG_PLAYER) go_page(PG_PLAYER);
+        else if (k == K_ESC) g_act = 2;
+        return;
+    }
+    switch (g_page)
+    {
+    case PG_PLAYER: key_player(k); break;
+    case PG_LIST: key_playlist(k); break;
+    case PG_FILES: key_files(k); break;
+    case PG_OPTIONS: key_options(k); break;
+    default: break;
+    }
+}
+static int g_mouse_key;
+static int get_input(void)
+{
+    static uint64_t next_mouse;
+    if (key_pressed()) return key_read();
+    if (g_ui && !mp3_on && now_us() >= next_mouse)
+    {   /* INT 33h is a mode switch: ~30 times a second is plenty */
+        int ox = tui_mx, oy = tui_my;
+        next_mouse = now_us() + 33000;
+        g_mouse_key = tui_mouse_poll();
+        if (ox != tui_mx || oy != tui_my) g_next_frame = 0;
+        if (g_mouse_key) { int m = g_mouse_key; g_mouse_key = 0; return m; }
+    }
     return 0;
 }
 
-/* returns: 0 finished, 1 next song requested, 2 quit, 3 previous song, 4 jump to g_jump */
-static int play(const Song* s, const char* name, int reset_mode)
+/* ---- songs */
+static int g_plays;
+static int start_index(int i)
 {
-    uint64_t last_show = 0, t_end;
-    int ret = 0, act;
-    viz_reset();
-    send_reset(reset_mode);
-    memset(&P, 0, sizeof P);
-    P.s = s; P.total = s->ev[s->nev - 1].us;
-    if (g_ui) { ui_begin(); g_last_draw = 0; ui_tick(s, name, 0, P.total, 0, 0); }
-    else
-        printf("%s  (format %d, %d track%s, %lu:%02lu)\n", name, s->format, s->ntrks, s->ntrks == 1 ? "" : "s",
-               (unsigned long)(P.total / 60000000ULL), (unsigned long)((P.total / 1000000ULL) % 60));
-    P.start = now_us();
-again:
-    while (P.i < s->nev)
+    int tries = 0;
+    while (g_npl && tries < g_npl)
     {
-        const Event* e = &s->ev[P.i];
-        P.skip = 0;
-        while (!P.skip && (P.paused || now_us() < P.start + e->us))
+        char err[64];
+        if (i >= g_npl) i = 0;
+        g_cur = i;
+        if (mp_start(g_pl[i].path, g_reset, err, sizeof err))
         {
-            idle();
-            if (key_pressed())
-            {
-                act = do_key(get_key(), 0);
-                if (act) { ret = act; goto out; }
-                if (P.skip) break;
-            }
-            if (g_ui) ui_tick(s, name, elapsed_us(), P.total, P.paused, 0);
-            else if (!P.paused)
-            {
-                uint64_t t = now_us();
-                if (t - last_show > 250000 || t < last_show)
-                {
-                    uint64_t el = (t - P.start) / 1000000ULL;
-                    printf("\r  %lu:%02lu  ", (unsigned long)(el / 60), (unsigned long)(el % 60));
-                    fflush(stdout);
-                    last_show = t;
-                }
-            }
+            g_plays++;
+            if (g_stfile[0]) { FILE* f = fopen(g_stfile, "a"); if (f) { fprintf(f, "start %d %s (act %d, t %lu ms)\n", i, g_pl[i].path, g_act, (unsigned long)(now_us() / 1000)); fclose(f); } }
+            return 1;
         }
-        if (P.skip) continue;
-        send_event(s, e);
-        viz_event(e);
-        P.i++;
+        msg("%s: %s", base_of(g_pl[i].path), err);
+        g_pl[i].have = 1; g_pl[i].si.ok = -1;
+        i++; tries++;
     }
-    /* let the last notes ring out while the display settles */
-    t_end = now_us() + 1200000;
-    while (now_us() < t_end)
-    {
-        idle();
-        ui_tick(s, name, P.total, P.total, 0, 1);
-        if (key_pressed())
-        {
-            act = do_key(get_key(), 1);
-            if (act) { ret = act; goto out; }
-            if (P.skip && P.i < s->nev) goto again;
-        }
-    }
-out:
-    silence();
-    if (!g_ui) printf(ret == 0 ? "\r  done        \n" : "\n");
-    return ret;
-}
-
-#else /* HOSTTEST */
-static void ui_end(void) {}
-static void ui_begin(void) {}
-static int play(const Song* s, const char* name, int reset_mode)
-{
-    long i;
-    (void)name;
-    viz_reset();
-    send_reset(reset_mode);
-    {
-        uint64_t start = now_us();
-        for (i = 0; i < s->nev; i++)
-        {
-            while (now_us() < start + s->ev[i].us) idle();
-            send_event(s, &s->ev[i]);
-            viz_event(&s->ev[i]);
-        }
-    }
-    silence();
+    mp_unload(); g_cur = -1;
     return 0;
 }
-#endif
-
-#ifdef HOSTTEST
-int main(int argc, char** argv)
+/* the song after this one: 1 when a song finished by itself, 0 when N was pressed */
+static int next_index(int finished)
 {
-    Song s; char err[64];
-    if (argc < 2 || !song_load(&s, argv[1], err, sizeof err)) { fprintf(stderr, "load failed: %s\n", argc < 2 ? "usage" : err); return 1; }
-    play(&s, argv[1], 2);
-    song_free(&s);
-    return 0;
+    int n;
+    if (g_cur <= -2) return -2 - g_cur;                    /* the playing song was removed from the list */
+    if (finished && g_rep == 2) return g_cur;
+    if (g_shuf && g_npl > 1)
+    {
+        if (finished && g_rep == 0 && g_plays >= g_npl) return -1;
+        do n = rand() % g_npl; while (n == g_cur);
+        return n;
+    }
+    n = g_cur + 1;
+    if (n >= g_npl) return g_rep ? 0 : -1;
+    return n;
 }
-#else
-static int next_idx(int idx, int finished)
+
+static void plain_status(void)
 {
-    if (g_rep == 2 && finished) return idx;
-    if (g_shuf && g_npl > 1) { int j; do j = rand() % g_npl; while (j == idx); return j; }
-    return idx + 1;
+    static uint64_t last;
+    uint64_t t = now_us(), el;
+    if (t - last < 250000) return;
+    last = t;
+    el = song_time() / 1000000ULL;
+    printf("\r  %lu:%02lu %s ", (unsigned long)(el / 60), (unsigned long)(el % 60), P.paused ? "(paused)" : "        ");
+    fflush(stdout);
 }
 
 int main(int argc, char** argv)
 {
-    int i, reset_mode = 0, quit = 0, r, plain = 0, want_browse = 0, plays = 0;
-    char exedir[260], scandir_arg[260];
-    scandir_arg[0] = 0;
-    view_load(argv[0]);
+    int i, want_browse = 0, plain = 0, files = 0, finished, seek_resume = 0;
+    uint64_t gap_until = 0; int gap_next = -1;
+    char dir_arg[260] = "";
+    /* home: the folder of MIDPLAY.EXE (MIDPLAY.CFG, the auto playlist, THEME.CFG) */
+    {
+        char* e; _fixpath(argv[0], g_home);
+        e = strrchr(g_home, '/'); if (!e) e = strrchr(g_home, '\\');
+        if (e) *e = 0; else strcpy(g_home, ".");
+        snprintf(g_cfg, sizeof g_cfg, "%s/MIDPLAY.CFG", g_home);
+        snprintf(g_m3u, sizeof g_m3u, "%s/MIDPLAY.M3U", g_home);
+    }
+    cfg_load();
+    srand((unsigned)time(NULL));
     for (i = 1; i < argc; i++)
     {
-        if (!strncmp(argv[i], "/P:", 3) || !strncmp(argv[i], "/p:", 3)) base = (int)strtol(argv[i] + 3, NULL, 16);
-        else if (!strncmp(argv[i], "/D:", 3) || !strncmp(argv[i], "/d:", 3)) strncpy(scandir_arg, argv[i] + 3, sizeof scandir_arg - 1);
-        else if (!strcmp(argv[i], "/L") || !strcmp(argv[i], "/l")) g_rep = 1;
-        else if (!strcmp(argv[i], "/R1") || !strcmp(argv[i], "/r1")) g_rep = 2;
-        else if (!strcmp(argv[i], "/H") || !strcmp(argv[i], "/h")) g_shuf = 1;
-        else if (!strcmp(argv[i], "/B") || !strcmp(argv[i], "/b")) want_browse = 1;
-        else if (!strcmp(argv[i], "/S") || !strcmp(argv[i], "/s")) plain = 1;
-        else if (!strcmp(argv[i], "/GM") || !strcmp(argv[i], "/gm")) reset_mode = 1;
-        else if (!strcmp(argv[i], "/N") || !strcmp(argv[i], "/n")) reset_mode = 2;
-        else if (argv[i][0] == '/') goto usage;
-        else pl_add(argv[i]);
-    }
-    if (0)
-    {
-usage:
-        puts("Plays MIDI files through the MPU-401 at port 330h (SBEMU + SC-55 must be loaded: run SC55.BAT).\n"
-             "  no files   plays every MIDI file in the folder MIDPLAY.EXE is in\n"
-             "  /D:dir     play every MIDI file in that folder instead\n"
-             "  /B         open the file explorer to pick files (also: B key while playing)\n"
-             "  /L repeat all   /R1 repeat one   /H shuffle   /S plain one-line display\n"
-             "  /GM send GM On instead of a GS reset   /N no reset   /P:330 MPU port (hex)\n"
-             "Keys: SPACE pause, N/P next/previous, LEFT/RIGHT seek 10 s, PGUP/PGDN seek 60 s,\n"
-             "      HOME restart song, R repeat off/all/one, H shuffle, TAB playlist, B file explorer,\n"
-             "      S SC-55 front panel / channel table, - + choose the part shown, ESC quit.");
-        return 2;
-    }
-    { int p = mpu_find(base); if (p) base = p; }   /* SBEMU's MPU-401 on whatever port it uses */
-    printf("MPU-401 at port %Xh: ", base);
-    if (!mpu_detect())
-    {
-        puts("no answer.\nIs SBEMU loaded (SC55.BAT) with the SC-55 enabled? Run SC55.BAT first, in the same DOS session.");
-        return 1;
-    }
-    puts("found.");
-    mpu_uart();
-    g_ui = !plain;
-    if (scandir_arg[0]) scan_dir(scandir_arg);
-    if (!g_npl && !want_browse)
-    {
-        char* a0 = argv[0];
-        const char* cut = NULL; const char* p;
-        for (p = a0; *p; p++) if (*p == '/' || *p == '\\') cut = p;
-        if (cut) { size_t l = (size_t)(cut - a0); if (l >= sizeof exedir) l = sizeof exedir - 1; memcpy(exedir, a0, l); exedir[l] = 0; if (!l) strcpy(exedir, "/"); }
-        else strcpy(exedir, ".");
-        if (!scan_dir(exedir)) scan_dir(".");
-        if (!g_npl) want_browse = 1;
-    }
-    if (want_browse)
-    {
-        if (!g_ui) { puts("No MIDI files found. Give file names, or run without /S to use the file explorer."); return 1; }
-        ui_begin();
-        browse_midi();
-        ui_end();
-        if (!g_npl) { puts("No files selected."); return 0; }
-    }
-    g_cur = 0;
-    while (!quit)
-    {
-        Song sg; char err[64];
-        if (g_cur >= g_npl) { if (g_rep == 1 && g_npl > 0) g_cur = 0; else break; }
-        if (!song_load(&sg, g_pl[g_cur], err, sizeof err)) { printf("%s: %s\n", g_pl[g_cur], err); g_cur++; continue; }
-        r = play(&sg, g_pl[g_cur], reset_mode);
-        song_free(&sg);
-        if (r == 2) quit = 1;
-        else if (r == 3) g_cur = g_cur > 0 ? g_cur - 1 : (g_rep == 1 ? g_npl - 1 : 0);
-        else if (r == 4) g_cur = g_jump;
-        else
+        const char* a = argv[i];
+        if (!strncasecmp(a, "/P:", 3)) base = (int)strtol(a + 3, NULL, 16);
+        else if (!strncasecmp(a, "/D:", 3)) snprintf(dir_arg, sizeof dir_arg, "%s", a + 3);
+        else if (!strcasecmp(a, "/L")) g_rep = 1;
+        else if (!strcasecmp(a, "/R1")) g_rep = 2;
+        else if (!strcasecmp(a, "/H")) g_shuf = 1;
+        else if (!strcasecmp(a, "/B")) want_browse = 1;
+        else if (!strcasecmp(a, "/S")) plain = 1;
+        else if (!strcasecmp(a, "/GM")) g_reset = 1;
+        else if (!strcasecmp(a, "/N")) g_reset = 2;
+        else if (!strncasecmp(a, "/T:", 3)) snprintf(g_stfile, sizeof g_stfile, "%s", a + 3);
+        else if (!strncasecmp(a, "/Q:", 3)) g_quit_s = atol(a + 3);
+        else if (!strncasecmp(a, "/V:", 3)) g_view = atoi(a + 3) % 3;
+        else if (!strcasecmp(a, "/X")) g_dry = 1;
+        else if (a[0] == '/')
         {
-            if (g_shuf && g_rep == 0 && ++plays >= g_npl && r == 0) break;
-            g_cur = next_idx(g_cur, r == 0);
+            puts("MIDPLAY [options] [file.mid ...]  plays MIDI files through SBEMU's MPU-401 (run SC55.BAT first)\n"
+                 "  no files   the last playlist (or every MIDI file next to MIDPLAY.EXE - Options)\n"
+                 "  /D:dir     every MIDI file in that folder      /B   start in the file explorer\n"
+                 "  /L repeat all   /R1 repeat one   /H shuffle    /S   plain one-line display\n"
+                 "  /GM GM System On instead of the GS reset   /N no reset   /P:330 MPU port (hex)\n"
+                 "In the player: F1 shows every key.");
+            return 2;
         }
+        else { pl_add(a); files++; }
     }
-    ui_end();
-    silence();
+    clock_init();
+    { int p = g_dry ? 0 : mpu_find(base); if (p) base = p; }
+    if (!g_dry)
+    {
+        printf("MPU-401 at port %Xh: ", base);
+        if (!mpu_detect()) { puts("no answer.\nIs SBEMU loaded (SC55.BAT) with its MPU-401 on? Run SC55.BAT first, in the same DOS session."); return 1; }
+        puts("found.");
+        mpu_uart();
+    }
+    /* the songs: file names, /D, else the last playlist (and song), else MIDPLAY's folder */
+    if (dir_arg[0]) files += scan_dir(dir_arg);
+    if (!files && !want_browse)
+    {
+        if (g_startlast && pl_load_m3u(g_m3u) > 0)
+        {
+            if (g_last_index >= 0 && g_last_index < g_npl) { g_cur = (int)g_last_index; seek_resume = 1; }
+        }
+        else { pl_clear(); if (!scan_dir(g_home)) scan_dir("."); }
+    }
+    if (!g_npl && plain) { puts("No MIDI files. Give file names, or run without /S to use the file explorer."); return 1; }
+    g_ui = !plain;
+    if (g_ui)
+    {
+        tui_theme_load(g_home);
+        tui_init();
+        tui_hook = mp_pump;
+        m3_hook = mp_pump;
+        tui_mouse_init();
+        if (!g_npl || want_browse) go_page(PG_FILES);
+    }
+    if (g_ui) { m3_vbe_probe(); mp3_prepare(); if (m3_vbest >= 0) mp3_make_panel("", 0, 0); screen_sync(); ui_frame(); }   /* the slow BIOS work (3D mode, first frame) before the music */
+    if (g_npl)
+    {
+        if (start_index(g_cur >= 0 ? g_cur : 0) && seek_resume && g_last_pos > 2)
+        {
+            mp_seek((uint64_t)g_last_pos * 1000000ULL);
+            msg("Back where you left: %s at %ld:%02ld (HOME starts the song from the beginning)", pl_name(g_cur), g_last_pos / 60, g_last_pos % 60);
+        }
+        if (!g_ui) printf("%s\n", g_pl[g_cur >= 0 ? g_cur : 0].path);
+    }
+    for (;;)
+    {
+        int k;
+        mp_pump();
+        if (g_quit_s && P.loaded && song_time() > (uint64_t)g_quit_s * 1000000ULL) break;
+        finished = 0;
+        if (P.loaded && mp_finished())
+        {
+            int n = next_index(1);
+            if (n < 0) { mp_unload(); msg("End of the playlist"); if (!g_ui) break; }
+            else if (g_gap) { mp_unload(); gap_until = now_us() + (uint64_t)g_gap * 1000000ULL; gap_next = n; }
+            else { start_index(n); if (!g_ui) printf("\n%s\n", g_pl[g_cur].path); }
+            finished = 1;
+        }
+        if (gap_next >= 0 && now_us() >= gap_until) { start_index(gap_next); gap_next = -1; }
+        k = get_input();
+        if (k)
+        {
+            if (g_ui) { handle_key(k); g_next_frame = 0; }
+            else if (k == 27 || k == 'q' || k == 'Q') g_act = 2;
+            else if (k == ' ') mp_pause(!P.paused);
+            else if (k == 'n' || k == 'N') g_act = 1;
+            else if (k == 'p' || k == 'P') g_act = 3;
+        }
+        if (g_act)
+        {
+            int a = g_act; g_act = 0; gap_next = -1;
+            if (a == 2) break;
+            if (a == 1 && g_npl) { int n = next_index(0); start_index(n < 0 ? 0 : n); }
+            else if (a == 3 && g_npl)
+            {
+                if (P.loaded && song_time() > 3000000ULL) mp_seek(0);       /* like a CD player: first back to the start */
+                else start_index(g_cur > 0 ? g_cur - 1 : g_npl - 1);
+            }
+            else if (a == 4 && g_jump >= 0 && g_jump < g_npl) start_index(g_jump);
+            if (!g_ui && P.loaded) printf("\n%s\n", g_pl[g_cur].path);
+        }
+        (void)finished;
+        if (g_ui) { ui_frame(); pl_info_step(g_page == PG_LIST ? pl_sel : g_cur + 1 < g_npl ? g_cur + 1 : -1); }
+        else plain_status();
+    }
+    cfg_save();
+    if (g_npl) pl_save_m3u(g_m3u);
+    mp_unload();
+    tui_hook = NULL; m3_hook = NULL;
+    if (g_ui) { mp3_leave(); tui_done(); }
+    else printf("\n");
+    { char lb[80]; snprintf(lb, sizeof lb, "view %d mode %s%s", g_view, tui_mode_id, g_dry ? " dry" : ""); st_write(lb); }
+    return 0;
+}
+#else /* HOSTTEST: plays the file with the virtual clock, every byte printed with its time */
+int main(int argc, char** argv)
+{
+    char err[64];
+    if (argc < 2 || !mp_start(argv[1], 2, err, sizeof err)) { fprintf(stderr, "load failed: %s\n", argc < 2 ? "usage" : err); return 1; }
+    if (argc > 2) set_speed(atoi(argv[2]));
+    while (!mp_finished()) { mp_pump(); g_now_us += 500; }
+    mp_unload();
     return 0;
 }
 #endif

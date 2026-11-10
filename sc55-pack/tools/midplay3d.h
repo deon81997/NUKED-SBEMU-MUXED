@@ -5,23 +5,37 @@
  * keyboard in front of it that lights up the notes being played in each channel's colour, and 16 columns on
  * the mirror floor bouncing with the channel levels. Song, time and keys in a bar along the bottom.
  *
- * MIDPLAY sends the MIDI events from its main loop, so a slow frame would make them late: frames are drawn at
- * most ~16 times a second, drop to half resolution (320x240, doubled) when a frame takes over 25 ms, and a
- * PC that is still too slow gets a note to use the text views (S). The list screens (TAB, B) are text: the
- * view switches back to text mode for them and returns afterwards. */
+ * MIDPLAY sends the MIDI events from inside the drawing (m3_hook = mp_pump: every 8 scan lines), so frames never
+ * make the music late. Frames are paced by what they cost: a frame starts at most every 2.5 frame-times (drawing takes
+ * at most ~40% of the CPU), at most ~16 a second. Always full 640x480 (half resolution only with F4); a PC that
+ * manages only ~2 frames a second gets a note. The other pages are text: the view
+ * switches back to text mode for them and returns afterwards. */
 #ifndef MIDPLAY3D_INCLUDED
 #define MIDPLAY3D_INCLUDED
 #include "m3core.h"
 
 static int    mp3_on;                 /* the VESA mode is set */
-static int    mp3_slow;               /* frames too slow even at half resolution */
+static int    mp3_slow;               /* frames so slow that the picture barely moves (a note says so) */
 static double mp3_last_frame, mp3_frame_ms;
 static float  mp3_col[16];            /* smoothed column heights */
-static M3SURF mp3_panel, mp3_keys;
+static M3SURF mp3_panel, mp3_keys, mp3_face;   /* mp3_face: the module's brushed face, made once */
 static const uint32_t mp3_chcol[16] = {
     0x40A0FF, 0x40E0A0, 0xA0E040, 0xFFD040, 0xFF9040, 0xFF5060, 0xE060C0, 0xA070FF,
     0x60C0FF, 0xFFFFFF, 0x50FFD0, 0xC0FF60, 0xFFB0A0, 0xFF80E0, 0xB0A0FF, 0x80D0D0 };
 
+/* buffers and textures, made before the music starts (switching to 3D later then costs only the mode set) */
+static void mp3_prepare(void)
+{
+    if (!m3_fb) m3_fb = (uint32_t*)malloc(M3W * M3H * 4);
+    if (!m3_zb) m3_zb = (float*)malloc(M3W * M3H * sizeof(float));
+    if (!m3_fb || !m3_zb) return;
+    m3_scr.w = M3W; m3_scr.h = M3H; m3_scr.p = m3_fb;
+    if (!m3_floor.p) m3_make_floor();
+    if (!mp3_panel.p) mp3_panel = m3_surf(512, 128);
+    if (!mp3_keys.p) mp3_keys = m3_surf(512, 64);
+    if (m3_tsc_us == 0) m3_time_init();
+}
+static void mp3_make_panel(const char* title, double frac, int paused);
 static int mp3_enter(void)
 {
     if (mp3_on) return 1;
@@ -49,12 +63,20 @@ static void mp3_leave(void)
 static void mp3_make_panel(const char* title, double frac, int paused)
 {
     M3SURF* s = &mp3_panel; char line[64]; int x, y, i;
-    for (y = 0; y < 128; y++) for (x = 0; x < 512; x++)
-    { int v = 40 + ((x * 7 + y * 13) % 5) + ((y & 1) ? 2 : 0); s->p[y * 512 + x] = m3_rgb(v, v, v + 6); }
-    m3_bevel(s, 0, 0, 512, 128, 3, 0, 120);
-    m3_text(s, 12, 8, 2, "NUKED", 0xE8E8F0, 256);
-    m3_text(s, 12, 36, 0, "SB-EMU", 0xB8B8C8, 256);
-    m3_text(s, 12, 54, 0, "MIDI PLAYER", 0x9A9AA8, 256);
+    if (!mp3_face.p)
+    {
+        M3SURF* f;
+        mp3_face = m3_surf(512, 128); f = &mp3_face;
+        for (y = 0; y < 128; y++) for (x = 0; x < 512; x++)
+        { int v = 40 + ((x * 7 + y * 13) % 5) + ((y & 1) ? 2 : 0); f->p[y * 512 + x] = m3_rgb(v, v, v + 6); }
+        m3_bevel(f, 0, 0, 512, 128, 3, 0, 120);
+        m3_text(f, 12, 8, 2, "NUKED", 0xE8E8F0, 256);
+        m3_text(f, 12, 36, 0, "SB-EMU", 0xB8B8C8, 256);
+        m3_text(f, 12, 54, 0, "MIDI PLAYER", 0x9A9AA8, 256);
+        m3_text(f, 440, 112, 0, "POSITION", 0x9090A0, 200);
+    }
+    memcpy(s->p, mp3_face.p, 512 * 128 * 4);
+    M3_HOOK();
     m3_text(s, 12, 104, 0, paused ? "PAUSED" : "PLAYING", paused ? 0xFFB040 : 0x60FF70, 256);
     m3_rect(s, 74, 108, 8, 8, paused ? 0x604010 : ((int)(m3_now() * 4) & 1 ? 0x30FF40 : 0x108020), 256);
     /* LCD */
@@ -68,6 +90,7 @@ static void mp3_make_panel(const char* title, double frac, int paused)
         for (i = 0; i < 16; i++) { unsigned char ch = g_lcd[9 + i]; ins[i] = ch >= 32 && ch < 127 ? ch : ' '; } ins[16] = 0;
         snprintf(line, sizeof line, "PART %s", part);  m3_text(s, 142, 15, 0, line, 0x14240A, 256);
         m3_text(s, 142, 33, 0, ins, 0x0C1A06, 256);
+        M3_HOOK();
         for (c = 0; c < 16; c++) for (r = 0; r < 16; r++)
             if (lcd_dot(r, c)) m3_rect(s, 286 + c * 7, 16 + r * 6, 5, 4, 0x10200A, 256);
             else m3_rect(s, 286 + c * 7, 16 + r * 6, 5, 4, 0x10200A, 30);
@@ -92,7 +115,6 @@ static void mp3_make_panel(const char* title, double frac, int paused)
         int px = 464 + (int)(48 * cos(a)), py = 64 + (int)(48 * sin(a));
         m3_rect(s, px - 2, py - 2, 4, 4, i <= frac * 23 ? 0xFFA030 : 0x404048, 256);
     }
-    m3_text(s, 440, 112, 0, "POSITION", 0x9090A0, 200);
 }
 
 /* keyboard texture: 75 white keys (C0..), lit by the channel that played the note last */
@@ -101,6 +123,7 @@ static void mp3_make_keys(void)
     M3SURF* s = &mp3_keys; int n, x, wk = 0;
     static const int black[12] = { 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0 };
     m3_rect(s, 0, 0, 512, 64, 0x101014, 256);
+    M3_HOOK();
     for (n = 12; n < 120; n++) if (!black[n % 12])
     {   /* white keys, 63 of them across 512 pixels */
         int lv = g_viz.nl[n]; uint32_t c = 0xE8E8EC;
@@ -110,6 +133,7 @@ static void mp3_make_keys(void)
         wk++;
     }
     wk = 0;
+    M3_HOOK();
     for (n = 12; n < 120; n++)
     {
         if (!black[n % 12]) { wk++; continue; }
@@ -141,8 +165,8 @@ static void mp3_bar(const char* name, const char* title, uint64_t el_us, uint64_
     m3_vgrad(&m3_scr, 66, M3H - 38, n, 8, 0x60FFA0, 0x20A060, 256);
     if (paused) m3_text_sh(&m3_scr, M3W / 2 - 28, M3H - 64, 0, "PAUSED", 0xFFC040);
     else if (done) m3_text_sh(&m3_scr, M3W / 2 - 20, M3H - 64, 0, "DONE", 0x60FF60);
-    if (mp3_slow) m3_text_sh(&m3_scr, 8, 28, 0, "This PC is slow for the 3D view - S switches to the text views.", 0xFFC040);
-    m3_text(&m3_scr, 10, M3H - 22, 0, "SPACE pause  N/P song  <> seek  TAB list  B files  S view  F4 speed  ESC quit", 0xA0A0B8, 256);
+    if (mp3_slow) m3_text_sh(&m3_scr, 8, 28, 0, "Few frames on this PC: F4 half resolution (faster), S text views.", 0xFFC040);
+    m3_text(&m3_scr, 10, M3H - 22, 0, "SPACE pause  N/P song  <> seek  TAB lists  S view  F4 resolution  F1 help  ESC quit", 0xA0A0B8, 256);
 }
 
 static void mp3_draw(const Song* s, const char* name, uint64_t el_us, uint64_t total_us, int paused, int done)
@@ -150,7 +174,7 @@ static void mp3_draw(const Song* s, const char* name, uint64_t el_us, uint64_t t
     double t = m3_now(), t0; float W = 2.6f, H = 0.62f, D = 1.2f, dt; int c;
     double frac = total_us ? (double)(el_us > total_us ? total_us : el_us) / (double)total_us : 0;
     if (!mp3_on) return;
-    if (t - mp3_last_frame < 0.06) return;            /* ~16 frames a second at most */
+    if (t - mp3_last_frame < 0.06 || t - mp3_last_frame < mp3_frame_ms * 2.5 / 1000) return;   /* paced by its cost: at most ~40% drawing */
     dt = mp3_last_frame ? (float)(t - mp3_last_frame) : 0.06f; if (dt > 0.2f) dt = 0.2f;
     mp3_last_frame = t; t0 = t;
     lcd_query();
@@ -158,7 +182,9 @@ static void mp3_draw(const Song* s, const char* name, uint64_t el_us, uint64_t t
     m3_fog = 0x0A0820; m3_fog0 = 8; m3_fog1 = 24;
     m3_camera(0.6f * sinf((float)t * 0.2f), 0.55f + 0.08f * sinf((float)t * 0.13f), -6.6f, -0.1f * sinf((float)t * 0.2f), -0.16f);
     m3_sky();
+    M3_HOOK();
     m3_draw_floor(-H - 0.02f, 256);
+    M3_HOOK();
     /* the module */
     mp3_make_panel(s->title[0] ? s->title : base_of(name), frac, paused);
     m3_box(m3_v(0, 0.35f, 0.6f), W, H, D, 0, &mp3_panel, 0x26262C, 0, 256);
@@ -167,7 +193,9 @@ static void mp3_draw(const Song* s, const char* name, uint64_t el_us, uint64_t t
     m3_knob3d(m3_v(-W + (464 / 512.0f) * 2 * W, 0.35f + H - (64 / 128.0f) * 2 * H, 0.6f - D - 0.16f), 0.32f, 0.16f,
               (float)(frac * 4.7 - 2.35), 0);
     /* the keyboard, tilted towards the camera in front of the module */
+    M3_HOOK();
     mp3_make_keys();
+    M3_HOOK();
     m3_quad(m3_v(-2.8f, -0.34f, -0.95f), m3_v(2.8f, -0.34f, -0.95f), m3_v(2.8f, -0.62f, -1.75f), m3_v(-2.8f, -0.62f, -1.75f),
             &mp3_keys, 0xFFFFFF, 0.15f, 256, 0);
     /* 16 channel columns on the floor in front (low enough not to hide the keyboard) */
@@ -179,12 +207,16 @@ static void mp3_draw(const Song* s, const char* name, uint64_t el_us, uint64_t t
         m3_box(m3_v(-1.8f + c * 0.24f, -H - 0.02f + h / 2, -3.5f), 0.085f, h / 2, 0.085f, 0, NULL,
                mp3_chcol[c], g_viz.count[c] > 0 ? 0.5f : 0.12f, 256);
     }
+    M3_HOOK();
     m3_upscale();
     mp3_bar(base_of(name), s->title, el_us, total_us, paused, done);
+    M3_HOOK();
     m3_present();
     /* frame time: half resolution when slow; a note when even that is too slow */
     mp3_frame_ms = (m3_now() - t0) * 1000;
-    if (mp3_frame_ms > 25 && !m3_half) { m3_half = 1; m3_rw = M3W / 2; m3_rh = M3H / 2; }
-    else if (m3_half && mp3_frame_ms > 40) mp3_slow = 1;
+    st_frame((uint64_t)(mp3_frame_ms * 1000));
+    /* always full resolution (sharp): the music no longer waits for frames, so a slow PC only gets fewer of
+     * them (F4 still switches to half resolution by hand). A note when it is down to ~2 frames a second. */
+    mp3_slow = mp3_frame_ms > 200;
 }
 #endif
