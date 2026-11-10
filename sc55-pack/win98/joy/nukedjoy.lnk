@@ -1,0 +1,10 @@
+system win_vxd dynamic
+option quiet, map=nukedjoy.map
+name NUKEDJOY.VXD
+order clname LCODE clname CODE clname DATA clname BSS
+file nukedjoy.o, nukedjoy.obj
+segment class 'LCODE' preload nondiscardable
+segment class 'CODE' preload nondiscardable
+segment class 'DATA' preload nondiscardable
+segment class 'BSS' preload nondiscardable
+export NUKEDJOY_DDB.1

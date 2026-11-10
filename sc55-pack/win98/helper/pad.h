@@ -13,6 +13,7 @@ struct PadInput {
     bool present = false;
     bool button[PB_COUNT] = {};
     int axis[PA_COUNT] = {};           // -32768..32767, 0 = centre
+    int trig = 0;                      // the Windows axis the triggers are on (LT +, RT -), 0 = none
 };
 
 // what the DOS box gets

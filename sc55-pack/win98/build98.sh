@@ -8,7 +8,7 @@ OBJ=${OBJ:-build98}; LIB=${LIB:-b98}
 BID=$(( $(date +%s) % 100000 + 100000 ))
 CXX="i686-w64-mingw32-g++ -std=c++23 $ARCH -DBUILD_ID=$BID -D_USE_MATH_DEFINES -I$N/build98/backend -I$N/src -I$N/src/backend -I$M/b98 -I$M/src -I$S -I$O"
 mkdir -p out/obj
-for f in opts romscan synths engine w98main install98 pad; do
+for f in opts romscan synths engine w98main install98 pad joyout; do
   $CXX -c helper/$f.cpp -o out/obj/$f.o &
 done
 i686-w64-mingw32-g++ -std=c++17 $ARCH -c $S/dbopl.cpp -o out/obj/dbopl.o &

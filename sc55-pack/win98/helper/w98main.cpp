@@ -23,6 +23,7 @@
 #include "romscan.h"
 #include "install98.h"
 #include "pad.h"
+#include "joyout.h"
 #include "resource.h"
 
 #ifndef BUILD_ID
@@ -202,7 +203,14 @@ static SC55W_CONFIG config_for(const Options& o)
     // DOS boxes get a game port (201h) and the BIOS joystick call (INT 15h AH=84h),
     // fed from the Windows joystick (SC55W.INI Joystick= / JoyBios=, 1 = on)
     c.joy = (u8)((ini_int("Joystick", 1) ? 1 : 0) | (ini_int("JoyBios", 1) ? 2 : 0) |
-                 (ini_int("PadKeys", 1) ? 4 : 0));     // pad buttons -> keys, layout per game
+                 (ini_int("PadKeys", 1) ? 4 : 0) |     // pad buttons -> keys, layout per game
+                 (GetPrivateProfileIntA("Joystick", "WindowsPort", 0, g_inipath.c_str()) ? 8 : 0));
+    // [Joystick] Port=201 (200..20F): where the game port is, for PCs whose sound card has none
+    char pb[16];
+    GetPrivateProfileStringA("Joystick", "Port", "201", pb, sizeof pb, g_inipath.c_str());
+    unsigned long port = strtoul(pb, NULL, 16);
+    c.joy_port = (u16)(port >= 0x200 && port <= 0x20F ? port : 0x201);
+    c.joy_type = (u8)GetPrivateProfileIntA("Joystick", "Type", 0, g_inipath.c_str());
     return c;
 }
 
@@ -827,6 +835,7 @@ static void pad_read(const JOYCAPSA& c, const JOYINFOEX& j, PadInput& in)
     }
     if (g_padmap.trig && strchr("XYZRUV", g_padmap.trig)) {          // triggers on one axis
         int t = axis_val(c, j, g_padmap.trig);
+        in.trig = t;
         if (t > 12000) in.button[PB_LT] = true;
         if (t < -12000) in.button[PB_RT] = true;
     }
@@ -882,13 +891,28 @@ static void pad_files_load()
     logf("pad: %s", log.c_str());
 }
 
+// a NUKED joystick (NUKEDJOY.VXD) shows what we feed it: never read it back as a pad
+static JoyOutSettings g_joyout;
+static PadInput g_padin[2];
+static bool is_nuked_joystick(UINT j, const JOYCAPSA& c)
+{
+    std::string v = c.szOEMVxD;
+    for (auto& ch : v) ch = (char)toupper((unsigned char)ch);
+    if (v.find("NUKEDJOY") != std::string::npos) return true;
+    if (!strncmp(c.szPname, "NUKED", 5)) return true;
+    if (g_sh) for (int k = 0; k < SC55W_NWJOY; k++) if (g_sh->wjoy[k].joyid == j + 1) return true;
+    return false;
+}
+
 static DWORD WINAPI joy_main(LPVOID)
 {
     bool x360_asked = false, focus_is_dos = false;
     DWORD last_focus = 0;
     u32 focus_vm = 0, focus_serial = 0xFFFFFFFFUL;
     JOYCAPSA cap[2];
+    UINT jid[2] = {0, 1};
     bool ok[2] = {false, false};
+    DWORD last_ini = 0;
     DWORD last_check = 0;
     std::string last_desc;
     while (!g_quit) {
@@ -896,18 +920,24 @@ static DWORD WINAPI joy_main(LPVOID)
         if (!last_check || now - last_check > 3000) {       // plugged in / out
             last_check = now;
             std::string d;
-            for (int j = 0; j < 2; j++) {
-                ok[j] = joyGetDevCapsA(j, &cap[j], sizeof cap[j]) == JOYERR_NOERROR;
-                if (ok[j]) {
-                    JOYINFOEX t; t.dwSize = sizeof t; t.dwFlags = JOY_RETURNALL;
-                    ok[j] = joyGetPosEx(j, &t) == JOYERR_NOERROR;   // configured but unplugged -> no
-                }
-                if (ok[j]) {
-                    char b[160];
-                    snprintf(b, sizeof b, "%s%d: %s (%u axes, %u buttons)", d.empty() ? "" : "; ", j + 1,
-                             cap[j].szPname, cap[j].wNumAxes, cap[j].wNumButtons);
-                    d += b;
-                }
+            // the first two Windows joysticks that are real pads (not our own NUKED ones,
+            // which only show what we feed them)
+            ok[0] = ok[1] = false;
+            UINT nj = joyGetNumDevs();
+            if (nj > 16) nj = 16;
+            int found = 0;
+            for (UINT j = 0; j < nj && found < 2; j++) {
+                JOYCAPSA c;
+                if (joyGetDevCapsA(j, &c, sizeof c) != JOYERR_NOERROR) continue;
+                if (is_nuked_joystick(j, c)) continue;
+                JOYINFOEX t; t.dwSize = sizeof t; t.dwFlags = JOY_RETURNALL;
+                if (joyGetPosEx(j, &t) != JOYERR_NOERROR) continue;     // configured but unplugged -> no
+                cap[found] = c; jid[found] = j; ok[found] = true;
+                char b[160];
+                snprintf(b, sizeof b, "%s%u: %s (%u axes, %u buttons)", d.empty() ? "" : "; ", j + 1,
+                         c.szPname, c.wNumAxes, c.wNumButtons);
+                d += b;
+                found++;
             }
             if (d.empty()) {
                 std::string x = x360_without_driver();
@@ -937,11 +967,24 @@ static DWORD WINAPI joy_main(LPVOID)
                 if (!ok[j]) continue;
                 ji[j].dwSize = sizeof ji[j];
                 ji[j].dwFlags = JOY_RETURNALL;
-                got[j] = joyGetPosEx(j, &ji[j]) == JOYERR_NOERROR;
+                got[j] = joyGetPosEx(jid[j], &ji[j]) == JOYERR_NOERROR;
             }
-            PadInput in;
-            if (got[0]) pad_read(cap[0], ji[0], in);
+            if (!last_ini || now - last_ini > 1000) {          // settings window changes, live
+                last_ini = now;
+                JoyOutSettings js;
+                joyout_load(g_inipath, js);
+                EnterCriticalSection(&g_cs);
+                g_joyout = js;
+                LeaveCriticalSection(&g_cs);
+            }
+            PadInput pin[2];
+            if (got[0]) pad_read(cap[0], ji[0], pin[0]);
+            if (got[1]) pad_read(cap[1], ji[1], pin[1]);
+            PadInput& in = pin[0];
             if (in.present) note_input(in, ji[0].dwButtons);
+            EnterCriticalSection(&g_cs);
+            g_padin[0] = pin[0]; g_padin[1] = pin[1];
+            LeaveCriticalSection(&g_cs);
 
             // which game runs in the DOS box that has the keyboard (10 times a second)
             bool focus_dos = false;
@@ -989,9 +1032,15 @@ static DWORD WINAPI joy_main(LPVOID)
                 out.joy_present |= 2;
                 out.joy_buttons |= (u8)((ji[1].dwButtons & 3) << 2);
             }
+            JoyOutSettings js;
+            EnterCriticalSection(&g_cs);
+            js = g_joyout;
+            LeaveCriticalSection(&g_cs);
+            joyout_port(js, pin, out, g_sh);
             for (int i = 0; i < 4; i++) g_sh->joy_axis[i] = out.joy_axis[i];
             g_sh->joy_buttons = out.joy_buttons;
             g_sh->joy_present = out.joy_present;
+            joyout_windows(js, pin, out, g_sh);
         }
         Sleep(10);
     }

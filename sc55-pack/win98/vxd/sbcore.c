@@ -783,7 +783,18 @@ static u8 dsp_read_data(void)
 /* (the stick values come from the helper, which reads the Windows        */
 /* joystick API; Windows' own programs keep the real port)                */
 /* ====================================================================== */
-static u32 joy_t0, sys_vm;
+static u32 joy_t0, sys_vm, joy_port = 0x201;
+
+/* NUKEDJOY.VXD (VJoyD minidriver) finds the shared block through our DDB */
+extern u32 SC55W_DDB[];
+#pragma aux SC55W_DDB "*"
+#define DDB_RSV1 17
+#define DDB_RSV2 18
+static void ddb_export(SC55W_SHARED *p)
+{
+    if (p) { SC55W_DDB[DDB_RSV1] = (u32)p; SC55W_DDB[DDB_RSV2] = SC55W_DDB_MAGIC; }
+    else { SC55W_DDB[DDB_RSV2] = 0; SC55W_DDB[DDB_RSV1] = 0; }
+}
 static u32 vol_saved = 0xFFFFFFFFUL, vol_set;
 
 static u8 joy_read(void)
@@ -796,6 +807,18 @@ static u8 joy_read(void)
            no stick: it never drops, as on a real port */
         if (!(sh->joy_present & (1 << (i >> 1)))) { v |= (u8)(1 << i); continue; }
         if (dt < 8 + (u32)sh->joy_axis[i] * 1000u / 65535u) v |= (u8)(1 << i);
+    }
+    if (sh->joy_mode == 3) {                       /* GrIP: no axes, frames on the button lines */
+        u32 n = sh->joy_grip_n++, bit = (n >> 2) % 24, clk = !((n >> 1) & 1), k;
+        v = 0x0F;
+        for (k = 0; k < 2; k++) {
+            u32 f = sh->joy_grip[k];
+            if (!f) { v |= (u8)(0x30 << (k * 2)); continue; }
+            if (clk) v |= (u8)(0x10 << (k * 2));
+            if ((f >> bit) & 1) v |= (u8)(0x20 << (k * 2));
+        }
+        sh->joy_reads++;
+        return v;
     }
     v |= (u8)((~sh->joy_buttons & 0x0F) << 4);    /* buttons: 0 = pressed */
     sh->joy_reads++;
@@ -828,8 +851,8 @@ int __cdecl sc_int15(u32 vm, u8 *cl)
 u32 __cdecl sc_in(u32 vm, u32 port)
 {
     u32 off;
-    if ((trapped & ST_OK_JOY) && port == 0x201) {
-        if (vm == sys_vm) return vxd_port_in(port);
+    if ((trapped & ST_OK_JOY) && port == joy_port) {
+        if (vm == sys_vm && !(cfg.joy & 8)) return vxd_port_in(port);
         return joy_read();
     }
     if ((trapped & ST_OK_SB) && port >= cfg.sb_port && port < (u32)cfg.sb_port + 16) {
@@ -860,8 +883,8 @@ void __cdecl sc_out(u32 vm, u32 port, u32 val)
 {
     u8 v = (u8)val;
     u32 off;
-    if ((trapped & ST_OK_JOY) && port == 0x201) {
-        if (vm == sys_vm) vxd_port_out(port, val);
+    if ((trapped & ST_OK_JOY) && port == joy_port) {
+        if (vm == sys_vm && !(cfg.joy & 8)) vxd_port_out(port, val);
         else joy_t0 = vxd_time_us();
         return;
     }
@@ -1015,11 +1038,12 @@ static void detach(void)
     if (trapped & ST_OK_IRQ) vxd_unvirt_irq();
     if (trapped & ST_OK_DMA8) vxd_unvirt_dma(0);
     if (trapped & ST_OK_DMA16) vxd_unvirt_dma(1);
-    if (trapped & ST_OK_JOY) vxd_remove_io(0x201);
+    if (trapped & ST_OK_JOY) vxd_remove_io(joy_port);
     if (trapped & ST_OK_JBIOS) vxd_hook_int15(0);
     if (hooked21) { vxd_hook_int21(0); hooked21 = 0; }
     if (trapped) vxd_min_period(0);
     trapped = 0;
+    ddb_export(0);
     if (sh) { vxd_unmap_block((u32)sh, sh_size); sh = 0; }
 }
 
@@ -1071,8 +1095,9 @@ static u32 attach(u32 user_addr)
             if (vxd_virt_dma(1, cfg.dma16) == 0) st |= ST_OK_DMA16; else st |= ST_ERR_DMA16;
         }
     }
+    joy_port = (cfg.joy_port >= 0x200 && cfg.joy_port <= 0x20F) ? cfg.joy_port : 0x201;
     if (cfg.joy & 1) {
-        if (vxd_install_io(0x201) == 0) st |= ST_OK_JOY; else st |= ST_ERR_JOYPORT;
+        if (vxd_install_io(joy_port) == 0) st |= ST_OK_JOY; else st |= ST_ERR_JOYPORT;
     }
     if (cfg.joy & 2) {
         if (vxd_hook_int15(1) == 0) st |= ST_OK_JBIOS; else st |= ST_ERR_JBIOS;
@@ -1085,6 +1110,7 @@ static u32 attach(u32 user_addr)
     if (trapped) vxd_min_period(1);
     s->attach_status = st;
     s->now_us = vxd_time_us();
+    ddb_export(s);
     return st;
 }
 

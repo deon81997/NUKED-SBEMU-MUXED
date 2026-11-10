@@ -27,7 +27,7 @@ typedef int32_t  s32;
 #endif
 
 #define SC55W_MAGIC      0x57353543UL   /* "C55W" */
-#define SC55W_IF_VERSION 6
+#define SC55W_IF_VERSION 7
 
 /* DeviceIoControl codes */
 #define IOCTL_SC55W_VERSION  0x10   /* out: u32 interface version            */
@@ -101,6 +101,18 @@ typedef struct {
     u32 rate;   /* Hz */
 } SC55W_PCMFMT;
 
+/* one NUKED joystick as Windows sees it (Game Controllers type "NUKED SB-EMU Joystick") */
+#define SC55W_NWJOY 2
+typedef struct {
+    volatile u16 axis[6];     /* X Y Z R U V, 0..65535, 32768 = centre          */
+    volatile u16 pov;         /* hundredths of a degree, 0xFFFF = centred        */
+    volatile u8  present;     /* 1 = the helper feeds it                         */
+    volatile u8  nbuttons;
+    volatile u32 buttons;     /* bit n = button n+1                              */
+    volatile u32 polls;       /* VJoyD polls (NUKEDJOY.VXD)                      */
+    volatile u32 joyid;       /* Windows joystick id VJoyD gave it + 1, 0 = none */
+} SC55W_WJOY;
+
 /* configuration (helper -> VxD, read at ATTACH) */
 typedef struct {
     u16 sb_port;       /* 0x220 / 0x240, 0 = off                    */
@@ -111,9 +123,12 @@ typedef struct {
     u8  sbtype;        /* 1..6 as SBEMU /T                          */
     u8  opl;           /* 1 = trap OPL ports (SB base + 388h)       */
     u8  fixtc;         /* 1 = snap time constants to 11/22/44 kHz   */
-    u8  joy;           /* bit0 = game port 201h, bit1 = INT 15h AH=84h,
-                          bit2 = watch INT 21h EXEC (pad keys per game) */
-    u8  reserved[5];
+    u8  joy;           /* bit0 = game port, bit1 = INT 15h AH=84h,
+                          bit2 = watch INT 21h EXEC (pad keys per game),
+                          bit3 = the game port for Windows programs too (no real one) */
+    u8  joy_type;      /* stick type as SBEMU /JOYMODE (helper only)  */
+    u16 joy_port;      /* game port address 200h..20Fh (0 = 201h)   */
+    u8  reserved[2];
 } SC55W_CONFIG;
 
 typedef struct {
@@ -162,6 +177,26 @@ typedef struct {
        high word right, 0xFFFF = full; set_by = 1 once the driver set it */
     volatile u32 midi_volume;
     volatile u32 midi_volume_set;
+
+    /* NUKED joysticks for Windows programs (helper -> NUKEDJOY.VXD, the VJoyD minidriver,
+       which finds this block through SC55W.VXD's DDB: Reserved1 = address, Reserved2 =
+       SC55W_DDB_MAGIC while attached) */
+    SC55W_WJOY wjoy[SC55W_NWJOY];
+
+    /* game port stick type, live (helper -> VxD): 0 standard, 1 CH Flightstick Pro, 2 Thrustmaster
+       FCS (the helper puts both in joy_buttons / joy_axis), 3 Gravis GrIP: the VxD clocks
+       joy_grip[pad] (24-bit frame, as SBEMU's vjoy.c) out on the button lines, one bit per 4 reads */
+    volatile u32 joy_mode;
+    volatile u32 joy_grip[2];
+    volatile u32 joy_grip_n;
 } SC55W_SHARED;
+
+#define SC55W_DDB_MAGIC 0x374A4E53UL    /* "SNJ7" */
+
+/* the same layout in Open Watcom (VxDs) and MinGW (helper): checked at compile time */
+#define SC55W_CHECK(n, c) typedef char n[(c) ? 1 : -1]
+SC55W_CHECK(sc55w_chk_size, sizeof(SC55W_SHARED) == 529404);
+SC55W_CHECK(sc55w_chk_cfg, sizeof(SC55W_CONFIG) == 16);
+SC55W_CHECK(sc55w_chk_wjoy, sizeof(SC55W_WJOY) == 28);
 
 #endif

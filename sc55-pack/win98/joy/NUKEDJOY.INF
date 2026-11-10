@@ -1,0 +1,137 @@
+; NUKEDJOY.INF - NUKED SB-EMU virtual game port + the "NUKED SB-EMU Joystick" type (Windows 98 / 95).
+; The game port is a stand-in device for PCs whose sound card has none: Device Manager shows it
+; (Sound, video and game controllers) at the address you pick (Resources tab, 200-20F), Windows
+; loads its joystick driver (VJoyD) for it, and Game Controllers can add the NUKED SB-EMU Joystick,
+; whose values come from SC55W.EXE (your pad) through NUKEDJOY.VXD. DOS boxes find SC55W's game
+; port at the same address. SC55W's settings window installs this for you; by hand: Control Panel >
+; Add New Hardware > No (don't search) > Sound, video and game controllers > Have Disk > this folder.
+
+[Version]
+Signature="$CHICAGO$"
+Class=MEDIA
+ClassGUID={4d36e96c-e325-11ce-bfc1-08002be10318}
+Provider=%NUKED%
+
+[ClassInstall]
+AddReg=Class.AddReg
+
+[Class.AddReg]
+HKR,,,,%MediaClassName%
+HKR,,Icon,,"-1"
+HKR,,Installer,,mmci.dll
+
+[Manufacturer]
+%NUKED%=NUKED
+
+[NUKED]
+%NUKGP.DeviceDesc%=NUKGP, *NUK0201
+
+[DestinationDirs]
+NUKGP.Copy = 11
+
+[SourceDisksNames]
+1="NUKED SB-EMU",,0
+
+[SourceDisksFiles]
+NUKEDJOY.VXD=1
+
+[NUKGP]
+LogConfig=NUKGP.LC0, NUKGP.LC1, NUKGP.LC2, NUKGP.LC3, NUKGP.LC4, NUKGP.LC5, NUKGP.LC6, NUKGP.LC7, NUKGP.LC8, NUKGP.LC9, NUKGP.LCA, NUKGP.LCB, NUKGP.LCC, NUKGP.LCD, NUKGP.LCE, NUKGP.LCF
+CopyFiles=NUKGP.Copy
+AddReg=NUKGP.AddReg, NUKJOY.AddReg
+UpdateInis=NUKGP.UpdateInis
+
+[NUKGP.Copy]
+NUKEDJOY.VXD
+
+[NUKGP.AddReg]
+HKR,,DevLoader,,mmdevldr.vxd
+HKR,,Driver,,vjoyd.vxd
+HKR,Drivers,MIGRATED,,0
+HKR,Drivers,SubClasses,,"joystick"
+HKR,Drivers\joystick,,,
+HKR,Drivers\joystick\msjstick.drv,Description,,%NUKGP.DeviceDesc%
+HKR,Drivers\joystick\msjstick.drv,Driver,,msjstick.drv
+
+[NUKJOY.AddReg]
+HKLM,"System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\NUKED_SBEMU",OEMName,,%NUKJOY.Desc%
+HKLM,"System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\NUKED_SBEMU",OEMCallout,,"NUKEDJOY.VXD"
+HKLM,"System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\NUKED_SBEMU",OEMData,1,23,00,88,00,0c,00,00,00
+HKLM,"System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\NUKED_SBEMU",OEMXYLabel,,"Left stick"
+HKLM,"System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\NUKED_SBEMU",OEMZLabel,,"Triggers"
+HKLM,"System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\NUKED_SBEMU",OEMRLabel,,"Right stick up/down"
+HKLM,"System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\NUKED_SBEMU",OEMULabel,,"Right stick left/right"
+HKLM,"System\CurrentControlSet\Control\MediaProperties\PrivateProperties\Joystick\OEM\NUKED_SBEMU",OEMPOVLabel,,"D-pad"
+
+[NUKGP.UpdateInis]
+system.ini,drivers,"joystick="
+
+[NUKGP.LC0]
+ConfigPriority=HARDWIRED
+IOConfig=201-201(3ff::)
+
+[NUKGP.LC1]
+ConfigPriority=HARDWIRED
+IOConfig=200-200(3ff::)
+
+[NUKGP.LC2]
+ConfigPriority=HARDWIRED
+IOConfig=202-202(3ff::)
+
+[NUKGP.LC3]
+ConfigPriority=HARDWIRED
+IOConfig=203-203(3ff::)
+
+[NUKGP.LC4]
+ConfigPriority=HARDWIRED
+IOConfig=204-204(3ff::)
+
+[NUKGP.LC5]
+ConfigPriority=HARDWIRED
+IOConfig=205-205(3ff::)
+
+[NUKGP.LC6]
+ConfigPriority=HARDWIRED
+IOConfig=206-206(3ff::)
+
+[NUKGP.LC7]
+ConfigPriority=HARDWIRED
+IOConfig=207-207(3ff::)
+
+[NUKGP.LC8]
+ConfigPriority=HARDWIRED
+IOConfig=208-208(3ff::)
+
+[NUKGP.LC9]
+ConfigPriority=HARDWIRED
+IOConfig=209-209(3ff::)
+
+[NUKGP.LCA]
+ConfigPriority=HARDWIRED
+IOConfig=20A-20A(3ff::)
+
+[NUKGP.LCB]
+ConfigPriority=HARDWIRED
+IOConfig=20B-20B(3ff::)
+
+[NUKGP.LCC]
+ConfigPriority=HARDWIRED
+IOConfig=20C-20C(3ff::)
+
+[NUKGP.LCD]
+ConfigPriority=HARDWIRED
+IOConfig=20D-20D(3ff::)
+
+[NUKGP.LCE]
+ConfigPriority=HARDWIRED
+IOConfig=20E-20E(3ff::)
+
+[NUKGP.LCF]
+ConfigPriority=HARDWIRED
+IOConfig=20F-20F(3ff::)
+
+[Strings]
+NUKED="NUKED SB-EMU"
+MediaClassName="Sound, video and game controllers"
+NUKGP.DeviceDesc="NUKED SB-EMU Game Port"
+NUKJOY.Desc="NUKED SB-EMU Joystick"
