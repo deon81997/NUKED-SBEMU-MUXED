@@ -56,6 +56,25 @@ bool Engine::apply_live(const Options& o)
 
 void Engine::midi_now(uint8_t b) { pending_midi.push_back(b); }
 
+bool Engine::has_input(const SC55W_SHARED* sh) const
+{
+    if (!pending_midi.empty()) return true;
+    return sh && (sh->ev_tail != sh->ev_head || sh->pcm_head != sh->pcm_tail);
+}
+
+bool Engine::can_sleep(const SC55W_SHARED* sh) const
+{
+    return silent_frames >= rate && (!midi || st.midi_idle) && (!opl || !opt.opl || st.opl_idle) && !dac_active &&
+           !pcm_primed && !has_input(sh);
+}
+
+void Engine::wake_output()
+{
+    started = false;          // render() takes the window from the VxD clock again
+    silent_frames = 0;
+    quiet_late = true;
+}
+
 void Engine::idle_check(const float* buf, int from, int to, int& quiet, bool& idle)
 {
     if (idle) return;
@@ -180,7 +199,7 @@ void Engine::render(SC55W_SHARED* sh, uint32_t now_us, int16_t* out, int frames)
             int32_t dt = (int32_t)(e.time - win_start);
             int epos = dt <= 0 ? 0 : (int)(dt / us_per_frame);
             if (epos >= frames) break;                  // belongs to a later buffer
-            if (dt < -(int32_t)lat_us) st.late_events++;
+            if (dt < -(int32_t)lat_us && !quiet_late) st.late_events++;
             if (epos > pos) { render_sources(pos, epos); pos = epos; }
             switch (e.type) {
             case EV_OPL:  if (opl) { wake_opl(); opl->write(e.c, e.a, e.b); } st.opl_writes++; break;
@@ -245,6 +264,13 @@ void Engine::render(SC55W_SHARED* sh, uint32_t now_us, int16_t* out, int frames)
         int a = (int)lrintf(l * 32767.0f), b = (int)lrintf(r * 32767.0f);
         out[i * 2] = (int16_t)(a > 32767 ? 32767 : a < -32768 ? -32768 : a);
         out[i * 2 + 1] = (int16_t)(b > 32767 ? 32767 : b < -32768 ? -32768 : b);
+    }
+
+    quiet_late = false;
+    {
+        bool zero = true;
+        for (int i = 0; i < frames * 2 && zero; i++) zero = out[i] == 0;
+        silent_frames = zero ? (silent_frames > (1 << 30) ? silent_frames : silent_frames + frames) : 0;
     }
 
     frac_us += frames * us_per_frame;

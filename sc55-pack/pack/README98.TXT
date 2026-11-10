@@ -25,7 +25,9 @@ inside Windows 98:
     Manager (see "Joystick" in section 3).
 
 It is made for the Dell Latitude D810 with the SigmaTel AC'97 WDM driver,
-but works with any sound card that has a Windows 98 driver.
+but works with any sound card that has a Windows 98 driver. It needs a
+CPU with SSE2: Pentium 4, Pentium M, Celeron D or M, Athlon 64 or newer
+(a Pentium II / III or Athlon XP cannot run SC55W.EXE).
 
 It does NOT replace "Restart in MS-DOS mode" for games that need it (games
 that want all of the memory, or that do not run in a DOS box): use the DOS
@@ -257,6 +259,10 @@ Windows-only options, in C:\SC55\WIN98\SC55W.INI under [SC55W]:
      BufferMs=80        sound output buffer (20-500). Raise it if the
                         sound breaks up; lower it for less delay.
      BlockMs=10         size of each buffer block (5-50).
+     OutputSleep=1      stop the sound output while nothing makes a sound
+                        (saves CPU; it starts again within about 20 ms).
+                        0 = keep it running, if your sound card's driver
+                        clicks or misses the first note after a pause.
      RecordWav=C:\X.WAV also record everything played to a WAV file
                         (troubleshooting).
      Joystick=1         game port for DOS programs (0 = off, e.g. for a
@@ -302,8 +308,11 @@ load. If music slows down or breaks up:
   * or use the original SC-55 ROM set instead of the mkII.
 The DOS pack's Automatic setup (SETTINGS /TUNE) finds good values for the
 D810; they are saved in SBOPTS.TXT, which Windows uses too.
-When nothing has played for a few seconds the synths pause, so the program
-uses almost no CPU while idle.
+When nothing has played for a few seconds the synths pause, and a second
+later the sound output stops too (Status: "paused while silent"), so the
+program uses almost no CPU while idle: on a Pentium II 450 about 0.25 % of
+the CPU (it was 1.6 % before beta.81-w98.4). Windows' timer runs at its
+normal rate unless a DOS program plays sound or reads the joystick.
 
 
 -----------------------------------------------------------------------------

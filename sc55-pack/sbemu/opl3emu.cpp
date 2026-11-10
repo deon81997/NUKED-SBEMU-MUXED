@@ -42,7 +42,7 @@ static int OPL3EMU_Rate = 44100;
 static uint32_t OPL3EMU_NukedKeyOn;  //bit per melodic channel (0-8 first bank, 9-17 second bank), bit 18: rhythm drums
 static int32_t OPL3EMU_NukedTail;    //output frames left to render after the last key event
 //CPU: a game can leave voices keyed on at zero volume (silent) for as long as it runs; the core then ran
-//without end. After 2 s of output that is exactly silent the core sleeps until the next register write.
+//without end. After 2 s of silent output (at most 1 step from 0) the core sleeps until the next register write.
 static int32_t OPL3EMU_NukedSilent;  //frames of exact silence in a row
 static int OPL3EMU_NukedSleep;
 #define OPL3EMU_NUKED_SLEEP_SECONDS 2
@@ -96,7 +96,8 @@ int OPL3EMU_GenSamples(int16_t* pcm16, int count)
         OPL3EMU_NukedTail = OPL3EMU_NukedTail > count ? OPL3EMU_NukedTail - count : 0;
         {
             int i, quiet = 1;
-            for(i = 0; i < count * 2; ++i) if(pcm16[i]) { quiet = 0; break; }
+            //a keyed-on voice whose envelope is fully down does not give exact 0 but flickers -1/0: that is silence too
+            for(i = 0; i < count * 2; ++i) if(pcm16[i] > 1 || pcm16[i] < -1) { quiet = 0; break; }
             OPL3EMU_NukedSilent = quiet ? OPL3EMU_NukedSilent + count : 0;
             if(OPL3EMU_NukedSilent > OPL3EMU_Rate * OPL3EMU_NUKED_SLEEP_SECONDS) OPL3EMU_NukedSleep = 1;
         }

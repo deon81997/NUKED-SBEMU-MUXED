@@ -71,6 +71,14 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.81-w98.4.** **Lighter on your CPU!!** NUKED SB-EMU for Windows 98
+now really rests when nothing plays: the sound output pauses while it's silent (and wakes up within a blink when a game or
+a MIDI file starts), Windows' timer is no longer kept at 1000 ticks a second, the joystick check slows down when no game
+uses it, and a sleeping SC-55 no longer costs more than a playing one. Measured in 86Box on a Pentium II 450 with
+Windows 98 idle: **1.6% of the CPU before, 0.25% now.** In plain DOS the Nuked OPL3 core goes to sleep after two seconds
+of silence (some games leave silent notes playing forever) and the SC-55 stops sooner after the music ends.
+New setting `OutputSleep=0` in SC55W.INI if your sound card's driver ever misses the first note after a pause.
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.80-w98.3.** **Joysticks EVERYWHERE in Windows 98!!** The
 settings window got tabs, and the new **Joystick** tab shows your pad live (sticks, buttons, what DOS games read). Pick the
 game port's address (200-20F) and stick type (CH Flightstick Pro, Thrustmaster FCS, Gravis GrIP) for DOS boxes, and one
@@ -98,15 +106,15 @@ D810 too) a USB mouse in plain DOS jumped around and clicked by itself, and on o
 read a whole mouse packet at once, and SBEMU was sending it one byte at a time. Now every packet goes to the mouse
 driver in one piece, right next to your touchpad's. The JEMM launchers got the same fix.
 
-<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.77-w98.2.** **Your pad presses the keys!!** In Windows 98
-DOS boxes the game pad's buttons now type the right keys for the game you're playing: jump, fire, pogo, menu. Download
-one free file (the Keyb2Joypad layouts from DOSBox Pure, link in DOWNLOADS.TXT) and over 3500 DOS games know their
-buttons. Your own layouts go in PADUSER.TXT.
-
 <details>
 <summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
 
 <br>
+
+<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.77-w98.2.** **Your pad presses the keys!!** In Windows 98
+DOS boxes the game pad's buttons now type the right keys for the game you're playing: jump, fire, pogo, menu. Download
+one free file (the Keyb2Joypad layouts from DOSBox Pure, link in DOWNLOADS.TXT) and over 3500 DOS games know their
+buttons. Your own layouts go in PADUSER.TXT.
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.77.** **SETTINGS, CD images and GAMETEST in 3D!!** Same
 three looks as the 3D menu (Panels, Carousel and Module), with mouse support and pop-ups that stay in 3D. Turn on the 3D

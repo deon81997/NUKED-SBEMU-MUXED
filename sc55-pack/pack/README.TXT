@@ -487,7 +487,9 @@ CONTENTS
      /T:1..6               1-3 Sound Blaster, 4-5 SB Pro (default 5), 6 SB16
      /OPL:0|1              OPL3 (FM) emulation on or off (default on)
      /FMCORE:0|1           0 = fast DOSBox OPL (default), 1 = accurate
-                           Nuked OPL3 (heavier)
+                           Nuked OPL3 (heavier; since beta.81 it sleeps
+                           after 2 s of silence, until the game writes
+                           to the FM chip again)
      /FIXTC:0|1            fix the time constant to match 11/22/44 kHz
      /VOL:n                master volume (default 80)
      /VSBVOL:pct           sound effects (digital Sound Blaster) volume,

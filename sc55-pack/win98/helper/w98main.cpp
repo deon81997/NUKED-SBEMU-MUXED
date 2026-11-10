@@ -388,6 +388,7 @@ static DWORD WINAPI audio_main(LPVOID)
     DWORD step_ok_at = 0;                       // 20 s after the sound runs the start counts as good
     if (buf_ms < 20) buf_ms = 20;
     if (buf_ms > 500) buf_ms = 500;
+    const bool out_sleep = ini_int("OutputSleep", 1) != 0;
 
     while (!g_quit) {
         if (InterlockedExchange(&g_have_pending, 0)) {
@@ -455,6 +456,15 @@ static DWORD WINAPI audio_main(LPVOID)
                 if (el > 100) el = 100;             // cannot keep up: skip ahead
                 int n = (int)((uint64_t)el * cur.rate / 1000);
                 if (n > 4096) n = 4096;
+                if (out_sleep && !g_rec && eng.can_sleep(sh)) {
+                    // CPU: silent and nothing waiting - nothing to drain; a slow tick for the VxD's clock
+                    if (!eng.st.out_asleep) eng.st.out_asleep = true;
+                    vxd_now();
+                    Sleep(250);
+                    last = 0;
+                    continue;
+                }
+                if (eng.st.out_asleep) { eng.st.out_asleep = false; eng.wake_output(); }
                 if (n > 0) { eng.render(sh, vxd_now(), tmp, n); rec_write(tmp, n); }
                 Sleep(25);
                 continue;
@@ -483,10 +493,28 @@ static DWORD WINAPI audio_main(LPVOID)
             if (eng.opl) eng.opl->reset();
         }
 
+        // CPU: while nothing makes a sound the sound output is stopped (no card interrupts, no mixing, and
+        // this loop does not run 100 times a second); input in the VxD's rings (a DOS program, Windows MIDI)
+        // starts it again within ~20 ms. SC55W.INI OutputSleep=0 keeps it running.
+        bool woke = false;
+        if (eng.st.out_asleep) {
+            if (eng.has_input(sh)) {
+                eng.st.out_asleep = false;
+                eng.wake_output();
+                QueryPerformanceCounter(&credit_t);
+                woke = true;
+            } else {
+                static DWORD tick;
+                Sleep(20);
+                DWORD t = GetTickCount();
+                if (t - tick >= 250) { tick = t; vxd_now(); }   // the VxD drops its 1 ms timer from this call
+            }
+        }
+        if (!eng.st.out_asleep) {
         WaitForSingleObject(g_wev, 50);
         int queued = 0;
         for (auto& h : g_hdr) if (!(h.dwFlags & WHDR_DONE)) queued++;
-        if (queued == 0) underruns++;
+        if (queued == 0 && !woke) underruns++;
         for (size_t i = 0; i < g_hdr.size() && !g_quit; i++) {
             WAVEHDR& h = g_hdr[i];
             if (!(h.dwFlags & WHDR_DONE)) continue;
@@ -514,6 +542,11 @@ static DWORD WINAPI audio_main(LPVOID)
                 last_wave_try = GetTickCount();
                 break;
             }
+        }
+        if (g_wo && out_sleep && !g_rec && eng.can_sleep(sh)) {
+            waveOutReset(g_wo);                         // every buffer comes back as done
+            eng.st.out_asleep = true;
+        }
         }
 
         // /VSCAUTO: shed the SC-55's reverb/chorus when the CPU cannot keep up
@@ -1133,7 +1166,7 @@ static std::string status_text()
     else {
         snprintf(b, sizeof b, "Output: %d Hz, %d ms buffer, CPU %d%%%s%s\r\n", p.rate, p.buf_ms,
                  (int)(p.load * 100 + 0.5), p.shed ? " (reverb/chorus paused)" : "",
-                 p.st.midi_idle ? ", synth idle" : "");
+                 p.st.out_asleep ? ", paused while silent" : p.st.midi_idle ? ", synth idle" : "");
         s += b;
     }
     snprintf(b, sizeof b, "\r\nActivity: MIDI %u bytes, FM %u writes, digital %u frames\r\n",

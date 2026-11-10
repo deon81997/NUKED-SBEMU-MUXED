@@ -13,6 +13,7 @@ struct EngineStats {
     double load = 0;     // render time / audio time, smoothed
     bool fx_shed = false;
     bool midi_idle = false, opl_idle = false;   // synth paused while silent
+    bool out_asleep = false;                    // sound output stopped while everything is silent
 };
 
 class Engine {
@@ -40,6 +41,14 @@ public:
     // MIDI from another source (e.g. a Windows MIDI-in port): applied at the next render
     void midi_now(uint8_t b);
 
+    // CPU: the sound output can be stopped while nothing makes a sound (synths asleep, no DMA,
+    // no direct DAC, the last second rendered was exact silence and no input is waiting).
+    // has_input() = something is waiting in the VxD's rings: start the output again.
+    bool has_input(const SC55W_SHARED* sh) const;
+    bool can_sleep(const SC55W_SHARED* sh) const;
+    // after the output was stopped: start a fresh time window (no resync / late-event counts)
+    void wake_output();
+
 private:
     bool started = false;
     uint32_t win_start = 0;      // VxD time of the next output frame
@@ -55,6 +64,8 @@ private:
     std::vector<uint8_t> pending_midi;
     float dc_x[2] = {0, 0}, dc_y[2] = {0, 0};   // DC blocker on the MIDI bus
     uint64_t frames_total = 0;                  // frames rendered since setup (idle rule)
+    int silent_frames = 0;                      // output frames of exact silence in a row
+    bool quiet_late = false;                    // first render after wake_output: old events are not "late"
     // idle gating: a synth that has had no input for a while and has gone
     // silent is not run (saves CPU, the SC-55 costs a lot); input wakes it
     int midi_quiet = 0, opl_quiet = 0;

@@ -1,7 +1,7 @@
 # SC-55 pack — handoff
 
-## NEW SESSION QUICK START (Win98 line, newest: beta.80-w98.3, 2026-11-10)
-- Read "VERSION NAMES" below, then the newest section at the END of this file ("Win98 w98.3 (on beta.80)").
+## NEW SESSION QUICK START (Win98 line, newest: beta.81-w98.4, 2026-11-10)
+- Read "VERSION NAMES" below, then the newest section at the END of this file ("beta.81-w98.4").
 - Nothing outside the repo survives a new session. Rebuild what you need:
   - DOS (SBEMU): DJGPP gcc 12.2 cross (github release andrewwutw/build-djgpp), `make -j16` in sc55-pack.
   - Win98 EXE: `sh win98/tools/build-gcc.sh` (GCC 13.2 msvcrt + win32 threads, ~30 min; sources cloned from
@@ -19,7 +19,7 @@
   user's personal zip that the public one lacks (ROMs, MSCDEX, VIDE-CDD, GSCDROM, MOUSE.COM); send it to the user.
 - Standing user rules: after every major milestone push a backup + HANDOFF note; plain-language updates; say
   what still needs testing on the real PCs (Dell D810; ASUS P5PE-VM + NEC USB card + wired Xbox 360 pad).
-- Next task the user asked for: CPU-usage optimisation in DOS (SBEMU) and Windows (SC55W.EXE / VxD).
+- Last task (done in beta.81-w98.4): CPU-usage optimisation in DOS and Windows. Waiting for the user's next request.
 
 ## VERSION NAMES - two Claude sessions work on this repo (read first)
 - DOS session: plain `beta.NN` (tag `v1.0.0-beta.NN-usb`, zip `NUKED-SB-EMU-1.0.0-beta.NN-usb.zip`).
@@ -871,21 +871,37 @@ tab on top of the x360c driver), then release beta.80-w98.3; afterwards CPU-usag
   numbering of x360c; Red Baron 3D in flight; the D810 / P5PE-VM.
 - NEXT (user asked): CPU-usage optimisation in DOS (SBEMU) and Windows (SC55W, VxD), after this release.
 
-## WIP (2026-11-10): CPU-usage work (not released yet; next release beta.81 DOS + beta.81-w98.4)
-Changes in the tree, built and host-tested, not yet in a release zip:
-- VxD (win98/vxd/sbcore.c): the 1 ms VTD minimum period is no longer held all the time. It is asked for when a
-  DMA transfer starts (period_need in xf_start) and dropped 2 s after the last transfer ends (period_check,
-  run from IOCTL_SC55W_TIME). Detach always drops it.
-- SC55W.EXE (helper/w98main.cpp): no permanent timeBeginPeriod(1) in the audio thread. The joystick thread polls
-  at 100 Hz only while something is using it (DOS box reads the port, a NUKED Windows joystick is polled, a DOS box
-  has focus, the Settings window is open, keys were sent), else 10 Hz with the default timer. Settings are reloaded
-  only after a Joystick page save (g_joyout_dirty), not every second.
-- Engine (helper/engine.cpp/.h): denormal flush in the DC blocker + underrun fade; DC blocker skipped when idle and
-  settled (native idle cost 5.4 -> 0.1 ms/s, win98/test/idletest.cpp); synth sleeps after 2 s of silence once the
-  engine has run 8 s (was 4 s).
-- DOS: Nuked OPL3 sleeps after 2 s of exactly-zero output (sbemu/opl3emu.cpp, any register write wakes it);
-  SC-55 tail 750 ms (sc55/sc55engine.hpp, was 1500).
-- Measuring: testrig/cpu (IDLEMTR.EXE for DOS, CPULOAD/MEASW for Win98, cpurun.sh = 86Box runner with the automation
-  socket, p2b450.cfg = P2B-LS + Pentium II 450, the fastest 86Box machine we have ROMs for; run the interpreter,
-  dynarec numbers are noisy). DOS idle overhead of SBEMU measured ~1.3% on the PII-450. QEMU Win98 numbers proved
-  unreliable; next step is Win98 in 86Box (P2B-LS, ES1371, QuickInstall ISO) with a Pentium II build of SC55W.
+## beta.81-w98.4 (2026-11-10): CPU usage in Windows 98 and DOS (RELEASED, tag v1.0.0-beta.81-w98.4-usb)
+Zip = beta.80-w98.3 zip + SBEMU.EXE, SBSET.EXE, SC55WAV.EXE, SC55LOG.EXE (DOS), SC55W.EXE, SC55W.VXD, SOURCE.ZIP,
+README98.TXT (x2), README.TXT. NUKEDJOY.VXD and SC55MIDI.DRV unchanged (sources unchanged). makefile VERSION beta.81.
+Windows (SC55W):
+- Output sleep (helper/w98main.cpp + engine.cpp/.h): when the synths sleep, no DMA/DAC, nothing waits in the VxD's
+  rings and the last second was exact silence, the audio thread calls waveOutReset and stops feeding the card
+  (eng.st.out_asleep; Status "paused while silent"). While asleep it checks Engine::has_input every 20 ms and calls
+  vxd_now() every 250 ms (the VxD drops its 1 ms timer from IOCTL_SC55W_TIME). Input -> wake_output() (fresh time
+  window, no resync/late counts), all buffers rendered at once. No-output path: same idea, 250 ms ticks.
+  SC55W.INI OutputSleep=0 turns it off (for a driver that clicks or drops the first note). Off while RecordWav= is on.
+- VxD 1 ms timer only while DMA runs (+2 s); no timeBeginPeriod(1) in SC55W; joystick thread 10 Hz when unused
+  (timeBeginPeriod(1) only while busy); settings reload only after a Joystick page save.
+- Engine: denormal flush in the DC blocker + PCM underrun fade (a sleeping SC-55 cost MORE than a playing one on
+  P4/Pentium M), DC blocker skipped when settled; synth idle after 2 s (4 s in the first 8 s).
+DOS (SBEMU): Nuked OPL3 core (/FMCORE:1) sleeps after 2 s of silent output until the next register write. NOTE: a
+keyed-on voice with its envelope fully down outputs -1/0 flicker, not exact 0 - silence = |sample| <= 1
+(testrig/cpu/opl_sleep_test.cpp, host test; run it after touching opl3emu.cpp). SC-55 tail 750 ms (was 1500).
+Measured: 86Box P2B-LS, Pentium II 450, dynarec ON (stable to +-0.02% for CPULOAD in Windows; the interpreter drops
+to ~0.1x real time once a busy loop runs). Win98 = QEMU base98x.img moved to 86Box (padded to 2072 cyl, 63/16),
+ESS Solo-1 card (Win98 found C:\DRIVER\SOLO1.INF; ES1371 has no driver in the QuickInstall image, SB16 gave no
+waveOut device). VM: /home/claude/padtest/w86 (86box.cfg, hd.img base saved as w86-hd-solo.img, d.img = MEASW disk).
+Pentium II builds of SC55W: ARCH="-march=pentium2 -O2" OBJ=build98p2 LIB=b98p2 for build-deps.sh and build98.sh.
+  CPULOAD loops/s (higher = more left over): no SC55W 148.87M; beta.80-w98.3 idle 146.48M (1.6%); before output
+  sleep 147.11M (1.2%); beta.81-w98.4 148.50M (0.25%); back to 148.43M right after MIDI notes.
+  MIDIT.EXE (testrig/cpu) plays 3 notes through "NUKED SB-EMU" after the output slept: 86Box "audio start DIR"
+  capture shows all 3 at the same level and timing as the old build. Tools: testrig/cpu/measw.c (MEASW runs a
+  script from D:), cpuload.c, midit.c, oplt.c (DOS FM notes). 86Box DOS + ES1371: the automation audio capture
+  stayed silent for old and new SBEMU alike (rig issue, not looked into) - the OPL sleep was tested on the host.
+- SC55W.EXE needs SSE2 (Pentium M build): on a PII/PIII it dies with PSHUFD at start (README98 says so now).
+  A non-SSE2 build (ARCH above) works, tested in 86Box, if a user ever needs one.
+- DOS idle overhead of SBEMU (PII-450) is ~1.3%, mostly the card interrupt round trip; not changed.
+- To test on the real PCs: sound after a pause (first note of a MIDI file / first sound in a DOS game after some
+  seconds of silence) with the SigmaTel AC'97 driver on the D810; if it clicks or the first note is missing,
+  OutputSleep=0 and tell us.
