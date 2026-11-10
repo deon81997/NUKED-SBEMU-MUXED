@@ -235,17 +235,31 @@ static unsigned m3_glyph_row(int f, unsigned char ch, int row)          /* bits 
 }
 static int m3_text(M3SURF* s, int x, int y, int f, const char* t, uint32_t c, int a)
 {
-    int w = m3_fw(f), h = m3_fh(f), i, r;
+    /* the bigger fonts (10x20 and up) get their stair-steps smoothed: an empty pixel in the inside corner of a step
+     * (a set pixel beside it AND one above or below it) is filled at ~40%, so curves and diagonals look cleaner
+     * without blurring the straight strokes. Font 0 (8x16) stays crisp: at that size it would look smudged. */
+    int w = m3_fw(f), h = m3_fh(f), i, r, aa = f >= 1, a2 = a * 100 / 256;
+    unsigned wm = w >= 32 ? 0xFFFFFFFFu : ~(0xFFFFFFFFu >> w);
     for (; *t; t++, x += w)
     {
+        unsigned prev = 0, cur, next;
         if (x >= s->w) break;
         if (x + w <= 0 || *t == ' ') continue;
-        for (r = 0; r < h; r++)
+        cur = m3_glyph_row(f, (unsigned char)*t, 0);
+        for (r = 0; r < h; r++, prev = cur, cur = next)
         {
-            unsigned bits = m3_glyph_row(f, (unsigned char)*t, r); int yy = y + r;
-            if (!bits || yy < 0 || yy >= s->h) continue;
+            unsigned bits = cur, soft; int yy = y + r;
+            next = r + 1 < h ? m3_glyph_row(f, (unsigned char)*t, r + 1) : 0;
+            soft = aa ? ~bits & ((bits >> 1) | (bits << 1)) & (prev | next) & wm : 0;
+            if (!(bits | soft) || yy < 0 || yy >= s->h) continue;
             for (i = 0; i < w; i++)
-                if (bits >> (31 - i) & 1) { int xx = x + i; if (xx >= 0 && xx < s->w) { uint32_t* p = s->p + yy * s->w + xx; *p = a >= 256 ? c : m3_blend(*p, c, a); } }
+            {
+                int xx = x + i; uint32_t* p;
+                if (xx < 0 || xx >= s->w) continue;
+                p = s->p + yy * s->w + xx;
+                if (bits >> (31 - i) & 1) *p = a >= 256 ? c : m3_blend(*p, c, a);
+                else if (soft >> (31 - i) & 1) *p = m3_blend(*p, c, a2);
+            }
         }
     }
     return x;

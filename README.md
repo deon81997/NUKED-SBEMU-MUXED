@@ -76,6 +76,11 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.87.** **Cleaner 3D screens!!** The bigger letters on every 3D screen
+(menu, SETTINGS, CD images, GAMETEST, MIDPLAY) now have their stair-steps smoothed: rounder curves, crisp straight
+strokes. In the Carousel and Module menus the description no longer runs into the key help: it gets its own three
+lines and the keys sit below a divider.
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.86.** **Snappier 3D menus, and the version on screen!!** The MENU now
 shows which version you run (yellow, under the logo), no more digging in SBLOG.TXT. The 3D menu styles got quicker:
 Panels' moving background now uses whole-number math (it did a slow float conversion for every pixel), and
@@ -108,6 +113,11 @@ uses the CPU's own clock. Measured in 86Box (Pentium II 450, SBEMU playing a ver
 **252 ms late before** (15 ms in the text views), **now at most 8 ms in every display mode**. The 3D view is always sharp
 full 640x480.
 
+<details>
+<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
+
+<br>
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.82.** **Virtual CDs work like a real disc!!** Games no longer
 stop with a CD read error: on a PC with its own CD-ROM driver loaded (like a Windows 98 boot), games asked DOS for "the
 first CD drive" and got your empty real drive instead of the mounted image. Now drive M: is the first CD drive and your
@@ -115,11 +125,6 @@ real drive keeps D:. The virtual drive also plays CD music by itself like a real
 "busy until the track ends"), so games that start or wait for their music don't fail or hang, with or without SBEMU, and
 CUE sheets with PREGAP lines play the right spot. New driver built from source: uCDD 0.9.5-a3 plus our CD-audio part,
 and SHSUCDX with a new /P option. No CPU used while nothing reads the disc.
-
-<details>
-<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
-
-<br>
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.81-w98.4.** **Lighter on your CPU!!** NUKED SB-EMU for Windows 98
 now really rests when nothing plays: the sound output pauses while it's silent (and wakes up within a blink when a game or

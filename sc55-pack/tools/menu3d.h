@@ -78,10 +78,12 @@ static void m3_overlay(int cat, int sel, int sb)
         x += w + 4;
         if (x + 300 > M3W - 40) break;
     }
-    m3_rect(&m3_scr, 10, 372, M3W - 20, 98, 0x000010, 170);
-    m3_bevel(&m3_scr, 10, 372, M3W - 20, 98, 2, 1, 120);
-    m3_text_sh(&m3_scr, 22, 380, 1, it->label, m3_mul(m3_catcol[it->cat], 380));
-    m3_wrap(&m3_scr, 22, 404, M3W - 44, 3, 0, it->desc, 0xD0D8E8, 0);
+    /* description box: title, 3 lines, then the keys on their own line (they used to share the last line) */
+    m3_rect(&m3_scr, 10, 354, M3W - 20, 118, 0x000010, 170);
+    m3_bevel(&m3_scr, 10, 354, M3W - 20, 118, 2, 1, 120);
+    m3_text_sh(&m3_scr, 22, 360, 1, it->label, m3_mul(m3_catcol[it->cat], 380));
+    m3_wrap(&m3_scr, 22, 384, M3W - 44, 3, 0, it->desc, 0xD0D8E8, 0);
+    m3_rect(&m3_scr, 18, 449, M3W - 36, 1, 0x7080A0, 90);
     m3_text(&m3_scr, 22, 452, 0, "Arrows choose  Enter go  F3 style  F4 speed  F8 text menu  Esc quit", 0x7080A0, 256);
 }
 

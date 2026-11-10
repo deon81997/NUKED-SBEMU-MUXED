@@ -1040,3 +1040,13 @@ M3PROF fps: Panels 8.5 -> 10.1, Carousel 8.6 -> 11.4. Test script /tmp/menufps.s
 a first run + MENU3D.CFG STYLE=n, Esc twice + Enter to quit, M3PROF.TXT copied to DIR.TXT).
 Zip = beta.85 zip + SC55MENU, SBSET, GAMETEST, CDGUI, MIDPLAY (m3core), SBEMU (version).
 Still open: "better looking" menu (ask the user what they want).
+
+## beta.87 (2026-11-10): smoother big text, menu footer fix (RELEASED, tag v1.0.0-beta.87-usb)
+User asked for "sharper text, new colours, a cleaner layout, nicer 3D styles - all of this".
+- m3core m3_text: fonts 1-3 (10x20, 12x24 bold, 16x32 bold) get inside-corner smoothing: empty pixel with a set pixel
+  left/right AND above/below drawn at ~40% (bit ops on prev/cur/next glyph rows). Font 0 (8x16) unchanged.
+- menu3d m3_overlay: description box 354..472, title 360, 3 lines from 384, divider at 449, keys at 452 (the 3rd
+  description line used to overlap the key line in Carousel/Module).
+- Screenshot script /tmp/menushot.sh EXE STYLE|t TAG [scancodes] -> /tmp/ms_TAG.png (root4 copy).
+- NEXT for the look: new colours (e.g. 3D styles following the text menu's 7 colour styles), nicer 3D styles; ask the
+  user which they like (mockups), the text menu already looks good.
