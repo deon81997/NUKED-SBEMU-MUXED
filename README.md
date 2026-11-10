@@ -56,7 +56,7 @@
 <table>
 <tr><td><a href="#-whats-new-"><img src="docs/90s/nav-news.gif" width="88" alt="What's new"></a></td><td><a href="#-what-is-this-"><img src="docs/90s/nav-what.gif" width="88" alt="What is this?"></a></td><td><a href="#-cool-features-"><img src="docs/90s/nav-features.gif" width="88" alt="Features"></a></td><td><a href="#-will-it-run-on-my-pc-"><img src="docs/90s/nav-run.gif" width="88" alt="Will it run?"></a></td></tr>
 <tr><td><a href="#-my-test-lab-"><img src="docs/90s/nav-lab.gif" width="88" alt="My test lab"></a></td><td><a href="#-getting-started-"><img src="docs/90s/nav-start.gif" width="88" alt="Getting started"></a></td><td><a href="#-usb-gamepads-in-dos-"><img src="docs/90s/nav-pads.gif" width="88" alt="USB gamepads"></a></td><td><a href="#-supported-sound-chips-"><img src="docs/90s/nav-chips.gif" width="88" alt="Sound chips"></a></td></tr>
-<tr><td><a href="#-screenshots-"><img src="docs/90s/nav-shots.gif" width="88" alt="Screenshots"></a></td><td><a href="#-hall-of-fame-"><img src="docs/90s/nav-fame.gif" width="88" alt="Hall of fame"></a></td><td><a href="#-built-with-claude-"><img src="docs/90s/nav-claude.gif" width="88" alt="Built with Claude"></a></td><td><a href="#-100-homemade-"><img src="docs/90s/nav-home.gif" width="88" alt="100% homemade"></a></td></tr>
+<tr><td><a href="#-screenshots-"><img src="docs/90s/nav-shots.gif" width="88" alt="Screenshots"></a></td><td><a href="#-hall-of-fame-"><img src="docs/90s/nav-fame.gif" width="88" alt="Hall of fame"></a></td><td><a href="#-built-with-claude-"><img src="docs/90s/nav-claude.gif" width="88" alt="Built with Claude"></a></td><td><a href="#-made-for-this-pack-"><img src="docs/90s/nav-home.gif" width="88" alt="Made for this pack"></a></td></tr>
 <tr><td><a href="#-download-zone-"><img src="docs/90s/nav-download.gif" width="88" alt="Downloads"></a></td><td><a href="#-sign-my-guestbook-"><img src="docs/90s/nav-guest.gif" width="88" alt="Guestbook"></a></td><td><a href="#-for-the-nerds-source-code-"><img src="docs/90s/nav-source.gif" width="88" alt="Source code"></a></td><td><a href="#-thanks-to-my-friends-"><img src="docs/90s/nav-thanks.gif" width="88" alt="Thanks"></a></td></tr>
 </table>
 
@@ -614,7 +614,7 @@ Stuff this little pack pulled off that I'm REALLY proud of:
 
 - 🏆 **A real Roland SC-55 inside a DOS sound card emulator**, running Roland's own firmware, and then made **about 20% faster without changing a single sample** of what it plays (checked bit for bit)
 - 🏆 **Starts twice as fast**: from 15 seconds to under 7 on a 366 MHz Celeron (a ROM check was secretly redone on almost every start)
-- 🏆 **A USB host written from scratch for plain DOS**: UHCI, OHCI, EHCI and xHCI, hubs four deep, hot-plugging, and not a single interrupt, so it never fights your sound chip
+- 🏆 **A USB host for plain DOS built into a sound emulator**: UHCI, OHCI, EHCI and xHCI, hubs four deep, hot-plugging, and not a single interrupt, so it never fights your sound chip (it learned from crazii's USBDDOS and Yeo Kheng Meng's xhci98)
 - 🏆 **USB mouse right next to a laptop touchpad**, no memory manager needed, by talking to the BIOS's own mouse services
 - 🏆 **Your pad presses each game's own keys** in over 3500 DOS games: SBEMU watches which program DOS starts and picks that game's layout. 13 shareware games, Doom II and the full Wolf3D were all played with nothing but the pad
 - 🏆 **Our own Windows 98 drivers**: a virtual Sound Blaster / OPL3 / MPU-401 for DOS boxes, a MIDI driver, a joystick driver and a virtual game port, **idling at 0.25% of the CPU**
@@ -651,7 +651,7 @@ history, November 4 - 10, 2026, at beta.82):
 
 </div>
 
-Highlights of what that means: a USB host for DOS from scratch, a 20% faster SC-55 that still plays every sample
+Highlights of what that means: a USB host for DOS inside SBEMU, a 20% faster SC-55 that still plays every sample
 the same, Windows 98 drivers, 3D menus, the pad-keys-per-game system, and dozens of bugs found in emulators
 before they ever reached my real hardware.
 
@@ -659,24 +659,26 @@ before they ever reached my real hardware.
 
 <div align="center"><img src="docs/90s/fd-hatchling.gif" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
-## ★ 100% Homemade!! ★
+## ★ Made For This Pack!! ★
 
-Every one of these was written from scratch for this pack by **Claude**. SBEMU, the emulator cores, the DOS
-drivers we bundle and the Xbox 360 driver for Windows 98 come from their original authors (see [Thanks](#-thanks-to-my-friends-)).
+Everything listed here was written for this pack by **Claude**. Some of it is brand new (the menus and screens,
+the test tools, the pad-keys system, the test rigs); some of it builds on other people's projects, and those rows say
+**based on...** so you know whose shoulders it stands on. SBEMU itself, the emulator cores, the DOS drivers we bundle
+and the Xbox 360 driver for Windows 98 are their original authors' work (see [Thanks](#-thanks-to-my-friends-)).
 
 <details open>
 <summary><b>&gt;&gt; Inside SBEMU &lt;&lt;</b></summary>
 
 | Part | What it does |
 |---|---|
-| SC-55 / MT-32 / SoundFont MIDI | the synths behind the virtual MPU-401, with render-ahead and automatic speed control |
-| SC-55 engine speed-ups | the bit-exact faster Nuked-SC55 core and faster start-up |
-| CD link | CD music from the virtual drive mixed into the sound card's output |
-| USB host (`usbpad.c`) | pads, keyboards and mice in plain DOS, on every USB controller type |
+| SC-55 / MT-32 / SoundFont MIDI | the synths behind the virtual MPU-401, with render-ahead and automatic speed control. **Based on** Nuked-SC55, Munt and TinySoundFont; the SoundFont MPU-401 started from Cacodemon345's VSBHDASF |
+| SC-55 engine speed-ups | a bit-exact faster core and faster start-up: **changes to** Nuked-SC55 (nukeykt) and J.C. Moyer's backend fork |
+| CD link | CD music from the virtual drive mixed into the sound card's output, **through** uCDD (vorvek) |
+| USB host (`usbpad.c`) | pads, keyboards and mice in plain DOS, on every USB controller type. **Based on** crazii's USBDDOS (UHCI / OHCI), Yeo Kheng Meng's xhci98 (xHCI start-up) and Linux `xpad.c` (the pad's protocol) |
 | Virtual keyboard controller (`vkbc.c`) | USB keyboard, USB mouse (with or without JEMM) and pad keys typed like a PS/2 keyboard |
-| Pad keys per game | the INT 21h program watcher and the PADMAP.BIN layouts |
+| Pad keys per game | the INT 21h program watcher and the PADMAP.BIN layouts. The layouts themselves are DOSBox Pure's Keyb2Joypad list (Jemy Murphy and bigjim), which you download |
 | BIOS joystick + game port extras | INT 15h joystick, CH / FCS / GrIP stick types, two pads |
-| `SBEMU16` | the stub that lets 16-bit protected-mode games (Jazz Jackrabbit) use SBEMU |
+| `SBEMU16` | the stub that lets 16-bit protected-mode games (Jazz Jackrabbit) use SBEMU, **with** HDPMI16I from crazii's HX build |
 </details>
 
 <details>
@@ -693,8 +695,8 @@ drivers we bundle and the Xbox 360 driver for Windows 98 come from their origina
 | `TIMETEST` | do games lose timer ticks while the music plays? |
 | `MPUTEST`, `JOYTEST`, `KMTEST`, `USBTEST` | MIDI port, joystick, keyboard / mouse and USB step-by-step checks |
 | `SC55WAV`, `SC55LOG` | render the SC-55 to WAV and measure its speed on your PC |
-| `PADCONV` | turns the free Keyb2Joypad download into the pad layouts |
-| CD-audio part of `UCDD`, `SHSUCDX /P` | the virtual drive plays CD music like a real one, and goes first in the list of CD drives |
+| `PADCONV` | turns the free Keyb2Joypad download (DOSBox Pure) into the pad layouts |
+| CD-audio part of `UCDD`, `SHSUCDX /P` | the virtual drive plays CD music like a real one, and goes first in the list of CD drives: **additions to** vorvek's uCDD and Jason Hood's SHSUCDX |
 | `SETUP`, `CDINST`, `CLEANUP`, `UNINSTAL`, `BUGREP` | install, remove and one-key bug reports, without touching CONFIG.SYS or AUTOEXEC.BAT |
 | `SC55`, `SC55JEM`, `SC55QMM`, `HYBRID`... | launchers for protected-mode, real-mode and CD-music games |
 </details>
@@ -705,8 +707,8 @@ drivers we bundle and the Xbox 360 driver for Windows 98 come from their origina
 | Part | What it does |
 |---|---|
 | `SC55W.EXE` | tray program and settings window (Sound and MIDI, Joystick, Pad keys) |
-| `SC55W.VXD` | virtual Sound Blaster, OPL3, MPU-401, joystick and pad keys for DOS boxes |
-| `SC55MIDI.DRV` | the "NUKED SB-EMU" MIDI device for Windows programs |
+| `SC55W.VXD` | virtual Sound Blaster, OPL3, MPU-401, joystick and pad keys for DOS boxes. Its Sound Blaster **follows** SBEMU's (crazii), with ADPCM tables from DOSBox |
+| `SC55MIDI.DRV` | the "NUKED SB-EMU" MIDI device for Windows programs, played by the same synth cores |
 | `NUKEDJOY.VXD` + `NUKEDJOY.INF` | joystick driver and virtual game port for Windows games |
 </details>
 
