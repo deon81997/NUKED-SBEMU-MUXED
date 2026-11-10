@@ -808,3 +808,23 @@ tab on top of the x360c driver), then release beta.80-w98.3; afterwards CPU-usag
   return 1 OK, 0 FAIL (unplugged), -1 "you poll". hwcaps(joyid, {maxbuttons, maxaxes, numaxes}).
   OEM type key: MediaProperties\PrivateProperties\Joystick\OEM\<name>: OEMName, OEMData (JOYREGHWSETTINGS),
   OEMCallout = NUKEDJOY.VXD.
+- Win98 test VM (DONE, QEMU): the user's QuickInstall ISO installs itself in QEMU (qi.iso as CD, an empty
+  FAT32 partition made by testrig/mkfat32.py; spam Enter at boot - its timer prompt shows 0s in QEMU), then
+  boot from disk only. /home/claude/w98vm: run.sh (P3+SSE2, 128 MB, SB16, PIIX3 UHCI), base98.img (fresh),
+  t1.img (x360c + SC55W installed + NUKED game port + NUKED joystick added), d.img = FAT16 transfer disk built
+  from /home/claude/w98d by testrig/mkdisk.py. Helpers in /tmp (recreate if gone): qk.py (monitor: keys/text/
+  screenshots), vmboot.sh / vmoff.sh / vmrun.sh (Start > Run), padplug.sh (fake 360 pad hot-plugged AFTER boot:
+  with usb-redir present at boot SeaBIOS leaves IO.SYS spinning with IF=0), dget.sh (file from D:).
+  D:\UPD.BAT updates SC55W in the VM (start /w SC55W /EXIT first), D:\SETINI.BAT Tn switches [Joystick].
+- NUKEDJOY.VXD WORKS (Joystick 2 in Game Controllers = "NUKED SB-EMU Joystick", polled by us). Lessons:
+  VJOYD's service table has NO Get_Version: Register_Device_Driver is service 0 (MSGAME.VXD: cd 20 00 00 49 04).
+  Windows 98 VJoyD only binds a callout that registers the DirectX 5 way, done like MSANALOG.VXD: EAX=-1,
+  EDX -> VJREGDRVINFO (44 bytes, function 1, flags 0 for us - MSANALOG uses 0x20000 ISANALOGPORTDRIVER),
+  EBX=ECX=0, VJPOLLREG {24, poll, 0, init, escape, ctrlmsg}; register on Sys_Dynamic_Device_Init AND on
+  control message 70000000h (VJoyD re-asks). Poll(id, *mask, VJPOLLDATA) must fill every field. The joystick's
+  calibration (Joystick<n>Configuration) is empty when Game Controllers adds it: SC55W writes 0..65535 and
+  calls joyConfigChanged. NUKEDJOY notes what VJoyD did in HKLM\Software\NUKED SB-EMU\NukedJoy (regedit /e).
+- Verified in the VM: WJOY.EXE (win98/test) shows NUKED joystick X/Y/Z/R/POV/buttons from the pad;
+  JPORT.EXE (DOS, in a DOS box): Port=209 moves the game port (201h then reads as no stick), INT 15h, CH
+  (D-pad up = all 4 lines), FCS (hat on axis 4: right = 64/255), GrIP frames (sync bits 18-22, A at bit 6).
+  x360c under QEMU's fake pad: Windows U axis stays 0 (right stick X shows on V) - check RStickX on real pad.

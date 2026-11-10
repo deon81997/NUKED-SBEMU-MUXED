@@ -1,5 +1,5 @@
 /* jport.c - JPORT.EXE: log a game port the way DOS games read it (test rig).
- * JPORT [port hex] [seconds] [file] [g]: every 250 ms one line: axis times in us (PIT),
+ * JPORT [port hex] [seconds] [file] [g]: every 250 ms one line: axis times in port reads (loop counts),
  * '-' = never timed out (no stick), button bits (1 = pressed), INT 15h AH=84h answer.
  * 'g': instead decode GrIP frames from the button lines (pad 1: clock line 1, data line 2).
  * Open Watcom 16-bit DOS: wcl -bt=dos -ms -ox jport.c */
@@ -41,25 +41,23 @@ int main(int argc, char **argv)
             fputc('\n', f);
             (void)fr; (void)n;
         } else {
-            unsigned t0, t, us[4];
-            int done = 0, i, guard = 0;
+            unsigned n[4], i, k;
             unsigned char v, b;
             union REGS r;
-            for (i = 0; i < 4; i++) us[i] = 0xFFFF;
-            _disable();
+            for (i = 0; i < 4; i++) n[i] = 0xFFFF;
             outp(port, 0xFF);
-            t0 = pit();
-            while (done != 15 && guard < 30000) {
+            for (k = 0; k < 20000; k++) {      /* loop counts, as games time it */
                 v = (unsigned char)inp(port);
-                t = t0 - pit();            /* PIT counts down, 1.193 MHz */
-                for (i = 0; i < 4; i++) if (!(done & (1 << i)) && !(v & (1 << i))) { done |= 1 << i; us[i] = (unsigned)((unsigned long)t * 838 / 1000); }
-                if (t > 3000) break;       /* ~2.5 ms: the rest never time out */
-                guard++;
+                for (i = 0; i < 4; i++) if (n[i] == 0xFFFF && !(v & (1 << i))) n[i] = k;
+                if ((v & 15) == 0) break;
             }
-            _enable();
+            {
+                unsigned us[4];
+                for (i = 0; i < 4; i++) us[i] = n[i];
             b = (unsigned char)(~inp(port) >> 4 & 15);
             fprintf(f, "ax");
             for (i = 0; i < 4; i++) if (us[i] == 0xFFFF) fprintf(f, " -"); else fprintf(f, " %u", us[i]);
+            }
             fprintf(f, " bt %X", b);
             r.x.ax = 0x8400; r.x.dx = 1; r.x.cflag = 1;
             int86(0x15, &r, &r);

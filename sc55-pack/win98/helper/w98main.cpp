@@ -929,7 +929,10 @@ static DWORD WINAPI joy_main(LPVOID)
             for (UINT j = 0; j < nj && found < 2; j++) {
                 JOYCAPSA c;
                 if (joyGetDevCapsA(j, &c, sizeof c) != JOYERR_NOERROR) continue;
-                if (is_nuked_joystick(j, c)) continue;
+                if (is_nuked_joystick(j, c)) {
+                    if (joyout_fix_calibration(j)) logf("joystick: NUKED joystick %u calibrated", j + 1);
+                    continue;
+                }
                 JOYINFOEX t; t.dwSize = sizeof t; t.dwFlags = JOY_RETURNALL;
                 if (joyGetPosEx(j, &t) != JOYERR_NOERROR) continue;     // configured but unplugged -> no
                 cap[found] = c; jid[found] = j; ok[found] = true;

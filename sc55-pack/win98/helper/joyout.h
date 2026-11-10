@@ -25,3 +25,8 @@ void joyout_windows(const JoyOutSettings& s, const PadInput in[2], const PadOutp
 
 // GrIP frame of a pad (24 bits, bit 0 first), 0 = no pad
 uint32_t joyout_grip_frame(const PadInput& in);
+
+// a NUKED joystick that Game Controllers added has no calibration (VJoyD then gives full scale):
+// write the NUKED values (0..65535, centre 32768, all calibrated) into its Joystick<n>Configuration.
+// Returns true when something was written (then joyConfigChanged has been called).
+bool joyout_fix_calibration(unsigned joyid);

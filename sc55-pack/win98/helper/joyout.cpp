@@ -1,6 +1,7 @@
 // joyout.cpp - see joyout.h
 #include "joyout.h"
 #include <windows.h>
+#include <mmsystem.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -123,4 +124,32 @@ void joyout_windows(const JoyOutSettings& s, const PadInput in[2], const PadOutp
         w.buttons = bt;
         w.present = 1;
     }
+}
+
+bool joyout_fix_calibration(unsigned joyid)
+{
+    // the joystick configuration key VJoyD reads (<FixedKey> on Windows 98)
+    static const char* key = "System\\CurrentControlSet\\Control\\MediaResources\\Joystick\\<FixedKey>\\CurrentJoystickSettings";
+    char name[40];
+    snprintf(name, sizeof name, "Joystick%uConfiguration", joyid + 1);
+    HKEY k;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, key, 0, KEY_READ | KEY_WRITE, &k) != ERROR_SUCCESS) return false;
+    uint32_t c[28];                                   // JOYREGHWCONFIG, 112 bytes
+    DWORD sz = sizeof c, type = 0;
+    bool done = false;
+    if (RegQueryValueExA(k, name, NULL, &type, (BYTE*)c, &sz) == ERROR_SUCCESS && sz == sizeof c) {
+        // [0] hws flags [1] buttons [2] usage, [3..8] min X..V, [9..14] max, [15..20] centre,
+        // [21..24] POV values, [25] calibration flags, [26] type, [27] reserved
+        bool ok = c[25] == 0x3F;
+        for (int i = 0; i < 6 && ok; i++) ok = c[3 + i] == 0 && c[9 + i] == 65535 && c[15 + i] == 32768;
+        if (!ok) {
+            for (int i = 0; i < 6; i++) { c[3 + i] = 0; c[9 + i] = 65535; c[15 + i] = 32768; }
+            c[21] = 0; c[22] = 18000; c[23] = 27000; c[24] = 9000;    // forward backward left right
+            c[25] = 0x3F;                                             // XY Z R U V POV calibrated
+            done = RegSetValueExA(k, name, 0, REG_BINARY, (BYTE*)c, sizeof c) == ERROR_SUCCESS;
+        }
+    }
+    RegCloseKey(k);
+    if (done) joyConfigChanged(0);
+    return done;
 }
