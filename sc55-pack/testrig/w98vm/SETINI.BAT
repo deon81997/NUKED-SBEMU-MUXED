@@ -1,0 +1,5 @@
+@echo off
+start /w C:\SC55\WIN98\SC55W.EXE /EXIT
+if not exist D:\BASE.INI copy C:\SC55\WIN98\SC55W.INI D:\BASE.INI
+copy /b D:\BASE.INI+D:\%1.INI C:\SC55\WIN98\SC55W.INI
+start C:\SC55\WIN98\SC55W.EXE

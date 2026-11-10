@@ -1,5 +1,26 @@
 # SC-55 pack — handoff
 
+## NEW SESSION QUICK START (Win98 line, newest: beta.80-w98.3, 2026-11-10)
+- Read "VERSION NAMES" below, then the newest section at the END of this file ("Win98 w98.3 (on beta.80)").
+- Nothing outside the repo survives a new session. Rebuild what you need:
+  - DOS (SBEMU): DJGPP gcc 12.2 cross (github release andrewwutw/build-djgpp), `make -j16` in sc55-pack.
+  - Win98 EXE: `sh win98/tools/build-gcc.sh` (GCC 13.2 msvcrt + win32 threads, ~30 min; sources cloned from
+    github, list in the script). NOT xPack/UCRT MinGW. Then `sh win98/tools/build-deps.sh; sh win98/build98.sh`
+    (also builds SC55W.VXD, SC55MIDI.DRV and joy/NUKEDJOY.VXD into win98/out). Needs Open Watcom v2 at
+    /home/claude/ow and JWasm at /home/claude/jwasm-src (win98/vxd/build.sh); Munt/Nuked-SC55 are in the repo.
+  - Import check: `python3 win98/tools/chkimp2.py out/SC55W.EXE` with Windows 98 DLLs in /home/claude/w98dll
+    (from the user's QuickInstall FULL.866, extracted with testrig/padkeys/mercy.py): only GetModuleHandleW and
+    LoadLibraryW may be W-STUB.
+  - Test PCs: QEMU 8.2 (with usbredir + pixman) and 86Box built from source; DOS boot disks with
+    testrig/mkdisk.py (MKDISK_BOOT=msdos), Win98 VM per testrig/w98vm/README.md; fake 360 pad testrig/fakepad.py.
+- Release recipe: pull; zip = newest zip in release/ with the changed files swapped in (python zipfile, keep
+  every other entry); release/ keeps one zip; README.md news (5 newest); HANDOFF section; commit `w98: ...`;
+  push -> the workflow publishes the tag from the zip name. Personal pack = public zip + the 52 entries of the
+  user's personal zip that the public one lacks (ROMs, MSCDEX, VIDE-CDD, GSCDROM, MOUSE.COM); send it to the user.
+- Standing user rules: after every major milestone push a backup + HANDOFF note; plain-language updates; say
+  what still needs testing on the real PCs (Dell D810; ASUS P5PE-VM + NEC USB card + wired Xbox 360 pad).
+- Next task the user asked for: CPU-usage optimisation in DOS (SBEMU) and Windows (SC55W.EXE / VxD).
+
 ## VERSION NAMES - two Claude sessions work on this repo (read first)
 - DOS session: plain `beta.NN` (tag `v1.0.0-beta.NN-usb`, zip `NUKED-SB-EMU-1.0.0-beta.NN-usb.zip`).
 - Windows 98 session (win98/, pack/README98.TXT, FILES\WIN98): `beta.NN-w98.M` = Win98 update M built
