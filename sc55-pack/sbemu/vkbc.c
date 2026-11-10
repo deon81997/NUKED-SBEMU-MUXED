@@ -78,8 +78,8 @@ static uint8_t MsRates[3];
 static volatile int MDx, MDy, MDw, MB, MDirty;
 static uint64_t MsLast;
 /* BIOS mode (beta.76, no real-mode traps): the INT 15h stub's data bytes tell whether the mouse driver has
- * enabled the BIOS mouse (C200h) and its resolution; USB movement is then put into the controller as 3-byte
- * PS/2 packets with D3h, and the BIOS's IRQ 12 handler passes them to the driver like the touchpad's own. */
+ * enabled the BIOS mouse (C200h) and its resolution; USB movement is then handed to the driver's own packet
+ * handler as whole packets (bios_deliver, beta.78), beside the touchpad's, which the BIOS hands over. */
 static uint32_t BiosLin;
 
 static void ms_defaults(void) { MsRate = 100; MsRes = 2; MsScale = 0; MsStream = 0; MsRemote = 0; }
@@ -87,15 +87,45 @@ static void ms_defaults(void) { MsRate = 100; MsRes = 2; MsScale = 0; MsStream =
 static int clamp(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
 
 /* movement is collected in 1/8 counts: USB counts x 2^resolution / 8 (resolution 3 = 8 counts/mm: 1:1) */
-static void ms_packet(void)
+static void ms_take(uint8_t p[4])
 {
     int dx = clamp(MDx / 8, -255, 255), dy = clamp(-MDy / 8, -255, 255), dz = clamp(-MDw, -8, 7);
     MDx -= dx * 8; MDy += dy * 8; MDw += dz;
-    apush((uint8_t)(0x08 | (MB & 7) | (dx < 0 ? 0x10 : 0) | (dy < 0 ? 0x20 : 0)));
-    apush((uint8_t)dx);
-    apush((uint8_t)dy);
-    if (MsId == 3) apush((uint8_t)dz);
+    p[0] = (uint8_t)(0x08 | (MB & 7) | (dx < 0 ? 0x10 : 0) | (dy < 0 ? 0x20 : 0));
+    p[1] = (uint8_t)dx;
+    p[2] = (uint8_t)dy;
+    p[3] = (uint8_t)dz;
     MDirty = (MDx / 8) || (MDy / 8) || MDw;
+}
+
+static void ms_packet(void)
+{
+    uint8_t p[4];
+    ms_take(p);
+    apush(p[0]); apush(p[1]); apush(p[2]);
+    if (MsId == 3) apush(p[3]);
+}
+
+/* BIOS mode: the whole packet to the mouse driver's handler through the INT 15h stub (see main.c MAIN_I15Stub):
+ * the stub's deliver (offset 24h) calls the handler the driver gave the BIOS (C207h) with status, X, Y, 0 on the
+ * stack, as the BIOS's IRQ 12 handler does. Putting the 3 bytes into the controller one by one (D3h) did not
+ * work where the BIOS reads a whole packet in one IRQ 12 and gives up when the next byte is late (Award; the
+ * D810's): nothing moved, or the packets slipped - random moves and clicks. */
+static int bios_deliver(void)
+{
+    DPMI_REG r;
+    uint8_t p[4];
+    int sx = MDx, sy = MDy;
+    int sw = MDw, sd = MDirty;
+    if (DPMI_LoadB(BiosLin + 15)) return 0;                     /* the driver's handler is running: later */
+    ms_take(p);
+    DPMI_StoreW(BiosLin + 20, p[0]); DPMI_StoreW(BiosLin + 22, p[1]); DPMI_StoreW(BiosLin + 24, p[2]);
+    memset(&r, 0, sizeof(r));
+    r.w.cs = (uint16_t)(BiosLin >> 4);
+    r.w.ip = 0x24;
+    DPMI_CallRealModeRETF(&r);
+    if (r.w.ax != 1) { MDx = sx; MDy = sy; MDw = sw; MDirty = sd; return 0; }   /* not taken: keep it */
+    return 1;
 }
 
 static void ms_cmd(uint8_t b)
@@ -146,24 +176,25 @@ static void inject(void)
     uint8_t st;
     uint64_t t;
     CLIS();
-    st = (uint8_t)UntrappedIO_IN(0x64);
     t = tsc();
+    if (BiosLin && MDirty && t - MsLast >= Cps / 100)
+    {
+        const uint8_t on = DPMI_LoadB(BiosLin + 9), ps = DPMI_LoadB(BiosLin + 10);
+        if ((on & 1) && (ps == 0 || ps == 3) && DPMI_LoadW(BiosLin + 18))
+        {
+            const int r = DPMI_LoadB(BiosLin + 11) & 3;
+            if (r != MsRes) { MDx = MDx >> MsRes << r; MDy = MDy >> MsRes << r; MsRes = r; }
+            MsId = 0;
+            if (bios_deliver()) MsLast = t;
+        }
+        else { MDx = MDy = MDw = 0; MDirty = 0; }                      /* no driver listening: drop it */
+    }
+    st = (uint8_t)UntrappedIO_IN(0x64);
     if (!in_flight(st, t) && (st & 3) == 0)
     {
         int ha, hk;
         if (Ah == At && MsOn && MsStream && !MsRemote && MDirty && t - MsLast >= Cps / (uint64_t)MsRate)
         { MsLast = t; ms_packet(); }
-        else if (Ah == At && BiosLin && MDirty && t - MsLast >= Cps / 100)
-        {
-            const uint8_t on = DPMI_LoadB(BiosLin + 9), ps = DPMI_LoadB(BiosLin + 10);
-            if ((on & 1) && (ps == 0 || ps == 3))
-            {
-                const int r = DPMI_LoadB(BiosLin + 11) & 3;
-                if (r != MsRes) { MDx = MDx >> MsRes << r; MDy = MDy >> MsRes << r; MsRes = r; }
-                MsId = 0; MsLast = t; ms_packet();
-            }
-            else { MDx = MDy = MDw = 0; MDirty = 0; }                  /* no driver listening: drop it */
-        }
         ha = Ah != At;
         hk = Kh != Kt && t >= Hold;
         if (ha && (!hk || !LastAux)) { kbc_put(1, Aq[At]); At = (At + 1) % AQN; LastAux = 1; }
@@ -264,7 +295,9 @@ uint32_t VKBC_IOHandler(uint32_t port, uint32_t val, uint32_t out)
 {
     if (port == 0x64)
     {
-        if (!out) return UntrappedIO_IN(0x64);
+        /* a BIOS IRQ 12 handler that reads the whole packet in one go (Award) polls here for the next
+         * byte with interrupts off: the sound interrupt cannot put it in then, so it goes in right now */
+        if (!out) { if (Ah != At) inject(); return UntrappedIO_IN(0x64); }
         if (MsOn && val == 0xD4) { AuxNext = 1; return val; }       /* next byte on 60h is for the mouse: ours */
         AuxNext = 0;
         Hold = tsc() + ms2c(20);

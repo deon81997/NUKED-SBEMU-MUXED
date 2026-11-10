@@ -1,5 +1,5 @@
 diff --git a/src/86box.c b/src/86box.c
-index 49876ab..a2983c7 100644
+index 49876ab26..a2983c7ba 100644
 --- a/src/86box.c
 +++ b/src/86box.c
 @@ -1984,6 +1984,7 @@ pc_reset_hard_init(void)
@@ -11,7 +11,7 @@ index 49876ab..a2983c7 100644
      /* Reset and reconfigure the Sound Card layer. */
      sound_card_reset();
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 89e2908..ced7e9a 100644
+index 89e290876..ced7e9a18 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
 @@ -53,6 +53,7 @@ add_executable(86Box
@@ -23,7 +23,7 @@ index 89e2908..ced7e9a 100644
      usb_legacy.c
      usb_msd.c
 diff --git a/src/automation.c b/src/automation.c
-index 7c9e06c..d328202 100644
+index 7c9e06ca1..d32820244 100644
 --- a/src/automation.c
 +++ b/src/automation.c
 @@ -85,6 +85,7 @@ typedef int sock_t;
@@ -64,7 +64,7 @@ index 7c9e06c..d328202 100644
          held = 1;
          respond_ok_time();
 diff --git a/src/device/kbc_at.c b/src/device/kbc_at.c
-index 8d99a14..0b922a1 100644
+index 8d99a1492..00f256de2 100644
 --- a/src/device/kbc_at.c
 +++ b/src/device/kbc_at.c
 @@ -110,6 +110,7 @@ typedef struct atkbc_t {
@@ -125,13 +125,13 @@ index 8d99a14..0b922a1 100644
              case 0xd2: /* write to keyboard output buffer */
                  kbc_at_log("ATkbc: write to keyboard output buffer\n");
                  kbc_delay_to_ob(dev, dev->ib, 0, 0x00);
-+                if (kbc_ob_delay_us) dev->ob_ready_at = tsc + kbc_ob_delay_us * TIMER_USEC;
++                if (kbc_ob_delay_us) dev->ob_ready_at = tsc + ((kbc_ob_delay_us * TIMER_USEC) >> 32);   /* TIMER_USEC is 32.32 */
                  break;
  
              case 0xd3: /* write to auxiliary output buffer */
                  kbc_at_log("ATkbc: write to auxiliary output buffer\n");
                  kbc_delay_to_ob(dev, dev->ib, 2, 0x00);
-+                if (kbc_ob_delay_us) dev->ob_ready_at = tsc + kbc_ob_delay_us * TIMER_USEC;
++                if (kbc_ob_delay_us) dev->ob_ready_at = tsc + ((kbc_ob_delay_us * TIMER_USEC) >> 32);   /* TIMER_USEC is 32.32 */
                  break;
  
              case 0xd4: /* write to auxiliary port */
@@ -147,7 +147,7 @@ index 8d99a14..0b922a1 100644
      int max_ports;
  
 diff --git a/src/include/86box/usb.h b/src/include/86box/usb.h
-index d321550..0bedf6a 100644
+index d321550ef..0bedf6afb 100644
 --- a/src/include/86box/usb.h
 +++ b/src/include/86box/usb.h
 @@ -59,6 +59,8 @@ extern const device_t *usb_hub_get_device(int hub);
@@ -169,7 +169,7 @@ index d321550..0bedf6a 100644
  extern const char     *usb_slot_internal_name(int slot);
  /* The device that holds the slot, NULL when the machine has none. */
 diff --git a/src/usb.c b/src/usb.c
-index ce51cfb..98eb930 100644
+index ce51cfb01..98eb93067 100644
 --- a/src/usb.c
 +++ b/src/usb.c
 @@ -2065,7 +2065,7 @@ typedef struct usb_slot_t {
@@ -182,7 +182,7 @@ index ce51cfb..98eb930 100644
  
  static usb_slot_t usb_slots[USB_SLOTS];
 diff --git a/src/usb_dev.c b/src/usb_dev.c
-index 211d0a0..7e8444d 100644
+index 211d0a08d..7e8444d7a 100644
 --- a/src/usb_dev.c
 +++ b/src/usb_dev.c
 @@ -313,6 +313,11 @@ usb_dev_standard(usb_dev_t *dev, const uint8_t *setup, uint8_t *buf)
