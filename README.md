@@ -346,6 +346,7 @@ Every release gets tried on real iron here, plus a whole fleet of emulated PCs:
 
 - ASUS P5PE-VM motherboard
 - Leadtek WinFast A400 (GeForce 6800)
+- Creative Sound Blaster Audigy
 - 2 GB RAM
 - 3X DVD-ROM
 - NEC uPD720101 USB 2.0 card + official wired Xbox 360 pad
@@ -599,7 +600,7 @@ Nuked-OPL3 (with **J.C. Moyer**'s backend fork and **Tony Gies**'s fast OPL3), t
 MPXPlay drivers, **Japheth**'s HX and Jemm, **vorvek**'s uCDD and everyone in [Thanks](#-thanks-to-my-friends-).
 
 Everything new on top of them was written by **Claude**, Anthropic's AI: the code, the bug hunting, the emulated
-test PCs, the docs and Port 220. My part was the ideas and testing on my own PCs. The numbers (from this repo's
+test PCs, the docs and Port 220. My part was the ideas, the direction and the testing on my own PCs. The numbers (from this repo's
 history, November 4 - 10, 2026):
 
 <div align="center">
