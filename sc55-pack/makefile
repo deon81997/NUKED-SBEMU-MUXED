@@ -7,7 +7,7 @@ DEBUG ?= 0
 # 0: original SBEMU build with the TinySoundFont SoundFont synth
 VSC55 ?= 1
 
-VERSION ?= 1.0.0-beta.88-usb-sc55
+VERSION ?= 1.0.0-beta.89-usb-sc55
 
 INCLUDES := -I./mpxplay -I./sbemu -I./drivers/include -I./sc55 -I./third_party/nuked-opl3-fast
 DEFINES := -D__DOS__ -DSBEMU -DDEBUG=$(DEBUG) -DSBEMU_VSC55=$(VSC55) -DMAIN_SBEMU_VER=\"$(VERSION)\"
@@ -145,6 +145,16 @@ CORE_DIR := upstream/Nuked-SC55/src/backend
 CORE_CXXFLAGS := -std=gnu++20 -O3 -march=i686 -mtune=pentium-m -fomit-frame-pointer -fno-rtti -DNDEBUG \
 	-I./sc55/shim -I./sc55/config -I./sc55 -I./$(CORE_DIR) -include ./sc55/shim/sc55_compat.h
 CORE_CFLAGS := -O3 -march=i686 -mtune=pentium-m -fomit-frame-pointer -DNDEBUG
+# Profile-guided build of the SC-55 core (bit-exact, ~8-10% faster): the profiles in sc55/pgo come from an instrumented
+# SC55WAV run in DOS (testrig/sc55bench/pgo.sh). SC55PGO=gen builds the instrumented core, =use (default when the
+# profiles are there) builds with them, =off without. A changed source file just falls back to the normal build.
+SC55PGO ?= $(if $(wildcard sc55/pgo/*.gcda),use,off)
+ifeq ($(SC55PGO),gen)
+CORE_CXXFLAGS += -fprofile-generate -fprofile-update=single
+endif
+ifeq ($(SC55PGO),use)
+CORE_CXXFLAGS += -fprofile-use=$(CURDIR)/sc55/pgo -fprofile-prefix-path=$(CURDIR) -fprofile-correction -fprofile-partial-training -Wno-missing-profile -Wno-coverage-mismatch
+endif
 # Nuked OPL3 runs for every game (SB FM), so it must run on any Pentium-class CPU: i586 (no CMOV).
 OPL_CFLAGS := -O3 -march=i586 -mtune=pentium-m -fomit-frame-pointer -DNDEBUG
 SC55_SRC :=

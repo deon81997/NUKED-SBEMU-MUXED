@@ -1068,3 +1068,16 @@ User picked all four: match text-menu colours, brighter 90s look, fuller Carouse
 NEXT (user agreed): optimization pass - (1) SC-55 emulation hot spots, (2) build the SC-55 parts for i686 (CMOV;
 needs a PPro/PII anyway) and measure, then (3) MMX inner loops for the 3D renderer, (4) profile SoundFont, SB
 resampler, USB polling.
+
+## beta.89 (2026-11-10): SC-55 core profile-guided build (RELEASED, tag v1.0.0-beta.89-usb)
+- makefile SC55PGO: gen (-fprofile-generate), use (default when sc55/pgo/*.gcda exist: -fprofile-use=sc55/pgo
+  -fprofile-prefix-path=$(CURDIR) -fprofile-correction -fprofile-partial-training, missing/mismatch warnings off), off.
+- Profiles: instrumented SC55WAV (DJGPP GCC 12, same flags) run in 86Box with GCOV_PREFIX=C:/PGO,
+  GCOV_PREFIX_STRIP=20 -> 8.3 files -> renamed to output#upstream#Nuked-SC55#src#backend#<name>.gcda. Recipe:
+  testrig/sc55bench/pgo.sh. Redo after changing the core (a changed file silently builds without its profile).
+- 86Box PII-450 mk1-v2.00 SC55WAV: 18000 -> 20456 frames/s (+13.6%), OUT.WAV md5 7355ccee606d0d3332ef52ed66663adf both.
+  SBEMU live (STRESS.MID, SBDIAG): SC-55 needs 340% -> 302%; MIDI timing unchanged (max 2.6 ms late).
+- Host bench (testrig/sc55bench): PGO +8-10% on x86-64, same hash.
+- Queue after this (user): Blood sound broken in Windows 98 (reported with beta.85; game files in user upload
+  BLOOD.zip: SB16 A220 I7 D1 H5, 44 kHz 16-bit stereo, FX and music on SB/OPL); MMX 3D renderer; Win98 DOS-box
+  performance, Windows bug sweep, DOS/Windows feature parity.

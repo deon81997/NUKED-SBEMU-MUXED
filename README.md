@@ -76,6 +76,12 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.89.** **The SC-55 needs 11-14% less CPU, same sound bit for bit!!**
+The SC-55 emulation is now built with profile-guided optimization: we ran an instrumented build in DOS to record which
+code paths are hot, and the compiler used that to lay out the code. 86Box, Pentium II 450: SC55WAV renders 13.6% faster
+(18000 -> 20456 audio frames a second, the WAV identical to the last byte), and live in SBEMU the SC-55 load went
+from 340% to 302% of that slow test PC. More headroom on every PC, and slower PCs get closer to real time.
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.88.** **The 3D menus get a 90s glow-up!!** The 3D screens now take
 their colours from the text menu's colour style (Groovy, Sunset, Ocean, Neon, Candy, Midnight): sky, grid floor and
 accents all change, also in MIDPLAY. **F6** in the 3D menu cycles them. Titles and the chosen item glow like neon.
@@ -100,6 +106,11 @@ since beta.83 sends the music while drawing: now it draws as fast as the PC allo
 with the SC-55 busy: 41 frames in 30 s before, 140 now, music still on time. The playlist now shows the file name
 first, then the title.
 
+<details>
+<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
+
+<br>
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.84.** **A hidden bug squashed: 3D games and SBEMU get along!!**
 Thin black lines across MIDPLAY's new 3D view led us to an old bug: SBEMU's sound interrupt and its Sound Blaster,
 joystick, PC speaker and FM handlers used the CPU's floating point unit without saving the game's own values. A game
@@ -108,11 +119,6 @@ polygons, jumpy objects, the odd crash, and only while SBEMU ran. Now SBEMU keep
 it steps in. Tested in 86Box: 6-10 broken lines in every 3D frame before, none now, and MIDI timing unchanged.
 New MIDPLAY screenshots below ([playlist](docs/shots/midplay-playlist.png), [files](docs/shots/midplay-files.png),
 [options](docs/shots/midplay-options.png)).
-
-<details>
-<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
-
-<br>
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.83.** **MIDPLAY, the MIDI player, made over!!** Five pages
 (Player, Playlist, Files, Options, Help) and the music keeps playing and moving to the next song on all of them. The
