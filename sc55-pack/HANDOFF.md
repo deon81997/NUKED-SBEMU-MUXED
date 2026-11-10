@@ -759,4 +759,10 @@
   [Default] Y=F1 3B BB). Real games (user's files, QEMU, MS-DOS 7.1 + HIMEM + HDPMI, screenshots): Keen 4 v1.4
   (102355-byte EXE, not in the ids: found by EGAGRAPH.CK4 in its folder) menus by Start/D-pad/Back; Doom II 1.9
   (DOS/4GW; found by README.TXT -> [DOOM]): Y menu, stick cursor, Start new game/skill, walk, RB fire, B map, LT run.
+- After the release: the user's Supergames CD (shareware): all 13 installed games get their layout (Bio Menace,
+  Doom 1, Duke 1, Gods, Keen Dreams, Keen 1, Keen 4 C/E, Keen 6, Major Stryker, Epic Pinball, Spear of Destiny,
+  Wolf3D 1.4 - mostly by a data file in the folder). Full Wolf3D 1.4 (user's copy; found by GAMEMAPS.WL6) played in
+  86Box (testrig/padkeys/drive86s.py + wolf2.steps, screenshots via automation "screenshot <path>"): Start through
+  the menus, stick walks, RB fires (ammo 8 -> 7), stick sideways strafes (LAlt+Left), Y = Options menu. QEMU shows
+  this Wolf3D build black with or without SBEMU (QEMU's VGA, not ours).
 - Not testable here: the real 360 pad on the D810 / P5PE-VM (NEC), real KBCs (Dell's EC).
