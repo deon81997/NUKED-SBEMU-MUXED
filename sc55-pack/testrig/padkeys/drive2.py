@@ -37,7 +37,7 @@ if os.path.exists('/tmp/mon.sock'): os.remove('/tmp/mon.sock')
 q = subprocess.Popen([QEMU, '-machine', 'pc', '-cpu', 'core2duo', '-m', '64', '-drive', 'file=%s,format=raw,if=ide,index=0' % img,
     '-boot', 'c', '-audiodev', 'none,id=snd', '-device', 'AC97,audiodev=snd', '-display', 'none', '-vga', 'std',
     '-monitor', 'unix:/tmp/mon.sock,server,nowait', '-chardev', 'socket,id=pad,host=127.0.0.1,port=4711',
-    '-device', 'piix3-usb-uhci,id=uhci', '-device', 'usb-redir,chardev=pad,bus=uhci.0'], stdout=open('/tmp/qemu.log', 'w'), stderr=subprocess.STDOUT)
+    '-device', 'piix3-usb-uhci,id=uhci', '-device', 'usb-redir,chardev=pad,bus=uhci.0'] + (['-device', 'usb-kbd,bus=uhci.0'] if os.environ.get('EXTRA_USB') else []), stdout=open('/tmp/qemu.log', 'w'), stderr=subprocess.STDOUT)
 t0 = time.time()
 while time.time() - t0 < 120 and stage() != 'REAL': time.sleep(1)
 print('REAL at %.1f' % (time.time() - t0), flush=True)
@@ -57,5 +57,6 @@ for ln in steps:
     elif a[0] == 'pad': open(ST, 'w').write(' '.join(a[1:]) or 'buttons=0')
     elif a[0] == 'tap':
         open(ST, 'w').write(a[1]); time.sleep(float(a[2]) if len(a) > 2 else 0.3); open(ST, 'w').write('buttons=0'); time.sleep(0.3)
+    elif a[0] == 'mon': print('mon', ' '.join(a[1:]), mon(' '.join(a[1:]))[-60:], flush=True)
     elif a[0] == 'quit': break
 mon('quit'); time.sleep(1); q.kill(); fp.kill()

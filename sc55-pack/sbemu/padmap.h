@@ -48,6 +48,8 @@ int         PADMAP_Describe(int lay, char* out, int size);     /* "A=LCtrl B=Spa
 
 /* layout to use from the next step on (0 = Default); held keys are let go first. Safe from any context. */
 void PADMAP_Select(int lay);
+/* stick dead zone in percent (/JOYDZ): how far a stick bound to keys must go (10 = 13000 of 32767, as SC55W) */
+void PADMAP_SetDeadZone(int pct);
 int  PADMAP_Current(void);
 /* one step: pads (npads, in[0] drives the game port) -> key changes through emit, game port values in out */
 void PADMAP_Step(const PADMAP_In* in, int npads, PADMAP_Out* out, PADMAP_EmitFn emit);

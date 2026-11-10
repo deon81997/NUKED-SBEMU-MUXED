@@ -914,7 +914,12 @@ CONTENTS
        line above (/JOYKEY), as before beta.79. A /JOYKEY of your own
        (not the default) keeps its buttons in every layout.
      Two pads: both type the layout's keys; the joystick of a game's layout
-       follows pad 1. Held keys do not repeat (a real key would).
+       follows pad 1.
+     Since beta.80: a held pad button repeats its key like a real keyboard
+       (after half a second, 30 times a second; the last key pressed). A
+       stick bound to keys presses them further out when Settings > Dead
+       zone (/JOYDZ) is bigger. A key held on a USB keyboard and on the pad
+       at once is let go only when both let go.
 
   Works with: the wired Microsoft Xbox 360 pad and wired pads that use the
   same protocol (Hori, Mad Catz, Logitech ChillStream, Saitek ... the

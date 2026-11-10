@@ -1392,6 +1392,8 @@ int main(int argc, char* argv[])
             MAIN_Step("reading options");
         }
     }
+    if(!padlog_only)     /* SBEMU /PADLOG prints only the answer (it is often redirected to a file) */
+    {
     MAIN_CPrintf(CYAN, "\r\n%s ", PROGNAME);
     MAIN_CPrintf(LIGHTCYAN, "%s ", MAIN_SBEMU_VER);
     MAIN_CPrintf(LIGHTGRAY,"(");
@@ -1400,6 +1402,7 @@ int main(int argc, char* argv[])
     MAIN_CPrintf(WHITE, "Sound Blaster emulation on PCI sound cards for DOS.\r\n");
     MAIN_CPrintf(LIGHTGRAY, "Based on MPXPlay (drivers) and DOSBox (OPL-3 emulation).\r\n");
     printf("\n");
+    }
 
     if((argc == 2 && stricmp(argv[1],"/?") == 0))
     {
@@ -1579,7 +1582,7 @@ int main(int argc, char* argv[])
 
         if (qemm_version < 0x0703) {
             if (qemm_major == 0) {
-                printf("QEMM or QPIEMU not installed, disabling real mode support.\n");
+                if(!padlog_only) printf("QEMM or QPIEMU not installed, disabling real mode support.\n");
             } else {
                 printf("QEMM or QPIEMU version below 7.03: %d.%02d, disabling real mode support.\n", qemm_major, qemm_minor);
             }
@@ -1594,7 +1597,7 @@ int main(int argc, char* argv[])
         MAIN_Options[OPT_PM].value = TRUE; //set to known value for compare
         BOOL hasHDPMI = HDPMIPT_Detect(); //another DPMI host used other than HDPMI
         if(!hasHDPMI)
-            printf("HDPMI not installed, disabling protected mode support.\n");
+            { if(!padlog_only) printf("HDPMI not installed, disabling protected mode support.\n"); }
         MAIN_Options[OPT_PM].value = hasHDPMI;
         MAIN_HDPMI_Present = hasHDPMI;
     }

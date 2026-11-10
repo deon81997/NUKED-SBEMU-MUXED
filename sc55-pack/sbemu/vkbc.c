@@ -170,6 +170,14 @@ static void ms_cmd(uint8_t b)
     }
 }
 
+/* beta.80: a keyboard byte left unread in the controller for 50 ms got no interrupt (seen in 86Box with pad keys
+ * repeating: a byte put in while the BIOS's IRQ 1 handler had the keyboard switched off, AD..AE). Nothing reads it, so
+ * nothing more could go in - every key after it was stuck. It is taken back and put in again (fresh IRQ 1), in front
+ * of the queue: nothing is lost. */
+static uint64_t ObfSince;
+static uint32_t Unstuck;
+uint32_t VKBC_Unstuck(void) { return Unstuck; }
+
 /* one byte into the controller if it is idle; mouse answers first */
 static void inject(void)
 {
@@ -190,6 +198,19 @@ static void inject(void)
         else { MDx = MDy = MDw = 0; MDirty = 0; }                      /* no driver listening: drop it */
     }
     st = (uint8_t)UntrappedIO_IN(0x64);
+    if ((st & 0x21) == 0x01)                                        /* keyboard byte waiting */
+    {
+        if (!ObfSince) ObfSince = t;
+        else if (t - ObfSince > ms2c(50))
+        {
+            uint8_t b = (uint8_t)UntrappedIO_IN(0x60);
+            int n = (Kt + KQN - 1) % KQN;
+            if (n != Kh) { Kt = n; Kq[Kt] = b; }
+            ObfSince = 0; Flight = 0; ++Unstuck;
+            st = (uint8_t)UntrappedIO_IN(0x64);
+        }
+    }
+    else ObfSince = 0;
     if (!in_flight(st, t) && (st & 3) == 0)
     {
         int ha, hk;
@@ -219,11 +240,40 @@ static const uint16_t Mods[8] = { 0x1D, 0x2A, 0x38, 0xE05B, 0xE01D, 0x36, 0xE038
 static uint8_t  KPrev[8][8];
 static int      Rep, RepId;
 static uint64_t RepT;
+/* beta.80: how many sources hold each key (USB keyboards, /JOYKEY, the pad layout): a key the pad and a USB keyboard
+ * both hold is let go only when the last one lets go (the PS/2 keyboard is not seen here: its bytes don't pass SBEMU) */
+static uint8_t  Held[2][128];
+/* pad keys repeat like a real keyboard's: the last one pressed, after 0.5 s, 30 per second (lock keys don't) */
+static uint16_t PadRep;
+static uint64_t PadRepT;
 
-void VKBC_Key(uint16_t code, int down)
+static void put_key(uint16_t code, int down)    /* the bytes only */
 {
     if (code > 0xFF) kpush(0xE0);
     kpush((uint8_t)((code & 0x7F) | (down ? 0 : 0x80)));
+}
+
+void VKBC_Key(uint16_t code, int down)
+{
+    uint8_t* h = &Held[code > 0xFF][code & 0x7F];
+    if (down) { if (*h < 255) ++*h; }
+    else if (*h > 1) { --*h; return; }              /* still held by another source */
+    else *h = 0;
+    put_key(code, down);
+}
+
+/* pad layout keys (padmap.c emit: one key's bytes, or the Pause sequence) */
+void VKBC_PadBytes(const uint8_t* b, int n)
+{
+    uint16_t code;
+    int down;
+    if (n <= 0) return;
+    if (b[0] == 0xE1 || n > 2 || (n == 2 && b[0] != 0xE0)) { VKBC_Bytes(b, n); return; }
+    code = n == 2 ? (uint16_t)(0xE000 | (b[1] & 0x7F)) : (uint16_t)(b[0] & 0x7F);
+    down = !((n == 2 ? b[1] : b[0]) & 0x80);
+    VKBC_Key(code, down);
+    if (down && code != 0x3A && code != 0x45 && code != 0x46) { PadRep = code; PadRepT = tsc() + ms2c(500); }
+    else if (!down && code == PadRep) PadRep = 0;
 }
 
 void VKBC_Bytes(const uint8_t* b, int n)
@@ -232,7 +282,7 @@ void VKBC_Bytes(const uint8_t* b, int n)
     for (i = 0; i < n; ++i) kpush(b[i]);
 }
 
-static void usage_key(int u, int down)
+static void usage_key(int u, int down, int again)   /* again: a repeat of a held key (not counted) */
 {
     if (u == 0x46)                                                      /* Print Screen */
     {
@@ -247,7 +297,7 @@ static void usage_key(int u, int down)
         if (down) for (i = 0; i < 6; ++i) kpush(p[i]);
         return;
     }
-    if (u < 0x66 && Usage[u]) VKBC_Key(Usage[u], down);
+    if (u < 0x66 && Usage[u]) { if (again) put_key(Usage[u], 1); else VKBC_Key(Usage[u], down); }
 }
 
 static int has(const uint8_t* r, int u) { int i; for (i = 2; i < 8; ++i) if (r[i] == u) return 1; return 0; }
@@ -259,11 +309,11 @@ void VKBC_UsbKeys(int id, const uint8_t* r)
     for (i = 0; i < 8; ++i)
         if ((r[0] ^ p[0]) & (1 << i)) VKBC_Key(Mods[i], (r[0] >> i) & 1);
     for (i = 2; i < 8; ++i)
-        if (p[i] > 3 && !has(r, p[i])) { usage_key(p[i], 0); if (Rep == p[i] && RepId == id) Rep = 0; }
+        if (p[i] > 3 && !has(r, p[i])) { usage_key(p[i], 0, 0); if (Rep == p[i] && RepId == id) Rep = 0; }
     for (i = 2; i < 8; ++i)
         if (r[i] > 3 && !has(p, r[i]))
         {
-            usage_key(r[i], 1);
+            usage_key(r[i], 1, 0);
             if (r[i] != 0x48 && r[i] != 0x39 && r[i] != 0x47 && r[i] != 0x53) { Rep = r[i]; RepId = id; RepT = tsc() + ms2c(500); }
         }
     memcpy(p, r, 8);
@@ -292,7 +342,8 @@ void VKBC_SetBios(uint32_t lin) { BiosLin = lin; MsRes = 2; }
 void VKBC_Tick(void)
 {
     uint64_t t = tsc();
-    if (Rep && t >= RepT && Kh == Kt) { usage_key(Rep, 1); RepT = t + ms2c(33); }
+    if (Rep && t >= RepT && Kh == Kt) { usage_key(Rep, 1, 1); RepT = t + ms2c(33); }
+    if (PadRep && t >= PadRepT && Kh == Kt) { put_key(PadRep, 1); PadRepT = t + ms2c(33); }
     USBPAD_SetLeds(VKBC_Leds());
     inject();
 }
@@ -337,7 +388,8 @@ void VKBC_Init(uint64_t cps, int mouse)
     Cps = cps ? cps : 1000000000ULL;
     Kh = Kt = Ah = At = 0;
     memset(KPrev, 0, sizeof(KPrev));
-    Rep = 0;
+    memset(Held, 0, sizeof(Held));
+    Rep = 0; PadRep = 0; ObfSince = 0; Unstuck = 0;
     MsOn = mouse; MsSeen = 0; BiosLin = 0; AuxNext = 0; MsArg = 0; MsWrap = 0; MsId = 0;
     ms_defaults();
     MDx = MDy = MDw = MB = MDirty = 0;

@@ -6,13 +6,15 @@
 
 void VKBC_Init(uint64_t cps, int mouse);    /* mouse: answer PS/2 mouse commands (ports 60h / 64h trapped) */
 void VKBC_Key(uint16_t code, int down);     /* set 1 scan code, E0xxh = extended */
-void VKBC_Bytes(const uint8_t* b, int n);   /* raw set 1 bytes (prefixes included), e.g. from padmap.c */
+void VKBC_Bytes(const uint8_t* b, int n);   /* raw set 1 bytes (prefixes included) */
+void VKBC_PadBytes(const uint8_t* b, int n);/* one pad layout key (padmap.c emit): counted with the other sources, repeats */
 void VKBC_UsbKeys(int id, const uint8_t* report);       /* USB boot keyboard report (USBPAD_KbdFn) */
 void VKBC_UsbMouse(int buttons, int dx, int dy, int dw); /* USB mouse movement (USBPAD_MouseFn) */
 void VKBC_Tick(void);                       /* sound interrupt: puts queued bytes into the controller, key repeat */
 uint32_t VKBC_IOHandler(uint32_t port, uint32_t val, uint32_t out);    /* ports 60h, 64h */
 int  VKBC_Leds(void);                       /* BIOS lock keys as USB LED bits */
 void VKBC_SetBios(uint32_t lin);            /* USB mouse through the BIOS mouse services: lin = INT 15h stub data */
-int  VKBC_MouseSeen(void);                  /* a program has enabled the emulated PS/2 mouse */
+int  VKBC_MouseSeen(void);
+uint32_t VKBC_Unstuck(void);                /* keyboard bytes put in again after 50 ms unread (lost IRQ 1) */                  /* a program has enabled the emulated PS/2 mouse */
 
 #endif

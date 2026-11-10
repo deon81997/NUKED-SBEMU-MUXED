@@ -6,7 +6,7 @@ V, steps = sys.argv[1], open(sys.argv[2]).read().splitlines()
 TR = '/home/claude/NUKED-SBEMU-MUXED/sc55-pack/testrig'
 B86 = '/home/claude/src/86box/build/src/86Box'; ROMS = '/home/claude/src/roms'
 SH = os.environ.get('SHOTS', '/home/claude/padtest/shots86'); os.makedirs(SH, exist_ok=True)
-ST = '/tmp/xpad1.st'; open(ST, 'w').write('buttons=0')
+ST = os.environ.get('XPST', '/tmp/xpad1.st'); open(ST, 'w').write('buttons=0')
 subprocess.run(['pkill', '-f', '86Box.*' + V]); time.sleep(0.5)
 if os.path.exists(V + '/a.sock'): os.remove(V + '/a.sock')
 if subprocess.run(['pgrep', '-f', 'Xvfb :9'], capture_output=True).returncode:
@@ -23,9 +23,9 @@ def req(c):
     f.write((c + '\n').encode()); f.flush(); return json.loads(f.readline().decode())
 def step(sec): req('step %d' % int(sec * 1000))
 def stage():
-    if os.path.exists('/tmp/stage86.txt'): os.remove('/tmp/stage86.txt')
-    subprocess.run(['python3', TR + '/mkdisk.py', 'get', V + '/hd.img', 'STAGE.TXT', '/tmp/stage86.txt'], capture_output=True)
-    try: return open('/tmp/stage86.txt').read().strip()
+    if os.path.exists(os.environ.get('XPST', '/tmp/x') + '.stage'): os.remove(os.environ.get('XPST', '/tmp/x') + '.stage')
+    subprocess.run(['python3', TR + '/mkdisk.py', 'get', V + '/hd.img', 'STAGE.TXT', os.environ.get('XPST', '/tmp/x') + '.stage'], capture_output=True)
+    try: return open(os.environ.get('XPST', '/tmp/x') + '.stage').read().strip()
     except OSError: return ''
 def pad(x): open(ST, 'w').write(x); time.sleep(0.05)
 step(12); req('key down 0x3b'); req('key up 0x3b')
@@ -38,6 +38,7 @@ for ln in steps:
     if not a or a[0].startswith('#'): continue
     if a[0] == 'wait': step(float(a[1]))
     elif a[0] == 'shot': print(req('screenshot %s/%s.png' % (SH, a[1])).get('ok'), a[1], flush=True)
+    elif a[0] == 'key': req('key down %s' % a[1]); step(0.15); req('key up %s' % a[1]); step(0.2)
     elif a[0] == 'pad': pad(' '.join(a[1:]) or 'buttons=0')
     elif a[0] == 'tap': pad(a[1]); step(float(a[2]) if len(a) > 2 else 0.3); pad('buttons=0'); step(0.3)
 s.close(); p.kill()

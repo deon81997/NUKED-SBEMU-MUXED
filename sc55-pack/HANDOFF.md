@@ -766,3 +766,23 @@
   the menus, stick walks, RB fires (ammo 8 -> 7), stick sideways strafes (LAlt+Left), Y = Options menu. QEMU shows
   this Wolf3D build black with or without SBEMU (QEMU's VGA, not ours).
 - Not testable here: the real 360 pad on the D810 / P5PE-VM (NEC), real KBCs (Dell's EC).
+
+## beta.80-usb (2026-11-09): pad key repeat, stick threshold from /JOYDZ, shared keys, lost-IRQ1 recovery
+- Game sweep first (86Box, MS-DOS 7.1 + HIMEM + HDPMI, testrig/padkeys drive86s.py + game.steps; VMs built per game
+  by /home/claude/padtest/gt/mk.sh): the user's Supergames CD - Bio Menace, Doom 1 sw, Duke 1, Gods, Keen Dreams
+  (START.EXE launcher needs key 5; KDREAMS.EXE alone refuses), Keen 1, Keen 4 CGA/EGA, Keen 6 demo, Major Stryker,
+  Epic Pinball, Spear of Destiny, Wolf3D 1.4 sw: all pick their layout and react to the pad, no hangs.
+- vkbc.c: Held[2][128] count per key (USB keyboards, /JOYKEY, pad): a break is sent only when the last holder lets go
+  (PS/2 keyboard not seen). VKBC_PadBytes (pad layout keys): counted + repeat of the last pad key (500 ms, 33 ms;
+  not Caps/Num/Scroll Lock). USB keyboard repeats no longer go through the count (usage_key again=1 -> put_key).
+- BUG found with repeat in 86Box (Award BIOS): after a few repeated bytes nothing more arrived (release and later keys
+  lost; SBEMU alive). A keyboard byte stayed in the KBC unread (OBF set, no IRQ 1 - most likely put in while the
+  BIOS IRQ 1 handler had the keyboard off, AD..AE), so inject() never found the controller idle again. Fix: a keyboard
+  byte unread for 50 ms is read back and queued in front again (fresh IRQ 1); VKBC_Unstuck() counts it. Probably the
+  cause of rare lost/stuck keys with fast USB keyboard typing before, too. After: Space held 45 repeats + release,
+  then Ctrl the same, all later keys arrive (86Box), QEMU unchanged.
+- padmap.c PADMAP_SetDeadZone (from VJOY_Init / VJOY_SetLive): stick-to-key point 13000 + (dz - 10) * 328, clamped
+  3300..31000 (10% = SC55W's 13000; pad.cpp equivalence test still 0 mismatches).
+- SBEMU /PADLOG prints only the answer (no banner, no QEMM/HDPMI notes).
+- Tested: QEMU usb-kbd + fakepad: pad Ctrl down, USB Ctrl down, pad up (no break), marker 39 B9, USB up -> 9D.
+  86Box JEMMEX+QPIEMU scan-code run (Keen/Wolf folder/Default) with repeats.

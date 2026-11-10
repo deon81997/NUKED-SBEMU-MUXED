@@ -71,6 +71,13 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.80.** **Hold the button, the key repeats!!** Pad buttons now
+repeat their key like a real keyboard, so menus and setup screens scroll when you hold the D-pad. Your dead zone setting
+now also decides how far you push a stick before it presses a key, and holding the same key on the pad and a USB keyboard
+no longer lets go too early. Also fixed: keys could get stuck after fast repeating on some BIOSes. Tested with 13 more
+games from a shareware CD (Bio Menace, Duke 1, Gods, Keen 1/4/6, Keen Dreams, Major Stryker, Epic Pinball, Spear of
+Destiny, Wolf3D...) plus Doom II and the full Wolf3D, all played from the pad.
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.79.** **Your pad presses the keys in plain DOS too!!** The
 per-game button layouts from beta.77-w98.2 now work outside Windows: SBEMU sees which game you start and gives your
 USB pad that game's keys, so in Commander Keen A jumps, B fires and X pogos, and in Doom RB fires and Y opens the menu.
@@ -91,15 +98,15 @@ buttons. Your own layouts go in PADUSER.TXT.
 three looks as the 3D menu (Panels, Carousel and Module), with mouse support and pop-ups that stay in 3D. Turn on the 3D
 menu and they all follow; <kbd>F8</kbd> flips everything back to text.
 
-<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.76-w98.1.** **Xbox 360 pads in Windows 98!!** The pack now
-comes with an unofficial Windows 98 driver for the 360 controller (and HORI, Mad Catz, Logitech and Saitek pads), with
-English install steps. Plug your pad in and the NUKED SB-EMU even tells you where the driver is. Then it works in
-Windows games and in DOS games in DOS boxes, left stick and right stick both!
-
 <details>
 <summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
 
 <br>
+
+<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.76-w98.1.** **Xbox 360 pads in Windows 98!!** The pack now
+comes with an unofficial Windows 98 driver for the 360 controller (and HORI, Mad Catz, Logitech and Saitek pads), with
+English install steps. Plug your pad in and the NUKED SB-EMU even tells you where the driver is. Then it works in
+Windows games and in DOS games in DOS boxes, left stick and right stick both!
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.76.** Laptop gamers rejoice!! A **USB mouse now
 works right next to your touchpad** in plain DOS, no JEMM needed. Before, the mouse driver found the touchpad

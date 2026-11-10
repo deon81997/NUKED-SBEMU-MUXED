@@ -519,12 +519,20 @@ static void decode(int lay, RLay* R)
 }
 
 static volatile int S_pend;
+static int      S_thr = 13000;          /* stick -> keys: past this (PADMAP_SetDeadZone) */
 static int      S_cur = -1;
 static RLay     S_r;
 static uint16_t S_taken; static uint8_t S_axtaken, S_used;
 static uint8_t  S_down[NKEYS];
 
 void PADMAP_Select(int lay) { S_pend = lay < 0 ? 0 : lay; }
+
+/* 10% (the default /JOYDZ) = 13000 as SC55W; each percent more or less moves it by about 1% of the travel */
+void PADMAP_SetDeadZone(int pct)
+{
+    int t = 13000 + (pct - 10) * 328;
+    S_thr = t < 3300 ? 3300 : t > 31000 ? 31000 : t;
+}
 int  PADMAP_Current(void) { return S_pend; }
 
 static void key_bytes(int k, int make, PADMAP_EmitFn emit)
@@ -600,7 +608,7 @@ void PADMAP_Step(const PADMAP_In* in, int npads, PADMAP_Out* out, PADMAP_EmitFn 
                     else if (a == A_J2UP && b == A_J2DOWN) st = 3;
                     if (st >= 0) { if (k == 0) { aset[st] = 1; analog[st] = v; } ++i; continue; }
                 }
-                on = neg ? v < -13000 : v > 13000;
+                on = neg ? v < -S_thr : v > S_thr;
             }
             if (!on) continue;
             for (j = 0; j < S_r.n[i]; ++j)

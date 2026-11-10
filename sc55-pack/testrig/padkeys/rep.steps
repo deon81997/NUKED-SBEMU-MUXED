@@ -1,0 +1,11 @@
+wait 5
+pad buttons=1000
+wait 0.15
+mon sendkey ctrl 3000
+wait 0.1
+pad buttons=0
+wait 0.8
+pad buttons=2000
+wait 0.2
+pad buttons=0
+wait 21

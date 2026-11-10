@@ -360,7 +360,7 @@ void VJOY_Tick(void)
     p1 = USBPAD_GetPad(0); p2 = USBPAD_GetPad(1);
     if (PadOn != PadPrev)
     {
-        if (!PadOn) { PADMAP_Release(VKBC_Bytes); memset(&PadOut, 0, sizeof PadOut); }
+        if (!PadOn) { PADMAP_Release(VKBC_PadBytes); memset(&PadOut, 0, sizeof PadOut); }
         PadPrev = PadOn;
     }
     if (PadOn)
@@ -368,7 +368,7 @@ void VJOY_Tick(void)
         PADMAP_In in[2];
         to_in(p1, &in[0]); to_in(p2, &in[1]);
         in[0].buttons &= (uint16_t)~KmMask; in[1].buttons &= (uint16_t)~KmMask;
-        PADMAP_Step(in, 2, &PadOut, VKBC_Bytes);
+        PADMAP_Step(in, 2, &PadOut, VKBC_PadBytes);
     }
     for (i = 0; i < Kn && (!PadOn || PadOver); ++i)
     {
@@ -414,6 +414,7 @@ void VJOY_PadKeys(int on, int over)
 void VJOY_SetLive(int dzp, int mode)
 {
     Dz = dzp < 0 ? 0 : dzp > 90 ? 90 : dzp;
+    PADMAP_SetDeadZone(Dz);
     Mode = mode >= 1 && mode <= 4 ? mode : 0;
     GripN = 0; GripF[0] = GripF[1] = 0;
 }
@@ -426,6 +427,7 @@ int VJOY_Init(uint64_t cps, const char* axes, const char* btns, const char* keys
     *bad = NULL;
     Cps = cps ? cps : 1000000000ULL;
     Dz = dzp < 0 ? 0 : dzp > 90 ? 90 : dzp;
+    PADMAP_SetDeadZone(Dz);
     Mode = mode >= 1 && mode <= 4 ? mode : 0;
     GripN = 0; GripF[0] = GripF[1] = 0;
     s = axes;
