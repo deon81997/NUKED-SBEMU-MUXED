@@ -71,6 +71,14 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.82.** **Virtual CDs work like a real disc!!** Games no longer
+stop with a CD read error: on a PC with its own CD-ROM driver loaded (like a Windows 98 boot), games asked DOS for "the
+first CD drive" and got your empty real drive instead of the mounted image. Now drive M: is the first CD drive and your
+real drive keeps D:. The virtual drive also plays CD music by itself like a real one (play, pause, resume, track time,
+"busy until the track ends"), so games that start or wait for their music don't fail or hang, with or without SBEMU, and
+CUE sheets with PREGAP lines play the right spot. New driver built from source: uCDD 0.9.5-a3 plus our CD-audio part,
+and SHSUCDX with a new /P option. No CPU used while nothing reads the disc.
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.81-w98.4.** **Lighter on your CPU!!** NUKED SB-EMU for Windows 98
 now really rests when nothing plays: the sound output pauses while it's silent (and wakes up within a blink when a game or
 a MIDI file starts), Windows' timer is no longer kept at 1000 ticks a second, the joystick check slows down when no game
@@ -101,15 +109,15 @@ USB pad that game's keys, so in Commander Keen A jumps, B fires and X pogos, and
 It finds the game by its EXE or by the files in its folder, and goes back to the normal layout when you quit. Same free
 download, same PADUSER.TXT for your own layouts. `SBEMU /PADLOG` shows which layout it picked.
 
-<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.78.** **The USB mouse behaves!!** On some PCs (very likely the
-D810 too) a USB mouse in plain DOS jumped around and clicked by itself, and on others it didn't move at all. Those BIOSes
-read a whole mouse packet at once, and SBEMU was sending it one byte at a time. Now every packet goes to the mouse
-driver in one piece, right next to your touchpad's. The JEMM launchers got the same fix.
-
 <details>
 <summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
 
 <br>
+
+<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.78.** **The USB mouse behaves!!** On some PCs (very likely the
+D810 too) a USB mouse in plain DOS jumped around and clicked by itself, and on others it didn't move at all. Those BIOSes
+read a whole mouse packet at once, and SBEMU was sending it one byte at a time. Now every packet goes to the mouse
+driver in one piece, right next to your touchpad's. The JEMM launchers got the same fix.
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.77-w98.2.** **Your pad presses the keys!!** In Windows 98
 DOS boxes the game pad's buttons now type the right keys for the game you're playing: jump, fire, pogo, menu. Download

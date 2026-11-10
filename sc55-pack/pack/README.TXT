@@ -693,6 +693,26 @@ CONTENTS
   names in C:\CDIMAGES. The virtual drive is always drive M: (never A: or
   B:, those are the floppies).
 
+  SINCE BETA.82 THE VIRTUAL DRIVE WORKS LIKE A DISC IN A REAL DRIVE:
+    * M: is the FIRST CD drive. Games ask DOS for "the first CD drive"; on
+      a PC whose real CD-ROM driver is loaded (a Windows 98 boot, BOOTCFG)
+      that used to be the empty real drive D:, and the game stopped with a
+      read error. Your real drive keeps its letter (D:) and still works.
+    * The drive plays CD music by itself, like a real drive: PLAY, pause,
+      resume, the time and track display and "busy until the track ends"
+      all work, with or without SBEMU. With HYBRID.BAT (section 10) you
+      hear it; without it the music is silent, but games no longer get a
+      "general failure" when they start their music, and games that wait
+      for a track to end do not hang.
+    * Changing discs: CDIMG and the CD images screen take the old disc out
+      first, and games are told that the disc was changed.
+    * It uses no CPU while nothing reads the disc.
+  The driver is uCDD 0.9.5-a3 (source: third_party/ucdd in the project, our
+  additions in src/sbemulink.asm) and SHSUCDX 3.09 with one added option,
+  /P:M (M: first). Games that look for a CD drive by trying the letters
+  A: to Z: one after another still find the real drive D: first: for such
+  a game, unload the real drive's driver (restart without BOOTCFG).
+
   C:\CDSET\GUI.BAT  (or C:\MOUNT.BAT, or MENU > CD-ROM > CD images)
       The CD images screen, in the menu's style. The list shows every
       .CUE, .ISO, .MDM and loose .BIN with its size and disc label, and
@@ -776,8 +796,8 @@ CONTENTS
          C:\CDSET\CDPLAY.COM M: 2      track 2 = both speakers
          (track 3 = left only, 4 = right only; track 1 is a data track)
 
-  Limits: audio plays only from .CUE images with one BIN file and no PREGAP
-  lines; mount with CDIMG or GUI (they pass a full path). While DOS itself
+  Limits: audio plays only from .CUE images with one BIN file (PREGAP lines
+  are fine since beta.82); mount with CDIMG or GUI (they pass a full path). While DOS itself
   is busy the track keeps playing from a 1.5-second buffer. If the PC hangs
   when a track starts, remove /VCDA from HYBRID.BAT.
   Since beta.58 the BIN file is read outside the sound card's interrupt

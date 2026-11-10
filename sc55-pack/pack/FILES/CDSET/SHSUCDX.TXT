@@ -347,3 +347,17 @@
 
     ==============================
     Jason Hood, 2 September, 2022.
+
+    ==================================
+    NUKED SB-EMU: ALTERED VERSION, /P
+    ==================================
+
+    The SHSUCDX.COM in this pack is an altered version of SHSUCDX 3.09 (source:
+    third_party/shsucdx in the NUKED SB-EMU project; original by Jason Hood,
+    https://github.com/adoxa/shsucd). It adds one option:
+
+    /P:x - drive x: is reported as the FIRST CD-ROM drive (INT 2Fh AX=1500h
+    returns it in CX, and it comes first in the lists of AX=1501h and
+    AX=150Dh), whatever letters the drives have. CDON.BAT uses /P:M so that
+    games that take "the first CD drive" find the virtual drive M: and not an
+    empty real drive.

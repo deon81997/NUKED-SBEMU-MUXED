@@ -8,9 +8,9 @@ PAUSE
 C:\CDSET\UCDD.EXE -install
 IF ERRORLEVEL 1 ECHO ** step 1 reported an error
 ECHO.
-ECHO STEP 2 of 5: give it a drive letter   (SHSUCDX.COM /R- /D:UCDD0001,M)
+ECHO STEP 2 of 5: give it a drive letter   (SHSUCDX.COM /R- /D:UCDD0001,M /P:M)
 PAUSE
-C:\CDSET\SHSUCDX.COM /R- /D:UCDD0001,M
+C:\CDSET\SHSUCDX.COM /R- /D:UCDD0001,M /P:M
 IF ERRORLEVEL 246 ECHO ** step 2 reported an error
 ECHO.
 ECHO STEP 3 of 5: mount the test disc   (UCDD.EXE -mount C:\CDIMAGES\TEST.CUE)

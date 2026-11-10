@@ -1,0 +1,1260 @@
+; SPDX-FileCopyrightText: 2026 vorvek
+; SPDX-License-Identifier: GPL-3.0-only
+
+%include "audio/sb_state.inc"
+
+sb_mono_left dd 0
+
+; FS:SI addresses the DMA source. A high source maps SI to its page copy.
+%macro sb_source 0
+%ifdef OWN_HOST
+    cmp dword [game_physical], 0
+    je %%low
+    call sb_high_map
+%%low:
+%endif
+%endmacro
+
+; Game samples decode at half level. The gain doubles them while no CD audio
+; plays. It rises in steps of 1/16 per period and falls in four periods with the CD.
+mix_gain_update:
+    pushad
+    mov eax, 65536
+%ifdef CD_IMAGE_TEST
+    ; The CD play state decides, not the data of this period.
+    cmp byte [cd_started], 1
+    jne .target
+%ifdef MOUNTED_AUDIO
+    ; A silent CD does not need the headroom.
+    mov ecx, [cd_gain]
+    or ecx, [cd_gain+4]
+    jz .target
+%endif
+    mov eax, 32768
+.target:
+%endif
+    sub eax, [game_boost]
+    cmp eax, 2048
+    jle .high
+    mov eax, 2048
+.high:
+    ; The fall takes four periods.
+    cmp eax, -8192
+    jge .low
+    mov eax, -8192
+.low:
+    add [game_boost], eax
+    mov ebx, [game_boost]
+    mov eax, [sb_pcm_gain]
+    mul ebx
+    shr eax, 15
+    mov [mix_gain], eax
+    mov eax, [sb_pcm_gain+4]
+    mul ebx
+    shr eax, 15
+    mov [mix_gain+4], eax
+    popad
+    ret
+
+; ES:DI is one output half. Sources use the current virtual playback state.
+mix_half:
+%ifdef SPEAKER_TEST
+    mov byte [test_channel], 0
+    mov ax, [test_half]
+    inc word [test_half]
+    cmp ax, 12
+    jb .test_left
+    cmp ax, 16
+    jb .test_ready
+    cmp ax, 28
+    jae .test_ready
+    mov byte [test_channel], 2
+    jmp .test_ready
+.test_left:
+    mov byte [test_channel], 1
+.test_ready:
+%endif
+%ifdef CD_IMAGE_TEST
+    push gs
+%ifdef RESIDENT_AUDIO
+    cmp byte [sb_patch_active], 0
+    jne .cd_ready
+%endif
+    call cd_begin_half
+%ifdef RESIDENT_AUDIO
+    call cd_filter
+.cd_ready:
+%endif
+%endif
+%ifdef RESIDENT_AUDIO
+    ; A remix repeats a period that has its gain.
+    cmp byte [sb_patch_active], 0
+    jne .gain_ready
+%endif
+    call mix_gain_update
+.gain_ready:
+    mov eax, [mix_period]
+    shl eax, OUTPUT_SHIFT
+%ifdef RESIDENT_AUDIO
+    cmp byte [sb_patch_active], 0
+    jne .patch_half
+    call sb_record_clear
+    jmp .normal_half
+.patch_half:
+    mov eax, [sb_patch_clock]
+.normal_half:
+%endif
+    cmp byte [game_active], 0
+    je .phase
+    cmp byte [game_start_pending], 1
+    jne .phase
+    mov [game_started], eax
+    mov byte [game_start_pending], 2
+.phase:
+    mov [sb_dac_frame], eax
+    sub eax, [game_started]
+    mov [game_mix_frame], eax
+    mul dword [game_step]
+    add eax, [game_origin]
+    adc edx, 0
+    cmp dword [game_limit], 0
+    je .full_ring
+    div dword [game_limit]
+    mov eax, edx
+.full_ring:
+    mov ebp, eax
+    mov cx, PERIOD_FRAMES
+%ifdef RESIDENT_AUDIO
+    cmp byte [sb_patch_active], 0
+    je .length_ready
+    mov ecx, [sb_patch_limit]
+    sub ecx, [sb_patch_clock]
+    mov dword [pro_pair_left], 0
+    mov dword [pro_pair_right], 0
+.length_ready:
+%endif
+    mov bx, [cd_position]
+    mov fs, [game_segment]
+    mov ax, [game_offset]
+    mov [sb_tail_read_offset], ax
+%ifdef OWN_HOST
+    mov dword [sb_high_tag], -1
+%endif
+    cmp byte [sb_tail_valid], 0
+    je .fast_dispatch
+    mov fs, [sb_tail_segment]
+    mov ax, [sb_tail_offset]
+    sub ax, [sb_tail_start_bytes]
+    mov [sb_tail_read_offset], ax
+    jmp .frame
+%ifdef RESIDENT_AUDIO
+.fast_dispatch:
+    cmp byte [sb_dac_enabled], 0
+    jne .frame
+%ifdef OWN_HOST
+    cmp dword [game_physical], 0
+    jne .frame
+%endif
+    cmp byte [sound_card], 0
+    jne .frame
+    cmp byte [sb_patch_active], 0
+    jne .frame
+    cmp dword [cd_step], 65536
+    jne .frame
+    cmp dword [cd_step_remainder], 0
+    jne .frame
+    cmp dword [cd_fraction], 0
+    jne .frame
+    cmp byte [sb_filter_legacy], 0
+    jne .frame
+    cmp byte [game_active], 0
+    jne .fast_active
+    cmp byte [cd_valid], 0
+    jne .cd_only
+    movzx eax, cx
+    add [game_mix_frame], eax
+    shl cx, 1
+    xor ax, ax
+    rep stosw
+    jmp .half_complete
+.cd_only:
+    cmp dword [cd_gain], 256
+    ja .fast_frame
+    cmp dword [cd_gain+4], 256
+    ja .fast_frame
+    movzx eax, cx
+    add [game_mix_frame], eax
+.cd_only_frame:
+    movsx eax, word [gs:bx]
+    imul eax, [cd_gain]
+    sar eax, 9
+    stosw
+    movsx eax, word [gs:bx+2]
+    imul eax, [cd_gain+4]
+    sar eax, 9
+    stosw
+    add bx, 4
+    dec cx
+    jnz .cd_only_frame
+    jmp .half_complete
+.fast_active:
+    call sb_record_lost
+    cmp byte [game_source], 0
+    jne .frame
+    cmp byte [sb_single], 0
+    jne .frame
+    cmp byte [sb_tail_valid], 0
+    jne .frame
+    cmp byte [sb_input], 0
+    jne .frame
+    cmp byte [sb_speaker], 1
+    jne .frame
+    cmp byte [sb_filter_legacy], 0
+    jne .frame
+    cmp byte [game_frame_shift], 2
+    jne .frame
+    cmp byte [game_format], 0
+    jne .frame
+    cmp dword [game_step], 65536
+    jne .frame
+    cmp dword [game_exit_frame], 0
+    jne .frame
+    mov si, [game_dma]
+    cmp byte [si+DMA_MASK], 0
+    jne .frame
+    cmp dword [game_limit], 0
+    je .frame
+    ; The decoded game samples are half level: gain 32768 with CD, 65536 without.
+    mov eax, 32768
+    cmp byte [cd_valid], 0
+    jne .unity_gain
+    add eax, eax
+.unity_gain:
+    cmp [mix_gain], eax
+    jne .fast_frame
+    cmp [mix_gain+4], eax
+    jne .fast_frame
+    cmp dword [cd_gain], 256
+    ja .fast_frame
+    cmp dword [cd_gain+4], 256
+    ja .fast_frame
+    cmp byte [cd_valid], 0
+    jne .unity_frame
+    push bx
+    movzx edx, cx
+    add [game_mix_frame], edx
+.unity_chunk:
+    mov eax, ebp
+    shr eax, 16
+    shl ax, 2
+    mov si, ax
+    add si, [game_offset]
+    mov eax, [game_limit]
+    sub eax, ebp
+    add eax, 65535
+    shr eax, 16
+    cmp eax, edx
+    jbe .unity_amount
+    mov eax, edx
+.unity_amount:
+    sub edx, eax
+    mov cx, ax
+    shl eax, 16
+    add ebp, eax
+    cmp ebp, [game_limit]
+    jb .unity_copy
+    sub ebp, [game_limit]
+.unity_copy:
+    mov eax, [fs:si]
+    mov [es:di], eax
+    add si, 4
+    add di, 4
+    dec cx
+    jnz .unity_copy
+    test edx, edx
+    jnz .unity_chunk
+    pop bx
+    jmp .half_complete
+.unity_frame:
+    movzx eax, cx
+    add [game_mix_frame], eax
+.cd_chunk:
+    mov eax, ebp
+    shr eax, 16
+    shl ax, 2
+    mov si, ax
+    add si, [game_offset]
+    mov eax, [game_limit]
+    sub eax, ebp
+    add eax, 65535
+    shr eax, 16
+    cmp ax, cx
+    jbe .cd_amount
+    movzx eax, cx
+.cd_amount:
+    sub cx, ax
+    push cx
+    mov cx, ax
+    shl eax, 16
+    add ebp, eax
+    cmp ebp, [game_limit]
+    jb .cd_copy
+    sub ebp, [game_limit]
+.cd_copy:
+    cmp dword [cd_gain], 256
+    jne .cd_gain_copy
+    cmp dword [cd_gain+4], 256
+    jne .cd_gain_copy
+.cd_full_copy:
+    mov eax, [fs:si]
+    mov edx, [gs:bx]
+    shr eax, 1
+    shr edx, 1
+    and eax, 7fff7fffh
+    and edx, 7fff7fffh
+    xor eax, 40004000h
+    xor edx, 40004000h
+    add eax, edx
+    xor eax, 80008000h
+    mov [es:di], eax
+    add si, 4
+    add bx, 4
+    add di, 4
+    dec cx
+    jnz .cd_full_copy
+    jmp .cd_chunk_done
+.cd_gain_copy:
+    movsx edx, word [fs:si]
+    sar edx, 1
+    movsx eax, word [gs:bx]
+    imul eax, [cd_gain]
+    sar eax, 9
+    add eax, edx
+    stosw
+    movsx edx, word [fs:si+2]
+    sar edx, 1
+    movsx eax, word [gs:bx+2]
+    imul eax, [cd_gain+4]
+    sar eax, 9
+    add eax, edx
+    stosw
+    add si, 4
+    add bx, 4
+    dec cx
+    jnz .cd_gain_copy
+.cd_chunk_done:
+    pop cx
+    test cx, cx
+    jnz .cd_chunk
+    jmp .half_complete
+.fast_frame:
+    xor edx, edx
+    xor esi, esi
+    cmp byte [game_active], 0
+    je .fast_pcm_ready
+    mov eax, ebp
+    shr eax, 16
+    shl ax, 2
+    add ax, [game_offset]
+    mov si, ax
+    movsx edx, word [fs:si]
+    movsx esi, word [fs:si+2]
+    sar edx, 1
+    sar esi, 1
+    imul edx, [mix_gain]
+    imul esi, [mix_gain+4]
+    sar edx, 15
+    sar esi, 15
+.fast_pcm_ready:
+    xor eax, eax
+    cmp byte [cd_valid], 0
+    je .fast_left
+    movsx eax, word [gs:bx]
+    imul eax, [cd_gain]
+    sar eax, 9
+.fast_left:
+    add eax, edx
+    call .clip
+    stosw
+    xor eax, eax
+    cmp byte [cd_valid], 0
+    je .fast_right
+    movsx eax, word [gs:bx+2]
+    imul eax, [cd_gain+4]
+    sar eax, 9
+    add bx, 4
+.fast_right:
+    add eax, esi
+    call .clip
+    stosw
+    cmp byte [game_active], 0
+    je .fast_phase
+    add ebp, 65536
+    cmp ebp, [game_limit]
+    jb .fast_phase
+    sub ebp, [game_limit]
+.fast_phase:
+    inc dword [game_mix_frame]
+    dec cx
+    jnz .fast_frame
+    jmp .half_complete
+%else
+.fast_dispatch:
+%endif
+.frame:
+    xor edx, edx
+    xor esi, esi
+    cmp byte [sb_dac_enabled], 0
+    je .dma_frame
+    call sb_dac_sample
+    jmp .sum
+.dma_frame:
+    cmp byte [game_active], 0
+    je .sum
+%ifdef WSS_INPUT
+    cmp byte [game_source], 1
+    jne .playing
+    cmp byte [wss_paused], 0
+    jne .sum
+.playing:
+%endif
+    cmp dword [game_exit_frame], 0
+    je .source
+    mov eax, [game_mix_frame]
+    cmp eax, [game_exit_frame]
+    jae .sum
+.source:
+    cmp byte [sb_input], 0
+    jne .audible
+    cmp byte [game_source], 0
+    jne .audible
+    cmp byte [sb_speaker], 0
+    je .advance
+.audible:
+    mov si, [game_dma]
+    cmp byte [si+DMA_MASK], 0
+    mov si, 0
+    jne .sum
+    mov eax, ebp
+    shr eax, 16
+    cmp byte [sb_input], 0
+    je .output_sample
+    mov si, ax
+    add si, [game_offset]
+    ; The virtual input supplies unsigned PCM silence.
+    mov byte [fs:si], 128
+    xor esi, esi
+    jmp .advance
+.output_sample:
+    call sb_dma_sample
+    call sb_pcm_interpolate
+    jmp .advance
+.advance:
+%ifdef WSS_INPUT
+    cmp byte [game_source], 1
+    jne .phase_step
+    imul edx, [wss_gain]
+    sar edx, 16
+    imul edx, [game_boost]
+    sar edx, 15
+    imul esi, [wss_gain+4]
+    sar esi, 16
+    imul esi, [game_boost]
+    sar esi, 15
+.phase_step:
+%endif
+    add ebp, [game_step]
+    cmp dword [game_limit], 0
+    je .sum
+.wrap:
+    cmp ebp, [game_limit]
+    jb .sum
+    sub ebp, [game_limit]
+    cmp byte [sb_tail_valid], 0
+    je .wrap
+    mov byte [sb_tail_valid], 0
+    mov fs, [game_segment]
+    mov ax, [game_offset]
+    mov [sb_tail_read_offset], ax
+    jmp .wrap
+.sum:
+    cmp byte [game_source], 0
+    jne .filtered
+    cmp byte [sb_filter_legacy], 0
+    je .pcm_gain
+    cmp byte [sb_filter_bypass], 0
+    jne .pcm_gain
+    call sb_filter
+.pcm_gain:
+    imul edx, [mix_gain]
+    sar edx, 15
+    imul esi, [mix_gain+4]
+    sar esi, 15
+.filtered:
+%ifdef CD_IMAGE_TEST
+    xor eax, eax
+%ifdef RESIDENT_AUDIO
+    cmp byte [sb_patch_active], 0
+    jne .left
+%endif
+    cmp byte [cd_valid], 0
+    je .left
+    movsx eax, word [gs:bx]
+%ifdef RESIDENT_AUDIO
+    call cd_interpolate
+%endif
+.left:
+%ifdef MOUNTED_AUDIO
+    imul eax, [cd_gain]
+    sar eax, 8
+%endif
+%else
+    movsx eax, word [cd_samples+bx]
+%endif
+%ifdef SPEAKER_TEST
+    cmp byte [test_channel], 1
+    je .left_ready
+    xor eax, eax
+.left_ready:
+%endif
+    sar eax, 1
+    add eax, edx
+    call .clip
+%ifdef RESIDENT_AUDIO
+    cmp byte [sound_card], 3
+    jne .pro_left
+    mov [sb_mono_left], eax
+    jmp .left_stored
+.pro_left:
+    cmp byte [sound_card], 1
+    jne .left_word
+    test cl, 1
+    jnz .left_pair
+    mov [pro_pair_left], eax
+    jmp .left_stored
+.left_pair:
+    add eax, [pro_pair_left]
+    add eax, 256
+    sar eax, 9
+    cmp eax, 127
+    jle .round_left
+    mov eax, 127
+.round_left:
+    cmp byte [sb_patch_active], 0
+    je .encode_left
+    movzx edx, byte [es:di]
+    sub edx, 128
+    add eax, edx
+    call .clip_byte
+.encode_left:
+    xor al, 80h
+    stosb
+    jmp .left_stored
+.left_word:
+    cmp byte [ess_half], 0
+    je .left_full
+    test cl, 1
+    jnz .left_half
+    mov [pro_pair_left], eax
+    jmp .left_stored
+.left_half:
+    add eax, [pro_pair_left]
+    sar eax, 1
+.left_full:
+    push edx
+    cmp byte [sb_patch_active], 0
+    je .left_record
+    call sb_record_word
+    movsx edx, word [es:di]
+    add eax, edx
+    call .clip
+    jmp .left_save
+.left_record:
+    cmp byte [game_active], 0
+    je .left_save
+    push eax
+    mov eax, edx
+    call .clip
+    call sb_record_word
+    pop eax
+.left_save:
+    pop edx
+%endif
+    stosw
+%ifdef RESIDENT_AUDIO
+.left_stored:
+%endif
+%ifdef CD_IMAGE_TEST
+    xor eax, eax
+%ifdef RESIDENT_AUDIO
+    cmp byte [sb_patch_active], 0
+    jne .right
+%endif
+    cmp byte [cd_valid], 0
+    je .right
+    movsx eax, word [gs:bx+2]
+%ifdef RESIDENT_AUDIO
+    add bx, 2
+    call cd_interpolate
+    sub bx, 2
+%endif
+.right:
+%ifdef MOUNTED_AUDIO
+    imul eax, [cd_gain+4]
+    sar eax, 8
+%endif
+%else
+    movsx eax, word [cd_samples+bx+2]
+%endif
+%ifdef SPEAKER_TEST
+    cmp byte [test_channel], 2
+    je .right_ready
+    xor eax, eax
+.right_ready:
+%endif
+    sar eax, 1
+    add eax, esi
+    call .clip
+%ifdef RESIDENT_AUDIO
+    cmp byte [sound_card], 3
+    jne .pro_right
+    add eax, [sb_mono_left]
+    test cl, 1
+    jnz .mono_pair
+    mov [pro_pair_left], eax
+    jmp .right_stored
+.mono_pair:
+    add eax, [pro_pair_left]
+    add eax, 512
+    sar eax, 10
+    cmp eax, 127
+    jle .mono_round
+    mov eax, 127
+.mono_round:
+    cmp byte [sb_patch_active], 0
+    je .mono_encode
+    movzx edx, byte [es:di]
+    sub edx, 128
+    add eax, edx
+    call .clip_byte
+.mono_encode:
+    xor al, 80h
+    stosb
+    jmp .right_stored
+.pro_right:
+    cmp byte [sound_card], 1
+    jne .right_word
+    test cl, 1
+    jnz .right_pair
+    mov [pro_pair_right], eax
+    jmp .right_stored
+.right_pair:
+    add eax, [pro_pair_right]
+    add eax, 256
+    sar eax, 9
+    cmp eax, 127
+    jle .round_right
+    mov eax, 127
+.round_right:
+    cmp byte [sb_patch_active], 0
+    je .encode_right
+    movzx edx, byte [es:di]
+    sub edx, 128
+    add eax, edx
+    call .clip_byte
+.encode_right:
+    xor al, 80h
+    stosb
+    jmp .right_stored
+.right_word:
+    cmp byte [ess_half], 0
+    je .right_full
+    test cl, 1
+    jnz .right_half
+    mov [pro_pair_right], eax
+    jmp .right_stored
+.right_half:
+    add eax, [pro_pair_right]
+    sar eax, 1
+.right_full:
+    cmp byte [sb_patch_active], 0
+    je .right_record
+    call sb_record_word
+    movsx edx, word [es:di]
+    add eax, edx
+    call .clip
+    jmp .right_save
+.right_record:
+    cmp byte [game_active], 0
+    je .right_save
+    push eax
+    mov eax, esi
+    call .clip
+    call sb_record_word
+    pop eax
+.right_save:
+%endif
+    stosw
+%ifdef RESIDENT_AUDIO
+.right_stored:
+%endif
+    inc dword [game_mix_frame]
+%ifdef RESIDENT_AUDIO
+    cmp byte [sb_patch_active], 0
+    jne .cd_advanced
+    cmp byte [cd_valid], 0
+    je .cd_advanced
+    mov eax, [cd_fraction]
+    add eax, [cd_step]
+    mov edx, [cd_step_error]
+    add edx, [cd_step_remainder]
+    cmp edx, [output_rate]
+    jb .cd_phase
+    sub edx, [output_rate]
+    inc eax
+.cd_phase:
+    mov [cd_step_error], edx
+    mov edx, eax
+    and edx, 65535
+    mov [cd_fraction], edx
+    shr eax, 16
+    shl ax, 2
+    add bx, ax
+.cd_advanced:
+%else
+    add bx, 4
+%endif
+%ifndef MOUNTED_AUDIO
+    and bx, 16383
+%endif
+    dec cx
+    jnz .frame
+.half_complete:
+    mov [cd_position], bx
+    mov [game_phase], ebp
+    call sb_tail_prepare
+    cmp byte [game_source], 0
+    jne .pending_ready
+    cmp byte [sb_single], 0
+    jne .pending_ready
+    cmp byte [game_start_pending], 2
+    jne .pending_ready
+    mov byte [game_start_pending], 0
+.pending_ready:
+%ifdef CD_IMAGE_TEST
+%ifdef RESIDENT_AUDIO
+    cmp byte [sb_patch_active], 0
+    jne .done_half
+%endif
+    cmp byte [cd_valid], 0
+    je .done_half
+%ifdef RESIDENT_AUDIO
+    mov eax, [cd_take_bytes]
+    add [cd_consumed], eax
+%else
+    add dword [cd_consumed], PERIOD_BYTES
+%endif
+.done_half:
+    pop gs
+%endif
+    ret
+%ifdef RESIDENT_AUDIO
+.clip_byte:
+    cmp eax, 127
+    jle .byte_low
+    mov eax, 127
+.byte_low:
+    cmp eax, -128
+    jge .byte_done
+    mov eax, -128
+.byte_done:
+    ret
+%endif
+.clip:
+    cmp eax, 32767
+    jle .low
+    mov eax, 32767
+.low:
+    cmp eax, -32768
+    jge .done
+    mov eax, -32768
+.done:
+    ret
+
+
+sb_dma_sample:
+    cmp byte [game_frame_shift], 0
+    jne .stereo
+    cmp byte [game_adpcm], 0
+    jne sb_adpcm_sample
+    mov si, ax
+    add si, [sb_tail_read_offset]
+    sb_source
+    movzx edx, byte [fs:si]
+    sub edx, 128
+    shl edx, 7
+    mov esi, edx
+    ret
+.stereo:
+    cmp byte [game_frame_shift], 1
+    je .stereo8
+    shl eax, 2
+    cmp byte [game_source], 0
+    jne .stereo16_normal
+    cmp byte [sb_single], 0
+    je .stereo16_normal
+    mov edx, [dma16+DMA_POSITION]
+    shl edx, 1
+    add edx, eax
+    movzx esi, word [dma16+DMA_COUNT]
+    inc esi
+    shl esi, 1
+    cmp edx, esi
+    jb .single16_address
+    sub edx, esi
+.single16_address:
+    add dx, [game_offset]
+    push eax
+    push dx
+    mov si, dx
+    sb_source
+    movsx edx, word [fs:si]
+    pop si
+    sar edx, 1
+    pop eax
+    add eax, 2
+    cmp eax, [game_block_bytes]
+    jae .single_left
+    push edx
+    movzx edx, word [dma16+DMA_COUNT]
+    inc edx
+    shl edx, 1
+    movzx eax, si
+    sub ax, [game_offset]
+    add eax, 2
+    cmp eax, edx
+    jb .single16_right
+    sub eax, edx
+.single16_right:
+    add ax, [game_offset]
+    mov si, ax
+    sb_source
+    movsx esi, word [fs:si]
+    pop edx
+    sar esi, 1
+    ret
+.single_left:
+    xor esi, esi
+    ret
+.stereo16_normal:
+    add ax, [sb_tail_read_offset]
+    mov si, ax
+    sb_source
+    movsx edx, word [fs:si]
+    movsx esi, word [fs:si+2]
+    test byte [game_format], 2
+    jnz .unsigned_pair
+.pair_scale:
+    sar edx, 1
+    sar esi, 1
+    ret
+.unsigned_pair:
+    xor dh, 80h
+    movsx edx, dx
+    xor si, 8000h
+    movsx esi, si
+    jmp .pair_scale
+.sb_mono16:
+    shl eax, 1
+    add ax, [sb_tail_read_offset]
+    mov si, ax
+    sb_source
+    movsx edx, word [fs:si]
+    test byte [game_format], 2
+    jz .mono16_scale
+    xor dh, 80h
+    movsx edx, dx
+.mono16_scale:
+    sar edx, 1
+    mov esi, edx
+    ret
+.stereo8:
+    test byte [game_format], 1
+    jnz .sb_mono16
+%ifdef WSS_INPUT
+    cmp byte [game_source], 1
+    jne .bytes
+    test byte [wss_registers+8], 40h
+    jnz .mono16
+.bytes:
+%endif
+    shl eax, 1
+    cmp byte [game_source], 0
+    jne .stereo8_normal
+    cmp byte [sb_single], 0
+    je .stereo8_normal
+    mov edx, [dma8+DMA_POSITION]
+    add edx, eax
+    movzx esi, word [dma8+DMA_COUNT]
+    inc esi
+    cmp edx, esi
+    jb .single8_address
+    sub edx, esi
+.single8_address:
+    add dx, [game_offset]
+    push eax
+    push dx
+    mov si, dx
+    sb_source
+    movzx edx, byte [fs:si]
+    pop si
+    sub edx, 128
+    shl edx, 7
+    pop eax
+    inc eax
+    cmp eax, [game_block_bytes]
+    jae .single_left
+    push edx
+    movzx edx, word [dma8+DMA_COUNT]
+    inc edx
+    movzx eax, si
+    sub ax, [game_offset]
+    inc eax
+    cmp eax, edx
+    jb .single8_right
+    sub eax, edx
+.single8_right:
+    add ax, [game_offset]
+    mov si, ax
+    sb_source
+    movzx esi, byte [fs:si]
+    sub esi, 128
+    shl esi, 7
+    pop edx
+    ret
+.stereo8_normal:
+    add ax, [sb_tail_read_offset]
+    mov si, ax
+    sb_source
+    movzx edx, byte [fs:si]
+    movzx esi, byte [fs:si+1]
+    sub edx, 128
+    sub esi, 128
+    shl edx, 7
+    shl esi, 7
+%ifdef WSS_INPUT
+    ret
+.mono16:
+    shl ax, 1
+    add ax, [game_offset]
+    mov si, ax
+    movsx edx, word [fs:si]
+    sar edx, 1
+    mov esi, edx
+%endif
+    ret
+
+; AX: sample index. Samples decode in order; the interpolation reads one ahead.
+sb_adpcm_sample:
+    push bx
+    push cx
+    mov cx, ax
+    sub cx, [adpcm_next]
+    cmp cx, -2
+    je .previous
+    ; -1 is the current sample.
+    cmp cx, 2048
+    jae .current
+    inc cx
+    add [adpcm_next], cx
+.decode:
+    call adpcm_decode
+    loop .decode
+.current:
+    mov al, [adpcm_value]
+    jmp .scale
+.previous:
+    mov al, [adpcm_prev]
+.scale:
+    movzx edx, al
+    sub edx, 128
+    shl edx, 7
+    mov esi, edx
+    pop cx
+    pop bx
+    ret
+
+; Creative ADPCM: one sample into adpcm_value.
+adpcm_decode:
+    push cx
+    mov al, [adpcm_value]
+    mov [adpcm_prev], al
+    cmp byte [adpcm_left], 0
+    jne .code
+.fetch:
+    mov si, [adpcm_src]
+    inc word [adpcm_src]
+    add si, [game_offset]
+    sb_source
+    mov al, [fs:si]
+    cmp byte [adpcm_ref], 0
+    je .byte
+    mov byte [adpcm_ref], 0
+    mov [adpcm_value], al
+    mov [adpcm_prev], al
+    mov byte [adpcm_level], 0
+    jmp .fetch
+.byte:
+    mov [adpcm_byte], al
+    mov al, [adpcm_per]
+    mov [adpcm_left], al
+.code:
+    dec byte [adpcm_left]
+    mov al, [adpcm_byte]
+    mov ah, al
+    mov cl, [adpcm_bits]
+    shl ah, cl
+    mov [adpcm_byte], ah
+    neg cl
+    add cl, 8
+    shr al, cl
+    mov ah, al
+    and ah, [adpcm_mask]
+    movzx bx, byte [adpcm_level]
+    ; CL=8-bits. 7-CL=bits-1.
+    xor cl, 7
+    shl bx, cl
+    add bl, ah
+    add bx, [adpcm_map]
+    movzx cx, byte [bx]
+    movzx bx, byte [adpcm_value]
+    ; The sign bit is the only bit outside the magnitude mask.
+    cmp al, ah
+    je .up
+    sub bx, cx
+    jns .value
+    xor bx, bx
+    jmp .value
+.up:
+    add bx, cx
+    cmp bx, 255
+    jbe .value
+    mov bx, 255
+.value:
+    mov [adpcm_value], bl
+    mov al, [adpcm_level]
+    cmp ah, [adpcm_up]
+    jb .low
+    cmp al, [adpcm_top]
+    jae .done
+    inc byte [adpcm_level]
+    jmp .done
+.low:
+    test ah, ah
+    jnz .done
+    test al, al
+    jz .done
+    dec byte [adpcm_level]
+.done:
+    pop cx
+    ret
+
+sb_pcm_interpolate:
+    cmp byte [game_source], 0
+    jne .done
+    cmp byte [sb_filter_legacy], 0
+    jne .done
+    cmp dword [game_step], 65536
+    jae .done
+    push eax
+    push ebx
+    push ecx
+    push ebp
+    push fs
+    push word [sb_tail_read_offset]
+    push edx
+    push esi
+    movzx ecx, bp
+    add ebp, 65536
+    cmp byte [sb_single], 0
+    je .ring
+    mov eax, ebp
+    sub eax, [game_origin]
+    jnc .single_position
+    add eax, [game_limit]
+.single_position:
+    shr eax, 16
+    push cx
+    mov cl, [game_frame_shift]
+    shl eax, cl
+    pop cx
+    cmp eax, [game_block_bytes]
+    jae .last
+.ring:
+    cmp dword [game_limit], 0
+    je .next
+    cmp ebp, [game_limit]
+    jb .next
+    sub ebp, [game_limit]
+    cmp byte [sb_tail_valid], 0
+    je .next
+    mov fs, [game_segment]
+    mov ax, [game_offset]
+    mov [sb_tail_read_offset], ax
+.next:
+    mov eax, ebp
+    shr eax, 16
+    call sb_dma_sample
+    pop ebx
+    sub esi, ebx
+    imul esi, ecx
+    sar esi, 16
+    add esi, ebx
+    pop ebx
+    sub edx, ebx
+    imul edx, ecx
+    sar edx, 16
+    add edx, ebx
+    jmp .restore
+.last:
+    pop esi
+    pop edx
+.restore:
+    pop word [sb_tail_read_offset]
+    pop fs
+    pop ebp
+    pop ecx
+    pop ebx
+    pop eax
+.done:
+    ret
+
+; Two-pole 3.2 kHz filter at the nominal 44.1 kHz mix rate, Q14.
+sb_filter:
+    push ecx
+%macro filter_channel 2
+    imul ecx, %1, 638
+    mov eax, ecx
+    add eax, [sb_filter_state+%2]
+    sar eax, 14
+    mov %1, eax
+    imul eax, 22436
+    lea eax, [eax+ecx*2]
+    add eax, [sb_filter_state+%2+4]
+    mov [sb_filter_state+%2], eax
+    imul eax, %1, -8604
+    add eax, ecx
+    mov [sb_filter_state+%2+4], eax
+%endmacro
+    filter_channel edx, 0
+    filter_channel esi, 8
+%unmacro filter_channel 2
+    pop ecx
+    ret
+
+sb_tail_start_bytes dw 0
+
+%include "audio/direct_sample.asm"
+
+%ifdef OWN_HOST
+%include "audio/high_dma.asm"
+%endif
+
+; Save at most one old-generation tail before the producer owns the ring.
+sb_tail_prepare:
+    pushad
+    push es
+    push fs
+    cmp byte [game_active], 0
+    je .done
+    cmp byte [game_source], 0
+    jne .done
+    cmp byte [sb_single], 0
+    jne .done
+%ifdef OWN_HOST
+    ; The tail copy reads the source in conventional memory.
+    cmp dword [game_physical], 0
+    jne .done
+%endif
+    mov si, [game_dma]
+    cmp byte [si+DMA_MASK], 0
+    jne .done
+%ifdef RESIDENT_AUDIO
+    mov ax, [cd_half_segment]
+    test ax, ax
+    jz .done
+    add ax, (CD_HALF_BYTES+15)/16
+    mov [sb_tail_segment], ax
+%endif
+    cmp word [sb_tail_segment], 0
+    je .done
+    mov eax, [game_limit]
+    shr eax, 16
+    mov cl, [game_frame_shift]
+    shl eax, cl
+    cmp eax, [game_block_bytes]
+    jne .done
+    mov eax, [game_step]
+    imul eax, PERIOD_FRAMES*2
+    cmp eax, [game_limit]
+    ja .done
+    mov eax, [game_step]
+    imul eax, PERIOD_FRAMES
+    add eax, 65535
+    shr eax, 16
+    mov cl, [game_frame_shift]
+    shl eax, cl
+    cmp eax, 2048
+    ja .done
+    mov byte [sb_tail_mode], 1
+    mov eax, [game_mix_frame]
+    cmp dword [game_exit_frame], 0
+    je .elapsed
+    cmp eax, [game_exit_frame]
+    jbe .elapsed
+    mov eax, [game_exit_frame]
+.elapsed:
+    mul dword [game_step]
+    shrd eax, edx, 16
+    mov cl, [game_frame_shift]
+    shl eax, cl
+    cmp eax, [sb_tail_consumed]
+    jbe .position_ready
+    mov [sb_tail_consumed], eax
+.position_ready:
+    cmp byte [sb_tail_valid], 0
+    jne .done
+    cmp dword [game_exit_frame], 0
+    jne .done
+    mov eax, [game_step]
+    imul eax, PERIOD_FRAMES
+    add eax, [game_phase]
+    cmp eax, [game_limit]
+    jbe .done
+    mov eax, [game_phase]
+    shr eax, 16
+    shl eax, cl
+    mov [sb_tail_start_bytes], ax
+    mov edx, [game_block_bytes]
+    sub edx, eax
+    cmp edx, 2048
+    ja .done
+    mov fs, [game_segment]
+    mov si, [game_offset]
+    add si, ax
+    mov es, [sb_tail_segment]
+    mov di, [sb_tail_offset]
+    mov cx, dx
+.copy:
+    mov al, [fs:si]
+    mov [es:di], al
+    inc si
+    inc di
+    loop .copy
+    add [sb_tail_consumed], edx
+    mov byte [sb_tail_valid], 1
+.done:
+    pop fs
+    pop es
+    popad
+    ret

@@ -2,6 +2,8 @@
 REM CDON.BAT - turns on the virtual CD drive for this DOS session (nothing is started at boot).
 REM   1. loads uCDD (mount-only build: no sound code, no memory manager needed)
 REM   2. gives the virtual drive the letter M: with SHSUCDX (never A:/B: - those are the floppy)
+REM   M: is reported as the FIRST CD drive (/P:M, the pack's SHSUCDX): games that use "the first CD drive"
+REM   find the mounted image, not an empty real drive (that gave read errors before beta.82).
 REM   3. real CD-ROM: if MSCDEX already serves it (BOOTCFG.BAT, a Windows 98 DOS-mode setup),
 REM      SHSUCDX installs next to it (/I) and D: keeps working. If only a CD-ROM driver is loaded
 REM      (XCDROM, VIDE-CDD, LG, Oak) SHSUCDX gives that drive a letter too, because MSCDEX
@@ -16,11 +18,11 @@ REM  drop any earlier drive letter (an old install used A:), then assign M:
 C:\CDSET\SHSUCDX.COM /U > NUL
 C:\CDSET\CDCHK.COM
 IF ERRORLEVEL 1 GOTO WITHMSCD
-C:\CDSET\SHSUCDX.COM /R- /D:?XCD0001,D /D:?MSCD001,D /D:?MSCD000,D /D:?OAKCD,D /D:UCDD0001,M
+C:\CDSET\SHSUCDX.COM /R- /D:?XCD0001,D /D:?MSCD001,D /D:?MSCD000,D /D:?OAKCD,D /D:UCDD0001,M /P:M
 IF ERRORLEVEL 246 GOTO FAILED
 GOTO OK
 :WITHMSCD
-C:\CDSET\SHSUCDX.COM /R- /I /D:UCDD0001,M
+C:\CDSET\SHSUCDX.COM /R- /I /D:UCDD0001,M /P:M
 IF ERRORLEVEL 246 GOTO FAILED
 :OK
 SET CDVM=1

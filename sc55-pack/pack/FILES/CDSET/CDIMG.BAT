@@ -21,6 +21,8 @@ IF EXIST %IMGDIR%\%1.CUE SET IMG=%IMGDIR%\%1.CUE
 IF EXIST %IMGDIR%\%1.MDM SET IMG=%IMGDIR%\%1.MDM
 IF EXIST %IMGDIR%\%1 SET IMG=%IMGDIR%\%1
 IF "%IMG%"=="" GOTO NOTFOUND
+REM  like a real drive: the old disc comes out before the new one goes in
+%CDDIR%\UCDD.EXE -unmount > NUL
 ECHO Mounting %IMG% ...
 %CDDIR%\UCDD.EXE -mount %IMG%
 IF ERRORLEVEL 1 GOTO FAILED

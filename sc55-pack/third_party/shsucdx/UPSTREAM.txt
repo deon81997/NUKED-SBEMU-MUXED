@@ -1,0 +1,1 @@
+upstream https://github.com/adoxa/shsucd 5ea0787549f60270df5f70a0d6b8d4d9f5cb49da (SHSUCDX 3.09 + 'Fix skipping Associated Files')

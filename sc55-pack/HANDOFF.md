@@ -905,3 +905,35 @@ Pentium II builds of SC55W: ARCH="-march=pentium2 -O2" OBJ=build98p2 LIB=b98p2 f
 - To test on the real PCs: sound after a pause (first note of a MIDI file / first sound in a DOS game after some
   seconds of silence) with the SigmaTel AC'97 driver on the D810; if it clicks or the first note is missing,
   OutputSleep=0 and tell us.
+
+## beta.82 (2026-11-10): virtual CD overhaul - "read error" when a game starts (RELEASED, tag v1.0.0-beta.82-usb)
+User report: "virtual CD roms always give a read error in DOS" - when STARTING A GAME, Win98 boot menu -> DOS,
+BIN/CUE (one BIN) and ISO. File reads were always fine (CDCHK2: 165 files + 300 seeks OK in every setup).
+ROOT CAUSE: with a real CD-ROM driver loaded (BOOTCFG / Win98 boot, D810 has a drive), CDON.BAT gave the real drive
+D: first and M: second; INT 2Fh 1500h ("first CD drive") = D:, empty -> the game reads D: -> CDR101 / read error.
+SHSUCDX hands out ascending letters only, so listing UCDD first moved the real drive to N:.
+FIX (user chose: keep M:, list it first, real drive stays D:):
+- SHSUCDX 3.09 from source (third_party/shsucdx, adoxa/shsucd 5ea0787, zlib-style licence, marked ALTERED) + /P:x:
+  MovePrimary moves drive x's DrvEnt to the front of the table before InitDrive (only lookups by letter exist, Bufp
+  is assigned in table order later) -> 1500h CX, 1501h, 150Dh list it first. CDON/CDDIAG use /P:M.
+- uCDD 0.9.5-a3 from source (third_party/ucdd, vorvek/uCDD 6c2f3e3, GPL-3) replaces the binary-patched a2 (whose
+  SBCDA1 patch source was lost): tools/ucdd/build.py + mkcdset.sh (NASM; upstream's build.py was blocked as external
+  code, ours does the same EXE packing). Define SBEMU_LINK: src/sbemulink.asm = the drive's own CD-Audio when no
+  external audio entry is attached (driver.asm hooks under %ifdef SBEMU_LINK: audio_request fallback, seek, IOCTL 1/15,
+  status bits 0310h, busy bit 200h in .done for non-read requests while playing, reset, clear_unit -> va_unit_gone).
+  PLAY/STOP(pause, 2nd = reset)/RESUME/SEEK, Q-channel, audio status, channel info/control; position from BIOS ticks
+  (4.119 sectors/tick) or SBEMU's box pos when SBEMU is attached (box.flags bit 0), ends at the range end (SBEMU's
+  state 0, or timer +3 s safety). SBCDA1 v1 box layout unchanged (cdlink.c untouched); start/end/pos are FILE
+  sectors = image sector - the start track's synthetic gap (PREGAP lines now map right: tested). IMAGE_PATH still 26.
+  PLAY on a data track / data-only disc -> 810Ch (as upstream resident audio). No timer hook: no CPU when idle.
+- CDIMG.BAT unmounts first (a3 refuses -mount over a mounted disc). CDGUI unchanged (uses errorlevels, ejects first).
+- UCDD-DOC.TXT / UCDD-REL.TXT from a3 (with a header on this build), SHSUCDX.TXT /P section, FILES\CDSET\UCDDSRC.ZIP
+  (GPL source). README.TXT section 9 "SINCE BETA.82", section 10 PREGAP limit dropped.
+Tested (86Box P2B-LS, MS-DOS 7.1, empty ATAPI drive, testrig/cdtest): A VIDE-CDD only (M first, list "M D"),
+B VIDE-CDD + MSCDEX (SHSUCDX /I: only M visible to the API, as before), C no real drive - ISO + CUE all OK;
+SBEMU /VCDA with the new driver: box found, flags 6F (attached/open/read/mixed), pos advances, eject stops it.
+Not fixed / known: empty drive DIR -> MS-DOS "General failure" (SHSUCDX returns not-ready for the free-space call;
+MSCDEX would say "Not ready"); 150Fh untested (tester call form); multi-BIN CUE still unsupported (a3 too);
+games that scan A:..Z: with 150Bh still find the real D: first (README says: boot without the real driver).
+To test on real PCs: a CD game from an image on the D810 booted via the Win98 menu with BOOTCFG's CD driver;
+CD music games with HYBRID.BAT; disc changes for multi-CD games.
