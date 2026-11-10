@@ -979,3 +979,27 @@ Zip = beta.82 zip + MIDPLAY, SBEMU (version), SC55MENU, SBSET, GAMETEST, JOYTEST
   USBTEST, CDSET\CDGUI (all tui.h) + README.TXT (section 8 rewritten).
 To test on real PCs: MIDPLAY with the SC-55 in 80x25, 80x50, 640x480 (F4) and 3D (S); playlist sorting/saving;
   quit and restart with Options > Start = last playlist; mouse on the time bar; P5PE with the NEC USB card.
+
+## beta.84 (2026-11-10): SBEMU did not save the program's FPU state (RELEASED, tag v1.0.0-beta.84-usb)
+Found while retaking MIDPLAY screenshots: pure-black horizontal lines across MIDPLAY's 3D view, only with SBEMU loaded
+(/X dry run: 0 of 12 frames; with SBEMU: 6-10 broken rows in every frame). Pure black = light value 0 = garbage floats.
+Not a z-buffer problem (the rasterizer has one); a host build of the same scene (5406 frames) was clean too.
+CAUSE: x87 code run from SBEMU's interrupt and port traps without fnsave. Found with a call-graph scan of an
+unstripped LTO link (objdump of /tmp/sbsym.exe: the makefile link line without -s; script approach: per-function FP
+opcodes + calls, stop at functions that fnsave): ISR -> VPCSPEAKER_GenSamples (doubles every interrupt),
+AU_setmixer_one (CD volume), USB pad paths, printf error paths; port traps -> SBEMU_DSP_Write (fcoms),
+DBOPL Chip::WriteReg, VJOY axis (port 201h), printf/debug paths. The synth renders already saved (fpu_buffer).
+x87 has 8 registers: a program with most in use (3D inner loops at -march=i386) lost values to stack overflow.
+FIX: MAIN_FPU_ENTER/LEAVE around the whole card-IRQ service in MAIN_InterruptPM and MAIN_InterruptRM (incl.
+TimerReplay and CDService); fnsave + frstor around every handler call in HDPMIPT_TrapHandler (PM) and the QEMM RM
+dispatcher. Buffers are on the stack (nesting-safe). After fnsave (which resets the FPU) fldcw reloads the program's
+control word, so a game's own IRQ handler called from SBEMU rounds as the game set it. vmpu.c (SoundFont) fpu_buffer
+static -> per call (VMPU_FPU_BUF), so the ISR saving during a trap can no longer overwrite the trap's saved state.
+Measured: 3D view 12/12 frames clean; STRESS.MID timing 0.88/3.9, 0.91/5.7, 0.91/5.3 ms (beta.83: 0.79/2.6, 0.84/5.4,
+0.95/5.0) = noise. Cost ~250 cycles per trapped port access / interrupt.
+Screenshots retaken (docs/shots/midplay-*.png; playlist/files/options new) with testrig-style 86Box automation:
+/home/claude/mptest/boot.sh ROOT VM boots without waiting; a.py "screenshot path", "key down 0x0f"... (TAB 0x0f,
+F2 0x3c, Esc 0x01, Enter 0x1c, Down 0x150), "@type:sp".
+Zip = beta.83 zip + SBEMU.EXE + README.TXT (troubleshooting entry "3D GAMES WITH GLITCHES ONLY WHILE SBEMU RUNS").
+To test on real PCs: a 3D DOS game (Quake, Descent, Duke 3D) with SBEMU + SB digital sound + pad: look for glitches
+that used to happen only with SBEMU; MIDPLAY 3D view.

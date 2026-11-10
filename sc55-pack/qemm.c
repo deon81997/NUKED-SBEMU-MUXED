@@ -95,7 +95,12 @@ static void QEMM_TrapHandler()
                 //uint8_t val2 = link->iodt[i].handler(port, val, out);
                 //QEMM_TrapHandlerREG.h.al = out ? QEMM_TrapHandlerREG.h.al : val2;
                 if(DIAG_Armed) DIAG_Trap(port);
-                QEMM_TrapHandlerREG.h.al = link->iodt[i].handler(port, val, out);
+                {   /* the program's FPU state stays its own (see HDPMIPT_TrapHandler) */
+                    unsigned char fpu_state[108];
+                    asm volatile("fnsave %0\n\tfldcw %0" : "+m"(fpu_state));
+                    QEMM_TrapHandlerREG.h.al = link->iodt[i].handler(port, val, out);
+                    asm volatile("frstor %0" :: "m"(fpu_state));
+                }
                 return;
             }
         }

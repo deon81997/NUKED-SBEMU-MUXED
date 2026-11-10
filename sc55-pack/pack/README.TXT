@@ -1221,6 +1221,14 @@ CONTENTS
   SBEMU SAYS "Not loaded" IN THE MENU: the line under the logo shows
   the first error from SBLOG.TXT.
 
+  3D GAMES WITH GLITCHES ONLY WHILE SBEMU RUNS (stray lines or polygons,
+  objects jumping, rare crashes in FPU-heavy games): fixed in beta.84. Before,
+  SBEMU's sound interrupt and its Sound Blaster / joystick / FM port handlers
+  used the CPU's floating point unit without saving the game's values, so a
+  game in the middle of its 3D math could get wrong numbers back (seen as
+  black lines in MIDPLAY's 3D view). Update SBEMU.EXE if you still use an
+  older one.
+
   MUSIC SLOWER THAN IT SHOULD BE IN A GAME (but fine in MIDPLAY): run SBDIAG.
       SC55                start SBEMU as usual
       SBDIAG START        start measuring

@@ -76,6 +76,15 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.84.** **A hidden bug squashed: 3D games and SBEMU get along!!**
+Thin black lines across MIDPLAY's new 3D view led us to an old bug: SBEMU's sound interrupt and its Sound Blaster,
+joystick, PC speaker and FM handlers used the CPU's floating point unit without saving the game's own values. A game
+in the middle of its 3D math (MIDPLAY's 3D view, Quake-style games) could get garbage numbers back: stray lines or
+polygons, jumpy objects, the odd crash, and only while SBEMU ran. Now SBEMU keeps the game's FPU state safe every time
+it steps in. Tested in 86Box: 6-10 broken lines in every 3D frame before, none now, and MIDI timing unchanged.
+New MIDPLAY screenshots below ([playlist](docs/shots/midplay-playlist.png), [files](docs/shots/midplay-files.png),
+[options](docs/shots/midplay-options.png)).
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.83.** **MIDPLAY, the MIDI player, made over!!** Five pages
 (Player, Playlist, Files, Options, Help) and the music keeps playing and moving to the next song on all of them. The
 playlist shows every song's title and length, finds songs as you type, sorts, reorders, and saves or opens .M3U lists;
@@ -110,6 +119,11 @@ so Windows games get your pad too, even on PCs whose sound card has no game port
 buttons: click a box, press the button. ([joystick tab](docs/shots/w98-joystick-tab.png),
 [pad keys tab](docs/shots/w98-padkeys-tab.png), [Device Manager](docs/shots/w98-gameport-devmgr.png))
 
+<details>
+<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
+
+<br>
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.80.** **Hold the button, the key repeats!!** Pad buttons now
 repeat their key like a real keyboard, so menus and setup screens scroll when you hold the D-pad. Your dead zone setting
 now also decides how far you push a stick before it presses a key, and holding the same key on the pad and a USB keyboard
@@ -117,11 +131,6 @@ no longer lets go too early. Also fixed: keys could get stuck after fast repeati
 games from a shareware CD (Bio Menace, Duke 1, Gods, Keen 1/4/6, Keen Dreams, Major Stryker, Epic Pinball, Spear of
 Destiny, Wolf3D...) plus Doom II and the full Wolf3D, all played from the pad
 ([screenshots](docs/padkeys-tests/README.md)).
-
-<details>
-<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
-
-<br>
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.79.** **Your pad presses the keys in plain DOS too!!** The
 per-game button layouts from beta.77-w98.2 now work outside Windows: SBEMU sees which game you start and gives your
@@ -545,14 +554,22 @@ works for some people.
 </tr>
 </table>
 
-<b>MIDPLAY</b>, the MIDI player, live off the SC-55, now with a <b>3D view</b>:
+<b>MIDPLAY</b>, the MIDI player, live off the SC-55 (beta.83: five pages, sharp full-resolution 3D):
 
 <img src="docs/shots/midplay-3d.png" width="640" alt="MIDPLAY's 3D view: a sound module, a lit keyboard and channel columns">
 
 <table>
 <tr>
+<td align="center"><img src="docs/shots/midplay-channels.png" width="420"><br><sub>Player: levels, pan, notes and keys of all 16 channels</sub></td>
 <td align="center"><img src="docs/shots/midplay-panel.png" width="420"><br><sub>front panel view: the emulated SC-55 display, live</sub></td>
-<td align="center"><img src="docs/shots/midplay-channels.png" width="420"><br><sub>channel view: instruments, levels and held notes</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/shots/midplay-playlist.png" width="420"><br><sub>Playlist: titles and lengths, type to find, sort, save .M3U</sub></td>
+<td align="center"><img src="docs/shots/midplay-files.png" width="420"><br><sub>Files: song info before you play it, add or play whole folders</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/shots/midplay-options.png" width="420"><br><sub>Options: kept in MIDPLAY.CFG, resume where you quit</sub></td>
+<td align="center"></td>
 </tr>
 </table>
 

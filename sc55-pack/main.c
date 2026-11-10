@@ -2346,6 +2346,20 @@ int main(int argc, char* argv[])
 //(*) means SBEMU might early terminate the calling chain if sound irq is handled (when MAIN_ISR_CHAINED==0).
 //early terminating is OK because PCI irq are level triggered, IRQ signal will keep high (raised) unless the hardware IRQ is ACKed.
 
+/* The sound interrupt can stop the program at any instruction, also in the middle of its floating point
+ * math. Parts of what runs here use the x87 FPU themselves (the PC speaker, the CD volume, printf on errors);
+ * the synths save it on their own. With 8 registers only, a program that has most of them in use (3D drawing:
+ * MIDPLAY's 3D view, Quake-style games) lost values to stack overflow: black lines across MIDPLAY's 3D picture.
+ * Now the whole interrupt keeps the program's FPU state on its own stack (nesting-safe): inside, the FPU is empty
+ * (fnsave resets it) but keeps the program's control word, so a game's own IRQ handler called from here rounds
+ * as the game set it, like on real hardware. */
+#ifdef DJGPP
+#define MAIN_FPU_ENTER() unsigned char main_fpu_state[108]; asm volatile("fnsave %0\n\tfldcw %0" : "+m"(main_fpu_state))
+#define MAIN_FPU_LEAVE() asm volatile("frstor %0" :: "m"(main_fpu_state))
+#else
+#define MAIN_FPU_ENTER() do {} while(0)
+#define MAIN_FPU_LEAVE() do {} while(0)
+#endif
 static void MAIN_InterruptPM()
 {
     const uint8_t irq = PIC_GetIRQ();
@@ -2372,6 +2386,7 @@ static void MAIN_InterruptPM()
     HDPMIPT_GetInterrupContext(&MAIN_IntContext);
     if(/*!(MAIN_InINT&MAIN_ININT_RM) && */aui.card_handler->irq_routine && aui.card_handler->irq_routine(&aui)) //check if the irq belong the sound card
     {
+        MAIN_FPU_ENTER();   /* the program we interrupted owns the FPU: keep its registers (see MAIN_FPU_ENTER) */
         uint64_t isr_t0 = DIAG_Tsc();
         DIAG_IsrBegin();
         SETIF();
@@ -2381,6 +2396,7 @@ static void MAIN_InterruptPM()
         DIAG_IsrEnd(MAIN_DiagFrames);
         MAIN_TimerReplay(DIAG_Tsc() - isr_t0);
         MAIN_CDService();
+        MAIN_FPU_LEAVE();
     }
     #if !MAIN_ISR_CHAINED
     else
@@ -2410,6 +2426,7 @@ static void MAIN_InterruptRM()
     {
         MAIN_IntContext.regs = MAIN_RMIntREG;
         MAIN_IntContext.EFLAGS = MAIN_RMIntREG.w.flags | CPU_VMFLAG;
+        MAIN_FPU_ENTER();   /* the program we interrupted owns the FPU: keep its registers (see MAIN_FPU_ENTER) */
         uint64_t isr_t0 = DIAG_Tsc();
         DIAG_IsrBegin();
         SETIF();
@@ -2419,6 +2436,7 @@ static void MAIN_InterruptRM()
         DIAG_IsrEnd(MAIN_DiagFrames);
         MAIN_TimerReplay(DIAG_Tsc() - isr_t0);
         MAIN_CDService();
+        MAIN_FPU_LEAVE();
     }
     #if !MAIN_ISR_CHAINED
     else
