@@ -55,9 +55,9 @@ if __name__ == '__main__':
     for f, top, big, bg, fg, icon, anim in NAV:
         m.button(f, top, big, bg, fg, icon, anim=True if anim else None)
     m.button('btn-top.gif', 'back to', 'TOP ^', (0, 0, 96), (255, 255, 255), ((255, 255, 0), '^', (0, 0, 96)))
-    m.counter(82)
-    ticker("*** NEW!! beta.82: virtual CDs work like a real disc *** Windows 98 idles at 0.25% CPU *** "
-           "your pad presses each game's own keys *** Port 220 says hi!! ***")
+    m.counter(85)
+    ticker("*** NEW!! beta.85: MIDPLAY's 3D view 3x smoother *** beta.84: 3D games safe from SBEMU's FPU bug *** "
+           "beta.83: MIDPLAY made over *** virtual CDs work like a real disc *** Port 220 says hi!! ***")
     for f in sorted(os.listdir(m.OUT)):
         if f.startswith(('nav-', 'btn-top', 'ticker', 'counter')):
             p = os.path.join(m.OUT, f); print(f, Image.open(p).size, os.path.getsize(p))

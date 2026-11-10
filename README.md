@@ -43,7 +43,7 @@
 
 <br><br>
 
-<a href="#-whats-new-"><img src="docs/90s/ticker.gif" width="600" alt="NEW!! beta.82: virtual CDs work like a real disc"></a>
+<a href="#-whats-new-"><img src="docs/90s/ticker.gif" width="600" alt="NEW!! beta.85: MIDPLAY's 3D view 3x smoother, beta.84: 3D games safe from an old FPU bug"></a>
 
 <br><br>
 
@@ -266,6 +266,7 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 <tr><td>🕹️</td><td><b>The pad presses each game's own keys</b>: jump, fire, pogo, menu, for over 3500 DOS games, in DOS and Windows 98</td></tr>
 <tr><td>🪟</td><td><b>Windows 98</b>: SB / OPL3 / MPU for DOS boxes, a "NUKED SB-EMU" MIDI device, a joystick + game port for every game, and barely any CPU while idle</td></tr>
 <tr><td>🖥️</td><td><b>Menus for everything</b>: seven colour styles, 3D screens (menu, settings, CD images, GAMETEST, MIDI player), game profiles, tests</td></tr>
+<tr><td>🎵</td><td><b>MIDPLAY</b>: a full-screen MIDI player with playlist, file browser, options, a live SC-55 front panel and a smooth 3D view</td></tr>
 <tr><td>🐞</td><td><b>One-key bug report</b>, start-up logs and a live load meter</td></tr>
 </table>
 
@@ -291,7 +292,7 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 - Render-ahead buffer and automatic speed control keep the music smooth while games run
 - **Automatic setup** measures each ROM set on your CPU and picks the best one it can handle
 - **Front panel in games**: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>F12</kbd> shows the SC-55 / MT-32 display over the game
-- `MIDPLAY`: MIDI player with playlists, shuffle, a file browser, a live front panel and a 3D view
+- `MIDPLAY`: MIDI player with five pages (player, playlist, files, options, help): titles and lengths read in the background, type-to-find, sorting, .M3U lists, speed 25-400%, mute/solo per channel, resume where you quit, a live SC-55 front panel and a sharp 640×480 3D view, in every text and VESA mode
 - `SC55WAV` / `SC55LOG`: render an SC-55 demo to WAV and see how fast your PC runs each ROM set
 </details>
 
@@ -653,7 +654,9 @@ Stuff this little pack pulled off that I'm REALLY proud of:
 - 🏆 **Your pad presses each game's own keys** in over 3500 DOS games: SBEMU watches which program DOS starts and picks that game's layout. 13 shareware games, Doom II and the full Wolf3D were all played with nothing but the pad
 - 🏆 **Our own Windows 98 drivers**: a virtual Sound Blaster / OPL3 / MPU-401 for DOS boxes, a MIDI driver, a joystick driver and a virtual game port, **idling at 0.25% of the CPU**
 - 🏆 **A virtual CD drive that acts like a real one**: rebuilt from source with our own CD-audio part, first in line for games, and CD music from CUE/BIN images mixed into the game's sound
-- 🏆 **3D menus drawn by the CPU** at 640×480, with no 3D card, that still run on a 366 MHz Celeron
+- 🏆 **3D menus drawn by the CPU** at 640×480, with no 3D card, that still run on a 366 MHz Celeron, with a floor drawn row by row for 3x more frames
+- 🏆 **A MIDI player that never makes the music late**: MIDPLAY sends the notes from inside its own drawing code, so even the 3D view keeps the music within a few milliseconds (it was a quarter of a second)
+- 🏆 **Found and fixed an FPU bug as old as SBEMU itself**: its sound interrupt and port handlers used the math unit without saving the game's values, which could garble 3D games; tracked down from a few black lines in MIDPLAY's 3D view
 - 🏆 **Tested like crazy** on emulated PCs: custom 86Box builds with a fake USB pad, a file-driven joystick and a strict keyboard controller, QEMU with a fake Xbox 360 pad, and real games driven by scripts
 
 <div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
@@ -723,7 +726,7 @@ and the Xbox 360 driver for Windows 98 are their original authors' work (see [Th
 | `MENU` | the main menu: sound, settings, games, CD-ROM, tests, files; seven styles + 3D |
 | `SETTINGS` (`SBSET`) | every option, automatic setup that measures your CPU, text + 3D |
 | `CD images` (`CDGUI`) | mount, eject, fix, install and look inside disc images, text + 3D |
-| `MIDPLAY` | MIDI player with playlists, a live SC-55 front panel and a 3D view |
+| `MIDPLAY` | MIDI player: playlist, file browser, options, a live SC-55 front panel and a 3D view |
 | `GAMETEST` | runs games by itself and finds each game's best settings, text + 3D |
 | `SBDIAG` | what SBEMU found and how hard it's working |
 | `TIMETEST` | do games lose timer ticks while the music plays? |
