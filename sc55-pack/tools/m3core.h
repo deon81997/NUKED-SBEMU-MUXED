@@ -264,6 +264,14 @@ static int m3_text(M3SURF* s, int x, int y, int f, const char* t, uint32_t c, in
     }
     return x;
 }
+/* 90s neon: the text over a soft halo of its glow colour (a ring of faint copies), then a crisp shadowless top */
+static int m3_text(M3SURF* s, int x, int y, int f, const char* t, uint32_t c, int a);
+static void m3_text_glow(M3SURF* s, int x, int y, int f, const char* t, uint32_t c, uint32_t glow)
+{
+    static const signed char o[12][2] = { {-2,0},{2,0},{0,-2},{0,2},{-1,-1},{1,-1},{-1,1},{1,1},{-3,0},{3,0},{0,-3},{0,3} };
+    int i; for (i = 0; i < 12; i++) m3_text(s, x + o[i][0], y + o[i][1], f, t, glow, i < 8 ? 48 : 22);
+    m3_text(s, x, y, f, t, c, 256);
+}
 static void m3_text_sh(M3SURF* s, int x, int y, int f, const char* t, uint32_t c)
 { m3_text(s, x + 2, y + 2, f, t, 0, 140); m3_text(s, x, y, f, t, c, 256); }
 static void m3_text_c(M3SURF* s, int cx, int y, int f, const char* t, uint32_t c, int sh)
@@ -455,28 +463,70 @@ static void m3_knob3d(M3V c, float r, float d, float rot, float press)
         M3V p0 = m3_v(fc.x + r * cosf(a0), fc.y + r * sinf(a0), fc.z), p1 = m3_v(fc.x + r * cosf(a1), fc.y + r * sinf(a1), fc.z);
         M3V q0 = m3_v(p0.x, p0.y, fc.z + d), q1 = m3_v(p1.x, p1.y, fc.z + d);
         uint32_t ridge = (i & 1) ? 0x2A2A30 : 0x3A3A42;
+        /* machined look: a knurled rim and a cap shaded by its angle to a light at the top left */
+        float am = (a0 + a1) * 0.5f - rot, sh = cosf(am + rot - 2.3f);
+        int lv = 0x58 + (int)(0x22 * sh), rv = (i & 1) ? 0x30 : 0x44;
+        M3V m0 = m3_v(fc.x + r * 0.78f * cosf(a0), fc.y + r * 0.78f * sinf(a0), fc.z - 0.001f), m1 = m3_v(fc.x + r * 0.78f * cosf(a1), fc.y + r * 0.78f * sinf(a1), fc.z - 0.001f);
         M3P t[3];
+        (void)am;
         m3_quad(p1, p0, q0, q1, NULL, ridge, 0, 256, 1);
-        t[0] = m3_xf(fc, 0, 0, 1.1f); t[1] = m3_xf(p0, 0, 0, 1.1f); t[2] = m3_xf(p1, 0, 0, 1.1f);
-        m3_poly(t, 3, NULL, i == 0 || i == n - 1 ? 0xFF8020 : 0x50505A, 256);   /* the face, with a marker */
+        m3_quad(m1, m0, p0, p1, NULL, (uint32_t)(rv << 16 | rv << 8 | (rv + 6)), 0, 256, 0);       /* knurled rim */
+        t[0] = m3_xf(m3_v(fc.x, fc.y, fc.z - 0.001f), 0, 0, 1.1f); t[1] = m3_xf(m0, 0, 0, 1.1f); t[2] = m3_xf(m1, 0, 0, 1.1f);
+        m3_poly(t, 3, NULL, (uint32_t)(lv << 16 | lv << 8 | (lv + 8)), 256);                         /* the cap */
+    }
+    {   /* the pointer: a bright line from near the centre to the rim */
+        float ca = cosf(rot), sa = sinf(rot), px = -sa * r * 0.06f, py = ca * r * 0.06f, z = fc.z - 0.003f;
+        M3V a = m3_v(fc.x + ca * r * 0.22f - px, fc.y + sa * r * 0.22f - py, z), b = m3_v(fc.x + ca * r * 0.92f - px, fc.y + sa * r * 0.92f - py, z),
+            c2 = m3_v(fc.x + ca * r * 0.92f + px, fc.y + sa * r * 0.92f + py, z), d2 = m3_v(fc.x + ca * r * 0.22f + px, fc.y + sa * r * 0.22f + py, z);
+        m3_quad(a, b, c2, d2, NULL, 0xFF8020, 0.3f, 256, 0);
     }
 }
 
 static M3SURF m3_floor, m3_floor_solid;   /* floor_solid: the floor already blended over the sky */
 static M3SURF m3_surf(int w, int h) { M3SURF s; s.w = w; s.h = h; s.p = (uint32_t*)calloc((size_t)w * h, 4); return s; }
 
+/* the scene's colours: the defaults are the original look; m3_theme_from_pal() takes them from a text style's
+ * 16-colour palette (roles: 1 desk, 5 highlight, 8 dim, 9-14 bright accents, 11 cyan-ish, 13 magenta-ish) */
+static uint32_t m3_sky0 = 0x02030C, m3_sky1 = 0x1A1040, m3_gridc = 0x2088C0, m3_tile0 = 0x0A0E1C, m3_tile1 = 0x0C1224,
+                m3_floorbg = 0x0E0A2C, m3_fogc = 0x0A0820, m3_glowc = 0x40E0FF, m3_accent[6] =
+                { 0x2E7DFF, 0xB050FF, 0x20C080, 0xFF6040, 0xE0B020, 0x40B8D8 };
+static int m3_theme_gen;                                  /* counts changes: screens rebuild their textures */
+static uint32_t m3_prgb(const unsigned char (*pal)[3], int i) { return (uint32_t)pal[i][0] << 16 | pal[i][1] << 8 | pal[i][2]; }
+
 static void m3_make_floor(void)
 {
     int x, y;
-    m3_floor = m3_surf(128, 128);
+    if (!m3_floor.p) m3_floor = m3_surf(128, 128);
     for (y = 0; y < 128; y++) for (x = 0; x < 128; x++)
     {
-        int l = (x % 32 == 0 || y % 32 == 0) ? 1 : 0;
-        m3_floor.p[y * 128 + x] = l ? 0x2088C0 : ((x / 32 + y / 32) & 1 ? 0x0A0E1C : 0x0C1224);
+        int l = (x % 32 == 0 || y % 32 == 0) ? 1 : 0, l2 = (x % 32 == 1 || y % 32 == 1 || x % 32 == 31 || y % 32 == 31);
+        uint32_t t = (x / 32 + y / 32) & 1 ? m3_tile0 : m3_tile1;
+        m3_floor.p[y * 128 + x] = l ? m3_gridc : l2 ? m3_blend(t, m3_gridc, 70) : t;   /* lines with a soft glow edge */
     }
-    m3_floor_solid = m3_surf(128, 128);
-    for (x = 0; x < 128 * 128; x++) m3_floor_solid.p[x] = m3_blend(0x0E0A2C, m3_floor.p[x], 160);   /* over the sky's lower part */
+    if (!m3_floor_solid.p) m3_floor_solid = m3_surf(128, 128);
+    for (x = 0; x < 128 * 128; x++) m3_floor_solid.p[x] = m3_blend(m3_floorbg, m3_floor.p[x], 160);   /* over the sky's lower part */
 }
+static void m3_theme_from_pal(const unsigned char (*pal)[3])
+{
+    uint32_t desk = m3_prgb(pal, 1), hi = m3_prgb(pal, 5);
+    int i; static const int acc[6] = { 9, 13, 10, 12, 14, 11 };
+    m3_sky0 = m3_mul(desk, 40); m3_sky1 = m3_mul(m3_lerpc(desk, hi, 110), 150);
+    m3_gridc = m3_prgb(pal, 11); m3_glowc = m3_prgb(pal, 11);
+    m3_tile0 = m3_mul(desk, 70); m3_tile1 = m3_mul(desk, 95);
+    m3_floorbg = m3_mul(m3_lerpc(desk, hi, 80), 120); m3_fogc = m3_mul(m3_lerpc(desk, hi, 110), 110);
+    for (i = 0; i < 6; i++) m3_accent[i] = m3_prgb(pal, acc[i]);
+    m3_make_floor(); m3_theme_gen++;
+}
+#ifdef TUI_INCLUDED
+/* follow the text screens' colour style (F3 there; F6 in the 3D menu): re-colours when it changed */
+static void m3_theme_sync(void)
+{
+    static int last = -1;
+    if (tui_theme != last || !m3_floor.p) { last = tui_theme; m3_theme_from_pal(tui_palette()); }
+}
+#else
+static void m3_theme_sync(void) { if (!m3_floor.p) m3_make_floor(); }
+#endif
 
 static void m3_upscale(void)
 {
@@ -498,7 +548,7 @@ static void m3_sky(void)
     int y, i;
     for (y = 0; y < m3_rh; y++)
     {
-        uint32_t c = m3_lerpc(0x02030C, 0x1A1040, y * 256 / m3_rh);
+        uint32_t c = m3_lerpc(m3_sky0, m3_sky1, y * 256 / m3_rh);
         if (!(y & 15)) M3_HOOK();
         uint32_t* p = m3_fb + y * M3W; for (i = 0; i < m3_rw; i++) p[i] = c;
         memset(m3_zb + y * M3W, 0, m3_rw * sizeof(float));

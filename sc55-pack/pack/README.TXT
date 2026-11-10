@@ -182,7 +182,10 @@ CONTENTS
       drawn in 3D by the CPU (no 3D card needed). F3 there picks the look:
       Panels (raised buttons), Carousel (a ring of cards) or Module (a rack
       sound module with an LCD, buttons and a knob). The keys are the same
-      as in the text menu; F8 goes back to the text menu, Esc to DOS. F4
+      as in the text menu; F8 goes back to the text menu, Esc to DOS. F6
+      cycles the colours: the 3D screens (menu, SETTINGS, CD images,
+      GAMETEST, MIDPLAY) take the colour style of the text screens (Groovy,
+      Sunset, Ocean, Neon, Candy, Midnight; F3 in the text menu). F4
       sets the speed: auto (the 3D scene at half resolution when the PC
       draws fewer than 15 pictures a second), full or half; the top right
       corner shows the frame rate for a few seconds. On a Pentium (not II)

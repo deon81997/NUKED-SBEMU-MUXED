@@ -149,7 +149,7 @@ static int f3_enter(void)
     if (!m3_zb) m3_zb = (float*)malloc(M3W * M3H * sizeof(float));
     if (!m3_fb || !m3_zb) return 0;
     m3_scr.w = M3W; m3_scr.h = M3H; m3_scr.p = m3_fb;
-    if (!m3_floor.p) m3_make_floor();
+    m3_theme_sync();
     if (!m3_vbe_open()) return 0;
     if (m3_tsc_us == 0) m3_time_init();
     m3_half = m3_quality == 2; m3_rw = m3_half ? M3W / 2 : M3W; m3_rh = m3_half ? M3H / 2 : M3H;
@@ -400,7 +400,7 @@ static void f3_draw_carousel(const F3VIEW* v, double t)
     span = n > 14 ? 6 : n;
     step = 6.2831853f / vis;
     R = vis * 0.42f; if (R < 2.8f) R = 2.8f;
-    m3_fog = 0x0A0820; m3_fog0 = R + 4.5f; m3_fog1 = R * 2 + 10;
+    m3_fog = m3_fogc; m3_fog0 = R + 4.5f; m3_fog1 = R * 2 + 10;
     m3_camera(0, 0.35f + 0.05f * sinf((float)t * 0.7f), -(R + 3.9f), 0.04f * sinf((float)t * 0.3f), -0.13f);
     m3_sky();
     for (pass = 0; pass < 2; pass++)
@@ -474,7 +474,7 @@ static void f3_make_panel(const F3VIEW* v, double t)
 static void f3_draw_module(const F3VIEW* v, double t)
 {
     float W = 2.9f, H = 0.72f, D = 1.6f; int c;
-    m3_fog = 0x0A0820; m3_fog0 = 8; m3_fog1 = 22;
+    m3_fog = m3_fogc; m3_fog0 = 8; m3_fog1 = 22;
     m3_camera(0.9f * sinf((float)t * 0.25f), 0.15f + 0.1f * sinf((float)t * 0.17f), -6.6f, -0.14f * sinf((float)t * 0.25f), -0.12f);
     m3_sky();
     m3_draw_floor(-H - 0.02f, 256);

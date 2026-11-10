@@ -76,6 +76,12 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.88.** **The 3D menus get a 90s glow-up!!** The 3D screens now take
+their colours from the text menu's colour style (Groovy, Sunset, Ocean, Neon, Candy, Midnight): sky, grid floor and
+accents all change, also in MIDPLAY. **F6** in the 3D menu cycles them. Titles and the chosen item glow like neon.
+Carousel: glowing markers for every place on the ring, "2 / 5" and arrows. Module: brushed metal, a backlit LCD
+glow and a machined knob with a pointer line. No speed lost: Panels even went from 10.1 to 11.2 frames a second.
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.87.** **Cleaner 3D screens!!** The bigger letters on every 3D screen
 (menu, SETTINGS, CD images, GAMETEST, MIDPLAY) now have their stair-steps smoothed: rounder curves, crisp straight
 strokes. In the Carousel and Module menus the description no longer runs into the key help: it gets its own three
@@ -103,6 +109,11 @@ it steps in. Tested in 86Box: 6-10 broken lines in every 3D frame before, none n
 New MIDPLAY screenshots below ([playlist](docs/shots/midplay-playlist.png), [files](docs/shots/midplay-files.png),
 [options](docs/shots/midplay-options.png)).
 
+<details>
+<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
+
+<br>
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.83.** **MIDPLAY, the MIDI player, made over!!** Five pages
 (Player, Playlist, Files, Options, Help) and the music keeps playing and moving to the next song on all of them. The
 playlist shows every song's title and length, finds songs as you type, sorts, reorders, and saves or opens .M3U lists;
@@ -112,11 +123,6 @@ or pages: the music is now sent while the screen is drawn, the graphics modes on
 uses the CPU's own clock. Measured in 86Box (Pentium II 450, SBEMU playing a very busy MIDI): notes came up to
 **252 ms late before** (15 ms in the text views), **now at most 8 ms in every display mode**. The 3D view is always sharp
 full 640x480.
-
-<details>
-<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
-
-<br>
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.82.** **Virtual CDs work like a real disc!!** Games no longer
 stop with a CD read error: on a PC with its own CD-ROM driver loaded (like a Windows 98 boot), games asked DOS for "the

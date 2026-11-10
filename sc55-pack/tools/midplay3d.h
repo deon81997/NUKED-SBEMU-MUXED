@@ -31,7 +31,7 @@ static void mp3_prepare(void)
     if (!m3_zb) m3_zb = (float*)malloc(M3W * M3H * sizeof(float));
     if (!m3_fb || !m3_zb) return;
     m3_scr.w = M3W; m3_scr.h = M3H; m3_scr.p = m3_fb;
-    if (!m3_floor.p) m3_make_floor();
+    m3_theme_sync();
     if (!mp3_panel.p) mp3_panel = m3_surf(512, 128);
     if (!mp3_keys.p) mp3_keys = m3_surf(512, 64);
     if (m3_tsc_us == 0) m3_time_init();
@@ -44,7 +44,7 @@ static int mp3_enter(void)
     if (!m3_zb) m3_zb = (float*)malloc(M3W * M3H * sizeof(float));
     if (!m3_fb || !m3_zb) return 0;
     m3_scr.w = M3W; m3_scr.h = M3H; m3_scr.p = m3_fb;
-    if (!m3_floor.p) m3_make_floor();
+    m3_theme_sync();
     if (!mp3_panel.p) mp3_panel = m3_surf(512, 128);
     if (!mp3_keys.p) mp3_keys = m3_surf(512, 64);
     if (!m3_vbe_open()) return 0;
@@ -175,12 +175,13 @@ static void mp3_draw(const Song* s, const char* name, uint64_t el_us, uint64_t t
     double t = m3_now(), t0; float W = 2.6f, H = 0.62f, D = 1.2f, dt; int c;
     double frac = total_us ? (double)(el_us > total_us ? total_us : el_us) / (double)total_us : 0;
     if (!mp3_on) return;
-    if (t - mp3_last_frame < 0.016) return;   /* up to 60 a second (the screen's refresh); frames follow each other (the music is sent from inside) */
+    if (t - mp3_last_frame < 0.016) return;
+    m3_theme_sync();                          /* F3 (style) re-colours the scene too */   /* up to 60 a second (the screen's refresh); frames follow each other (the music is sent from inside) */
     dt = mp3_last_frame ? (float)(t - mp3_last_frame) : 0.06f; if (dt > 0.2f) dt = 0.2f;
     mp3_last_frame = t; t0 = t;
     lcd_query();
     m3_bgphase = (float)t;
-    m3_fog = 0x0A0820; m3_fog0 = 8; m3_fog1 = 24;
+    m3_fog = m3_fogc; m3_fog0 = 8; m3_fog1 = 24;
     m3_camera(0.6f * sinf((float)t * 0.2f), 0.55f + 0.08f * sinf((float)t * 0.13f), -6.6f, -0.1f * sinf((float)t * 0.2f), -0.16f);
     m3_sky();
     M3_HOOK();

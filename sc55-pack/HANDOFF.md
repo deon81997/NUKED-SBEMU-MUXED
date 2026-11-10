@@ -1050,3 +1050,21 @@ User asked for "sharper text, new colours, a cleaner layout, nicer 3D styles - a
 - Screenshot script /tmp/menushot.sh EXE STYLE|t TAG [scancodes] -> /tmp/ms_TAG.png (root4 copy).
 - NEXT for the look: new colours (e.g. 3D styles following the text menu's 7 colour styles), nicer 3D styles; ask the
   user which they like (mockups), the text menu already looks good.
+
+## beta.88 (2026-11-10): 3D look - colour styles, neon glow, fuller Carousel, nicer Module (RELEASED, tag v1.0.0-beta.88-usb)
+User picked all four: match text-menu colours, brighter 90s look, fuller Carousel, nicer Module.
+- m3core: scene colours are variables (m3_sky0/1, m3_gridc, m3_tile0/1, m3_floorbg, m3_fogc, m3_glowc, m3_accent[6]);
+  m3_theme_from_pal(tui_palette()) maps a text style's 16 colours (1 desk, 5 highlight, 11 grid/glow, 9/13/10/12/14/11
+  accents) and rebuilds the floor (now with a soft glow edge on the grid lines); m3_theme_gen counts changes;
+  m3_theme_sync() re-themes when tui_theme changed (menu loop every frame, MIDPLAY mp3_draw, form3d/menu open).
+- menu3d: m3_catcol = m3_accent; Panels waves via a 64-entry LUT from the theme (faster: 10.1 -> 11.2 fps); title
+  gradient from the theme; F6 cycles tui_theme (skips Classic) and saves THEME.CFG; corner note shows the style name.
+- m3_text_glow(): 12 faint offset copies in the glow colour + the text; used for the big titles, the selected Panels
+  item, the description title, Carousel count/arrows.
+- Carousel: a glowing floor marker per ring slot (min 7), "si / n" under the card, < > when n > 1.
+- Module: brushed metal panel texture, LCD backlight halo, m3_knob3d machined (angle-shaded cap, knurled rim,
+  orange line pointer) - MIDPLAY's knob too.
+- fps (86Box PII-450 full res): Panels 11.2, Carousel 11.5, Module 11.7 (beta.86: 10.1 / 11.4 / -).
+NEXT (user agreed): optimization pass - (1) SC-55 emulation hot spots, (2) build the SC-55 parts for i686 (CMOV;
+needs a PPro/PII anyway) and measure, then (3) MMX inner loops for the 3D renderer, (4) profile SoundFont, SB
+resampler, USB polling.
