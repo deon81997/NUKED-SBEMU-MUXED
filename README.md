@@ -219,9 +219,10 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 <tr><td>🎹</td><td><b>Roland SC-55 and SC-55mkII</b>: the real firmware, from your ROMs</td></tr>
 <tr><td>🎼</td><td><b>Roland MT-32 / CM-32L</b> (Munt), or any <code>.SF2</code> SoundFont</td></tr>
 <tr><td>💿</td><td><b>Virtual CD drive M:</b>: ISO, CUE/BIN, multi-disc, with CD music mixed in</td></tr>
-<tr><td>🎮</td><td><b>USB Xbox 360 pads</b> as gameport joysticks (up to two), plus USB keyboard and mouse</td></tr>
-<tr><td>🪟</td><td><b>Windows 98</b>: SB / OPL3 / MPU for DOS boxes, and a "NUKED SB-EMU" MIDI device</td></tr>
-<tr><td>🖥️</td><td><b>Menus for everything</b>: seven colour styles, a 3D menu, game profiles, a MIDI player, tests</td></tr>
+<tr><td>🎮</td><td><b>USB game pads</b> as gameport joysticks (up to two), plus USB keyboard and a USB mouse right next to your touchpad</td></tr>
+<tr><td>🕹️</td><td><b>The pad presses each game's own keys</b>: jump, fire, pogo, menu, for over 3500 DOS games, in DOS and Windows 98</td></tr>
+<tr><td>🪟</td><td><b>Windows 98</b>: SB / OPL3 / MPU for DOS boxes, a "NUKED SB-EMU" MIDI device, a joystick + game port for every game, and barely any CPU while idle</td></tr>
+<tr><td>🖥️</td><td><b>Menus for everything</b>: seven colour styles, 3D screens (menu, settings, CD images, GAMETEST, MIDI player), game profiles, tests</td></tr>
 <tr><td>🐞</td><td><b>One-key bug report</b>, start-up logs and a live load meter</td></tr>
 </table>
 
@@ -268,9 +269,10 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 - **Games**: per-game profiles (SBEMU options, CD image, arguments)
 - **SETTINGS**: every option on one screen; changes apply to a running SBEMU straight away
 - <kbd>F3</kbd> in any program switches the colour style for all of them
+- **3D screens** for MENU, SETTINGS, CD images, GAMETEST and MIDPLAY in three looks (Panels, Carousel, Module), with the mouse; <kbd>F8</kbd> flips them all between 3D and text
 - **GAMETEST**: runs games by itself (Doom demos, Duke 3D), measures music timing and finds each game's best settings
 - Styles: Groovy, Classic, Sunset, Ocean, Neon, Candy, Midnight; a 3D menu (640×480, no 3D card needed); Terminus or VGA fonts; 80×25 up to 80×60 and your card's VESA text modes
-- `SBDIAG`, `MPUTEST`, `TIMETEST`, `JOYTEST`, `USBTEST`, `KMTEST`, `CPUMHZ`
+- `SBDIAG`, `MPUTEST`, `TIMETEST`, `JOYTEST`, `USBTEST`, `KMTEST`, `CPUMHZ`, `PADCONV`
 - `SETUP`, `CDINST`, `CLEANUP`, `UNINSTAL`: install and remove without touching `CONFIG.SYS` or `AUTOEXEC.BAT`
 </details>
 
@@ -279,7 +281,10 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 
 - Virtual Sound Blaster (1.5 – 16), OPL3 and MPU-401 for DOS boxes (`SC55W.VXD`)
 - **"NUKED SB-EMU" MIDI device** for Windows programs, played by the same synths
-- Tray program with a settings window matching the DOS one; settings shared with DOS
+- Tray program with a settings window (tabs: Sound and MIDI, Joystick, Pad keys); settings shared with DOS
+- **Joysticks**: any pad Windows knows plays DOS games in DOS boxes; *Set up...* adds a NUKED SB-EMU Game Port and Joystick so Windows games get it too, even without a game port on your sound card
+- **Pad keys** per game in DOS boxes, and an Xbox 360 pad driver for Windows 98 (unofficial, with English install steps)
+- Rests when nothing plays: about **0.25% CPU** while idle on a Pentium II
 - See [`README98.TXT`](sc55-pack/pack/README98.TXT)
 </details>
 
@@ -376,7 +381,7 @@ but the pad: [see all the screenshots](docs/padkeys-tests/README.md)!
 - **Stick types** (`/JOYMODE`): standard, CH Flightstick Pro, Thrustmaster FCS, Gravis GamePad Pro (GrIP), or native (a real gameport)
 - **USB keyboard** typed through the PC's keyboard controller, so DOS sees a PS/2 keyboard
 - **USB mouse** through a DOS mouse driver (CuteMouse is included and loaded for you)
-- **Pads:** the wired Microsoft pad and wired lookalikes (Hori, Mad Catz, Logitech, Saitek...). Not Xbox One / Series pads, sorry!
+- **Pads:** the wired Microsoft Xbox 360 pad and wired lookalikes (Hori, Mad Catz, Logitech, Saitek...); also wired Xbox One / Series pads and ordinary USB gamepads (PC pads, PS4 pad on the cable, retro pads), tested in emulators so far. Not PS3 pads or Bluetooth, sorry!
 - **Controllers:** UHCI, OHCI, EHCI and xHCI, through hubs (up to four deep), hot-plugging. Not CardBus cards
 - **How:** a tiny polled USB host inside SBEMU (`sbemu/usbpad.c`). It uses no USB interrupt, so it never fights the sound chip for an IRQ
 
@@ -531,6 +536,90 @@ works for some people.
 </div>
 
 <div align="center"><img src="docs/90s/fd-potion.gif" alt=""> <img src="docs/90s/ic-cd.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-cd.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
+
+## ★ Hall of Fame!! ★
+
+<div align="center"><img src="docs/90s/port220-hello.gif" width="330" alt="Port 220"></div>
+
+Stuff this little pack pulled off that I'm REALLY proud of:
+
+- 🏆 **A real Roland SC-55 inside a DOS sound card emulator**, running Roland's own firmware, and then made **about 20% faster without changing a single sample** of what it plays (checked bit for bit)
+- 🏆 **Starts twice as fast**: from 15 seconds to under 7 on a 366 MHz Celeron (a ROM check was secretly redone on almost every start)
+- 🏆 **A USB host written from scratch for plain DOS**: UHCI, OHCI, EHCI and xHCI, hubs four deep, hot-plugging, and not a single interrupt, so it never fights your sound chip
+- 🏆 **USB mouse right next to a laptop touchpad**, no memory manager needed, by talking to the BIOS's own mouse services
+- 🏆 **Your pad presses each game's own keys** in over 3500 DOS games: SBEMU watches which program DOS starts and picks that game's layout. 13 shareware games, Doom II and Wolf3D were played start to finish with nothing but the pad
+- 🏆 **Our own Windows 98 drivers**: a virtual Sound Blaster / OPL3 / MPU-401 for DOS boxes, a MIDI driver, a joystick driver and a virtual game port, **idling at 0.25% of the CPU**
+- 🏆 **CD music from CUE/BIN images mixed into the game's sound**, plus a patch so the virtual CD drive can let go of CUE images again
+- 🏆 **3D menus drawn by the CPU** at 640×480, with no 3D card, that still run on a 366 MHz Celeron
+- 🏆 **Tested like crazy** on emulated PCs: custom 86Box builds with a fake USB pad, a file-driven joystick and a strict keyboard controller, QEMU with a fake Xbox 360 pad, and real games driven by scripts
+
+<div align="center"><img src="docs/90s/port220-small.gif" width="96" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/fd-keycard.gif" alt=""></div>
+
+## ★ 100% Homemade!! ★
+
+Every one of these was written from scratch for this pack (by me together with **Claude**). Only SBEMU, the
+emulator cores and the DOS drivers we bundle come from other people (see [Thanks](#-thanks-to-my-friends-)).
+
+<details open>
+<summary><b>&gt;&gt; Inside SBEMU &lt;&lt;</b></summary>
+
+| Part | What it does |
+|---|---|
+| SC-55 / MT-32 / SoundFont MIDI | the synths behind the virtual MPU-401, with render-ahead and automatic speed control |
+| SC-55 engine speed-ups | the bit-exact faster Nuked-SC55 core and faster start-up |
+| CD link | CD music from the virtual drive mixed into the sound card's output |
+| USB host (`usbpad.c`) | pads, keyboards and mice in plain DOS, on every USB controller type |
+| Virtual keyboard controller (`vkbc.c`) | USB keyboard, USB mouse (with or without JEMM) and pad keys typed like a PS/2 keyboard |
+| Pad keys per game | the INT 21h program watcher and the PADMAP.BIN layouts |
+| BIOS joystick + game port extras | INT 15h joystick, CH / FCS / GrIP stick types, two pads |
+| `SBEMU16` | the stub that lets 16-bit protected-mode games (Jazz Jackrabbit) use SBEMU |
+</details>
+
+<details>
+<summary><b>&gt;&gt; DOS programs &lt;&lt;</b></summary>
+
+| Program | What it does |
+|---|---|
+| `MENU` | the main menu: sound, settings, games, CD-ROM, tests, files; seven styles + 3D |
+| `SETTINGS` (`SBSET`) | every option, automatic setup that measures your CPU, text + 3D |
+| `CD images` (`CDGUI`) | mount, eject, fix, install and look inside disc images, text + 3D |
+| `MIDPLAY` | MIDI player with playlists, a live SC-55 front panel and a 3D view |
+| `GAMETEST` | runs games by itself and finds each game's best settings, text + 3D |
+| `SBDIAG` | what SBEMU found and how hard it's working |
+| `TIMETEST` | do games lose timer ticks while the music plays? |
+| `MPUTEST`, `JOYTEST`, `KMTEST`, `USBTEST` | MIDI port, joystick, keyboard / mouse and USB step-by-step checks |
+| `SC55WAV`, `SC55LOG` | render the SC-55 to WAV and measure its speed on your PC |
+| `PADCONV` | turns the free Keyb2Joypad download into the pad layouts |
+| `SETUP`, `CDINST`, `CLEANUP`, `UNINSTAL`, `BUGREP` | install, remove and one-key bug reports, without touching CONFIG.SYS or AUTOEXEC.BAT |
+| `SC55`, `SC55JEM`, `SC55QMM`, `HYBRID`... | launchers for protected-mode, real-mode and CD-music games |
+</details>
+
+<details>
+<summary><b>&gt;&gt; Windows 98 &lt;&lt;</b></summary>
+
+| Part | What it does |
+|---|---|
+| `SC55W.EXE` | tray program and settings window (Sound and MIDI, Joystick, Pad keys) |
+| `SC55W.VXD` | virtual Sound Blaster, OPL3, MPU-401, joystick and pad keys for DOS boxes |
+| `SC55MIDI.DRV` | the "NUKED SB-EMU" MIDI device for Windows programs |
+| `NUKEDJOY.VXD` + `NUKEDJOY.INF` | joystick driver and virtual game port for Windows games |
+</details>
+
+<details>
+<summary><b>&gt;&gt; Behind the scenes &lt;&lt;</b></summary>
+
+| Tool | What it does |
+|---|---|
+| 86Box test rig | custom 86Box builds: fake USB pad, joystick from a file, strict keyboard controller, scripted keys and screenshots |
+| QEMU test rig | disk builder, VM driver and a fake Xbox 360 pad over USB redirection |
+| Windows 98 test VM | scripts that install and drive Windows 98 for the driver tests |
+| Host benchmark | runs the SC-55 core on a normal PC to make it faster without changing its sound |
+| `k2j.py` | reads DOSBox Pure's button layouts |
+| `ucdd-unmount-fix.py` | the patch that lets uCDD unmount CUE images |
+| `make90s.py`, `port220.py` | every animated GIF on this page, Port 220 included |
+</details>
+
+<div align="center"><img src="docs/90s/fd-trilobite.gif" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
 ## ★ Download Zone ★
 
