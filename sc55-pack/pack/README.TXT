@@ -899,6 +899,11 @@ CONTENTS
        the D810's touchpad and the USB mouse did nothing. Now both work.
        With SC55JEM / SC55QMM: if the driver says no mouse found, check
        the USB mouse was plugged in when SBEMU started (or use /USBMS:2).
+     * USB mouse jumping around or clicking by itself (D810, beta.76/77),
+       or not moving at all on some PCs: fixed in beta.78. Many BIOSes
+       (very likely the D810's) read a whole mouse packet at once and gave
+       up on SBEMU's, which came one byte at a time; now each packet goes
+       to the mouse driver whole.
      * It works for protected-mode games (HDPMI) and, with SC55JEM.BAT or
        SC55QMM.BAT, real-mode games too - the same as the sound.
      * Each read of port 201h is a trap, so a game polling the stick in a

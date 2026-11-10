@@ -691,13 +691,31 @@
 - Next: real pad on the D810 / P5PE-VM (button numbers via the status line); DOS session: feed pad.cpp's format
   from usbpad.c and inject through vkbc.c (PLANNED, SHARED above).
 
-## mouse-flight-fix (paused 2026-11-09, not merged, not released)
-- vkbc.c fix (wait until a D2h/D3h byte has arrived and been read, or 4 ms) builds clean with DJGPP; not yet shown
-  to work: the 86Box test could not move the mouse at all, with or without the fix.
-- 86Box rig additions (testrig/86box): XPAD_KIND2=mouse = file-driven USB boot mouse (lx/ly per report, buttons hex,
-  rx = reports per file change; works in USBTEST), KBC_OB_DELAY_US = slow D2h/D3h model of the D810 (byte arrives
-  late while status reads idle; a new command in the gap loses it). VM u3 = u1 with JEMMEX only (no QPIEMU).
-- Open: under SBEMU (BIOS path in u3 and trap path in u1) the file-driven USB mouse never moved CTMOUSE/KMTEST, while
-  the PS/2 "touchpad" did. Next: count VKBC_UsbMouse calls / injected packets (debug build writing to INT 15h stub
-  bytes 12/15, read with a small COM), find why, then compare old vs fixed SBEMU at KBC_OB_DELAY_US=300.
-- Then: merge into main, next free beta number (pull first: beta.77 is the newest), release zip from release/.
+## beta.78-usb (2026-11-09): USB mouse in BIOS mode (D810 random moves / clicks; Award: no movement at all)
+- Cause, found in 86Box (P2B-LS, Award BIOS, KBC trace): the BIOS's IRQ 12 handler reads a whole PS/2 packet in one
+  interrupt - after byte 1 it polls port 64h (interrupts off) for bytes 2 and 3 and gives up after ~70 polls.
+  SBEMU put the bytes in one per sound interrupt (D3h), so byte 2 could never come while the BIOS waited: on
+  Award nothing moved; on the D810 (Dell BIOS, most likely the same style - not confirmed) packets slip - dx/dy bytes with bit 3 set
+  (08 18 28..) were taken as packet starts: the random moves and clicks. QEMU/SeaBIOS takes one byte per IRQ,
+  which is why beta.76 worked there. The "in flight" theory of the paused branch was not the cause (its wait is
+  kept: harmless, and right for slow D2h keyboard bytes).
+- BIOS mode fix (sbemu/int15.asm, main.c MAIN_I15Stub, now 361 bytes; data 0..1Fh, INT 15h entry 20h, deliver
+  24h): on C207h the stub gives the BIOS its own handler (bioscb) and keeps the driver's (byte 16); bioscb passes
+  the BIOS's packets (touchpad) on with busy (byte 15) set. vkbc.c bios_deliver: the USB packet (status, X, Y at
+  20/22/24) goes to the driver's handler by a DPMI far call to deliver (refused while busy / no handler / mouse
+  off: the movement is kept for the next try). No KBC involved, so packets cannot slip. Counters: 26 delivered,
+  27 refused.
+- Trap mode (SC55JEM/QMM): VKBC_IOHandler on a trapped port 64h read with mouse bytes queued calls inject() first,
+  so the BIOS's polling loop finds the next byte. Before: no movement on Award either.
+- 86Box rig: KBC_OB_DELAY_US was 2^32 times too long (TIMER_USEC is 32.32 fixed point): with it set, every D2h/D3h
+  byte was lost - the other half of "the scripted USB mouse never moved". Fixed in 86box-xpad.diff.
+- Test VM (rebuilt this session; disk not in the repo): Windows 98 QuickInstall image (see Win98 w98.2) with
+  MSDOS.SYS BootGUI=0 = MS-DOS 7.1 like the D810's MS-DOS mode, HIMEM (or JEMMEX for SC55JEM), pack installed by
+  SETUP, 86Box P2B-LS (UHCI + OPTi OHCI, ES1371, PS/2 mouse = touchpad), env XPAD=2 XPAD_KIND2=mouse. Scripts kept
+  in /home/claude/86vm (mt2.py: KMTEST pointer before/after USB move + click + PS/2 move; msseq.sh).
+  Results (pointer x from 320): beta.77 BIOS mode: USB 320 (no move), PS/2 416. beta.78 BIOS mode, KBC delay 0 and
+  300 us: USB 368, PS/2 +96 after it. beta.77 SC55JEM: USB no move; beta.78 SC55JEM (delay 0 / 300): USB 368.
+  USB + PS/2 moving together (KMTEST log): USB x rises steadily, one right click down/up, no stray clicks.
+  MENU (SC55MENU) clicked with the USB mouse (BIOS mode, delay 300): Games tab opened. J15: INT 15h AH=84h through
+  the moved entry still answers (vector seg:0020). No real game with a mouse was available in the rig.
+- Not testable here: the real D810 (Dell BIOS) - user to confirm with KMTEST and a mouse game.

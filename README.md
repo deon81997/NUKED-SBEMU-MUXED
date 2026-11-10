@@ -71,6 +71,11 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.78.** **The USB mouse behaves!!** On some PCs (very likely the
+D810 too) a USB mouse in plain DOS jumped around and clicked by itself, and on others it didn't move at all. Those BIOSes
+read a whole mouse packet at once, and SBEMU was sending it one byte at a time. Now every packet goes to the mouse
+driver in one piece, right next to your touchpad's. The JEMM launchers got the same fix.
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.77-w98.2.** **Your pad presses the keys!!** In Windows 98
 DOS boxes the game pad's buttons now type the right keys for the game you're playing: jump, fire, pogo, menu. Download
 one free file (the Keyb2Joypad layouts from DOSBox Pure, link in DOWNLOADS.TXT) and over 3500 DOS games know their
@@ -89,15 +94,15 @@ Windows games and in DOS games in DOS boxes, left stick and right stick both!
 works right next to your touchpad** in plain DOS, no JEMM needed. Before, the mouse driver found the touchpad
 and the USB mouse just sat there. You can even plug it in while a game is running.
 
-<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.75.** **Joysticks in DOS boxes!!** Any controller Windows 98
-knows about now works in DOS games inside Windows too, on the game port and through the BIOS, so a 360 pad with its
-Windows driver can play your DOS games without leaving Windows. And Windows games' music volume sliders now work
-on the NUKED SB-EMU MIDI device.
-
 <details>
 <summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
 
 <br>
+
+<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.75.** **Joysticks in DOS boxes!!** Any controller Windows 98
+knows about now works in DOS games inside Windows too, on the game port and through the BIOS, so a 360 pad with its
+Windows driver can play your DOS games without leaving Windows. And Windows games' music volume sliders now work
+on the NUKED SB-EMU MIDI device.
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.74.** The **Windows 98 part** gets its first update in ages!!
 It now has the faster SC-55 too, and it can't hog the CPU any more: when the synth can't keep up, the music lags
