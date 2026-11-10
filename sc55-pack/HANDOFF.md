@@ -937,3 +937,45 @@ MSCDEX would say "Not ready"); 150Fh untested (tester call form); multi-BIN CUE 
 games that scan A:..Z: with 150Bh still find the real D: first (README says: boot without the real driver).
 To test on real PCs: a CD game from an image on the D810 booted via the Win98 menu with BOOTCFG's CD driver;
 CD music games with HYBRID.BAT; disc changes for multi-CD games.
+
+## beta.83 (2026-11-10): MIDPLAY rewrite - speed in all display modes, pages, smarter menus (RELEASED, tag v1.0.0-beta.83-usb)
+User: "improve the midplay player, optimize its performance in all display modes, make it look better and make its
+menus more functional and smart"; then "the resolution in the 3d portion should be fixed it seems blurry".
+tools/midplay.c rewritten (~2000 lines; parser and song_info() scanner kept). Layout of the file:
+- Platform: key defines (K_DEL/INS/CUP/CDOWN/CLEFT/CRIGHT/F4-F10, Ctrl+A/O/P/S), keys read via the BIOS buffer
+  (0x41A/0x41C) + INT 16h AH=10h, out_byte, MPU detect/UART. /X = dry run (no MPU; for timing the drawing alone).
+- CLOCK: TSC is the time base (uclock() under SBEMU was non-monotonic and slow; the BIOS tick froze while IRQ0 was held
+  off -> 519 ms stall). now_us(): TSC rate calibrated against the BIOS tick over ~1 s windows; a big rate change needs
+  two agreeing windows (SpeedStep); torn 32-bit tick reads and midnight are ignored (a torn read once looked like
+  +24 h and skipped songs instantly).
+- Engine struct P: speed 25-400 (set_speed keeps the song position), mp_pump (late stats), mp_seek replays program/
+  controllers, mp_start sends the reset (GS/GM/none) + 250 ms, mp_finished = end + 1.2 s tail. g_mute/g_solo +
+  audible(): note-ons of muted channels are not sent (timing unchanged).
+- MUSIC DURING DRAWING: tui.h tui_hook / m3core.h m3_hook (= mp_pump) are called per text row, per scan line in the
+  VESA text renderer, in retrace waits, every 8 rows in the 3D rasterizer/present and every 16 in sky/upscale.
+  NOT inside lcd_query (would interleave with SBEMU's MPU display report).
+- Frame pacing by cost: text frames <= 25% CPU (>= 40 ms apart), 3D frames start at most every 2.5 frame-times.
+- tui.h: tui_grow_span() draws only changed cells in the VESA text modes; tui_gline[] per glyph line (0 empty, 1 full,
+  2 mixed) -> memset for empty/full lines. Affects every tui.h program (all rebuilt; MENU checked in G640x480).
+- 3D: m3_vbe_probe() caches the VBE mode lookup (done before the music starts), the mode is set with 0x8000 (no
+  clear), mp3_prepare() pre-builds buffers/textures, the module face texture is cached (mp3_face). Always full
+  640x480 (auto half resolution removed after the "blurry" report); F4 toggles half by hand; mp3_slow (> 200 ms
+  frames) shows the hint.
+- Pages: Player / Playlist / Files / Options / Help, none blocks; songs auto-advance. g_back only from non-modal pages.
+  Playlist: type-to-find (2 s), Enter, Del, Ctrl+Up/Down, F5 sort (file/title/length/shuffle), Ctrl+S/O .M3U, Ins,
+  mouse; titles/lengths filled in the background by pl_info_step only when the next event is >= 20 ms away.
+  Files: drives from INT 21h 4408h (no disk access) listed at the end, .M3U entries, "Selected" info panel, Ins mark,
+  Ctrl+A add folder, Ctrl+P play folder, opens in the current song's folder. Options: 10 items -> MIDPLAY.CFG (VIEW
+  REPEAT SHUFFLE RESET START GAP SPEED DIR LAST POS). MIDPLAY.M3U saved on exit; START=1 resumes song + position.
+  Paths go through dosify() (upper case, backslashes).
+- Fade-in of the Groovy palette is done in ui_frame (tui_key, which used to do it, is no longer used).
+Test switches (not in README): /T:file stats log, /Q:sec quit after, /V:n start view, /X dry. HOSTTEST build:
+  gcc -O2 -DHOSTTEST -o /tmp/mphost tools/midplay.c   (virtual clock; 200% speed takes exactly half the time)
+Test rig: testrig/midplay/genmid.py (STRESS.MID / DENSE.MID). 86Box P2B-LS PII-450 dynarec, STRESS.MID:
+  before: text 2.7 ms avg / 15 ms max late with SBEMU, 3D 84 / 252 ms.  after (SBEMU): table 0.87/2.7, panel 0.73/4.8,
+  G640x480 0.67/2.5, 3D 1.0/6.5, switch to 3D mid-song 0.93/7.8 ms. Dry: every view in VGA80x25/80x50/G640x480/
+  G1024x768 has 0 late events. Release zip re-checked: 0.79/2.6, 0.84/5.4, 0.95/5.0 (3D at 41 frames in 30 s).
+Zip = beta.82 zip + MIDPLAY, SBEMU (version), SC55MENU, SBSET, GAMETEST, JOYTEST, KMTEST, MPUTEST, SBDIAG, TIMETEST,
+  USBTEST, CDSET\CDGUI (all tui.h) + README.TXT (section 8 rewritten).
+To test on real PCs: MIDPLAY with the SC-55 in 80x25, 80x50, 640x480 (F4) and 3D (S); playlist sorting/saving;
+  quit and restart with Options > Start = last playlist; mouse on the time bar; P5PE with the NEC USB card.

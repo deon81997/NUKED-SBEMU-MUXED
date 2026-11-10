@@ -858,7 +858,7 @@ static int pl_save_m3u(const char* file)
     {
         char p[300]; char* c;
         snprintf(p, sizeof p, "%s", g_pl[i].path);
-        for (c = p; *c; c++) if (*c == '/') *c = '\\';
+        dosify(p); (void)c;
         if (g_pl[i].have && g_pl[i].si.ok > 0) fprintf(f, "#EXTINF:%ld,%s\n", (g_pl[i].si.ms + 500) / 1000, pl_name(i));
         fprintf(f, "%s\n", p);
     }
@@ -1690,12 +1690,12 @@ static void draw_player(void)
 {
     static const char* const vname[3] = { "Channels", "SC-55 front panel", "3D" };
     char b[120];
-    snprintf(b, sizeof b, "SC-55 MIDI player \xFA %s \xFA MPU-401 %Xh%s", vname[g_view], base, g_dry ? " (test: nothing sent)" : "");
+    snprintf(b, sizeof b, "%s \xFA MPU %Xh%s", vname[g_view], base, g_dry ? " \xFA test, no MIDI" : "");
     header(b);
     now_playing();
     if (g_view == 1) sc55_panel(); else channel_table();
     keyboard();
-    hintline(g_view == 1 ? "\x18\x19 choose the part shown. The panel is the module's real display while SBEMU sends it."
+    hintline(g_view == 1 ? "\x18\x19 part shown. SC-55: the module's real display, live from SBEMU."
                          : "\x18\x19 channel: M mute, O solo, U all on   [ ] speed   R repeat   H shuffle");
     keybar("~F1~ Help ~F2~ Options ~SPACE~ Pause ~\x1B\x1A~ Seek ~N P~ Song ~S~ View ~TAB~ Lists ~ESC~ Quit");
 }
@@ -1887,8 +1887,9 @@ int main(int argc, char** argv)
         char* e; _fixpath(argv[0], g_home);
         e = strrchr(g_home, '/'); if (!e) e = strrchr(g_home, '\\');
         if (e) *e = 0; else strcpy(g_home, ".");
-        snprintf(g_cfg, sizeof g_cfg, "%s/MIDPLAY.CFG", g_home);
-        snprintf(g_m3u, sizeof g_m3u, "%s/MIDPLAY.M3U", g_home);
+        dosify(g_home);
+        snprintf(g_cfg, sizeof g_cfg, "%s\\MIDPLAY.CFG", g_home);
+        snprintf(g_m3u, sizeof g_m3u, "%s\\MIDPLAY.M3U", g_home);
     }
     cfg_load();
     srand((unsigned)time(NULL));

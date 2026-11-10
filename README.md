@@ -76,6 +76,16 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.83.** **MIDPLAY, the MIDI player, made over!!** Five pages
+(Player, Playlist, Files, Options, Help) and the music keeps playing and moving to the next song on all of them. The
+playlist shows every song's title and length, finds songs as you type, sorts, reorders, and saves or opens .M3U lists;
+the file browser opens where your song is and shows a song's title and length before you play it. New: speed 25-400%,
+mute or solo any channel, click the time bar to jump, and "start where I quit". No more stutter when you change views
+or pages: the music is now sent while the screen is drawn, the graphics modes only redraw what changed, and the timing
+uses the CPU's own clock. Measured in 86Box (Pentium II 450, SBEMU playing a very busy MIDI): notes came up to
+**252 ms late before** (15 ms in the text views), **now at most 8 ms in every display mode**. The 3D view is always sharp
+full 640x480.
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.82.** **Virtual CDs work like a real disc!!** Games no longer
 stop with a CD read error: on a PC with its own CD-ROM driver loaded (like a Windows 98 boot), games asked DOS for "the
 first CD drive" and got your empty real drive instead of the mounted image. Now drive M: is the first CD drive and your
@@ -108,16 +118,16 @@ games from a shareware CD (Bio Menace, Duke 1, Gods, Keen 1/4/6, Keen Dreams, Ma
 Destiny, Wolf3D...) plus Doom II and the full Wolf3D, all played from the pad
 ([screenshots](docs/padkeys-tests/README.md)).
 
+<details>
+<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
+
+<br>
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.79.** **Your pad presses the keys in plain DOS too!!** The
 per-game button layouts from beta.77-w98.2 now work outside Windows: SBEMU sees which game you start and gives your
 USB pad that game's keys, so in Commander Keen A jumps, B fires and X pogos, and in Doom RB fires and Y opens the menu.
 It finds the game by its EXE or by the files in its folder, and goes back to the normal layout when you quit. Same free
 download, same PADUSER.TXT for your own layouts. `SBEMU /PADLOG` shows which layout it picked.
-
-<details>
-<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
-
-<br>
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.78.** **The USB mouse behaves!!** On some PCs (very likely the
 D810 too) a USB mouse in plain DOS jumped around and clicked by itself, and on others it didn't move at all. Those BIOSes

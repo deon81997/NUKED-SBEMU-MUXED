@@ -279,8 +279,9 @@ CONTENTS
       /L loop until a key is pressed.
 
   C:\SC55\MIDPLAY.EXE [/B] [/D:dir] [/L] [/R1] [/H] [/S] [/GM | /N] [file.mid ...]
-      Full-screen MIDI player with visualizer, playlist and file explorer
-      (section 8). With no file names it plays the MIDI files next to it.
+      Full-screen MIDI player with visualizer, playlist, file explorer
+      and options (section 8). With no file names it plays the MIDI files
+      next to it (or, if set in Options, resumes where you quit).
 
   C:\SC55\CPUMHZ.EXE [/LOAD]
       Shows the real CPU clock speed, live (section 15).
@@ -630,46 +631,67 @@ CONTENTS
   since drawing there would garble their picture. The keys are only
   watched, never taken away from the game.
 
-  Keys while playing:
-     SPACE        pause / resume
-     N  or END    next song              P   previous song
-     LEFT/RIGHT   seek back / forward 10 seconds
-     PGUP/PGDN    seek back / forward 60 seconds
-     HOME         restart the song
-     R            repeat: off, all, one  H   shuffle on/off
-     L            repeat all on/off
-     TAB          playlist: UP/DOWN/PGUP/PGDN pick, ENTER play it,
-                  DEL remove it, TAB or ESC back
-     B            file explorer: adds files to the playlist and plays the
-                  first one added
-     S            SC-55 front panel / channel table (remembered in
-                  MIDPLAY.CFG). With SBEMU beta.34 and later the panel is
-                  the emulated module's REAL display, read from SBEMU 10
-                  times a second: part, instrument, level, pan, reverb,
-                  chorus, key shift, MIDI channel, the 16 x 16 dot level
-                  display and the synth's CPU load ("live from SBEMU").
-                  With the MT-32 it shows the MT-32's 20-character LCD.
-                  Without it (older SBEMU, SoundFont) the panel is worked
-                  out from the MIDI file: part, instrument, level, pan,
-                  expression, reverb, chorus, pitch bend, note, and 16
-                  part level bars with peak hold
-                  Third press: the 3D VIEW (640x480 VESA, like MENU's 3D
-                  menu): a module with the synth's live display and a
-                  knob that turns with the song, a keyboard lighting up
-                  the notes in each channel's colour, and 16 channel
-                  columns on the floor. F4 there switches full / half
-                  resolution. It needs CPU time MIDPLAY also uses to
-                  send the music: on slow PCs (it says so) use the text
-                  views. The playlist and file explorer stay text.
-     F3           next style (also in every other program since
-                  beta.72; saved for MENU and all of them)
-     - and +      choose the part shown on the panel (worked-out panel)
-     ESC or Q     quit
+  MIDPLAY HAS FIVE PAGES (since beta.83). The music keeps playing and the
+  next song starts by itself on every page. TAB / SHIFT+TAB go Player >
+  Playlist > Files, F1 is Help, F2 Options, ESC goes back (on the Player
+  page ESC quits). It works in every screen mode of F4 (80x25, 80x50 and
+  the 640x480 / 1024x768 graphics modes) and with the mouse.
 
-  File explorer keys: UP/DOWN/PGUP/PGDN/HOME/END move, ENTER opens a folder
-  or adds the file (or all marked files), SPACE marks files, A adds every
-  MIDI file in the folder, BACKSPACE goes up a folder, D switches drive
-  (C: and up; floppies are skipped), ESC closes it.
+  Keys on every page:
+     SPACE        pause / resume       < and >     previous / next song
+     CTRL+LEFT/RIGHT  seek 10 seconds  F3 style    F4 screen mode
+     F7           font (graphics modes)
+
+  Player page:
+     N  or END    next song            P   previous song (restarts the
+                                           song first if past 3 seconds)
+     LEFT/RIGHT   seek 10 seconds      PGUP/PGDN   seek 60 seconds
+     HOME         restart the song     click the time bar to jump there
+     UP/DOWN      choose a channel     M  mute it   O  solo it
+     U            all channels on again (muting only stops new notes on that
+                  channel; the song's timing does not change)
+     [ and ]      speed -5% / +5% (25% to 400%), BACKSPACE back to 100%
+     R            repeat: off, all, one  L repeat all  H shuffle
+     S            view: channel table > SC-55 front panel > 3D view
+                  (remembered in MIDPLAY.CFG)
+     B            file explorer        Q or ESC   quit
+  The top shows the song's title (from the file), its format, the repeat /
+  shuffle / speed / mute state and the time left.
+  CHANNEL TABLE: level meter, pan, note, instrument keys and reverb of all
+  16 channels, plus a keyboard at the bottom lighting up the notes.
+  SC-55 FRONT PANEL: with SBEMU beta.34 and later it is the emulated
+  module's REAL display, read from SBEMU 10 times a second (with the MT-32:
+  its 20-character LCD); otherwise it is worked out from the MIDI file.
+  3D VIEW (640x480 VESA): a module with the synth's live display, a
+  keyboard lighting up the notes in each channel's colour and 16 channel
+  columns on the floor. Always sharp, full 640x480; F4 there switches to
+  half resolution if your PC shows few frames (it tells you).
+
+  Playlist page: UP/DOWN/PGUP/PGDN pick, ENTER plays, DEL removes,
+  CTRL+UP/DOWN moves a song, type letters to jump to a song, F5 sorts (by
+  file name, title, length, or shuffles), CTRL+S saves the list as an .M3U,
+  CTRL+O opens one, INS adds files. The title and length of every song are
+  read in the background while the music plays. Click a song to pick it,
+  click it again to play it.
+
+  Files page: opens in the folder of the song that plays. ENTER plays a
+  file or opens a folder or .M3U, INS marks files (ENTER then adds the
+  marked ones), CTRL+A adds the whole folder, CTRL+P plays the whole
+  folder, BACKSPACE goes up, type letters to jump. The drives are listed
+  at the end ("C:  drive"). The panel on the right shows the title,
+  length, format and tracks of the file under the cursor.
+
+  Options page (F2, saved in MIDPLAY.CFG): view, repeat, shuffle, the reset
+  sent before each song (GS, GM or none), speed, pause between songs, what
+  to play at start (the last playlist, from the song and spot where you
+  quit, or the MIDI files next to MIDPLAY), screen mode, style and font.
+  When you quit, the playlist is kept in MIDPLAY.M3U.
+
+  Smoother on slow PCs: the music is sent even while the screen is being
+  drawn, the graphics modes only redraw what changed, and the timing uses
+  the CPU's own clock, so songs no longer stutter when you change views
+  or open a page.
+
   Seeking replays instruments and controllers, so the sound stays right.
   Format 0 and 1 files and RMI are supported (.MID .MIDI .RMI .KAR).
 
