@@ -1030,3 +1030,5 @@ User: "make the sc55 menu faster and better looking quickly" (session ran out of
   4-quad path: give m3_floor_rows an alpha (tex m3_floor, blend, no z-write) for it; (3) "better looking": ask user
   what they want; (4) release as beta.86 (zip = beta.85 + SC55MENU + SBEMU version).
 - Also open: 48 kHz garbled on the D810 (see beta.85 section).
+
+- 2026-11-10 17:01 user: the D810 48 kHz garbling "went away after a restart" - closed unless it comes back (if so: SBLOG.TXT at 48000, AC97 clock check line).
