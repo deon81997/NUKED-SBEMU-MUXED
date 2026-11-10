@@ -1,0 +1,31 @@
+wait 75
+shot d01_title
+tap buttons=8000
+wait 1.5
+shot d02_menu_y
+tap ly=-32768 0.25
+wait 1
+shot d03_stick_down
+tap ly=32767 0.25
+wait 1
+tap buttons=0010
+wait 1.5
+shot d04_skill
+tap buttons=0010
+wait 4
+shot d05_ingame
+pad ly=32767
+wait 1.5
+pad buttons=0
+shot d06_walked
+tap buttons=0200 0.5
+wait 0.3
+shot d07_fire
+tap buttons=2000
+wait 1
+shot d08_map_tab
+tap buttons=2000
+pad buttons=0040 ly=32767
+wait 1.5
+pad buttons=0
+shot d09_run

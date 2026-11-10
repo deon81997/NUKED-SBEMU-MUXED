@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """mkdisk.py - bootable FreeDOS FAT16 hard-disk image from a host folder, and file extraction.
    mkdisk.py build <folder> <image> [MB]      folder becomes C:\\ (KERNEL.SYS must be in it)
+                                              MKDISK_BOOT=msdos: MS-DOS 7.1 boot record (IO.SYS, MSDOS.SYS in the
+                                              folder, e.g. from a Windows 98 QuickInstall FULL.866)
    mkdisk.py get <image> <DOS path> <out>     copy a file out of the image (e.g. SC55\\GAMETEST.TXT)
    mkdisk.py ls <image> [DOS dir]"""
 import os, re, struct, sys
@@ -52,6 +54,8 @@ def build(folder, image, mb=120):
 
     def dodir(path, parent_clus):
         names = sorted(os.listdir(path))
+        if parent_clus == 0 and os.environ.get('MKDISK_BOOT') == 'msdos':   # IO.SYS first: the boot record loads it
+            names = [n for n in ('IO.SYS', 'MSDOS.SYS') if n in names] + [n for n in names if n not in ('IO.SYS', 'MSDOS.SYS')]
         ents = []
         sub = []
         for n in names:
@@ -76,10 +80,11 @@ def build(folder, image, mb=120):
     assert len(root) <= ROOTN * 32, 'root too big'
     # boot sector
     bs = bytearray(SEC)
-    bs[0:3] = b'\xEB\x3C\x90'; bs[3:11] = b'FRDOS4.1'
+    ms = os.environ.get('MKDISK_BOOT') == 'msdos'
+    bs[0:3] = b'\xEB\x3C\x90'; bs[3:11] = b'MSWIN4.1' if ms else b'FRDOS4.1'
     struct.pack_into('<HBHBHHBHHHII', bs, 11, SEC, SPC, RES, NFAT, ROOTN, 0, 0xF8, fatsz, SPT, HEADS, SPT, psec)
     struct.pack_into('<BBBI11s8s', bs, 36, 0x80, 0, 0x29, 0x1234ABCD, b'SC55TEST   ', b'FAT16   ')
-    code = carray('br_fat16fd_0x3e.h')
+    code = carray('br_fat16_0x3e.h' if ms else 'br_fat16fd_0x3e.h')
     bs[0x3E:0x3E + len(code)] = code
     bs[510:512] = b'\x55\xAA'
     # MBR

@@ -638,6 +638,7 @@
   (D-pad = arrows, Start = Enter, Back = Esc, A/B/X/Y = game port buttons 1-4).
 - Split: Win98 session = format, converter, engine (C, shared), SC55W + VxD key injection (VKD_Force_Keys).
   DOS session = feed the engine from its USB pad code and inject through its existing 60h/64h traps.
+  DONE on both sides: Win98 in w98.2, DOS in beta.79 (sbemu/padmap.c = pad.cpp in plain C, see beta.79 below).
 
 ## Win98 w98.2 (on beta.77) - 2026-11-09: pad buttons -> keys per game
 - Release: release/NUKED-SB-EMU-1.0.0-beta.77-w98.2-usb.zip (= beta.77 zip + new SC55W.EXE, SC55W.VXD, README98,
@@ -719,3 +720,43 @@
   MENU (SC55MENU) clicked with the USB mouse (BIOS mode, delay 300): Games tab opened. J15: INT 15h AH=84h through
   the moved entry still answers (vector seg:0020). No real game with a mouse was available in the rig.
 - Not testable here: the real D810 (Dell BIOS) - user to confirm with KMTEST and a mouse game.
+
+## beta.79-usb (2026-11-09): pad buttons -> keys with a layout per game, in plain DOS (DOS side of PLANNED, SHARED)
+- sbemu/padmap.c/.h: win98/helper/pad.cpp ported to plain C (DJGPP + host gcc), same files and rules: PADMAP.TXT +
+  PADUSER.TXT (user sections override line by line, user Id= lines win), same key table/names, JoyButton1-4 /
+  Joy..(2).. game port actions, analog pass-through for whole-axis binds, [Default]. Verified against pad.cpp on the
+  host (/home/claude/padtest/w/diff.cpp, windows.h shim): all 4233 ids x 40 random pad states, same scan codes,
+  game port buttons/axes/present (after a release between layouts - SBEMU lets every held key go on a layout change).
+- PADMAP.BIN (PADMAP_Build/Load): "PADMAP1\x1A", stamps (FAT date/time + size of PADMAP.TXT, PADUSER.TXT,
+  keyb2joypad.cpp), sorted (u32 id, u32 layout) table, per layout: title, set slots (0-15 buttons, 16+2a / 17+2a
+  axis neg/pos) with action bytes. 280 KB for 3557 games, loaded whole into SBEMU's memory at start (no file I/O
+  while resident). PADMAP_Prepare(dir): PADMAP\*.CPP (KEYB2J~1.CPP in plain DOS) -> PADMAP.TXT through padconv.c
+  (built in: sbemu/padconvl.c, -DPADCONV_LIB) when missing or the .cpp's stamp changed, then BIN when any stamp
+  changed. 86Box PII-400: 1.5 s + 0.85 s, once.
+- Program tracking: sbemu/int21.asm (scripts/mkint21.py -> sbemu/int21bin.h, 515 bytes, entry C0h), hooked only when
+  layouts are there. AX=4B00h: TRUENAME + FINDFIRST (own DTA, the caller's put back) before DOS is entered, RMCB
+  (AL=1 own id; answer 0 = scan the folder: AL=2 per file, max 1024; AL=3 done), then the stub runs the EXEC itself
+  (pushf/call far) and calls back AL=4 when it returns - every way a program ends, no exit hooks. CF of the EXEC into
+  the caller's flags, IF as the caller had it (iret). main.c MAIN_Int21: stack of 8 programs; layout = newest with its
+  own id, else newest found by a folder file, else Default (as SC55W). Pick log (last 8) for SBEMU /PADLOG (AMIS AL=03h;
+  the /PADLOG run opens neither SBEMULOG nor SBDETAIL). Unhooked if start-up fails.
+- vjoy.c: VJOY_Tick runs PADMAP_Step on both pads (keys from either; game port from pad 1) -> VKBC_Bytes (new, raw
+  set-1 bytes into vkbc's D2h queue). Mode 0 + Default: /JOYAX /JOYBT as before minus what the layout types keys with
+  (D-pad = arrows, no longer joystick A). Mode 0 + a game's layout: port 201h / INT 15h AH=84h = the layout's Joy
+  binds (none = no joystick). Modes 1-3: port unchanged, layout only adds keys. /JOYKEY: used when layouts are off or
+  missing; a non-default /JOYKEY overrides its buttons in every layout. Held keys don't repeat.
+- Options: /PADKEYS (default 1; also live from a second SBEMU run: stub byte 8 + VJOY_PadKeys), /PADLOG. SETTINGS >
+  Joystick > "Keys per game" (text + 3D). USBTEST /PAD[:GAME.EXE]: layout + why + id, live key codes per button.
+  PADCONV.EXE (DOS build of tools/padmap/padconv.c) in FILES\SC55. SETUP copies FILES\PADMAP to C:\SC55\PADMAP.
+  SBDETAIL: "Pad layouts: ...", "Pad layout Default: ...", "Pad keys: on (INT 21h stub at ...)".
+- Tested (testrig/padkeys, README there): QEMU 8.2.2 (built here: usbredir 0.7 parser, pixman) + fakepad live, PIIX3
+  UHCI, AC97: FreeDOS + JEMMEX + QPIEMU; MS-DOS 7.1 (from the user's Win98 QuickInstall ISO, MercyPak extract,
+  MS boot record) + HIMEM + HDPMI (D810 MS-DOS mode set-up); MS-DOS 7.1 + JEMMEX + QPIEMU with /PADKEYS:0 / :1 live.
+  86Box P2B-LS PII-400 (ES1371, PIIX4 UHCI + OPTi OHCI, emulated 360 pad, built here with header-only SDL2/OpenAL/
+  sndfile/zstd from GitHub and a SLiRP stub) with HIMEM and with JEMMEX+QPIEMU: fake Keen (own id) A 1D 9D, B 39 B9,
+  X 38 B8, Y 1C 9C, stick left E0 4B/CB, D-pad up E0 48/C8, Start 1C 9C, RT 3B BB, PADUSER RB=F2+F3 3C 3D BC BD;
+  RUN.EXE next to WOLF3D.EXE (folder) LAlt+Left 38 E0 4B ... B8 E0 CB; unknown = Default (A no key, PADUSER
+  [Default] Y=F1 3B BB). Real games (user's files, QEMU, MS-DOS 7.1 + HIMEM + HDPMI, screenshots): Keen 4 v1.4
+  (102355-byte EXE, not in the ids: found by EGAGRAPH.CK4 in its folder) menus by Start/D-pad/Back; Doom II 1.9
+  (DOS/4GW; found by README.TXT -> [DOOM]): Y menu, stick cursor, Start new game/skill, walk, RB fire, B map, LT run.
+- Not testable here: the real 360 pad on the D810 / P5PE-VM (NEC), real KBCs (Dell's EC).

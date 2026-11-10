@@ -15,6 +15,9 @@ uint32_t VJOY_InfoHandler(uint32_t port, uint32_t val, uint32_t out);   /* port 
 void VJOY_Tick(void);
 uint8_t VJOY_BiosButtons(void);   /* INT 15h AH=84h DX=0: AL bits 4-7 */
 void VJOY_BiosAxes(uint16_t* a);  /* INT 15h AH=84h DX=1: AX BX CX DX, 0..255 */   /* from the sound interrupt: USB poll + key presses */
-const char* VJOY_Names(void); /* list of the names for the help text */
+const char* VJOY_Names(void);
+/* pad buttons -> keys with a layout per game (padmap.c): on/off; over = 1: /JOYKEY's buttons keep its keys in every
+ * layout (-1 = leave as it is) */
+void VJOY_PadKeys(int on, int over); /* list of the names for the help text */
 
 #endif

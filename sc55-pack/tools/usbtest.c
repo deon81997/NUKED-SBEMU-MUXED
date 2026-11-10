@@ -6,6 +6,9 @@
  *                      unplug. Esc (PS/2 or USB keyboard) quits.
  *   USBTEST FILE       the same, also written to FILE (for a bug report)
  *   USBTEST FILE /T:n  ... and stop by itself after n seconds
+ *   USBTEST /PAD:GAME.EXE  also: the pad layout SBEMU would use for that program (PADMAP.TXT / PADUSER.TXT next to
+ *                      USBTEST.EXE, see padmap.c) and why, and the key codes each pad button would type there
+ *                      (shown, not typed). /PAD alone: the Default layout.
  * Run it without SBEMU loaded (it takes the USB controllers over, like SBEMU does), after
  * C:\HDPMI\HDPMI32I.EXE -r -x. The BIOS's USB keyboard / mouse support stops until the next restart. */
 #include <stdio.h>
@@ -19,6 +22,7 @@
 #include "usbpad.h"
 #include "dpmi/dpmi.h"
 #include "toolui.h"
+#include "padmap.h"
 
 static FILE* Log;
 static int Ui;                      /* full-screen view (on the screen; plain text when redirected) */
@@ -52,6 +56,47 @@ static void kb(int id, const uint8_t* r)
     for (i = 2; i < 8; ++i) if (r[i] == 0x29) KEsc = 1;
 }
 static void ms(int b, int dx, int dy, int dw) { MX += dx; MY += dy; MW += dw; MBt = b; MNew = 1; }
+
+/* /PAD: the layout and the key codes the pads would type */
+static int PadOn;
+static char PadTitle[64], PadKeys[64], PadNew[256];
+static int PadNewN;
+static void pad_emit(const uint8_t* b, int n)
+{
+    int i;
+    for (i = 0; i < n; ++i)
+    {
+        size_t l = strlen(PadKeys);
+        if (l > sizeof PadKeys - 4) { memmove(PadKeys, PadKeys + 3, l - 3 + 1); l -= 3; }
+        snprintf(PadKeys + l, sizeof PadKeys - l, "%02X ", b[i]);
+        if (PadNewN < (int)sizeof PadNew - 4) PadNewN += snprintf(PadNew + PadNewN, sizeof PadNew - PadNewN, "%02X ", b[i]);
+    }
+}
+static void out(const char* f, ...);
+static void pad_note(int kind, const char* t) { out("Pad layouts: %s%s\n", kind == 1 ? "problem: " : "", t); }
+static void pad_tick(void)
+{
+    PADMAP_In in[2];
+    PADMAP_Out o;
+    int i, k;
+    if (!PadOn) return;
+    for (i = 0; i < 2; ++i)
+    {
+        static const uint16_t x[PM_BUTTONS] = { XPAD_A, XPAD_B, XPAD_X, XPAD_Y, XPAD_LB, XPAD_RB, 0, 0, XPAD_LS, XPAD_RS,
+                                                XPAD_BACK, XPAD_START, XPAD_DU, XPAD_DD, XPAD_DL, XPAD_DR };
+        const USBPAD_State* p = USBPAD_GetPad(i);
+        in[i].present = p->connected;
+        in[i].buttons = 0;
+        for (k = 0; k < PM_BUTTONS; ++k) if (x[k] && (p->buttons & x[k])) in[i].buttons |= (uint16_t)(1u << k);
+        if (p->lt > 128) in[i].buttons |= 1u << PM_LT;
+        if (p->rt > 128) in[i].buttons |= 1u << PM_RT;
+        in[i].axis[PM_LX] = p->lx; in[i].axis[PM_LY] = p->ly == -32768 ? 32767 : -p->ly;
+        in[i].axis[PM_RX] = p->rx; in[i].axis[PM_RY] = p->ry == -32768 ? 32767 : -p->ry;
+    }
+    PadNewN = 0; PadNew[0] = 0;
+    PADMAP_Step(in, 2, &o, pad_emit);
+    if (PadNewN) out("\nPad keys: %s%s", PadNew, o.game && o.buttons ? "(game port buttons too)" : "");
+}
 
 /* ------------------------------------------------------------------ the screen */
 static const char* Result = "";
@@ -89,7 +134,8 @@ static void draw(int busy)
     tui_printf(53, 5, 0x17, "modifiers %02X", KRep[0]);
     tui_put(53, 6, 0x17, "keys");
     for (i = 2; i < 8; ++i) tui_printf(58 + (i - 2) * 3, 6, KRep[i] ? 0x1E : 0x18, "%02X", KRep[i]);
-    tui_put(53, 8, 0x18, "HID usage codes");
+    tui_put(53, 7, 0x18, "HID usage codes");
+    if (PadOn) { tui_printf(53, 4, 0x1B, "Pad: %.20s", PadTitle); tui_printf(53, 8, 0x1E, "%-24.24s", PadKeys[0] ? PadKeys : "pad keys: none yet"); }
     tui_panel(51, 10, 28, 6, 1, 0x1E, "USB mouse");
     tui_printf(53, 11, 0x1F, "x %5ld  y %5ld", MX, MY);
     tui_printf(53, 12, 0x17, "wheel %ld", MW);
@@ -118,12 +164,15 @@ int main(int argc, char** argv)
     uint32_t ch = 0;
     unsigned lastb[2] = { 0xFFFFFFFF, 0xFFFFFFFF };
     int force = 0;
+    const char* padprog = NULL;
     for (i = 1; i < argc; ++i)
     {
         if (!strncasecmp(argv[i], "/T:", 3)) secs = atoi(argv[i] + 3);
         else if (!strcasecmp(argv[i], "/F")) force = 1;
+        else if (!strncasecmp(argv[i], "/PAD", 4) && (!argv[i][4] || argv[i][4] == ':'))
+        { PadOn = 1; padprog = argv[i][4] == ':' && argv[i][5] ? argv[i] + 5 : NULL; }
         else if (argv[i][0] != '/') Log = fopen(argv[i], "w");
-        else { printf("USBTEST [logfile] [/T:seconds] [/F]\n"); return 1; }
+        else { printf("USBTEST [logfile] [/T:seconds] [/F] [/PAD[:GAME.EXE]]\n"); return 1; }
     }
     /* SBEMU resident drives the same USB controllers from its sound interrupt: both at once crashed the
      * P5PE-VM (EMM386 error 06 after SC55, then USBTEST). Its MPU-401 answering = SBEMU (or a real MPU). */
@@ -141,6 +190,33 @@ int main(int argc, char** argv)
     a = tsc(); tk = ticks(); while (ticks() - tk < 4) {}
     cps = (tsc() - a) * 18206 / 4000;
     out("USBTEST - USB pad / keyboard / mouse finder (same code as SBEMU /JOY)\nCPU %lu MHz\n", (unsigned long)(cps / 1000000));
+    if (PadOn)
+    {   /* the same files and look-up as SBEMU (its folder = this program's) */
+        char dir[260], where[64], d[600];
+        char* e;
+        int how = 0, lay = 0;
+        snprintf(dir, sizeof dir, "%s", argv[0]);
+        e = strrchr(dir, '\\'); if (!e) e = strrchr(dir, '/');
+        if (e) *e = 0; else strcpy(dir, ".");
+        if (!PADMAP_Prepare(dir, pad_note)) out("Pad layouts: none (no PADMAP.TXT or PADUSER.TXT in %s): only the Default layout\n", dir);
+        if (padprog)
+        {
+            {   /* its id, for a PADUSER.TXT section of the user's own */
+                struct find_t f;
+                if (_dos_findfirst(padprog, _A_NORMAL | _A_RDONLY | _A_ARCH | _A_HIDDEN | _A_SYSTEM, &f) == 0)
+                    out("%s: %lu bytes, id %08lX (Id= in PADUSER.TXT)\n", f.name, (unsigned long)f.size,
+                        (unsigned long)PADMAP_FileId(f.name, f.size));
+                else out("%s: not found\n", padprog);
+            }
+            lay = PADMAP_ForProgram(padprog, where, sizeof where, &how);
+            out("Pad layout for %s: %s (%s%s)\n", padprog, PADMAP_Title(lay), how ? where : "no layout for it",
+                how == 2 ? " found by its id" : how == 1 ? " in its folder" : "");
+        }
+        PADMAP_Select(lay);
+        snprintf(PadTitle, sizeof PadTitle, "%s", PADMAP_Title(lay));
+        PADMAP_Describe(lay, d, sizeof d);
+        out("Pad layout %s: %s\n", PADMAP_Title(lay), d);
+    }
     out("Looking for USB controllers and devices (up to 3 s)...\n");
     USBPAD_SetHid(kb, ms);
     n = USBPAD_Init(cps, 3000, USBPAD_F_KBD | USBPAD_F_MOUSE, &msg);
@@ -161,6 +237,7 @@ int main(int argc, char** argv)
         {
             const char* tr;
             USBPAD_Poll();
+            pad_tick();
             tr = USBPAD_Trace();
             if ((int)strlen(tr) > shown) { out("\n%s", tr + shown); shown = (int)strlen(tr); }
             if (USBPAD_Changes() != ch)

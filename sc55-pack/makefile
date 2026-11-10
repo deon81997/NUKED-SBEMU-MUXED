@@ -7,7 +7,7 @@ DEBUG ?= 0
 # 0: original SBEMU build with the TinySoundFont SoundFont synth
 VSC55 ?= 1
 
-VERSION ?= 1.0.0-beta.78-usb-sc55
+VERSION ?= 1.0.0-beta.79-usb-sc55
 
 INCLUDES := -I./mpxplay -I./sbemu -I./drivers/include -I./sc55 -I./third_party/nuked-opl3-fast
 DEFINES := -D__DOS__ -DSBEMU -DDEBUG=$(DEBUG) -DSBEMU_VSC55=$(VSC55) -DMAIN_SBEMU_VER=\"$(VERSION)\"
@@ -38,7 +38,7 @@ MIDPLAY := output/midplay.exe
 CDGUI := output/cdgui.exe
 SBSET := output/sbset.exe
 ifeq ($(VSC55),1)
-all: $(TARGET) $(SC55WAV) $(SC55LOG) $(MPUTEST) $(MIDPLAY) $(CDGUI) $(SBSET) output/sc55menu.exe output/gametest.exe output/sbdiag.exe output/timetest.exe output/joytest.exe output/usbtest.exe output/kmtest.exe output/sbemu16.com
+all: $(TARGET) $(SC55WAV) $(SC55LOG) $(MPUTEST) $(MIDPLAY) $(CDGUI) $(SBSET) output/sc55menu.exe output/gametest.exe output/sbdiag.exe output/timetest.exe output/joytest.exe output/usbtest.exe output/kmtest.exe output/sbemu16.com output/padconv.exe
 else
 all: $(TARGET)
 endif
@@ -116,6 +116,8 @@ SBEMU_SRC := sbemu/dbopl.cpp \
              sbemu/usbpad.c \
              sbemu/vjoy.c \
              sbemu/vkbc.c \
+             sbemu/padmap.c \
+             sbemu/padconvl.c \
 	     sbemu/dpmi/xms.c \
 	     sbemu/dpmi/dpmi.c \
 	     sbemu/dpmi/dbgutil.c \
@@ -210,13 +212,18 @@ output/sbdiag.exe: tools/sbdiag.c $(wildcard tools/*.h)
 	$(SILENTMSG) "CC\t$@\n"
 	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
 
-USBTEST_SRC := tools/usbtest.c sbemu/usbpad.c mpxplay/au_cards/pcibios.c mpxplay/au_cards/au_base.c \
+USBTEST_SRC := tools/usbtest.c sbemu/usbpad.c sbemu/padmap.c sbemu/padconvl.c mpxplay/au_cards/pcibios.c mpxplay/au_cards/au_base.c \
 	sbemu/dpmi/dpmi.c sbemu/dpmi/dpmi_dj2.c sbemu/dpmi/xms.c sbemu/dpmi/dbgutil.c sbemu/dpmi/dpmi_tsr.c \
 	sbemu/pic.c sbemu/serial.c sbemu/untrapio.c
-output/usbtest.exe: $(USBTEST_SRC) sbemu/usbpad.h $(wildcard tools/*.h)
+output/usbtest.exe: $(USBTEST_SRC) sbemu/usbpad.h sbemu/padmap.h $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
 	$(SILENTCMD)$(CC) -O2 -march=i386 -fcommon -D__DOS__ -DSBEMU -DDEBUG=0 -DNDEBUG -I./mpxplay -I./sbemu -I./drivers/include -o $@ $(USBTEST_SRC) -s
+
+output/padconv.exe: tools/padmap/padconv.c
+	@mkdir -p $(dir $@)
+	$(SILENTMSG) "CC\t$@\n"
+	$(SILENTCMD)$(CC) -O2 -march=i386 -o $@ $< -s
 
 output/sbemu16.com: tools/sbemu16.asm
 	@mkdir -p $(dir $@)

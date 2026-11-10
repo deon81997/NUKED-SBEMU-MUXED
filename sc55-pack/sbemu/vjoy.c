@@ -34,6 +34,7 @@
 #include "vjoy.h"
 #include "usbpad.h"
 #include "vkbc.h"
+#include "padmap.h"
 
 enum { A_NONE, A_LX, A_LY, A_RX, A_RY, A_LT, A_RT, A_TR };
 static const char* AxName[] = { "-", "LX", "LY", "RX", "RY", "LT", "RT", "TR" };
@@ -59,6 +60,55 @@ static int      Mode;                  /* 0 standard, 1 CH Flightstick Pro, 2 Th
 static uint32_t GripN, GripF[2];      /* read counter, frames being sent */
 static uint64_t Cps, T0, End[4], LastPoll;
 static int      Inited;
+
+/* pad buttons -> keys per game (padmap.c, /PADKEYS). Default layout (no game found): the game port works as /JOYAX
+ * /JOYBT say, minus the buttons and sticks the layout types keys with (D-pad = arrow keys: no longer joystick A in
+ * mode 0). A game's layout: in mode 0 the game port is the layout's (JoyButton1-4, Joy..: from pad 1; nothing bound
+ * to it = no joystick there, so games don't see a stick that also types keys). Modes 1-3 keep their port as it is;
+ * the layout only adds keys. */
+static volatile int PadOn;
+static int      PadPrev, PadOver;
+static uint16_t KmMask;                /* PM_* bits of the /JOYKEY buttons when they override the layouts */
+static PADMAP_Out PadOut;
+static USBPAD_State Filt[2];
+static const uint16_t PmXpad[PM_BUTTONS] = { XPAD_A, XPAD_B, XPAD_X, XPAD_Y, XPAD_LB, XPAD_RB, 0, 0, XPAD_LS, XPAD_RS,
+                                             XPAD_BACK, XPAD_START, XPAD_DU, XPAD_DD, XPAD_DL, XPAD_DR };
+
+static int game_port(void) { return PadOn && Mode == 0 && PadOut.game; }
+
+/* the pad as the game port sees it: in mode 0 without a game layout, what the layout types keys with is left out */
+static const USBPAD_State* padst(int n)
+{
+    const USBPAD_State* p = USBPAD_GetPad(n);
+    USBPAD_State* f = &Filt[n];
+    uint16_t t = PadOut.taken;
+    int i;
+    if (!PadOn || Mode != 0 || (!t && !PadOut.axis_taken)) return p;
+    f->connected = p->connected; f->buttons = p->buttons; f->lt = p->lt; f->rt = p->rt;
+    f->lx = p->lx; f->ly = p->ly; f->rx = p->rx; f->ry = p->ry; f->reports = p->reports;
+    for (i = 0; i < PM_BUTTONS; ++i) if (t & (1u << i)) f->buttons &= (uint16_t)~PmXpad[i];
+    if (t & (1u << PM_LT)) f->lt = 0;
+    if (t & (1u << PM_RT)) f->rt = 0;
+    if (PadOut.axis_taken & 1) f->lx = 0;
+    if (PadOut.axis_taken & 2) f->ly = 0;
+    if (PadOut.axis_taken & 4) f->rx = 0;
+    if (PadOut.axis_taken & 8) f->ry = 0;
+    return f;
+}
+
+static void to_in(const USBPAD_State* p, PADMAP_In* in)
+{
+    int i;
+    in->present = p->connected;
+    in->buttons = 0;
+    for (i = 0; i < PM_BUTTONS; ++i) if (PmXpad[i] && (p->buttons & PmXpad[i])) in->buttons |= (uint16_t)(1u << i);
+    if (p->lt > 128) in->buttons |= 1u << PM_LT;
+    if (p->rt > 128) in->buttons |= 1u << PM_RT;
+    in->axis[PM_LX] = p->lx;
+    in->axis[PM_LY] = p->ly == -32768 ? 32767 : -p->ly;       /* the pad sends up = positive */
+    in->axis[PM_RX] = p->rx;
+    in->axis[PM_RY] = p->ry == -32768 ? 32767 : -p->ry;
+}
 
 
 static inline uint64_t tsc(void) { uint32_t lo, hi; __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi)); return ((uint64_t)hi << 32) | lo; }
@@ -151,10 +201,19 @@ static uint32_t grip_frame(const USBPAD_State* p)
 
 static const USBPAD_State* pad_for(int i, int* m)
 {
-    const USBPAD_State* p2 = USBPAD_GetPad(1);
-    if (p2->connected && !Mode) { *m = i & 1; return i < 2 ? USBPAD_GetPad(0) : p2; }
+    const USBPAD_State* p2 = padst(1);
+    if (p2->connected && !Mode) { *m = i & 1; return i < 2 ? padst(0) : p2; }
     *m = i;
-    return USBPAD_GetPad(0);
+    return padst(0);
+}
+
+/* game port axis i (0..65535) from a game's layout, -1 = not there */
+static int32_t lay_axis(int i)
+{
+    int32_t v;
+    if (!(PadOut.present & (i < 2 ? 1 : 2)) || !USBPAD_GetPad(0)->connected) return -1;
+    v = dz(PadOut.axis[i]) + 32768;
+    return v < 0 ? 0 : v > 65535 ? 65535 : v;
 }
 
 /* BIOS joystick (INT 15h AH=84h, hooked by main.c): DX=0 the buttons as port 201h bits 4-7 (0 = pressed),
@@ -169,6 +228,11 @@ void VJOY_BiosAxes(uint16_t* a)
     int i, m;
     if (!Inited) { for (i = 0; i < 4; ++i) a[i] = 0; return; }
     poll(0);
+    if (game_port())
+    {
+        for (i = 0; i < 4; ++i) { int32_t v = lay_axis(i); a[i] = v < 0 ? 0 : (uint16_t)(v >> 8); }
+        return;
+    }
     for (i = 0; i < 4; ++i)
     {
         const USBPAD_State* p = pad_for(i, &m);
@@ -193,6 +257,15 @@ uint32_t VJOY_IOHandler(uint32_t port, uint32_t val, uint32_t out)
     if (out)
     {
         T0 = tsc();
+        if (game_port())
+        {
+            for (i = 0; i < 4; ++i)
+            {
+                int32_t a = lay_axis(i);
+                End[i] = a < 0 ? ~0ULL : T0 + Cps * (24 + (uint64_t)a * 1100 / 65535) / 1000000ULL;
+            }
+            return val;
+        }
         for (i = 0; i < 4; ++i)
         {
             const USBPAD_State* p = pad_for(i, &m);
@@ -234,6 +307,11 @@ uint32_t VJOY_IOHandler(uint32_t port, uint32_t val, uint32_t out)
             for (i = 0; i < 4 && !lines && p->connected; ++i)
                 if (Bt[i] >= 0 && held(Bt[i], p)) lines = 1u << i;
             return r & ~(lines << 4);
+        }
+        if (game_port())
+        {
+            if (USBPAD_GetPad(0)->connected) r &= ~((uint32_t)(PadOut.buttons & 0x0F) << 4);
+            return r;
         }
         for (i = 0; i < 4; ++i)
         {
@@ -280,7 +358,19 @@ void VJOY_Tick(void)
     if (!Inited) return;
     poll(1);
     p1 = USBPAD_GetPad(0); p2 = USBPAD_GetPad(1);
-    for (i = 0; i < Kn; ++i)
+    if (PadOn != PadPrev)
+    {
+        if (!PadOn) { PADMAP_Release(VKBC_Bytes); memset(&PadOut, 0, sizeof PadOut); }
+        PadPrev = PadOn;
+    }
+    if (PadOn)
+    {
+        PADMAP_In in[2];
+        to_in(p1, &in[0]); to_in(p2, &in[1]);
+        in[0].buttons &= (uint16_t)~KmMask; in[1].buttons &= (uint16_t)~KmMask;
+        PADMAP_Step(in, 2, &PadOut, VKBC_Bytes);
+    }
+    for (i = 0; i < Kn && (!PadOn || PadOver); ++i)
     {
         int h = (p1->connected && held(Km[i].b, p1)) || (p2->connected && held(Km[i].b, p2)), was = (KDown >> i) & 1;
         if (h == was) continue;
@@ -297,6 +387,26 @@ static const char* item(const char* s, int* n)
     while (*e && *e != ',' && *e != ' ') ++e;
     *n = (int)(e - s);
     return e;
+}
+
+void VJOY_PadKeys(int on, int over)
+{
+    int i;
+    static const int pm[] = { PM_A, PM_B, PM_X, PM_Y, PM_LB, PM_RB, PM_LT, PM_RT, PM_START, PM_BACK, PM_LS, PM_RS, -1,
+                              PM_DUP, PM_DDOWN, PM_DLEFT, PM_DRIGHT, -1 };    /* BNames order */
+    if (over >= 0)
+    {
+        PadOver = over;
+        KmMask = 0;
+        if (over) for (i = 0; i < Kn; ++i) if (pm[Km[i].b] >= 0) KmMask |= (uint16_t)(1u << pm[Km[i].b]);
+    }
+    if ((on ? 1 : 0) != PadOn)   /* /JOYKEY's held keys go; the layout's are let go in VJOY_Tick */
+    {
+        uint32_t k;
+        for (k = 0; k < (uint32_t)Kn; ++k) if ((KDown >> k) & 1) VKBC_Key(Km[k].code, 0);
+        KDown = 0;
+    }
+    PadOn = on ? 1 : 0;
 }
 
 /* A second SBEMU run changed /JOYMODE or /JOYDZ: the resident copy takes them (not to or from 4, which

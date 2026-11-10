@@ -577,6 +577,11 @@ CONTENTS
                            hex, E0xx for extended keys; - = none
                            (default ST:1C,BK:01 = Start Enter, Back Esc)
      /JOYDZ:pct            stick dead zone, 0-90 (default 10)
+     /PADKEYS:1|0          pad buttons type each game's keys (PADMAP.TXT,
+                           PADUSER.TXT next to SBEMU.EXE; default on;
+                           0 = only /JOYKEY)
+     /PADLOG               with SBEMU loaded: show the layout it picked for
+                           the last programs started, then quit
 
   Selection and diagnostics
      /SCL                  list installed sound cards
@@ -857,6 +862,59 @@ CONTENTS
                   keys. Typed like real keys (games with their own
                   keyboard handler see them too).
      Dead zone    stick movement ignored around the centre (default 10%).
+     Keys per game  (new in beta.79, /PADKEYS) - see below.
+
+  Pad buttons as keys, a layout per game (beta.79; the same files and
+  rules as the Windows 98 part, README98.TXT):
+     When a program starts, SBEMU looks at its name and size (and, if
+     that is not a known game, at the files in its folder: data files
+     identify games too) and gives the pad that game's keys - e.g.
+     Commander Keen 4: A = Ctrl (jump), B = Space (fire), X = Alt (pogo),
+     Y = Enter, sticks and D-pad = arrow keys. When the game ends, the
+     layout of the program you go back to (or Default) is used again and
+     held keys are let go.
+     Layouts for 3500+ games: download keyb2joypad.cpp as DOWNLOADS.TXT
+       says (the Keyb2Joypad project, as built into DOSBox Pure; not
+       shipped with the pack) into C:\SC55\PADMAP (Setup copies the pack's
+       FILES\PADMAP there). The next SBEMU start turns it into
+       C:\SC55\PADMAP.TXT (a few seconds, once), and PADMAP.TXT +
+       PADUSER.TXT into PADMAP.BIN, which SBEMU keeps in memory (it reads
+       no files while games run). PADCONV.EXE does the first step by hand:
+       PADCONV PADMAP\KEYB2J~1.CPP PADMAP.TXT
+     Without a layout for the game ("Default"): the joystick works as set
+       above (Sticks, Buttons 1-4), D-pad = arrow keys, Start = Enter,
+       Back = Esc. (The D-pad no longer moves joystick A then; make it do
+       so again with [Default] DUp=JoyUp ... in PADUSER.TXT, or Keys per
+       game = Off.)
+     With a game's layout: the joystick the game sees is the layout's
+       (JoyButton1-4, JoyUp ...); a layout with none = no joystick, so the
+       game doesn't get stick and keys at once. CH / FCS / GrIP stick
+       types keep their joystick as set; the layout only adds keys.
+     Your own layouts and changes: C:\SC55\PADUSER.TXT, same format as
+       PADMAP.TXT. A section with a game's title (or [Default]) changes only
+       the lines it has, e.g.
+          [Default]
+          Y=F1
+          [Commander Keen 4 - Secret of the Oracle]
+          RB=F2+F3
+       A new game: a new [title] with Id= (USBTEST /PAD:GAME.EXE shows the
+       id ... or copy one from PADMAP.TXT), then its lines.
+       Buttons: A B X Y LB RB LT RT LS RS Back Start DUp DDown DLeft DRight
+       Sticks:  LStickX LStickY RStickX RStickY = key-for-left/up key-for-
+       right/down. Keys as in PADMAP.TXT (LCtrl, Space, Up, F1, A ... Z,
+       KP8, None); JoyButton1-4, JoyUp/Down/Left/Right, Joy2Up... = the DOS
+       joystick. SBEMU picks the change up at its next start.
+     Which layout did it pick?  SBEMU /PADLOG (with SBEMU loaded) lists the
+       last programs started and the layout each got, e.g.
+          KEEN4E.EXE: Commander Keen 4 - Secret of the Oracle (KEEN4E.EXE
+          found by its id)
+       USBTEST /PAD:C:\GAMES\KEEN4\KEEN4E.EXE (without SBEMU) shows the
+       layout for that program and the key codes each pad button types.
+     Settings > Joystick > Keys per game = Off (/PADKEYS:0): only the Keys
+       line above (/JOYKEY), as before beta.79. A /JOYKEY of your own
+       (not the default) keeps its buttons in every layout.
+     Two pads: both type the layout's keys; the joystick of a game's layout
+       follows pad 1. Held keys do not repeat (a real key would).
 
   Works with: the wired Microsoft Xbox 360 pad and wired pads that use the
   same protocol (Hori, Mad Catz, Logitech ChillStream, Saitek ... the
@@ -1235,7 +1293,8 @@ CONTENTS
      FILES\SC55       SBEMU.EXE, SBSET.EXE, SC55WAV.EXE, SC55LOG.EXE,
                       MPUTEST.EXE, MIDPLAY.EXE, CPUMHZ.EXE, SC55MENU.EXE,
                       SBDIAG.EXE, GAMETEST.EXE, TIMETEST.EXE, JOYTEST.EXE,
-                      USBTEST.EXE, KMTEST.EXE, SBEMU16.COM
+                      USBTEST.EXE, KMTEST.EXE, SBEMU16.COM, PADCONV.EXE
+     FILES\PADMAP     for your keyb2joypad.cpp (pad layouts, DOWNLOADS.TXT)
      FILES\ROMS       ROM dumps (yours)
      FILES\HDPMI      HDPMI32I.EXE, HDPMI16I.EXE (16-bit, section 11b)
      FILES\CDSET      uCDD, SHSUCDX, CDGUI, CDPLAY, GUI/CDIMG/CDON/CDDIAG
@@ -1256,6 +1315,9 @@ CONTENTS
      C:\SC55\THEME.CFG    menu style, display mode, animation and font
      C:\SC55\MENU.CFG     the item the menu was last on
      C:\SC55\ROMS\ROMHASH.CAC  ROM recognition cache (safe to delete)
+     C:\SC55\PADMAP\     your keyb2joypad.cpp; PADMAP.TXT (made from it),
+                          PADUSER.TXT (yours), PADMAP.BIN (made from both;
+                          safe to delete) - pad layouts per game
      C:\SC55\SBOPTS.TXT   your saved settings (made by SETTINGS.BAT; also
                           SBOPTS.BAT, the same as a SET line)
      C:\SC55\SC55LOG.TXT  report written by TEST.BAT

@@ -226,6 +226,12 @@ void VKBC_Key(uint16_t code, int down)
     kpush((uint8_t)((code & 0x7F) | (down ? 0 : 0x80)));
 }
 
+void VKBC_Bytes(const uint8_t* b, int n)
+{
+    int i;
+    for (i = 0; i < n; ++i) kpush(b[i]);
+}
+
 static void usage_key(int u, int down)
 {
     if (u == 0x46)                                                      /* Print Screen */

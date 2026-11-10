@@ -6,6 +6,7 @@
 
 void VKBC_Init(uint64_t cps, int mouse);    /* mouse: answer PS/2 mouse commands (ports 60h / 64h trapped) */
 void VKBC_Key(uint16_t code, int down);     /* set 1 scan code, E0xxh = extended */
+void VKBC_Bytes(const uint8_t* b, int n);   /* raw set 1 bytes (prefixes included), e.g. from padmap.c */
 void VKBC_UsbKeys(int id, const uint8_t* report);       /* USB boot keyboard report (USBPAD_KbdFn) */
 void VKBC_UsbMouse(int buttons, int dx, int dy, int dw); /* USB mouse movement (USBPAD_MouseFn) */
 void VKBC_Tick(void);                       /* sound interrupt: puts queued bytes into the controller, key repeat */

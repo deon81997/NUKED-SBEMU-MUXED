@@ -23,6 +23,7 @@
 #include <untrapio.h>
 #include <vmpu.h>
 #include <dirent.h>
+#include <dir.h>
 #include <sys/stat.h>
 #if SBEMU_VSC55
 #include <sc55synth.h>
@@ -32,6 +33,7 @@
 #include "sbemu/usbpad.h"
 #include "sbemu/vjoy.h"
 #include "sbemu/vkbc.h"
+#include "sbemu/padmap.h"
 #include "qemm.h"
 #include "hdpmipt.h"
 #include "serial.h"
@@ -218,6 +220,166 @@ static BOOL MAIN_HookInt15(int joy)
     STIL();
     return TRUE;
 }
+/* Pad layout per game (padmap.c): which program is running. A real-mode INT 21h stub (sbemu/int21.asm, bytes in
+ * int21bin.h) sees every EXEC (AX=4B00h) before DOS does, finds the program's full name and size and calls back here;
+ * it runs the EXEC itself, so it also calls back when the program has ended, however it ended. The callback only
+ * looks ids up in the table loaded at start (no file reads, never from the sound interrupt) and keeps a stack of
+ * running programs; the layout used is the newest program found by its own id, else the newest found by a file in
+ * its folder (data files identify games too), else Default - as SC55W does it in Windows 98. */
+#include "sbemu/int21bin.h"
+#define MAIN_PADSTK 8
+static DPMI_REG MAIN_I21REG;
+static uint32_t MAIN_I21Lin;           /* the stub (its data bytes), 0 = not hooked */
+static uint32_t MAIN_I21Cb;
+static struct { int lay, how; char name[13], where[13]; } MAIN_PadStk[MAIN_PADSTK];   /* how: 2 own id, 1 a file in its folder */
+static int MAIN_PadDepth;
+static char MAIN_PadLog[8][100];       /* last layout picks, oldest first */
+static int MAIN_PadLogN;
+static uint32_t MAIN_PadExecs;
+static BOOL MAIN_PadOn;                /* layouts loaded and the stub hooked */
+
+static void MAIN_PadName(char* d, uint32_t lin)   /* 8.3 name after the last backslash of a real-mode string */
+{
+    char b[128];
+    const char* n;
+    char* e;
+    DPMI_LMemcpy(DPMI_PTR2L(b), lin, sizeof b);
+    b[sizeof b - 1] = 0;
+    n = strrchr(b, '\\'); n = n ? n + 1 : b;
+    strncpy(d, n, 12); d[12] = 0;
+    for(e = d; *e; ++e) *e = (char)toupper((unsigned char)*e);
+}
+
+static void MAIN_PadPick(const char* prog, int always)   /* always: log it even when the layout stays */
+{
+    int i, lay = 0, at = -1, n = MAIN_PadDepth < MAIN_PADSTK ? MAIN_PadDepth : MAIN_PADSTK;
+    char* l;
+    for(i = n - 1; i >= 0 && at < 0; --i) if(MAIN_PadStk[i].how == 2) at = i;
+    for(i = n - 1; i >= 0 && at < 0; --i) if(MAIN_PadStk[i].how == 1) at = i;
+    if(at >= 0) lay = MAIN_PadStk[at].lay;
+    if(lay == PADMAP_Current() && !always && MAIN_PadLogN) return;
+    PADMAP_Select(lay);
+    if(MAIN_PadLogN == 8) { memmove(MAIN_PadLog[0], MAIN_PadLog[1], sizeof(MAIN_PadLog[0]) * 7); MAIN_PadLogN = 7; }
+    l = MAIN_PadLog[MAIN_PadLogN++];
+    if(at < 0) snprintf(l, sizeof MAIN_PadLog[0], "%s: Default (%s)", prog, n ? "no layout found" : "back at the prompt");
+    else if(MAIN_PadStk[at].how == 2)
+        snprintf(l, sizeof MAIN_PadLog[0], "%s: %.60s (%s found by its id)", prog, PADMAP_Title(lay), MAIN_PadStk[at].where);
+    else snprintf(l, sizeof MAIN_PadLog[0], "%s: %.60s (%s in the folder of %s)", prog, PADMAP_Title(lay), MAIN_PadStk[at].where, MAIN_PadStk[at].name);
+}
+
+static void MAIN_Int21(void)
+{
+    DPMI_REG* r = &MAIN_I21REG;
+    const uint32_t id = r->d.ebx;
+    const int top = MAIN_PadDepth - 1;
+    int l;
+    switch(r->h.al)
+    {
+    case 1:                                         /* a program starts: its own id (0 = file not found) */
+        ++MAIN_PadExecs;
+        r->h.al = 1;
+        if(MAIN_PadDepth++ >= MAIN_PADSTK) return;
+        MAIN_PadStk[top + 1].lay = 0; MAIN_PadStk[top + 1].how = 0; MAIN_PadStk[top + 1].where[0] = 0;
+        MAIN_PadName(MAIN_PadStk[top + 1].name, MAIN_I21Lin + MAIN_I21_PATH);
+        if(!id) return;
+        if((l = PADMAP_Find(id)) >= 0)
+        {
+            MAIN_PadStk[top + 1].lay = l; MAIN_PadStk[top + 1].how = 2;
+            strcpy(MAIN_PadStk[top + 1].where, MAIN_PadStk[top + 1].name);
+            return;
+        }
+        r->h.al = 0;                                /* try the files in its folder */
+        return;
+    case 2:                                         /* a file in its folder */
+        r->h.al = 0;
+        if(top < 0 || top >= MAIN_PADSTK || (l = PADMAP_Find(id)) < 0) return;
+        MAIN_PadStk[top].lay = l; MAIN_PadStk[top].how = 1;
+        MAIN_PadName(MAIN_PadStk[top].where, MAIN_I21Lin + MAIN_I21_NAME);
+        r->h.al = 1;
+        return;
+    case 3:                                         /* look-up done */
+        if(top >= 0 && top < MAIN_PADSTK) MAIN_PadPick(MAIN_PadStk[top].name, 1);
+        return;
+    case 4:                                         /* it has ended */
+        if(MAIN_PadDepth > 0)
+        {
+            char n[13];
+            strcpy(n, top < MAIN_PADSTK ? MAIN_PadStk[top].name : "?");
+            --MAIN_PadDepth;
+            if(MAIN_PadDepth > 0 && MAIN_PadDepth <= MAIN_PADSTK)
+            {   /* name the program now running again */
+                char m[40];
+                snprintf(m, sizeof m, "%s ended, %s", n, MAIN_PadStk[MAIN_PadDepth - 1].name);
+                MAIN_PadPick(m, 0);
+            }
+            else { strcat(n, " ended"); MAIN_PadPick(n, 0); }
+        }
+        return;
+    }
+}
+
+static BOOL MAIN_HookInt21(void)
+{
+    uint8_t code[sizeof(MAIN_I21Stub)];
+    uint32_t mem;
+    uint16_t seg, old_off, old_seg;
+    if(MAIN_I21Lin) return TRUE;
+    if(!MAIN_I21Cb) MAIN_I21Cb = DPMI_AllocateRMCB_IRET(&MAIN_Int21, &MAIN_I21REG);
+    if(!MAIN_I21Cb || (mem = DPMI_HighMalloc((sizeof(code) + 15) / 16, TRUE)) == 0) return FALSE;
+    seg = (uint16_t)mem;
+    memcpy(code, MAIN_I21Stub, sizeof code);
+    old_off = DPMI_LoadW(0x21 * 4); old_seg = DPMI_LoadW(0x21 * 4 + 2);
+    memcpy(code + 0, &old_off, 2); memcpy(code + 2, &old_seg, 2);
+    memcpy(code + 4, &MAIN_I21Cb, 4);
+    code[8] = 1;
+    DPMI_LMemcpy(DPMI_SEGOFF2L(seg, 0), DPMI_PTR2L(code), sizeof(code));
+    MAIN_I21Lin = DPMI_SEGOFF2L(seg, 0);
+    CLIS();
+    DPMI_StoreW(0x21 * 4, MAIN_I21_ENTRY); DPMI_StoreW(0x21 * 4 + 2, seg);
+    STIL();
+    return TRUE;
+}
+
+static void MAIN_UnhookInt21(void)    /* start-up failed: give INT 21h back if nothing came after us */
+{
+    if(!MAIN_I21Lin) return;
+    CLIS();
+    if(DPMI_LoadW(0x21 * 4) == MAIN_I21_ENTRY && DPMI_LoadW(0x21 * 4 + 2) == (uint16_t)(MAIN_I21Lin >> 4))
+    {
+        DPMI_StoreW(0x21 * 4, DPMI_LoadW(MAIN_I21Lin)); DPMI_StoreW(0x21 * 4 + 2, DPMI_LoadW(MAIN_I21Lin + 2));
+    }
+    else DPMI_StoreB(MAIN_I21Lin + 8, 0);  /* someone hooked after us: just switch the stub off */
+    STIL();
+}
+
+/* PADMAP.TXT (made from keyb2joypad.cpp in PADMAP\\ when that is new), PADUSER.TXT -> PADMAP.BIN (rebuilt when any
+ * of them changed), loaded whole: padmap.c PADMAP_Prepare. 1 = layouts there. */
+static void MAIN_Step(const char* what);
+static void MAIN_D(const char* fmt, ...);
+static void MAIN_CPrintf(int color, const char* format, ...);
+static void MAIN_PadNote(int kind, const char* text)
+{
+    if(kind == 0)   /* MAIN_Step keeps the pointer: only fixed strings */
+    {
+        MAIN_Step(strncmp(text, "making PADMAP.TXT", 17) == 0 ? "pad layouts: PADMAP.TXT from keyb2joypad.cpp" : "pad layouts: PADMAP.BIN");
+        printf("Pad layouts: %s ...\n", text);
+    }
+    else if(kind == 1) { MAIN_CPrintf(YELLOW, "Pad layouts: %s - /JOYKEY only.\n", text); MAIN_D("Pad layouts: %s\n", text); }
+    else MAIN_D("Pad layouts: %s\n", text);
+}
+static int MAIN_PadLoad(void)
+{
+    char dir[_MAX_PATH], d[400];
+    int ids = 0, n;
+    get_program_path(dir, sizeof dir);
+    if(!PADMAP_Prepare(dir, MAIN_PadNote)) return 0;
+    n = PADMAP_Count(&ids);
+    PADMAP_Describe(0, d, sizeof d);
+    MAIN_D("Pad layout Default: %s\n", d);
+    printf("Pad buttons as keys, layout per game (%d games): ", n - 1);
+    return 1;
+}
+
 static uint32_t MAIN_TSR_INT_FNO = MAIN_TSR_INTSTART_ID;
 static uint32_t MAIN_ISR_DOSID;
 static const char MAIN_ISR_DOSID_String[] = "Crazii  SBEMU   Sound Blaster emulation on AC97"; //8:8:asciiz
@@ -616,6 +778,8 @@ struct MAIN_OPT
     "/USBKB", "USB keyboard typed through the PC's keyboard controller (1=on, 0=off; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
     "/USBMS", "USB mouse for a DOS mouse driver loaded after SBEMU (1=auto, 2=always, 0=off; needs /JOY:1). Without JEMM/QEMM it goes through the BIOS, next to the touchpad", 1, MAIN_SETCMD_BASE10,
     "/JOYBIOS", "BIOS joystick calls (INT 15h AH=84h) answered from the USB pad too (1=on, 0=off; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
+    "/PADKEYS", "Pad buttons -> keyboard keys with a layout per game, from PADMAP.TXT / PADUSER.TXT in SBEMU's folder (1=on, 0=off: only /JOYKEY; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
+    "/PADLOG", "Show which pad layout the loaded SBEMU picked for the last programs started (SBEMU /PADLOG)", 0, MAIN_SETCMD_BASE10,
     NULL, NULL, 0,
 };
 enum EOption
@@ -684,6 +848,8 @@ enum EOption
     OPT_USBKB,
     OPT_USBMS,
     OPT_JOYBIOS,
+    OPT_PADKEYS,
+    OPT_PADLOG,
     OPT_COUNT,
 };
 
@@ -1191,6 +1357,10 @@ static void MAIN_PrintRomsetName(const char* name, void* user)
 
 int main(int argc, char* argv[])
 {
+    /* SBEMU /PADLOG only asks the loaded SBEMU: it must not overwrite that one's start-up log and SBDETAIL.TXT */
+    int padlog_only = 0;
+    for(int i = 1; i < argc; ++i) if(strnicmp(argv[i], "/PADLOG", 7) == 0) padlog_only = 1;
+    if(!padlog_only)
     {   //SC55.BAT sets SBEMULOG=<file>: everything SBEMU prints is written there (and shown afterwards by the batch file)
         const char* logname = getenv("SBEMULOG");
         FILE* probe = (logname && *logname) ? fopen(logname, "w") : NULL;
@@ -1201,6 +1371,7 @@ int main(int argc, char* argv[])
             MAIN_LogOn = 1;
         }
     }
+    if(!padlog_only)
     {
         /* SBEMUDETAIL names the file; otherwise SBDETAIL.TXT next to the SBEMULOG file (SC55.BAT sets that) */
         static char dbuf[260];
@@ -1499,6 +1670,7 @@ int main(int argc, char* argv[])
     //TSR installation check: update parameter & exit if already installed
     MAIN_Step("checking for a resident SBEMU");
     MAIN_TSR_InstallationCheck();
+    if(MAIN_Options[OPT_PADLOG].setcmd & MAIN_SETCMD_SET) { printf("SBEMU is not loaded.\n"); exit(1); }
 
 #if SBEMU_VMPU && SBEMU_VSC55
     //Auto-load: on a fresh install (a second run already exited above), switch the SC-55 on by itself when
@@ -2043,6 +2215,28 @@ int main(int argc, char* argv[])
                 if(!(USBPAD_Have() & (USBPAD_HAVE_PAD1 | USBPAD_HAVE_PAD2)))
                     MAIN_CPrintf(LIGHTGRAY, "  Plug a pad in any time; it is picked up while games run.\n"
                         "  Not found? Run USBTEST.EXE (without SBEMU loaded) to see every USB step.\n");
+                if(MAIN_Options[OPT_PADKEYS].value)
+                {
+                    /* /JOYKEY given and not the default: those buttons stay as it says, in every layout */
+                    const char* jk = (const char*)MAIN_Options[OPT_JOYKEY].value;
+                    int over = (MAIN_Options[OPT_JOYKEY].setcmd & MAIN_SETCMD_SET) && strcasecmp(jk, "ST:1C,BK:01") != 0;
+                    MAIN_Step("pad layouts (/PADKEYS)");
+                    if(MAIN_PadLoad())
+                    {
+                        MAIN_Step("pad layouts: INT 21h EXEC hook");
+                        if(MAIN_HookInt21())
+                        {
+                            MAIN_PadOn = TRUE;
+                            VJOY_PadKeys(1, over);
+                            MAIN_Print_Enabled_Newline(TRUE);
+                            if(over) MAIN_CPrintf(LIGHTGRAY, "  /JOYKEY:%s keeps its buttons in every layout.\n", jk);
+                        }
+                        else { PADMAP_Reset(); MAIN_CPrintf(YELLOW, "not on (INT 21h not hooked: no memory)\n"); }
+                    }
+                    MAIN_D("Pad keys: %s (INT 21h stub at %x, /JOYKEY %s)\n", MAIN_PadOn ? "on" : "off - /JOYKEY only",
+                        MAIN_I21Lin, over ? "overrides its buttons" : "used only without layouts");
+                }
+                else MAIN_D("Pad keys: off (/PADKEYS:0) - /JOYKEY only\n");
                 MAIN_Step("USB: polling from the sound interrupt on");
                 MAIN_JOY_On = TRUE;
                 {   /* a second of it before going on, so a hang there shows up in this log */
@@ -2137,6 +2331,7 @@ int main(int argc, char* argv[])
 
         if(!MAIN_TSRed)
             MAIN_CPrintf(RED, "Error: Failed installing TSR.\n");
+        MAIN_UnhookInt21();
     }
     return 1;
 }
@@ -2620,6 +2815,18 @@ void MAIN_TSR_InstallationCheck()
         //printf("DOSID:%x\n", DPMI_SEGOFF2L(r.w.dx, r.w.di));
         if(DPMI_LMemcmp(DPMI_SEGOFF2L(r.w.dx, r.w.di), DPMI_PTR2L((char*)MAIN_ISR_DOSID_String), 16) == 0)
         {
+            if(MAIN_Options[OPT_PADLOG].setcmd & MAIN_SETCMD_SET)
+            {   /* SBEMU /PADLOG: what the loaded SBEMU picked, then nothing else */
+                char* t = (char*)alloca(1024);
+                r.h.ah = i;
+                r.h.al = 0x03;
+                r.d.ebx = DPMI_PTR2L(t);
+                r.d.ecx = 1024;
+                DPMI_CallRealModeINT(MAIN_TSR_INT, &r);
+                if((r.w.flags & CPU_CFLAG) || r.h.al == 0x03) printf("The loaded SBEMU is older: it has no pad layouts.\n");
+                else fputs(t, stdout);
+                exit(0);
+            }
             printf("%s is active.\n", PROGNAME);
 
             //note: copy array won't copy string pointers in the array, don't reference them, use string in MAIN_Options.
@@ -2752,6 +2959,27 @@ static void MAIN_TSR_Interrupt()
             MAIN_TSRREG.w.dx = (MAIN_ISR_DOSID&0xFFFF); //a real mode string buffer of identification: segment
             MAIN_TSRREG.w.di = 0; //offset
         return;
+        case 0x03: //pad layout log (SBEMU /PADLOG): text into EBX, at most ECX bytes
+        {
+            char t[8 * 104 + 120];
+            int i, n;
+            if(!MAIN_PadOn) n = snprintf(t, sizeof t, "Pad layouts per game are off (no PADMAP.TXT / PADUSER.TXT, /PADKEYS:0 or /JOY:0).\r\n");
+            else
+            {
+                n = snprintf(t, sizeof t, "Pad layout now: %s. Programs started: %lu, running: %d.\r\n", PADMAP_Title(PADMAP_Current()),
+                    (unsigned long)MAIN_PadExecs, MAIN_PadDepth);
+                for(i = 0; i < MAIN_PadLogN && n < (int)sizeof t - 1; ++i)
+                    n += snprintf(t + n, sizeof t - n, "  %s\r\n", MAIN_PadLog[i]);
+            }
+            if(n > (int)sizeof t - 1) n = sizeof t - 1;
+            if(MAIN_TSRREG.d.ecx < (uint32_t)n + 1) n = MAIN_TSRREG.d.ecx ? (int)MAIN_TSRREG.d.ecx - 1 : 0;
+            t[n] = 0;
+            if(MAIN_TSRREG.d.ecx) DPMI_LMemcpy(MAIN_TSRREG.d.ebx, DPMI_PTR2L(t), n + 1);
+            MAIN_TSRREG.d.ecx = n;
+            MAIN_TSRREG.h.al = 0;                       /* an older SBEMU leaves AL as it was */
+            MAIN_TSRREG.w.flags &= ~CPU_CFLAG;
+        }
+        return;
         case 0x01: //query
         {
             if(MAIN_TSRREG.d.ecx != sizeof(MAIN_Options)) //different version of SBEMU?
@@ -2880,6 +3108,11 @@ static void MAIN_TSR_Interrupt()
             if((OPT_CHANGED(OPT_JOYMODE) || OPT_CHANGED(OPT_JOYDZ)) && MAIN_Options[OPT_JOY].value
                 && old_opt[OPT_JOYMODE].value != 4 && MAIN_Options[OPT_JOYMODE].value != 4)
                 VJOY_SetLive(MAIN_Options[OPT_JOYDZ].value, MAIN_Options[OPT_JOYMODE].value);
+            if(OPT_CHANGED(OPT_PADKEYS) && MAIN_PadOn)   /* layouts were loaded at start: just on / off */
+            {
+                DPMI_StoreB(MAIN_I21Lin + 8, MAIN_Options[OPT_PADKEYS].value ? 1 : 0);
+                VJOY_PadKeys(MAIN_Options[OPT_PADKEYS].value ? 1 : 0, -1);
+            }
             if(OPT_CHANGED(OPT_FMCORE))
             {
                 OPL3EMU_SetCore(MAIN_Options[OPT_FMCORE].value);
