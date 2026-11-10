@@ -93,15 +93,17 @@ static void m3_draw_panels(int cat, int sel, float selanim)
     int k[80], n = cat_items(cat, k), i, x, y, j, t = (int)(m3_bgphase * 40);
     const ITEM* it = &g_it[sel];
     {   /* sin(x*0.01 + b) = sin(x*0.01) cos b + cos(x*0.01) sin b: two tables instead of 300000 sinf a frame */
-        static float sx[M3W], cx[M3W]; static int init;
-        if (!init) { for (x = 0; x < M3W; x++) { sx[x] = 14 * sinf(x * 0.01f); cx[x] = 14 * cosf(x * 0.01f); } init = 1; }
+        /* integers per pixel: a float-to-int conversion per pixel (307200 a frame) is very slow on i386-built code */
+        static int sx[M3W], cx[M3W]; static int init;
+        if (!init) { for (x = 0; x < M3W; x++) { sx[x] = (int)(14 * 256 * sinf(x * 0.01f)); cx[x] = (int)(14 * 256 * cosf(x * 0.01f)); } init = 1; }
         for (y = 0; y < M3H; y++)
         {
             uint32_t* p = m3_fb + y * M3W;
-            float b = y * 0.013f + m3_bgphase * 0.6f, sb = sinf(b), cb = cosf(b);
+            float b = y * 0.013f + m3_bgphase * 0.6f; int sb = (int)(256 * sinf(b)), cb = (int)(256 * cosf(b));
+            if (!(y & 15)) M3_HOOK();
             for (x = 0; x < M3W; x++)
             {
-                int v = ((x + y + t) >> 5 & 1) ? 6 : 0, w = (int)(24 + sx[x] * cb + cx[x] * sb);
+                int v = ((x + y + t) >> 5 & 1) ? 6 : 0, w = 24 + ((sx[x] * cb + cx[x] * sb) >> 16);
                 p[x] = m3_rgb(8 + v, 14 + w / 2 + v, 40 + w + v);
             }
         }

@@ -1020,3 +1020,13 @@ User video from the D810 (beta.84): no more black lines, LOAD 48% (SC-55), 3D at
   from snd_intel_measure_ac97_clock). Asked the user for SBLOG.TXT (codec id + "AC97 clock check" line) at 48000 and
   what it sounds like. 86Box's ES1371 does not take that path; QEMU (ICH AC'97) not installed here.
 Zip = beta.84 zip + MIDPLAY, SC55MENU, SBSET, GAMETEST, CDSET\CDGUI (m3core), SBEMU (version) + README.TXT.
+
+## after beta.85 (2026-11-10, NOT RELEASED - source only): MENU 3D speed, started
+User: "make the sc55 menu faster and better looking quickly" (session ran out of usage).
+- DONE (built, not tested in 86Box, not in a zip): menu3d.h Panels background uses integer math per pixel (was a
+  float->int conversion per pixel, 307200 a frame, slow in -march=i386 x87 code).
+- NEXT: (1) test Panels in 86Box (MENU3D.CFG STYLE=0 makes SC55MENU start in 3D; M3PROF=1 env logs fps to
+  C:\M3PROF.TXT), compare fps with beta.85; (2) Carousel's mirror floor (m3_draw_floor alpha 160) still uses the
+  4-quad path: give m3_floor_rows an alpha (tex m3_floor, blend, no z-write) for it; (3) "better looking": ask user
+  what they want; (4) release as beta.86 (zip = beta.85 + SC55MENU + SBEMU version).
+- Also open: 48 kHz garbled on the D810 (see beta.85 section).
