@@ -336,6 +336,7 @@ Every release gets tried on real iron here, plus a whole fleet of emulated PCs:
 <b>💻 Dell Latitude D810</b> (the home machine!!)
 
 - Intel Pentium M
+- ATI Mobility Radeon X300
 - Intel ICH6 chipset, AC'97 sound, built-in touchpad
 - Windows 98 SE / MS-DOS 7.1
 
