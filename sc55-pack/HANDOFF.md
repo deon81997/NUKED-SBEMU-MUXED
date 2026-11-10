@@ -1021,7 +1021,7 @@ User video from the D810 (beta.84): no more black lines, LOAD 48% (SC-55), 3D at
   what it sounds like. 86Box's ES1371 does not take that path; QEMU (ICH AC'97) not installed here.
 Zip = beta.84 zip + MIDPLAY, SC55MENU, SBSET, GAMETEST, CDSET\CDGUI (m3core), SBEMU (version) + README.TXT.
 
-## after beta.85 (2026-11-10, NOT RELEASED - source only): MENU 3D speed, started
+## beta.86 (2026-11-10): MENU 3D speed + version on screen (RELEASED, tag v1.0.0-beta.86-usb)
 User: "make the sc55 menu faster and better looking quickly" (session ran out of usage).
 - DONE (built, not tested in 86Box, not in a zip): menu3d.h Panels background uses integer math per pixel (was a
   float->int conversion per pixel, 307200 a frame, slow in -march=i386 x87 code).
@@ -1032,3 +1032,11 @@ User: "make the sc55 menu faster and better looking quickly" (session ran out of
 - Also open: 48 kHz garbled on the D810 (see beta.85 section).
 
 - 2026-11-10 17:01 user: the D810 48 kHz garbling "went away after a restart" - closed unless it comes back (if so: SBLOG.TXT at 48000, AC97 clock check line).
+
+beta.86 done: Panels background integer math; m3_floor_rows(y, alpha) also does the alpha < 256 mirror floor (m3_floor
+texture, blend, z test, no z write; host: 1.12 -> 0.46 ms, same picture as the quads). SC55MENU header line 5 shows the
+version (makefile passes -DMENU_VER=$(VERSION); "beta.NN" cut out, yellow at column 44). 86Box PII-450, QUALITY=1 (full),
+M3PROF fps: Panels 8.5 -> 10.1, Carousel 8.6 -> 11.4. Test script /tmp/menufps.sh (root4 copy + TUNED.FLG so it is not
+a first run + MENU3D.CFG STYLE=n, Esc twice + Enter to quit, M3PROF.TXT copied to DIR.TXT).
+Zip = beta.85 zip + SC55MENU, SBSET, GAMETEST, CDGUI, MIDPLAY (m3core), SBEMU (version).
+Still open: "better looking" menu (ask the user what they want).

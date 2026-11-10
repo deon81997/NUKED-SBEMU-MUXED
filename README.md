@@ -76,6 +76,12 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.86.** **Snappier 3D menus, and the version on screen!!** The MENU now
+shows which version you run (yellow, under the logo), no more digging in SBLOG.TXT. The 3D menu styles got quicker:
+Panels' moving background now uses whole-number math (it did a slow float conversion for every pixel), and
+Carousel's see-through mirror floor is drawn row by row like MIDPLAY's. 86Box, Pentium II 450 at full 640x480:
+Panels 8.5 -> 10.1 frames a second, Carousel 8.6 -> 11.4.
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.85.** **MIDPLAY's 3D view, 3x smoother!!** On the D810 it showed
 only 5-6 pictures a second. It used to rest between frames to leave the CPU to the music, which is no longer needed
 since beta.83 sends the music while drawing: now it draws as fast as the PC allows, up to 60 a second. The grid floor
@@ -110,6 +116,11 @@ real drive keeps D:. The virtual drive also plays CD music by itself like a real
 CUE sheets with PREGAP lines play the right spot. New driver built from source: uCDD 0.9.5-a3 plus our CD-audio part,
 and SHSUCDX with a new /P option. No CPU used while nothing reads the disc.
 
+<details>
+<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
+
+<br>
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.81-w98.4.** **Lighter on your CPU!!** NUKED SB-EMU for Windows 98
 now really rests when nothing plays: the sound output pauses while it's silent (and wakes up within a blink when a game or
 a MIDI file starts), Windows' timer is no longer kept at 1000 ticks a second, the joystick check slows down when no game
@@ -117,11 +128,6 @@ uses it, and a sleeping SC-55 no longer costs more than a playing one. Measured 
 Windows 98 idle: **1.6% of the CPU before, 0.25% now.** In plain DOS the Nuked OPL3 core goes to sleep after two seconds
 of silence (some games leave silent notes playing forever) and the SC-55 stops sooner after the music ends.
 New setting `OutputSleep=0` in SC55W.INI if your sound card's driver ever misses the first note after a pause.
-
-<details>
-<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
-
-<br>
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.80-w98.3.** **Joysticks EVERYWHERE in Windows 98!!** The
 settings window got tabs, and the new **Joystick** tab shows your pad live (sticks, buttons, what DOS games read). Pick the

@@ -501,9 +501,9 @@ static void m3_sky(void)
  * screen row of a flat floor lies at ONE depth. Per row: one divide, one fog value, and u/v stepping linearly
  * (exact, no perspective error), instead of a perspective divide every 16 pixels and per-pixel fog. Same picture
  * as the 4 textured quads (tile = 2 units, 128-pixel texture, -12..12 in x and z), about 3x faster. */
-static void m3_floor_rows(float fy)
+static void m3_floor_rows(float fy, int alpha)          /* alpha < 256: the see-through mirror floor (no z write) */
 {
-    const M3SURF* tex = &m3_floor_solid;
+    const M3SURF* tex = alpha >= 256 ? &m3_floor_solid : &m3_floor;
     float f = m3_f * m3_rw / M3W, hgt = fy - m3_cam.y, cx = m3_rw / 2.0f, cyy = m3_rh / 2.0f;
     float fk = m3_fog1 > m3_fog0 ? 256.0f / (m3_fog1 - m3_fog0) : 0;
     int y;
@@ -541,7 +541,10 @@ static void m3_floor_rows(float fy)
         F = (int)((t - m3_fog0) * fk); if (F > 256) F = 256;
         iz = 1.0f / t;
         fp = m3_fb + y * M3W + xs; zp = m3_zb + y * M3W + xs;
-        if (F > 0)
+        if (alpha < 256)
+            for (x = xs; x < xe; x++, fp++, zp++, U += dU, V += dV)
+            { if (iz > *zp) { uint32_t px = tex->p[((V >> 16) & 127) * 128 + ((U >> 16) & 127)]; if (F > 0) px = m3_lerpc(px, m3_fog, F); *fp = m3_blend(*fp, px, alpha); } }
+        else if (F > 0)
             for (x = xs; x < xe; x++, fp++, zp++, U += dU, V += dV)
             { if (iz > *zp) { *fp = m3_lerpc(tex->p[((V >> 16) & 127) * 128 + ((U >> 16) & 127)], m3_fog, F); *zp = iz; } }
         else
@@ -553,7 +556,7 @@ static void m3_floor_rows(float fy)
 static void m3_draw_floor(float y, int alpha)            /* alpha 256: opaque (faster), less: the mirror shows */
 {
     int i, j; float s = 2.0f;
-    if (alpha >= 256 && m3_floor_solid.w == 128 && m3_floor_solid.h == 128) { m3_floor_rows(y); return; }
+    if (m3_floor_solid.w == 128 && m3_floor_solid.h == 128 && m3_floor.w == 128 && m3_floor.h == 128) { m3_floor_rows(y, alpha); return; }
     /* 4 big quads with the tile repeated 6 times each (was 144 small ones: too slow on Pentium-class PCs) */
     m3_texwrap = 1;
     for (j = -1; j < 1; j++) for (i = -1; i < 1; i++)

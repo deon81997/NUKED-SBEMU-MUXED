@@ -11,6 +11,9 @@
  *
  *   SC55MENU [home folder]     (default: the folder SC55MENU.EXE is in)
  */
+#ifndef MENU_VER
+#define MENU_VER "1.0.0"
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -454,7 +457,12 @@ static void draw_header(void)
     if (!g_running && g_lasterr[0])
         tui_printf(2, 5, (BG_DESK << 4) | 0x0C, "Last start failed: %.37s", g_lasterr);
     else
-        tui_put(2, 5, (BG_DESK << 4) | 0x0B, "SBEMU \xFA Nuked-SC55 \xFA MT-32 \xFA SoundFont \xFA for DOS");
+    {   /* the pack's version (from the makefile's VERSION, e.g. 1.0.0-beta.86-usb-sc55 -> beta.86) */
+        char v[24] = ""; const char* b = strstr(MENU_VER, "beta");
+        if (b) { int i = 0; while (b[i] && b[i] != '-' && i < 23) { v[i] = b[i]; i++; } v[i] = 0; } else snprintf(v, sizeof v, "%.20s", MENU_VER);
+        tui_put(2, 5, (BG_DESK << 4) | 0x0B, "SBEMU \xFA Nuked-SC55 \xFA MT-32 \xFA SoundFont");
+        tui_printf(44, 5, (BG_DESK << 4) | 0x0E, "%s", v);
+    }
 }
 
 static void draw_status(void)
