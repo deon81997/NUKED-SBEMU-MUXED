@@ -41,6 +41,11 @@ static int OPL3EMU_Core = OPL3EMU_CORE_DBOPL;
 static int OPL3EMU_Rate = 44100;
 static uint32_t OPL3EMU_NukedKeyOn;  //bit per melodic channel (0-8 first bank, 9-17 second bank), bit 18: rhythm drums
 static int32_t OPL3EMU_NukedTail;    //output frames left to render after the last key event
+//CPU: a game can leave voices keyed on at zero volume (silent) for as long as it runs; the core then ran
+//without end. After 2 s of output that is exactly silent the core sleeps until the next register write.
+static int32_t OPL3EMU_NukedSilent;  //frames of exact silence in a row
+static int OPL3EMU_NukedSleep;
+#define OPL3EMU_NUKED_SLEEP_SECONDS 2
 
 void OPL3EMU_SetCore(int core)
 {
@@ -65,12 +70,14 @@ void OPL3EMU_Init(int samplerate)
     OPL3_Reset(&OPL3EMU_Nuked, (uint32_t)samplerate);
     OPL3EMU_NukedKeyOn = 0;
     OPL3EMU_NukedTail = 0;
+    OPL3EMU_NukedSilent = 0;
+    OPL3EMU_NukedSleep = 0;
 }
 
 int OPL3EMU_IsActive()
 {
     if(OPL3EMU_Core == OPL3EMU_CORE_NUKED)
-        return OPL3EMU_NukedKeyOn != 0 || OPL3EMU_NukedTail > 0;
+        return !OPL3EMU_NukedSleep && (OPL3EMU_NukedKeyOn != 0 || OPL3EMU_NukedTail > 0);
     return (OPL3EMU_Chip->oplActive&(OPL3EMU_Chip->opl3Active?0xFFFFFFFF:0x8000FFFF));
 }
 
@@ -87,6 +94,12 @@ int OPL3EMU_GenSamples(int16_t* pcm16, int count)
     {
         OPL3_GenerateStream(&OPL3EMU_Nuked, pcm16, (uint32_t)count);
         OPL3EMU_NukedTail = OPL3EMU_NukedTail > count ? OPL3EMU_NukedTail - count : 0;
+        {
+            int i, quiet = 1;
+            for(i = 0; i < count * 2; ++i) if(pcm16[i]) { quiet = 0; break; }
+            OPL3EMU_NukedSilent = quiet ? OPL3EMU_NukedSilent + count : 0;
+            if(OPL3EMU_NukedSilent > OPL3EMU_Rate * OPL3EMU_NUKED_SLEEP_SECONDS) OPL3EMU_NukedSleep = 1;
+        }
         return count;
     }
     return OPL3EMU_Chip->Generate(pcm16, count);
@@ -133,6 +146,7 @@ static void OPL3EMU_WriteReg(uint32_t index, uint32_t val)
     }
     //buffered write: keeps the relative timing of writes made between two audio blocks
     OPL3_WriteRegBuffered(&OPL3EMU_Nuked, (uint16_t)index, (uint8_t)val);
+    OPL3EMU_NukedSleep = 0; OPL3EMU_NukedSilent = 0;   //anything written can make sound again
 }
 
 uint32_t OPL3EMU_PrimaryRead(uint32_t val)

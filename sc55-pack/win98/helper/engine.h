@@ -54,6 +54,7 @@ private:
     std::vector<float> bm, bo, bp;    // per-render scratch: midi, opl, pcm
     std::vector<uint8_t> pending_midi;
     float dc_x[2] = {0, 0}, dc_y[2] = {0, 0};   // DC blocker on the MIDI bus
+    uint64_t frames_total = 0;                  // frames rendered since setup (idle rule)
     // idle gating: a synth that has had no input for a while and has gone
     // silent is not run (saves CPU, the SC-55 costs a lot); input wakes it
     int midi_quiet = 0, opl_quiet = 0;

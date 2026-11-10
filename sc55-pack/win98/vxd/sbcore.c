@@ -203,6 +203,17 @@ static struct {
     int carryn;
 } xf;
 
+/* CPU: the 1 ms timer interrupt (VTD minimum period) is only needed while a DOS program plays
+   sound through DMA (sc_tick paces it). It goes on when a transfer starts and off 2 s after the
+   last one ended, checked from IOCTL_SC55W_TIME (thread time; the helper calls it every block). */
+static int min_on;
+static u32 xf_idle_since;
+static void period_need(void) { if (!min_on) { vxd_min_period(1); min_on = 1; } }
+static void period_check(u32 now)
+{
+    if (min_on && !xf.active && now - xf_idle_since > 2000000UL) { vxd_min_period(0); min_on = 0; }
+}
+
 /* our own view of each DMA channel. VDMAD recomputes the count from the
  * (never programmed) physical 8237 whenever the program reads the count or
  * address registers, so we keep the real position here and put it back
@@ -492,6 +503,7 @@ static void xf_start(int bits, int chans, int sign, int autoinit, u32 bytes, int
     if (!xf.bps) xf.bps = 1;
     xf.start_us = vxd_time_us();
     xf.active = 1;
+    period_need();
     trace(1, ((u32)bits << 16) | ((u32)chans << 8) | (u32)autoinit, bytes);
     trace(2, dsp.rate, xf.bps);
     if (bits && !record) pcm_rate(dsp.rate ? dsp.rate : 22050);
@@ -506,6 +518,7 @@ static void xf_start(int bits, int chans, int sign, int autoinit, u32 bytes, int
 static void xf_stop(void)
 {
     xf.active = 0;
+    xf_idle_since = vxd_time_us();
     if (!xf.autoinit) dsp.highspeed = 0;
     if (sh) sh->dma_active = 0;
 }
@@ -616,6 +629,7 @@ void __cdecl sc_eoi(u32 vm)
 static void dsp_reset(void)
 {
     if (xf.active) ev_put(EV_RESET, 0, 0, 0);
+    if (xf.active) xf_idle_since = vxd_time_us();
     xf.active = 0;
     if (sh) sh->dma_active = 0;
     dsp.cmd = -1; dsp.need = 0; dsp.np = 0;
@@ -784,6 +798,7 @@ static u8 dsp_read_data(void)
 /* joystick API; Windows' own programs keep the real port)                */
 /* ====================================================================== */
 static u32 joy_t0, sys_vm, joy_port = 0x201;
+
 
 /* NUKEDJOY.VXD (VJoyD minidriver) finds the shared block through our DDB */
 extern u32 SC55W_DDB[];
@@ -1041,7 +1056,7 @@ static void detach(void)
     if (trapped & ST_OK_JOY) vxd_remove_io(joy_port);
     if (trapped & ST_OK_JBIOS) vxd_hook_int15(0);
     if (hooked21) { vxd_hook_int21(0); hooked21 = 0; }
-    if (trapped) vxd_min_period(0);
+    if (min_on) { vxd_min_period(0); min_on = 0; }
     trapped = 0;
     ddb_export(0);
     if (sh) { vxd_unmap_block((u32)sh, sh_size); sh = 0; }
@@ -1107,7 +1122,6 @@ static u32 attach(u32 user_addr)
         if (vxd_hook_int21(1) == 0) { st |= ST_OK_PROG; hooked21 = 1; } else st |= ST_ERR_PROG;
     }
     trapped = st & 0xFF;
-    if (trapped) vxd_min_period(1);
     s->attach_status = st;
     s->now_us = vxd_time_us();
     ddb_export(s);
@@ -1140,9 +1154,12 @@ int __cdecl sc_ioctl(u32 code, u8 *in, u32 inlen, u8 *out, u32 outlen)
     case IOCTL_SC55W_DETACH:
         detach();
         return 0;
-    case IOCTL_SC55W_TIME:
-        if (outlen >= 4) { *(u32 *)out = vxd_time_us(); return 4; }
+    case IOCTL_SC55W_TIME: {
+        u32 now = vxd_time_us();
+        period_check(now);
+        if (outlen >= 4) { *(u32 *)out = now; return 4; }
         return 0;
+    }
     case IOCTL_SC55W_MIDI: {
         u32 i;
         for (i = 0; i < inlen; i++) ev_put(EV_MIDI, in[i], 0, 0);

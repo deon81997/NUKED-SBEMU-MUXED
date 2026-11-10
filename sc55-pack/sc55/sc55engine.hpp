@@ -51,7 +51,7 @@ public:
     // a game that only sends an MPU init and then plays through OPL must not
     // lose its FM music.
     static constexpr int kWakeMs = 750;                 // run at least this long after MIDI
-    static constexpr int kTailMs = 1500;                // keep running this long after the last audible sample
+    static constexpr int kTailMs = 750;                 // keep running this long after the last audible sample (CPU: was 1500)
 
     Engine(Core& core, uint32_t native_rate, int dc_offset)
         : core_(core), native_rate_(native_rate), dc_offset_(dc_offset)

@@ -355,7 +355,10 @@ static Options engine_opts(const Options& o)
 
 static DWORD WINAPI audio_main(LPVOID)
 {
-    timeBeginPeriod(1);
+    // no timeBeginPeriod(1) here (CPU): on Windows 98 it reprograms the PC's timer to 1000 interrupts a
+    // second for as long as SC55W runs. The sound loop waits on the wave-out event, not on Sleep; the 1 ms
+    // timer is only switched on while it is needed: by SC55W.VXD while a DOS program plays sound (DMA),
+    // and by the joystick thread while a game reads the pad.
     // normal priority while the synth boots (it takes seconds); the render
     // loop runs at "highest" so DOS boxes and games do not starve the sound
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
@@ -574,7 +577,6 @@ static DWORD WINAPI audio_main(LPVOID)
     }
     wave_close();
     rec_close();
-    timeEndPeriod(1);
     return 0;
 }
 
@@ -897,6 +899,7 @@ static void pad_files_load()
 
 // a NUKED joystick (NUKEDJOY.VXD) shows what we feed it: never read it back as a pad
 static JoyOutSettings g_joyout;
+static volatile LONG g_joyout_dirty;     // the settings window saved [Joystick]
 static PadInput g_padin[2];
 static DWORD g_rawbtn;                   // Windows buttons of the first pad (settings: learn)
 static std::string g_padname[2];
@@ -920,6 +923,8 @@ static DWORD WINAPI joy_main(LPVOID)
     bool ok[2] = {false, false};
     DWORD last_ini = 0;
     DWORD last_check = 0;
+    DWORD busy_until = GetTickCount() + 2000;
+    bool fast = false;                       // 1 ms timer on (timeBeginPeriod) while busy
     std::string last_desc;
     while (!g_quit) {
         DWORD now = GetTickCount();
@@ -978,7 +983,7 @@ static DWORD WINAPI joy_main(LPVOID)
                 ji[j].dwFlags = JOY_RETURNALL;
                 got[j] = joyGetPosEx(jid[j], &ji[j]) == JOYERR_NOERROR;
             }
-            if (!last_ini || now - last_ini > 1000) {          // settings window changes, live
+            if (!last_ini || InterlockedExchange(&g_joyout_dirty, 0)) {   // settings saved: reload
                 last_ini = now;
                 JoyOutSettings js;
                 joyout_load(g_inipath, js);
@@ -1052,9 +1057,27 @@ static DWORD WINAPI joy_main(LPVOID)
             g_sh->joy_buttons = out.joy_buttons;
             g_sh->joy_present = out.joy_present;
             joyout_windows(js, pin, out, g_sh);
+
+            // CPU: read the pads 100 times a second only while something uses them (a DOS
+            // program reads the game port or INT 15h, a Windows game the NUKED joystick, the pad
+            // types keys into the DOS box that has the keyboard, or the settings window is open);
+            // otherwise 10 times a second, which still notices a pad being picked up. Reading an
+            // analog game-port joystick through Windows busy-waits ~1 ms each time.
+            static u32 last_reads, last_polls;
+            u32 reads = g_sh->joy_reads, polls = g_sh->wjoy[0].polls + g_sh->wjoy[1].polls;
+            if (reads != last_reads || polls != last_polls || focus_dos || g_settings_dlg ||
+                !out.scancodes.empty())
+                busy_until = now + 2000;
+            last_reads = reads; last_polls = polls;
         }
-        Sleep(10);
+        bool busy = (int32_t)(busy_until - now) > 0;
+        if (busy != fast) {                      // 10 ms sleeps need the 1 ms timer (Windows 98: ~55 ms without)
+            if (busy) timeBeginPeriod(1); else timeEndPeriod(1);
+            fast = busy;
+        }
+        Sleep(busy ? 10 : 100);
     }
+    if (fast) timeEndPeriod(1);
     return 0;
 }
 
@@ -1477,6 +1500,7 @@ static bool joy_page_save(HWND p, std::string& note)
     js.mode = cb_get(p, IDC_J_MODE, 0);
     js.deadzone = get_int(p, IDC_J_DZ, 0, 50, 10);
     joyout_save(g_inipath, js);
+    InterlockedExchange(&g_joyout_dirty, 1);
     if (gameport_set_port(port)) {               // the Device Manager entry follows the address
         note += "Device Manager shows the NUKED game port at its new address after Windows is restarted "
                 "(DOS boxes use it now).\r\n";

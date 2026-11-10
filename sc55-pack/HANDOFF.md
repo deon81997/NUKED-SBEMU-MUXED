@@ -870,3 +870,22 @@ tab on top of the x360c driver), then release beta.80-w98.3; afterwards CPU-usag
   Windows axis V, triggers did not move Z - check [Pad] RStickX/Triggers with the Pad keys tab); Start/Back
   numbering of x360c; Red Baron 3D in flight; the D810 / P5PE-VM.
 - NEXT (user asked): CPU-usage optimisation in DOS (SBEMU) and Windows (SC55W, VxD), after this release.
+
+## WIP (2026-11-10): CPU-usage work (not released yet; next release beta.81 DOS + beta.81-w98.4)
+Changes in the tree, built and host-tested, not yet in a release zip:
+- VxD (win98/vxd/sbcore.c): the 1 ms VTD minimum period is no longer held all the time. It is asked for when a
+  DMA transfer starts (period_need in xf_start) and dropped 2 s after the last transfer ends (period_check,
+  run from IOCTL_SC55W_TIME). Detach always drops it.
+- SC55W.EXE (helper/w98main.cpp): no permanent timeBeginPeriod(1) in the audio thread. The joystick thread polls
+  at 100 Hz only while something is using it (DOS box reads the port, a NUKED Windows joystick is polled, a DOS box
+  has focus, the Settings window is open, keys were sent), else 10 Hz with the default timer. Settings are reloaded
+  only after a Joystick page save (g_joyout_dirty), not every second.
+- Engine (helper/engine.cpp/.h): denormal flush in the DC blocker + underrun fade; DC blocker skipped when idle and
+  settled (native idle cost 5.4 -> 0.1 ms/s, win98/test/idletest.cpp); synth sleeps after 2 s of silence once the
+  engine has run 8 s (was 4 s).
+- DOS: Nuked OPL3 sleeps after 2 s of exactly-zero output (sbemu/opl3emu.cpp, any register write wakes it);
+  SC-55 tail 750 ms (sc55/sc55engine.hpp, was 1500).
+- Measuring: testrig/cpu (IDLEMTR.EXE for DOS, CPULOAD/MEASW for Win98, cpurun.sh = 86Box runner with the automation
+  socket, p2b450.cfg = P2B-LS + Pentium II 450, the fastest 86Box machine we have ROMs for; run the interpreter,
+  dynarec numbers are noisy). DOS idle overhead of SBEMU measured ~1.3% on the PII-450. QEMU Win98 numbers proved
+  unreliable; next step is Win98 in 86Box (P2B-LS, ES1371, QuickInstall ISO) with a Pentium II build of SC55W.

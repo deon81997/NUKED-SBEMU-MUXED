@@ -69,13 +69,16 @@ void Engine::idle_check(const float* buf, int from, int to, int& quiet, bool& id
         }
     if (hi[0] - lo[0] > 4e-4f || hi[1] - lo[1] > 4e-4f) { quiet = 0; return; }
     quiet += to - from;
-    if (quiet > rate * 4) idle = true;          // 4 s of silence with no input
+    // silence with no input: 4 s while the synth is starting (the SC-55 boots its firmware in the
+    // first seconds), then 2 s (CPU: a sleeping synth costs nothing, a running one ~a third of a D810)
+    if (quiet > rate * (frames_total > (uint64_t)rate * 8 ? 2 : 4)) idle = true;
 }
 
 void Engine::render_sources(int from, int to)
 {
     int n = to - from;
     if (n <= 0) return;
+    frames_total += (uint64_t)n;
     if (midi && !st.midi_idle) {
         midi->render(&bm[(size_t)from * 2], n);
         idle_check(bm.data(), from, to, midi_quiet, st.midi_idle);
@@ -131,6 +134,8 @@ void Engine::pcm_render(SC55W_SHARED* sh, float* out, int frames)
             st.pcm_frames++;
         } else {
             f[0] *= 0.99f; f[1] *= 0.99f;       // underrun: fade the last frame
+            if (f[0] > -1e-15f && f[0] < 1e-15f) f[0] = 0.0f;   // never into denormals (slow)
+            if (f[1] > -1e-15f && f[1] < 1e-15f) f[1] = 0.0f;
         }
     });
     for (int i = 0; i < frames * 2; i++) out[i] += tmp[(size_t)i];
@@ -208,12 +213,21 @@ void Engine::render(SC55W_SHARED* sh, uint32_t now_us, int16_t* out, int frames)
     const float sbv = opt.sbvol / 100.0f, oplv = opt.oplvol / 100.0f;
     const float pl = master * ml * vl * sbv, pr = master * mr * vr * sbv;
     const float ol = master * ml * fl * oplv, orr = master * mr * fr * oplv;
-    for (int i = 0; i < frames; i++) {          // remove the SC-55's DC offset
-        for (int c = 0; c < 2; c++) {
-            float x = bm[i * 2 + c];
-            float y = x - dc_x[c] + 0.9995f * dc_y[c];
-            dc_x[c] = x; dc_y[c] = y;
-            bm[i * 2 + c] = y;
+    // remove the SC-55's DC offset. CPU: while the synth sleeps its output is a constant, the filter's
+    // output decays towards 0 and would end up as denormal floats (and stay there: 0.9995 x the smallest
+    // one rounds back to itself), which the Pentium M / 4 handle ~100x slower - a sleeping synth then
+    // cost more than a playing one. Flush the tail to 0, and skip the loop once it has settled.
+    if (st.midi_idle && dc_y[0] == 0.0f && dc_y[1] == 0.0f && bm[0] == dc_x[0] && bm[1] == dc_x[1]) {
+        for (int i = 0; i < frames * 2; i++) bm[i] = 0.0f;
+    } else {
+        for (int i = 0; i < frames; i++) {
+            for (int c = 0; c < 2; c++) {
+                float x = bm[i * 2 + c];
+                float y = x - dc_x[c] + 0.9995f * dc_y[c];
+                if (y > -1e-15f && y < 1e-15f) y = 0.0f;
+                dc_x[c] = x; dc_y[c] = y;
+                bm[i * 2 + c] = y;
+            }
         }
     }
     // Windows MIDI volume (Volume Control, midiOutSetVolume): the synth's output

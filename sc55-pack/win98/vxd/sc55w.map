@@ -1,7 +1,7 @@
 Open Watcom Linker Version 2.0 beta Nov  8 2026 06:40:35 (64-bit)
 Copyright (c) 2002-2026 The Open Watcom Contributors. All Rights Reserved.
 Portions Copyright (c) 1985-2002 Sybase, Inc. All Rights Reserved.
-Created on:       26/11/09 18:12:10
+Created on:       26/11/10 08:19:20
 Executable Image: SC55W.VXD
 creating a Windows VxD dynamic link library
 
@@ -13,7 +13,7 @@ creating a Windows VxD dynamic link library
 Group                           Address              Size
 =====                           =======              ====
 
-DGROUP                          0002:00000000        000015ea
+DGROUP                          0002:00000000        000015f6
 
 
 
@@ -26,11 +26,11 @@ Segment                Class          Group          Address         Size
 
 _LDATA                 LCODE          AUTO           0001:00000000   00000088
 _LTEXT                 LCODE          AUTO           0001:00000088   0000050e
-_TEXT                  CODE           AUTO           0001:00000598   00002fd6
-_DATA                  DATA           DGROUP         0002:00000000   00000004
-CONST                  DATA           DGROUP         0002:00000004   00000000
-CONST2                 DATA           DGROUP         0002:00000004   0000013f
-_BSS                   BSS            DGROUP         0002:00000144   000014a6
+_TEXT                  CODE           AUTO           0001:00000598   00003178
+_DATA                  DATA           DGROUP         0002:00000000   00000008
+CONST                  DATA           DGROUP         0002:00000008   00000000
+CONST2                 DATA           DGROUP         0002:00000008   0000013f
+_BSS                   BSS            DGROUP         0002:00000148   000014ae
 
 
                         +----------------+
@@ -82,18 +82,18 @@ Module: sc55w.o(sc55w.o)
 0001:00000452* Int15_Hook
 0001:00000492* Int21_Hook
 Module: sbcore.obj(sbcore.obj)
-0001:000009a2  _sc_eoi
-0001:00001730  _sc_tick
-0001:00001932  _sc_dma_changed
-0001:00002503  _sc_int15
-0001:0000265e  _sc_in
-0001:00002813  _sc_out
-0001:00002b08  _sc_vm_gone
-0001:00002df5  _sc_int21
-0001:00002e9e  _sc_exit
-0001:0000330a  _sc_ioctl
-0001:00003524  _sc_api_midi
-0001:00003539  _sc_api_volume
+0001:000009fb  _sc_eoi
+0001:00001798  _sc_tick
+0001:0000199a  _sc_dma_changed
+0001:00002643  _sc_int15
+0001:0000279e  _sc_in
+0001:0000295d  _sc_out
+0001:00002c66  _sc_vm_gone
+0001:00002f53  _sc_int21
+0001:00002ffc  _sc_exit
+0001:000034a5  _sc_ioctl
+0001:000036c6  _sc_api_midi
+0001:000036db  _sc_api_volume
 
 
                         +-----------------------+
@@ -101,5 +101,5 @@ Module: sbcore.obj(sbcore.obj)
                         +-----------------------+
 
 Stack size:  0000 (0.)
-Memory size:  4b58 (19288.)
-Link time: 00:00.92
+Memory size:  4d06 (19718.)
+Link time: 00:00.81
