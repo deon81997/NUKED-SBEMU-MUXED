@@ -6,8 +6,9 @@
  * the mirror floor bouncing with the channel levels. Song, time and keys in a bar along the bottom.
  *
  * MIDPLAY sends the MIDI events from inside the drawing (m3_hook = mp_pump: every 8 scan lines), so frames never
- * make the music late. Frames are paced by what they cost: a frame starts at most every 2.5 frame-times (drawing takes
- * at most ~40% of the CPU), at most ~16 a second. Always full 640x480 (half resolution only with F4); a PC that
+ * make the music late. Frames follow each other back to back (at most 60 a second, the screen refresh): the old pause of 1.5 frame-times
+ * between frames (drawing at most ~40% of the CPU) dates from before the music was sent from inside the drawing, and
+ * left the D810 at ~5 frames a second. The floor is drawn row by row (m3_floor_rows), about 3x faster. Always full 640x480 (half resolution only with F4); a PC that
  * manages only ~2 frames a second gets a note. The other pages are text: the view
  * switches back to text mode for them and returns afterwards. */
 #ifndef MIDPLAY3D_INCLUDED
@@ -174,7 +175,7 @@ static void mp3_draw(const Song* s, const char* name, uint64_t el_us, uint64_t t
     double t = m3_now(), t0; float W = 2.6f, H = 0.62f, D = 1.2f, dt; int c;
     double frac = total_us ? (double)(el_us > total_us ? total_us : el_us) / (double)total_us : 0;
     if (!mp3_on) return;
-    if (t - mp3_last_frame < 0.06 || t - mp3_last_frame < mp3_frame_ms * 2.5 / 1000) return;   /* paced by its cost: at most ~40% drawing */
+    if (t - mp3_last_frame < 0.016) return;   /* up to 60 a second (the screen's refresh); frames follow each other (the music is sent from inside) */
     dt = mp3_last_frame ? (float)(t - mp3_last_frame) : 0.06f; if (dt > 0.2f) dt = 0.2f;
     mp3_last_frame = t; t0 = t;
     lcd_query();

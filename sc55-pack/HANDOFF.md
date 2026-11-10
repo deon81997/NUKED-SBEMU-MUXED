@@ -1003,3 +1003,20 @@ F2 0x3c, Esc 0x01, Enter 0x1c, Down 0x150), "@type:sp".
 Zip = beta.83 zip + SBEMU.EXE + README.TXT (troubleshooting entry "3D GAMES WITH GLITCHES ONLY WHILE SBEMU RUNS").
 To test on real PCs: a 3D DOS game (Quake, Descent, Duke 3D) with SBEMU + SB digital sound + pad: look for glitches
 that used to happen only with SBEMU; MIDPLAY 3D view.
+
+## beta.85 (2026-11-10): MIDPLAY 3D ~3x more frames, fast floor, playlist columns (RELEASED, tag v1.0.0-beta.85-usb)
+User video from the D810 (beta.84): no more black lines, LOAD 48% (SC-55), 3D at ~5-6 fps ("running slow").
+- midplay3d.h pacing: was "start a frame at most every 2.5 frame-times" (drawing <= 40% CPU, from before the music was
+  sent from inside the drawing) -> back to back, cap 60/s (0.016 s; user: "let the PC draw up to the VESA framerate").
+- m3core.h m3_floor_rows(): opaque floor (alpha 256) drawn per screen row - no roll, so a flat floor has one depth per
+  row: one divide, one fog value, exact linear u/v (16.16, wrapped 128x128), x/z clipped to -12..12. Host check vs
+  the 4-quad path over 300 camera positions: avg 1.2 levels difference on ~27k px (fog rounding), ~50 edge px/frame;
+  0.71 -> 0.27 ms on the host. Mirror pass (alpha < 256, menus) keeps the quads. Used by MENU/SETTINGS/CDGUI/GAMETEST 3D.
+- 86Box PII-450 + SBEMU + STRESS.MID, 3D: 41 -> 140 frames / 30 s, draw 296 -> 216 ms, late max 6.5 -> 8.4 ms.
+- User asked "flat black background at 60 fps?": sky + floor now ~30% of a frame; kept the look.
+- Playlist: File column first (8), Title second (22, empty when the file has none) - user request.
+- 48 kHz "garbled" on the D810 (22 kHz fine): NOT CPU - SBDIAG in 86Box: ISR 59% at 22050 vs 60% at 48000 (STRESS.MID).
+  Suspect the ICH AC'97 48000 path (sc_ich.c: VRA left off when freq_set == 48000; freq_card = 48000 / clock corrector
+  from snd_intel_measure_ac97_clock). Asked the user for SBLOG.TXT (codec id + "AC97 clock check" line) at 48000 and
+  what it sounds like. 86Box's ES1371 does not take that path; QEMU (ICH AC'97) not installed here.
+Zip = beta.84 zip + MIDPLAY, SC55MENU, SBSET, GAMETEST, CDSET\CDGUI (m3core), SBEMU (version) + README.TXT.

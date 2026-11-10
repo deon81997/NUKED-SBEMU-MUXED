@@ -1295,7 +1295,7 @@ static void page_playlist(void)
     tui_fill(1, 2, 80, 22, 0x10, ' ');
     header(b);
     tui_fill(1, 2, 80, 1, 0x80, ' ');
-    tui_put(2, 2, 0x8F, " No"); tui_put(8, 2, 0x8F, "Title"); tui_put(48, 2, 0x8F, "File"); tui_put(62, 2, 0x8F, " Time"); tui_put(69, 2, 0x8F, "Fmt Trk");
+    tui_put(2, 2, 0x8F, " No"); tui_put(8, 2, 0x8F, "File"); tui_put(22, 2, 0x8F, "Title"); tui_put(62, 2, 0x8F, " Time"); tui_put(69, 2, 0x8F, "Fmt Trk");
     list_keep(&pl_sel, &pl_top, g_npl);
     for (r = 0; r < LROWS && pl_top + r < g_npl; r++)
     {
@@ -1305,8 +1305,8 @@ static void page_playlist(void)
         tui_fill(1, y, 80, 1, bg, ' ');
         snprintf(b, sizeof b, "%3d", i2 + 1); tui_put(2, y, bg | (sel ? 0x08 : 0x08), b);
         if (cur) tui_cell(6, y, bg | (P.paused ? 0x0E : 0x0A), P.paused ? 0xBA : 0x10);
-        tui_putw(8, y, 39, bg | fg, e->have && e->si.title[0] ? e->si.title : base_of(e->path));
-        { char fn[80]; snprintf(fn, sizeof fn, "%s", base_of(e->path)); dosify(fn); tui_putw(48, y, 13, bg | (sel ? 0x01 : 0x03), fn); }
+        { char fn[80]; snprintf(fn, sizeof fn, "%s", base_of(e->path)); dosify(fn); tui_putw(8, y, 13, bg | fg, fn); }
+        if (e->have && e->si.title[0]) tui_putw(22, y, 39, bg | (sel ? 0x01 : 0x03), e->si.title);   /* file name first, then the title */
         fmt_ms(t, e); tui_put(62, y, bg | (e->have && e->si.ok <= 0 ? 0x0C : fg), t);
         if (e->have && e->si.ok > 0) { snprintf(b, sizeof b, " %d  %3d", e->si.fmt, e->si.trk); tui_put(69, y, bg | (sel ? 0x08 : 0x08), b); }
     }

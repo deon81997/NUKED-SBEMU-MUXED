@@ -76,6 +76,13 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.85.** **MIDPLAY's 3D view, 3x smoother!!** On the D810 it showed
+only 5-6 pictures a second. It used to rest between frames to leave the CPU to the music, which is no longer needed
+since beta.83 sends the music while drawing: now it draws as fast as the PC allows, up to 60 a second. The grid floor
+(half of every frame) is now drawn row by row, about 3x faster, and the 3D menus get that too. 86Box, Pentium II 450
+with the SC-55 busy: 41 frames in 30 s before, 140 now, music still on time. The playlist now shows the file name
+first, then the title.
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.84.** **A hidden bug squashed: 3D games and SBEMU get along!!**
 Thin black lines across MIDPLAY's new 3D view led us to an old bug: SBEMU's sound interrupt and its Sound Blaster,
 joystick, PC speaker and FM handlers used the CPU's floating point unit without saving the game's own values. A game
@@ -111,6 +118,11 @@ Windows 98 idle: **1.6% of the CPU before, 0.25% now.** In plain DOS the Nuked O
 of silence (some games leave silent notes playing forever) and the SC-55 stops sooner after the music ends.
 New setting `OutputSleep=0` in SC55W.INI if your sound card's driver ever misses the first note after a pause.
 
+<details>
+<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
+
+<br>
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.80-w98.3.** **Joysticks EVERYWHERE in Windows 98!!** The
 settings window got tabs, and the new **Joystick** tab shows your pad live (sticks, buttons, what DOS games read). Pick the
 game port's address (200-20F) and stick type (CH Flightstick Pro, Thrustmaster FCS, Gravis GrIP) for DOS boxes, and one
@@ -118,11 +130,6 @@ click on *Set up...* adds a **NUKED SB-EMU Game Port** to Device Manager and a *
 so Windows games get your pad too, even on PCs whose sound card has no game port. The **Pad keys** tab learns your pad's
 buttons: click a box, press the button. ([joystick tab](docs/shots/w98-joystick-tab.png),
 [pad keys tab](docs/shots/w98-padkeys-tab.png), [Device Manager](docs/shots/w98-gameport-devmgr.png))
-
-<details>
-<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
-
-<br>
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.80.** **Hold the button, the key repeats!!** Pad buttons now
 repeat their key like a real keyboard, so menus and setup screens scroll when you hold the D-pad. Your dead zone setting

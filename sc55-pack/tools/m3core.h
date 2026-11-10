@@ -497,9 +497,63 @@ static void m3_sky(void)
     }
 }
 
+/* The opaque floor drawn row by row: the camera only turns (yaw) and tilts (pitch), never rolls, so every
+ * screen row of a flat floor lies at ONE depth. Per row: one divide, one fog value, and u/v stepping linearly
+ * (exact, no perspective error), instead of a perspective divide every 16 pixels and per-pixel fog. Same picture
+ * as the 4 textured quads (tile = 2 units, 128-pixel texture, -12..12 in x and z), about 3x faster. */
+static void m3_floor_rows(float fy)
+{
+    const M3SURF* tex = &m3_floor_solid;
+    float f = m3_f * m3_rw / M3W, hgt = fy - m3_cam.y, cx = m3_rw / 2.0f, cyy = m3_rh / 2.0f;
+    float fk = m3_fog1 > m3_fog0 ? 256.0f / (m3_fog1 - m3_fog0) : 0;
+    int y;
+    if (hgt >= 0) return;                                   /* camera below the floor: nothing to see */
+    for (y = 0; y < m3_rh; y++)
+    {
+        float dy = (cyy - (float)y) / f, wy = dy * m3_cp_ + m3_sp_, t, z1, ax, bx, az, bz, lo, hi, iz;
+        int xs, xe, x, U, V, dU, dV, F;
+        uint32_t* fp; float* zp;
+        if (!(y & 7)) M3_HOOK();
+        if (wy >= -1e-6f) continue;                         /* at or above the horizon */
+        t = hgt / wy;                                       /* camera-space depth of this row */
+        if (t < 0.15f) continue;                            /* the near plane, as m3_poly */
+        z1 = -dy * m3_sp_ + m3_cp_;
+        /* world x and z along the row, linear in the pixel's dx = (x - cx) / f */
+        ax = m3_cam.x + z1 * m3_sy_ * t; bx = m3_cy_ * t;   /* x_w = ax + bx * dx */
+        az = m3_cam.z + z1 * m3_cy_ * t; bz = -m3_sy_ * t;  /* z_w = az + bz * dx */
+        lo = -1e30f; hi = 1e30f;                            /* dx range with -12 <= x_w, z_w < 12 */
+        #define M3_CLIP(a, b) do { if ((b) > 1e-9f) { float l_ = (-12.0f - (a)) / (b), h_ = (12.0f - (a)) / (b); if (l_ > lo) lo = l_; if (h_ < hi) hi = h_; } \
+                                   else if ((b) < -1e-9f) { float l_ = (12.0f - (a)) / (b), h_ = (-12.0f - (a)) / (b); if (l_ > lo) lo = l_; if (h_ < hi) hi = h_; } \
+                                   else if ((a) < -12.0f || (a) >= 12.0f) { lo = 1; hi = 0; } } while (0)
+        M3_CLIP(ax, bx); M3_CLIP(az, bz);
+        #undef M3_CLIP
+        if (lo >= hi) continue;
+        { float sl = cx + lo * f, sh = cx + hi * f;
+          xs = sl < 0 ? 0 : (int)ceilf(sl); xe = sh > (float)m3_rw ? m3_rw : (int)ceilf(sh); }
+        if (xs >= xe) continue;
+        {   /* texture: u = x_w / 2 tiles, v = -z_w / 2 tiles; 16.16 texels, wrapped */
+            float dx0 = ((float)xs - cx) / f, du = bx / f * 64.0f * 65536.0f, dv = -bz / f * 64.0f * 65536.0f;
+            double u0 = (ax + bx * dx0) * 64.0 * 65536.0, v0 = -(az + bz * dx0) * 64.0 * 65536.0;
+            u0 = fmod(u0, 128.0 * 65536.0); if (u0 < 0) u0 += 128.0 * 65536.0;   /* keep 16.16 in range */
+            v0 = fmod(v0, 128.0 * 65536.0); if (v0 < 0) v0 += 128.0 * 65536.0;
+            U = (int)u0; V = (int)v0; dU = (int)du; dV = (int)dv;
+        }
+        F = (int)((t - m3_fog0) * fk); if (F > 256) F = 256;
+        iz = 1.0f / t;
+        fp = m3_fb + y * M3W + xs; zp = m3_zb + y * M3W + xs;
+        if (F > 0)
+            for (x = xs; x < xe; x++, fp++, zp++, U += dU, V += dV)
+            { if (iz > *zp) { *fp = m3_lerpc(tex->p[((V >> 16) & 127) * 128 + ((U >> 16) & 127)], m3_fog, F); *zp = iz; } }
+        else
+            for (x = xs; x < xe; x++, fp++, zp++, U += dU, V += dV)
+            { if (iz > *zp) { *fp = tex->p[((V >> 16) & 127) * 128 + ((U >> 16) & 127)]; *zp = iz; } }
+    }
+}
+
 static void m3_draw_floor(float y, int alpha)            /* alpha 256: opaque (faster), less: the mirror shows */
 {
     int i, j; float s = 2.0f;
+    if (alpha >= 256 && m3_floor_solid.w == 128 && m3_floor_solid.h == 128) { m3_floor_rows(y); return; }
     /* 4 big quads with the tile repeated 6 times each (was 144 small ones: too slow on Pentium-class PCs) */
     m3_texwrap = 1;
     for (j = -1; j < 1; j++) for (i = -1; i < 1; i++)

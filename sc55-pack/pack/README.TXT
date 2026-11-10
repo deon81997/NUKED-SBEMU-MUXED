@@ -664,15 +664,17 @@ CONTENTS
   its 20-character LCD); otherwise it is worked out from the MIDI file.
   3D VIEW (640x480 VESA): a module with the synth's live display, a
   keyboard lighting up the notes in each channel's colour and 16 channel
-  columns on the floor. Always sharp, full 640x480; F4 there switches to
-  half resolution if your PC shows few frames (it tells you).
+  columns on the floor. Always sharp, full 640x480, as many frames as the
+  PC can draw (up to 60 a second; since beta.85 about 3x more than before).
+  F4 there switches to half resolution if your PC shows few frames (it
+  tells you).
 
-  Playlist page: UP/DOWN/PGUP/PGDN pick, ENTER plays, DEL removes,
-  CTRL+UP/DOWN moves a song, type letters to jump to a song, F5 sorts (by
-  file name, title, length, or shuffles), CTRL+S saves the list as an .M3U,
-  CTRL+O opens one, INS adds files. The title and length of every song are
-  read in the background while the music plays. Click a song to pick it,
-  click it again to play it.
+  Playlist page (file name, title, length): UP/DOWN/PGUP/PGDN pick, ENTER
+  plays, DEL removes, CTRL+UP/DOWN moves a song, type letters to jump to a
+  song, F5 sorts (by file name, title, length, or shuffles), CTRL+S saves
+  the list as an .M3U, CTRL+O opens one, INS adds files. The title and
+  length of every song are read in the background while the music plays.
+  Click a song to pick it, click it again to play it.
 
   Files page: opens in the folder of the song that plays. ENTER plays a
   file or opens a folder or .M3U, INS marks files (ENTER then adds the
