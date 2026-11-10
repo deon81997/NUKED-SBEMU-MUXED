@@ -202,8 +202,8 @@ SoundFont that sounds kinda close". It's the real thing!! Then I added a
 virtual CD drive with CD music, USB gamepads in DOS, a Windows 98 side, and
 menus for all of it.
 
-It's made and tested on my **Dell Latitude D810** (Pentium M, ICH6, Win98SE /
-DOS 7.1), plus a lot of testing in QEMU and 86Box. It's still beta, so if
+It's made and tested on my **Dell Latitude D810** and my **ASUS P5PE-VM** Windows 98 / DOS
+tower ([my test lab](#-my-test-lab-)), plus a LOT of testing in QEMU and 86Box. It's still beta, so if
 something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 
 > [!IMPORTANT]
@@ -324,6 +324,40 @@ emulated CPU, and that always runs at full speed.)
 | **Disk** | about 25 MB, more for disc images | |
 
 <div align="center"><img src="docs/90s/fd-potion.gif" alt=""> <img src="docs/90s/ic-rocket.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-rocket.gif" alt=""> <img src="docs/90s/mascot-flopsy.gif" alt=""></div>
+
+## ★ My Test Lab!! ★
+
+Every release gets tried on real iron here, plus a whole fleet of emulated PCs:
+
+<table>
+<tr>
+<td valign="top" width="50%">
+
+<b>💻 Dell Latitude D810</b> (the home machine!!)
+
+- Intel Pentium M
+- Intel ICH6 chipset, AC'97 sound, built-in touchpad
+- Windows 98 SE / MS-DOS 7.1
+
+</td>
+<td valign="top" width="50%">
+
+<b>🖥️ Custom Windows 98 / DOS tower</b>
+
+- ASUS P5PE-VM motherboard
+- Leadtek WinFast A400 (GeForce 6800)
+- 2 GB RAM
+- 3X DVD-ROM
+- NEC uPD720101 USB 2.0 card + official wired Xbox 360 pad
+
+</td>
+</tr>
+</table>
+
+**Emulated:** 86Box (Celeron 366 for "how slow can it go?", Pentium II with Windows 98 SE) and QEMU, with custom
+add-ons: a fake USB Xbox 360 pad, a joystick driven from a file and scripted keys and screenshots.
+
+<div align="center"><img src="docs/90s/port220-small.gif" width="96" alt=""> <img src="docs/90s/ic-computer.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-computer.gif" alt=""> <img src="docs/90s/fd-potion.gif" alt=""></div>
 
 ## ★ Getting Started ★
 
@@ -555,10 +589,41 @@ Stuff this little pack pulled off that I'm REALLY proud of:
 
 <div align="center"><img src="docs/90s/port220-small.gif" width="96" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/fd-keycard.gif" alt=""></div>
 
+## ★ Built With Claude!! ★
+
+<div align="center"><img src="docs/90s/port220-hop.gif" width="100%" alt=""></div>
+
+**Credit where it's due!!** NUKED SB-EMU stands on the shoulders of giants: **crazii**'s
+[SBEMU](https://github.com/crazii/SBEMU), **nukeykt**'s [Nuked-SC55](https://github.com/nukeykt/Nuked-SC55) and
+Nuked-OPL3 (with **J.C. Moyer**'s backend fork and **Tony Gies**'s fast OPL3), the **Munt** team, **Attila Padar**'s
+MPXPlay drivers, **Japheth**'s HX and Jemm, **vorvek**'s uCDD and everyone in [Thanks](#-thanks-to-my-friends-).
+
+Everything new on top of them was written by **Claude**, Anthropic's AI: the code, the bug hunting, the emulated
+test PCs, the docs and Port 220. My part was the ideas and testing on my own PCs. The numbers (from this repo's
+history, November 4 - 10, 2026):
+
+<div align="center">
+
+| | |
+|---|---|
+| 🧑‍💻 **commits co-written by Claude** | **118 of 124** |
+| 📦 **releases** | **47** |
+| 📜 **new code** | **about 30,000 lines**: DOS programs, SBEMU additions, Windows 98 drivers, test rigs |
+| 📖 **docs** | a 1,350-line manual (README.TXT) and a 900-line dev diary (HANDOFF.md) |
+| 🎨 **art** | Port 220 and every animated GIF on this page |
+
+</div>
+
+Highlights of what that means: a USB host for DOS from scratch, a 20% faster SC-55 that still plays every sample
+the same, Windows 98 drivers, 3D menus, the pad-keys-per-game system, and dozens of bugs found in emulators
+before they ever reached my real hardware.
+
+<div align="center"><img src="docs/90s/fd-hatchling.gif" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
+
 ## ★ 100% Homemade!! ★
 
-Every one of these was written from scratch for this pack (by me together with **Claude**). Only SBEMU, the
-emulator cores, the DOS drivers we bundle and the Xbox 360 driver for Windows 98 come from other people (see [Thanks](#-thanks-to-my-friends-)).
+Every one of these was written from scratch for this pack by **Claude**. SBEMU, the emulator cores, the DOS
+drivers we bundle and the Xbox 360 driver for Windows 98 come from their original authors (see [Thanks](#-thanks-to-my-friends-)).
 
 <details open>
 <summary><b>&gt;&gt; Inside SBEMU &lt;&lt;</b></summary>
@@ -776,7 +841,7 @@ VIDE-CDD (Acer / BenQ), GSCDROM (LG), QEMM (Quarterdeck). Built with
 
 <sub>Last updated: November 9, 2026 &nbsp;·&nbsp; made for fun on a Dell D810 &nbsp;·&nbsp; bring your own ROMs!!</sub>
 
-<sub>Built together with <b>Claude</b> (Anthropic), who also drew <b>Port 220</b> <img src="docs/90s/port220-small.gif" width="48" alt="" align="absmiddle"></sub>
+<sub>Built on <b>SBEMU</b>, <b>Nuked-SC55</b> and friends; everything new written by <b>Claude</b> (Anthropic), who also drew <b>Port 220</b> <img src="docs/90s/port220-small.gif" width="48" alt="" align="absmiddle"></sub>
 
 <sub>Roland, SC-55, MT-32 and CM-32L are trademarks of Roland Corporation. Sound Blaster is a trademark of Creative Technology. Xbox is a trademark of Microsoft. NUKED SB-EMU is not affiliated with any of them.</sub>
 
