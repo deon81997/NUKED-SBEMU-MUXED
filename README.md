@@ -338,10 +338,24 @@ The `README.TXT` in the pack is the full manual.
 <img src="docs/joytest.png" width="560" alt="JOYTEST showing the pad's sticks and buttons">
 
 Yep!! DOS games read an analog joystick on the gameport (port 201h), and SBEMU
-answers there with a USB Xbox 360 pad: left stick = joystick A (the D-pad
-too), right stick = joystick B, A/B/X/Y = buttons 1-4, and Start / Back type
-Enter / Esc. Two pads? Pad 1 is joystick A and pad 2 is joystick B. Games that
-ask the BIOS for the joystick get the pad too.
+answers there with a USB Xbox 360 pad: left stick = joystick A, right stick =
+joystick B, A/B/X/Y = buttons 1-4, and Start / Back type Enter / Esc. Two pads?
+Pad 1 is joystick A and pad 2 is joystick B. Games that ask the BIOS for the
+joystick get the pad too.
+
+<div align="center">
+
+<img src="docs/90s/new.gif" alt="NEW!"> <b>...and the pad presses each game's own keys!!</b> <img src="docs/90s/new.gif" alt="NEW!"><br>
+<img src="docs/shots/pad-games.gif" width="480" alt="Doom II, Wolfenstein 3D, Commander Keen, Bio Menace, Spear of Destiny, Duke Nukem, Gods, Major Stryker and Epic Pinball, all played from the pad">
+
+</div>
+
+Since beta.79 SBEMU sees which game you start and gives the pad **that game's
+keys**: jump, fire, pogo, map, menu. Over 3500 DOS games know their buttons (the
+free Keyb2Joypad list from DOSBox Pure, one download, see DOWNLOADS.TXT), and
+your own layouts go in PADUSER.TXT. Games without a layout get arrow keys on the
+D-pad, Enter on Start and Esc on Back. Every game above was played with nothing
+but the pad: [see all the screenshots](docs/padkeys-tests/README.md)!
 
 - **Stick types** (`/JOYMODE`): standard, CH Flightstick Pro, Thrustmaster FCS, Gravis GamePad Pro (GrIP), or native (a real gameport)
 - **USB keyboard** typed through the PC's keyboard controller, so DOS sees a PS/2 keyboard
@@ -458,6 +472,21 @@ works for some people.
 <tr>
 <td align="center"><img src="docs/shots/gametest.png" width="420"><br><sub>GAMETEST: runs your games and finds their best settings</sub></td>
 <td align="center"><img src="docs/main-menu.png" width="420"><br><sub>the main menu, <i>Sunset</i> style</sub></td>
+</tr>
+</table>
+
+<b>Games played with nothing but the pad</b> (beta.79/80, the layout picked by itself; [all 160 screenshots](docs/padkeys-tests/README.md)):
+
+<table>
+<tr>
+<td align="center"><img src="docs/padkeys-tests/doom2/d07_fire.png" width="280"><br><sub>DOOM II: RB fires, Y opens the menu</sub></td>
+<td align="center"><img src="docs/padkeys-tests/wolf3d-ingame/x02_forward.png" width="280"><br><sub>Wolfenstein 3D: the stick walks to the door</sub></td>
+<td align="center"><img src="docs/padkeys-tests/keen4-real/k07_down.png" width="280"><br><sub>Commander Keen 4: D-pad picks the difficulty</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/padkeys-tests/sg-biomen/a07_ABX.png" width="280"><br><sub>Bio Menace</sub></td>
+<td align="center"><img src="docs/padkeys-tests/sg-sod/a06_dright.png" width="280"><br><sub>Spear of Destiny</sub></td>
+<td align="center"><img src="docs/padkeys-tests/sg-gods/a06_dright.png" width="280"><br><sub>Gods</sub></td>
 </tr>
 </table>
 
