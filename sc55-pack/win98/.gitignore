@@ -1,0 +1,6 @@
+out/
+joy/*.obj
+joy/*.err
+joy/*.map
+mididrv/*.obj
+mididrv/SC55MIDI.DRV

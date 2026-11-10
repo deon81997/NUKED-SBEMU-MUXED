@@ -13,6 +13,7 @@
 // Everything that is changed is noted in WIN98\SC55W.INI [Install] so that
 // uninstall puts it back. Settings (SBOPTS.TXT) and ROMs are never removed.
 #include "install98.h"
+#include "gameport.h"
 #include "resource.h"
 #include <cstdio>
 #include <cstring>
@@ -478,6 +479,7 @@ int run_install(HINSTANCE inst)
     }
     // the Xbox 360 pad driver, so it is on the hard disk when the pad is first plugged in
     if (is_dir(join(src, "X360"))) copy_tree(join(src, "X360"), join(wdir, "X360"));
+    if (is_dir(join(src, "JOY"))) copy_tree(join(src, "JOY"), join(wdir, "JOY"));   // NUKED game port + joystick
     // the user's game pad layout download (FILES\PADMAP\keyb2joypad.cpp, see DOWNLOADS.TXT):
     // SC55W.EXE turns it into PADMAP.TXT at its next start
     if (is_dir(join(parent(src), "PADMAP"))) copy_tree(join(parent(src), "PADMAP"), join(base, "PADMAP"));
@@ -613,6 +615,11 @@ int run_uninstall(HINSTANCE)
         if (!DeleteFileA(p.c_str())) wininit_line("NUL=" + shortp(p));
     }
     delete_tree(join(wdir, "X360"));
+    {
+        std::string gl;
+        gameport_remove(gl);                     // NUKED game port + joystick, if set up
+        delete_tree(join(wdir, "JOY"));
+    }
     MessageBoxA(NULL, ("The NUKED SB-EMU has been removed from Windows. The last files are deleted when Windows "
                        "restarts; the empty folder " + wdir + " can then be deleted.").c_str(), TITLE, MB_ICONINFORMATION);
     return 0;

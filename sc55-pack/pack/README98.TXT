@@ -14,14 +14,15 @@ inside Windows 98:
   * Windows programs (Media Player, MIDI sequencers, Windows games) get a
     MIDI device called "NUKED SB-EMU" played by the same synth. Its volume
     follows Windows (games' music sliders, midiOutSetVolume).
-  * DOS programs also get a joystick: a game port at 201h and the BIOS
-    joystick call (INT 15h AH=84h), fed by the joystick Windows knows
-    (Control Panel > Game Controllers) - e.g. an Xbox 360 pad with the
-    Windows 98 driver that comes with the pack (WIN98\X360).
-  * Game pad buttons can press keys in DOS games, with a layout per game
-    for 3500+ games (see "Game pad buttons as keys" below).
-  * The settings are the DOS pack's: C:\SC55\SBOPTS.TXT. What you set in
-    DOS (SETTINGS.BAT) applies in Windows and the other way round.
+  * DOS programs also get a joystick: a game port (201h, or any address
+    200h-20Fh) and the BIOS joystick call (INT 15h AH=84h), fed by the
+    joystick Windows knows (an Xbox 360 pad with the driver that comes
+    with the pack, or any USB pad). Stick types as in DOS: standard, CH
+    Flightstick Pro, Thrustmaster FCS, Gravis GamePad Pro (GrIP).
+  * Windows games get the "NUKED SB-EMU Joystick" (Control Panel > Game
+    Controllers), the pad as NUKED SB-EMU passes it on, and PCs whose
+    sound card has no game port get a "NUKED SB-EMU Game Port" in Device
+    Manager (see "Joystick" in section 3).
 
 It is made for the Dell Latitude D810 with the SigmaTel AC'97 WDM driver,
 but works with any sound card that has a Windows 98 driver.
@@ -106,7 +107,8 @@ C:\SC55\WIN98\SC55W.INI and the uninstaller puts it back.
      Buttons 1-4 = joystick 1's buttons 1-4 (joystick 2's buttons 1-2
                    also press buttons 3-4)
   Status shows the joystick Windows found and how often DOS read it.
-  Windows' own programs keep using the joystick through Windows as before.
+  Windows' own programs keep using the joystick through Windows as before;
+  they can also use the NUKED SB-EMU Joystick (Settings > Joystick).
 
   Xbox 360 controller: Windows 98 has no driver for it, so the pack has an
   unofficial one in WIN98\X360 (copied there by Setup; FILES\WIN98\X360 in
@@ -151,7 +153,11 @@ C:\SC55\WIN98\SC55W.INI and the uninstaller puts it back.
  3. SETTINGS
 -----------------------------------------------------------------------------
 
-The same options as SETTINGS.BAT / SBSET, with the SBEMU switch they set:
+Three tabs: "Sound and MIDI", "Joystick" and "Pad keys" (Ctrl+Tab goes to
+the next one). Save / Apply / Cancel are for all three.
+
+"Sound and MIDI" has the same options as SETTINGS.BAT / SBSET, with the
+SBEMU switch they set:
 
   Sound Blaster (DOS)
      Port 220/240 (/A), IRQ 5/7/9/10 (/I), 8-bit DMA 0/1/3 (/D), 16-bit
@@ -191,13 +197,69 @@ be restarted to see a new port or IRQ). Volume and gain changes are
 instant; changing the synth, ROM set or sample rate restarts the synth (a
 few seconds of silence).
 
+"Joystick":
+  Game port for DOS programs
+     Game port in DOS boxes   on/off (off = a real game port card answers
+                              DOS directly)
+     Address                  200-20F (201 is what nearly every game uses;
+                              a PC with a real game port on 201 can put
+                              ours elsewhere). DOS boxes use it at once.
+     Stick type               Standard (2 sticks, 4 buttons), CH
+                              Flightstick Pro (D-pad = the hat), Thrustmaster
+                              FCS (D-pad = the hat on axis 4), Gravis GamePad
+                              Pro digital (GrIP: all buttons of 2 pads) - as
+                              SBEMU's /JOYMODE in DOS. Pick the same in the
+                              game's setup.
+     BIOS joystick call       INT 15h AH=84h for the games that use it.
+     Also for Windows programs that read the port
+                              old Windows programs that read the game port
+                              themselves (not through Windows) get ours too.
+                              Leave it off if the PC has a real game port.
+  NUKED joystick for Windows games
+     Feed the NUKED SB-EMU Joystick
+                              Windows joystick "NUKED SB-EMU Joystick" shows
+                              the pad: left stick X/Y, triggers Z, right
+                              stick R (down) / U (across), D-pad = the hat,
+                              buttons 1-12 (A B X Y LB RB Back Start LS RS
+                              LT RT) - or, with "It shows: the game port as
+                              DOS sees it", the 4 axes and 4 buttons of the
+                              game port above (with its stick type).
+     Dead zone                % of the stick's travel around the middle
+                              that counts as centred (0-50, default 10).
+     Set up...                adds the "NUKED SB-EMU Game Port" to Device
+                              Manager (Sound, video and game controllers,
+                              at the Address above) and the "NUKED SB-EMU
+                              Joystick" to Game Controllers, then asks for a
+                              restart. No Windows CD needed. Changing the
+                              Address later moves the Device Manager entry
+                              too (shown after a restart).
+     Remove                   takes both out again (Uninstall does too).
+     Game Controllers...      Control Panel > Game Controllers (calibrate,
+                              test, the Xbox 360 driver's own settings).
+  Test (live)                 the pad as Windows gives it (sticks, buttons),
+                              what DOS boxes read from the game port, and
+                              what the NUKED joystick shows Windows games.
+  The NUKED joystick only moves while SC55W runs; Windows games that want
+  joystick 1 use whatever Game Controllers lists first (Advanced tab:
+  "Preferred device").
+
+"Pad keys":
+  Pad buttons press keys in DOS games    on/off (as PadKeys= below)
+  Layout now / Last pad button           what is in use right now
+  My layouts (PADUSER.TXT)...            opens it in Notepad
+  PADMAP folder...                       where keyb2joypad.cpp goes
+  Which Windows joystick button is which pad button: the [Pad] settings
+  below. Click a box, press the button on the pad and its number is filled
+  in (then the next box gets the cursor). "Xbox 360 defaults" puts the
+  360 driver's numbers back.
+
 Windows-only options, in C:\SC55\WIN98\SC55W.INI under [SC55W]:
      BufferMs=80        sound output buffer (20-500). Raise it if the
                         sound breaks up; lower it for less delay.
      BlockMs=10         size of each buffer block (5-50).
      RecordWav=C:\X.WAV also record everything played to a WAV file
                         (troubleshooting).
-     Joystick=1         game port 201h for DOS programs (0 = off, e.g. for a
+     Joystick=1         game port for DOS programs (0 = off, e.g. for a
                         real game port card that DOS should read directly).
      JoyBios=1          BIOS joystick call INT 15h AH=84h (0 = off).
      X360Prompt=1       0 = do not offer the Xbox 360 driver when a 360 pad
@@ -213,6 +275,13 @@ Windows-only options, in C:\SC55\WIN98\SC55W.INI under [SC55W]:
      StartDelay=15      when it starts with Windows: seconds to wait before
                         starting the synth, so the other startup programs
                         get the CPU first (0 = start at once).
+   Under [Joystick] (the Joystick tab writes them):
+     Port=201           game port address, 200-20F
+     Type=0             stick type: 0 standard, 1 CH, 2 FCS, 3 GrIP
+     WindowsPort=0      1 = the game port for Windows programs too
+     NukedJoystick=1    feed the NUKED SB-EMU Joystick
+     NukedMode=0        0 = the pad, 1 = the game port as DOS sees it
+     DeadZone=10        percent
 
 If Windows froze while NUKED SB-EMU was starting, the next start with Windows
 is skipped and a message tells you at which step it stopped (in
@@ -266,7 +335,8 @@ uses almost no CPU while idle.
 Control Panel > Add/Remove Programs > "NUKED SB-EMU for Windows 98", or
 C:\SC55\WIN98\SC55W.EXE /UNINSTALL. It removes the MIDI device, the start
 entry and the BLASTER line, turns SBEMUL back on if Setup turned it off,
-and restores the previous default MIDI device. The DOS pack, ROMs and your
+restores the previous default MIDI device and takes out the NUKED SB-EMU
+Game Port and Joystick if they were set up. The DOS pack, ROMs and your
 settings stay. Restart Windows afterwards.
 
 If you also remove the DOS pack (UNINSTAL.BAT), remove this Windows part
@@ -281,7 +351,14 @@ first: UNINSTAL.BAT deletes C:\SC55 including C:\SC55\WIN98.
   FILES\WIN98\SC55W.VXD     the virtual Sound Blaster / OPL3 / MPU-401
                             (a dynamic VxD, loaded by SC55W.EXE)
   FILES\WIN98\SC55MIDI.DRV  the Windows MIDI driver ("NUKED SB-EMU")
-  FILES\WIN98\SOURCE.ZIP    source code of the three
+  FILES\WIN98\JOY\NUKEDJOY.VXD
+                            the NUKED SB-EMU Joystick (a VJoyD joystick
+                            minidriver: Windows loads it for that joystick)
+  FILES\WIN98\JOY\NUKEDJOY.INF
+                            the NUKED SB-EMU Game Port, for Add New Hardware
+                            by hand (Settings > Joystick > Set up... does
+                            the same without it)
+  FILES\WIN98\SOURCE.ZIP    source code of all of them
   FILES\WIN98\COPYING.TXT   GNU General Public License, version 2
 
   Built on: Nuked-SC55 (nukeykt, jcmoyer fork; GPL v2+), Munt mt32emu

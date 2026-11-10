@@ -71,6 +71,14 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.80-w98.3.** **Joysticks EVERYWHERE in Windows 98!!** The
+settings window got tabs, and the new **Joystick** tab shows your pad live (sticks, buttons, what DOS games read). Pick the
+game port's address (200-20F) and stick type (CH Flightstick Pro, Thrustmaster FCS, Gravis GrIP) for DOS boxes, and one
+click on *Set up...* adds a **NUKED SB-EMU Game Port** to Device Manager and a **NUKED SB-EMU Joystick** to Game Controllers,
+so Windows games get your pad too, even on PCs whose sound card has no game port. The **Pad keys** tab learns your pad's
+buttons: click a box, press the button. ([joystick tab](docs/shots/w98-joystick-tab.png),
+[pad keys tab](docs/shots/w98-padkeys-tab.png), [Device Manager](docs/shots/w98-gameport-devmgr.png))
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.80.** **Hold the button, the key repeats!!** Pad buttons now
 repeat their key like a real keyboard, so menus and setup screens scroll when you hold the D-pad. Your dead zone setting
 now also decides how far you push a stick before it presses a key, and holding the same key on the pad and a USB keyboard
@@ -95,14 +103,14 @@ DOS boxes the game pad's buttons now type the right keys for the game you're pla
 one free file (the Keyb2Joypad layouts from DOSBox Pure, link in DOWNLOADS.TXT) and over 3500 DOS games know their
 buttons. Your own layouts go in PADUSER.TXT.
 
-<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.77.** **SETTINGS, CD images and GAMETEST in 3D!!** Same
-three looks as the 3D menu (Panels, Carousel and Module), with mouse support and pop-ups that stay in 3D. Turn on the 3D
-menu and they all follow; <kbd>F8</kbd> flips everything back to text.
-
 <details>
 <summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
 
 <br>
+
+<img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.77.** **SETTINGS, CD images and GAMETEST in 3D!!** Same
+three looks as the 3D menu (Panels, Carousel and Module), with mouse support and pop-ups that stay in 3D. Turn on the 3D
+menu and they all follow; <kbd>F8</kbd> flips everything back to text.
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.76-w98.1.** **Xbox 360 pads in Windows 98!!** The pack now
 comes with an unofficial Windows 98 driver for the 360 controller (and HORI, Mad Catz, Logitech and Saitek pads), with

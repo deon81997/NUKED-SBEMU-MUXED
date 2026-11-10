@@ -3,86 +3,87 @@
 
 IDI_APP ICON "sc55w.ico"
 
-IDD_SETTINGS DIALOGEX 0, 0, 402, 242
+IDD_SETTINGS DIALOGEX 0, 0, 402, 254
 STYLE DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
 CAPTION "NUKED SB-EMU for Windows 98 - Settings"
 FONT 8, "MS Sans Serif"
 BEGIN
-    GROUPBOX        "Sound Blaster (DOS)", -1, 7, 4, 128, 100
-    LTEXT           "Port", -1, 13, 17, 48, 8
-    COMBOBOX        IDC_PORT, 60, 15, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "IRQ", -1, 13, 31, 48, 8
-    COMBOBOX        IDC_IRQ, 60, 29, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "8-bit DMA", -1, 13, 45, 48, 8
-    COMBOBOX        IDC_DMA, 60, 43, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "16-bit DMA", -1, 13, 59, 48, 8
-    COMBOBOX        IDC_HDMA, 60, 57, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Type", -1, 13, 73, 48, 8
-    COMBOBOX        IDC_TYPE, 60, 71, 70, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "FM music", -1, 13, 87, 48, 8
-    COMBOBOX        IDC_FM, 60, 85, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "", IDC_TABS, "SysTabControl32", WS_TABSTOP | WS_CLIPSIBLINGS, 4, 3, 394, 196
+    GROUPBOX        "Sound Blaster (DOS)", -1, 7, 22, 128, 100
+    LTEXT           "Port", -1, 13, 35, 48, 8
+    COMBOBOX        IDC_PORT, 60, 33, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "IRQ", -1, 13, 49, 48, 8
+    COMBOBOX        IDC_IRQ, 60, 47, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "8-bit DMA", -1, 13, 63, 48, 8
+    COMBOBOX        IDC_DMA, 60, 61, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "16-bit DMA", -1, 13, 77, 48, 8
+    COMBOBOX        IDC_HDMA, 60, 75, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Type", -1, 13, 91, 48, 8
+    COMBOBOX        IDC_TYPE, 60, 89, 70, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "FM music", -1, 13, 105, 48, 8
+    COMBOBOX        IDC_FM, 60, 103, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 
-    GROUPBOX        "Output", -1, 7, 108, 128, 58
-    LTEXT           "Sample rate", -1, 13, 121, 48, 8
-    COMBOBOX        IDC_RATE, 60, 119, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Render-ahead (ms)", -1, 13, 135, 70, 8
-    EDITTEXT        IDC_AHEAD, 96, 133, 34, 12, ES_NUMBER
-    AUTOCHECKBOX    "Fix time constants", IDC_FIXTC, 13, 150, 118, 10
+    GROUPBOX        "Output", -1, 7, 126, 128, 58
+    LTEXT           "Sample rate", -1, 13, 139, 48, 8
+    COMBOBOX        IDC_RATE, 60, 137, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Render-ahead (ms)", -1, 13, 153, 70, 8
+    EDITTEXT        IDC_AHEAD, 96, 151, 34, 12, ES_NUMBER
+    AUTOCHECKBOX    "Fix time constants", IDC_FIXTC, 13, 168, 118, 10
 
-    GROUPBOX        "MIDI", -1, 141, 4, 128, 100
-    LTEXT           "MPU-401", -1, 147, 17, 46, 8
-    COMBOBOX        IDC_MPU, 194, 15, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Synth", -1, 147, 31, 46, 8
-    COMBOBOX        IDC_SYNTH, 194, 29, 70, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "SC-55 ROM set", -1, 147, 45, 46, 8
-    COMBOBOX        IDC_ROMSET, 194, 43, 70, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "SoundFont file", -1, 147, 59, 100, 8
-    EDITTEXT        IDC_SF, 147, 69, 99, 12, ES_AUTOHSCROLL
-    PUSHBUTTON      "...", IDC_SFBROWSE, 248, 69, 16, 12
-    LTEXT           "MIDI device: ""NUKED SB-EMU""", -1, 147, 88, 118, 8
+    GROUPBOX        "MIDI", -1, 141, 22, 128, 100
+    LTEXT           "MPU-401", -1, 147, 35, 46, 8
+    COMBOBOX        IDC_MPU, 194, 33, 70, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Synth", -1, 147, 49, 46, 8
+    COMBOBOX        IDC_SYNTH, 194, 47, 70, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "SC-55 ROM set", -1, 147, 63, 46, 8
+    COMBOBOX        IDC_ROMSET, 194, 61, 70, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "SoundFont file", -1, 147, 77, 100, 8
+    EDITTEXT        IDC_SF, 147, 87, 99, 12, ES_AUTOHSCROLL
+    PUSHBUTTON      "...", IDC_SFBROWSE, 248, 87, 16, 12
+    LTEXT           "MIDI device: ""NUKED SB-EMU""", -1, 147, 106, 118, 8
 
-    GROUPBOX        "Volume (%)", -1, 141, 108, 128, 72
-    LTEXT           "Master", -1, 147, 121, 70, 8
-    EDITTEXT        IDC_VOL, 224, 119, 40, 12, ES_NUMBER
-    LTEXT           "Sound effects", -1, 147, 135, 70, 8
-    EDITTEXT        IDC_SBVOL, 224, 133, 40, 12, ES_NUMBER
-    LTEXT           "FM music", -1, 147, 149, 70, 8
-    EDITTEXT        IDC_OPLVOL, 224, 147, 40, 12, ES_NUMBER
-    LTEXT           "MIDI music (0-400)", -1, 147, 163, 74, 8
-    EDITTEXT        IDC_MIDIVOL, 224, 161, 40, 12, ES_NUMBER
+    GROUPBOX        "Volume (%)", -1, 141, 126, 128, 72
+    LTEXT           "Master", -1, 147, 139, 70, 8
+    EDITTEXT        IDC_VOL, 224, 137, 40, 12, ES_NUMBER
+    LTEXT           "Sound effects", -1, 147, 153, 70, 8
+    EDITTEXT        IDC_SBVOL, 224, 151, 40, 12, ES_NUMBER
+    LTEXT           "FM music", -1, 147, 167, 70, 8
+    EDITTEXT        IDC_OPLVOL, 224, 165, 40, 12, ES_NUMBER
+    LTEXT           "MIDI music (0-400)", -1, 147, 181, 74, 8
+    EDITTEXT        IDC_MIDIVOL, 224, 179, 40, 12, ES_NUMBER
 
-    GROUPBOX        "SC-55 / MT-32", -1, 275, 4, 120, 72
-    LTEXT           "Gain % (100 = unity)", -1, 281, 17, 72, 8
-    EDITTEXT        IDC_SCGAIN, 356, 15, 34, 12, ES_NUMBER
-    LTEXT           "Note limit", -1, 281, 31, 72, 8
-    COMBOBOX        IDC_SCVOICES, 356, 29, 34, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    AUTOCHECKBOX    "Reverb and chorus", IDC_SCFX, 281, 46, 110, 10
-    AUTOCHECKBOX    "Automatic speed control", IDC_SCAUTO, 281, 59, 110, 10
+    GROUPBOX        "SC-55 / MT-32", -1, 275, 22, 120, 72
+    LTEXT           "Gain % (100 = unity)", -1, 281, 35, 72, 8
+    EDITTEXT        IDC_SCGAIN, 356, 33, 34, 12, ES_NUMBER
+    LTEXT           "Note limit", -1, 281, 49, 72, 8
+    COMBOBOX        IDC_SCVOICES, 356, 47, 34, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    AUTOCHECKBOX    "Reverb and chorus", IDC_SCFX, 281, 64, 110, 10
+    AUTOCHECKBOX    "Automatic speed control", IDC_SCAUTO, 281, 77, 110, 10
 
-    GROUPBOX        "SoundFont", -1, 275, 80, 120, 100
-    LTEXT           "Reverb", -1, 281, 93, 30, 8
-    EDITTEXT        IDC_SFREV, 311, 91, 22, 12, ES_NUMBER
-    LTEXT           "Room", -1, 339, 93, 26, 8
-    EDITTEXT        IDC_SFROOM, 368, 91, 22, 12, ES_NUMBER
-    LTEXT           "Damping", -1, 281, 107, 30, 8
-    EDITTEXT        IDC_SFDAMP, 311, 105, 22, 12, ES_NUMBER
-    LTEXT           "Chorus", -1, 339, 107, 26, 8
-    EDITTEXT        IDC_SFCHO, 368, 105, 22, 12, ES_NUMBER
-    LTEXT           "Speed", -1, 281, 121, 30, 8
-    EDITTEXT        IDC_SFCRATE, 311, 119, 22, 12, ES_NUMBER
-    LTEXT           "Depth", -1, 339, 121, 26, 8
-    EDITTEXT        IDC_SFCDEPTH, 368, 119, 22, 12, ES_NUMBER
-    LTEXT           "Voices", -1, 281, 135, 30, 8
-    EDITTEXT        IDC_SFVOICES, 311, 133, 22, 12, ES_NUMBER
-    AUTOCHECKBOX    "Follow the song's effect sends", IDC_SFSEND, 281, 150, 112, 10
-    LTEXT           "Levels in %, speed in 0.1 Hz", -1, 281, 164, 112, 8
+    GROUPBOX        "SoundFont", -1, 275, 98, 120, 100
+    LTEXT           "Reverb", -1, 281, 111, 30, 8
+    EDITTEXT        IDC_SFREV, 311, 109, 22, 12, ES_NUMBER
+    LTEXT           "Room", -1, 339, 111, 26, 8
+    EDITTEXT        IDC_SFROOM, 368, 109, 22, 12, ES_NUMBER
+    LTEXT           "Damping", -1, 281, 125, 30, 8
+    EDITTEXT        IDC_SFDAMP, 311, 123, 22, 12, ES_NUMBER
+    LTEXT           "Chorus", -1, 339, 125, 26, 8
+    EDITTEXT        IDC_SFCHO, 368, 123, 22, 12, ES_NUMBER
+    LTEXT           "Speed", -1, 281, 139, 30, 8
+    EDITTEXT        IDC_SFCRATE, 311, 137, 22, 12, ES_NUMBER
+    LTEXT           "Depth", -1, 339, 139, 26, 8
+    EDITTEXT        IDC_SFCDEPTH, 368, 137, 22, 12, ES_NUMBER
+    LTEXT           "Voices", -1, 281, 153, 30, 8
+    EDITTEXT        IDC_SFVOICES, 311, 151, 22, 12, ES_NUMBER
+    AUTOCHECKBOX    "Follow the song's effect sends", IDC_SFSEND, 281, 168, 112, 10
+    LTEXT           "Levels in %, speed in 0.1 Hz", -1, 281, 182, 112, 8
 
-    AUTOCHECKBOX    "Start with Windows", IDC_AUTOSTART, 7, 170, 128, 10
-    LTEXT           "", IDC_PREVIEW, 7, 186, 388, 26, SS_NOPREFIX | SS_SUNKEN
-    PUSHBUTTON      "Defaults", IDC_DEFAULTS, 7, 221, 50, 14
-    DEFPUSHBUTTON   "Save", IDOK, 235, 221, 50, 14
-    PUSHBUTTON      "Apply", IDC_APPLY, 290, 221, 50, 14
-    PUSHBUTTON      "Cancel", IDCANCEL, 345, 221, 50, 14
+    AUTOCHECKBOX    "Start with Windows", IDC_AUTOSTART, 7, 188, 128, 10
+    LTEXT           "", IDC_PREVIEW, 7, 203, 388, 22, SS_NOPREFIX | SS_SUNKEN
+    PUSHBUTTON      "Defaults", IDC_DEFAULTS, 7, 233, 50, 14
+    DEFPUSHBUTTON   "Save", IDOK, 235, 233, 50, 14
+    PUSHBUTTON      "Apply", IDC_APPLY, 290, 233, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 345, 233, 50, 14
 END
 
 IDD_STATUS DIALOGEX 0, 0, 260, 170
@@ -111,4 +112,84 @@ BEGIN
     AUTOCHECKBOX    "Set BLASTER= in AUTOEXEC.BAT for DOS programs", IDC_I_BLASTER, 7, 126, 286, 10
     DEFPUSHBUTTON   "Install", IDOK, 188, 151, 50, 14
     PUSHBUTTON      "Cancel", IDCANCEL, 243, 151, 50, 14
+END
+
+IDD_PAGE_JOY DIALOGEX 0, 0, 386, 176
+STYLE DS_CONTROL | WS_CHILD
+FONT 8, "MS Sans Serif"
+BEGIN
+    GROUPBOX        "Game port for DOS programs", -1, 2, 0, 186, 86
+    AUTOCHECKBOX    "Game port in DOS boxes", IDC_J_PORTON, 8, 11, 110, 10
+    LTEXT           "Address", -1, 8, 26, 50, 8
+    COMBOBOX        IDC_J_ADDR, 60, 24, 50, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Stick type", -1, 8, 40, 50, 8
+    COMBOBOX        IDC_J_TYPE, 60, 38, 122, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    AUTOCHECKBOX    "BIOS joystick call (INT 15h)", IDC_J_BIOS, 8, 54, 170, 10
+    AUTOCHECKBOX    "Also for Windows programs that read the port", IDC_J_WINPORT, 8, 67, 176, 10
+
+    GROUPBOX        "NUKED joystick for Windows games", -1, 2, 90, 186, 84
+    AUTOCHECKBOX    "Feed the NUKED SB-EMU Joystick from the pad", IDC_J_NUKED, 8, 101, 176, 10
+    LTEXT           "It shows", -1, 8, 116, 50, 8
+    COMBOBOX        IDC_J_MODE, 60, 114, 122, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Dead zone (%)", -1, 8, 130, 50, 8
+    EDITTEXT        IDC_J_DZ, 60, 128, 30, 12, ES_NUMBER
+    LTEXT           "", IDC_J_NSTAT, 8, 143, 176, 16, SS_NOPREFIX
+    PUSHBUTTON      "&Set up...", IDC_J_SETUP, 8, 158, 54, 13
+    PUSHBUTTON      "&Remove", IDC_J_REMOVE, 66, 158, 40, 13
+    PUSHBUTTON      "&Game Controllers...", IDC_J_CPL, 110, 158, 72, 13
+
+    GROUPBOX        "Test (live)", -1, 194, 0, 190, 174
+    CONTROL         "", IDC_J_VIEW, "Static", SS_OWNERDRAW, 199, 10, 180, 160
+END
+
+IDD_PAGE_PAD DIALOGEX 0, 0, 386, 176
+STYLE DS_CONTROL | WS_CHILD
+FONT 8, "MS Sans Serif"
+BEGIN
+    AUTOCHECKBOX    "Pad buttons press keys in DOS games (a layout for each game, 3500+ games)", IDC_P_KEYS, 4, 2, 300, 10
+    LTEXT           "", IDC_P_STAT, 4, 15, 378, 26, SS_NOPREFIX | SS_SUNKEN
+    PUSHBUTTON      "My layouts (PADUSER.TXT)...", IDC_P_EDIT, 4, 44, 110, 13
+    PUSHBUTTON      "PADMAP folder...", IDC_P_FOLDER, 118, 44, 70, 13
+
+    GROUPBOX        "Which Windows joystick button is which pad button (0 = none). Click a box and press the pad button.", -1, 2, 62, 382, 112
+    LTEXT           "A", -1, 8, 76, 30, 8
+    EDITTEXT        IDC_P_B0, 40, 74, 20, 12, ES_NUMBER
+    LTEXT           "B", -1, 8, 90, 30, 8
+    EDITTEXT        IDC_P_B1, 40, 88, 20, 12, ES_NUMBER
+    LTEXT           "X", -1, 8, 104, 30, 8
+    EDITTEXT        IDC_P_B2, 40, 102, 20, 12, ES_NUMBER
+    LTEXT           "Y", -1, 8, 118, 30, 8
+    EDITTEXT        IDC_P_B3, 40, 116, 20, 12, ES_NUMBER
+    LTEXT           "LB", -1, 70, 76, 30, 8
+    EDITTEXT        IDC_P_B4, 102, 74, 20, 12, ES_NUMBER
+    LTEXT           "RB", -1, 70, 90, 30, 8
+    EDITTEXT        IDC_P_B5, 102, 88, 20, 12, ES_NUMBER
+    LTEXT           "LT", -1, 70, 104, 30, 8
+    EDITTEXT        IDC_P_B6, 102, 102, 20, 12, ES_NUMBER
+    LTEXT           "RT", -1, 70, 118, 30, 8
+    EDITTEXT        IDC_P_B7, 102, 116, 20, 12, ES_NUMBER
+    LTEXT           "LS click", -1, 132, 76, 30, 8
+    EDITTEXT        IDC_P_B8, 164, 74, 20, 12, ES_NUMBER
+    LTEXT           "RS click", -1, 132, 90, 30, 8
+    EDITTEXT        IDC_P_B9, 164, 88, 20, 12, ES_NUMBER
+    LTEXT           "Back", -1, 132, 104, 30, 8
+    EDITTEXT        IDC_P_B10, 164, 102, 20, 12, ES_NUMBER
+    LTEXT           "Start", -1, 132, 118, 30, 8
+    EDITTEXT        IDC_P_B11, 164, 116, 20, 12, ES_NUMBER
+    LTEXT           "D-pad up", -1, 194, 76, 42, 8
+    EDITTEXT        IDC_P_B12, 236, 74, 20, 12, ES_NUMBER
+    LTEXT           "D-pad down", -1, 194, 90, 42, 8
+    EDITTEXT        IDC_P_B13, 236, 88, 20, 12, ES_NUMBER
+    LTEXT           "D-pad left", -1, 194, 104, 42, 8
+    EDITTEXT        IDC_P_B14, 236, 102, 20, 12, ES_NUMBER
+    LTEXT           "D-pad right", -1, 194, 118, 42, 8
+    EDITTEXT        IDC_P_B15, 236, 116, 20, 12, ES_NUMBER
+    LTEXT           "Triggers on axis", -1, 262, 76, 60, 8
+    COMBOBOX        IDC_P_TRIG, 324, 74, 54, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Right stick across", -1, 262, 90, 60, 8
+    COMBOBOX        IDC_P_RX, 324, 88, 54, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Right stick down", -1, 262, 104, 60, 8
+    COMBOBOX        IDC_P_RY, 324, 102, 54, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Xbox 360 defaults", IDC_P_DEF, 262, 118, 116, 13
+    LTEXT           "", IDC_P_LAST, 8, 136, 370, 32, SS_NOPREFIX
 END

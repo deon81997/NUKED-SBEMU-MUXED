@@ -828,3 +828,24 @@ tab on top of the x360c driver), then release beta.80-w98.3; afterwards CPU-usag
   JPORT.EXE (DOS, in a DOS box): Port=209 moves the game port (201h then reads as no stick), INT 15h, CH
   (D-pad up = all 4 lines), FCS (hat on axis 4: right = 64/255), GrIP frames (sync bits 18-22, A at bit 6).
   x360c under QEMU's fake pad: Windows U axis stays 0 (right stick X shows on V) - check RStickX on real pad.
+- RELEASED beta.80-w98.3 (tag v1.0.0-beta.80-w98.3-usb): zip = beta.80 zip + SC55W.EXE, SC55W.VXD (interface 7),
+  README98.TXT (x2), SOURCE.ZIP, new FILES\WIN98\JOY\NUKEDJOY.VXD + NUKEDJOY.INF. SC55MIDI.DRV unchanged.
+  Settings window: tabs "Sound and MIDI" / "Joystick" / "Pad keys" (Ctrl+Tab), helper/w98main.cpp (pages are child
+  dialogs IDD_PAGE_JOY/IDD_PAGE_PAD; page 0 = the old controls shifted down 18 DLU). Joystick tab: game port on/off,
+  address 200-20F, stick type, INT 15h, "also for Windows programs" ([Joystick] WindowsPort: the VxD answers the
+  system VM too), NUKED joystick feed/mode/dead zone, Set up... / Remove (helper/gameport.cpp writes the device the
+  way the INF install does: Enum\Root\MEDIA\NNNN + Services\Class\MEDIA\NNNN, ForcedConfig with the address,
+  LogConfig 201,200,202..20F, the OEM type and a JoystickN of that type with calibration), live test view.
+  Pad keys tab: PadKeys, layout status, PADUSER/PADMAP buttons, [Pad] map with learn-by-pressing.
+  Uninstall removes the game port + joystick. Install copies WIN98\JOY.
+- Tested in the Win98 VM (QEMU): automatic Set up on a fresh install (t3.img) -> after restart Joystick 2 =
+  NUKEDJOY.VXD, values follow the pad, Device Manager lists "NUKED SB-EMU Game Port" without a problem mark;
+  Remove; Windows program reading 201h (WJOY P) gets our port only with WindowsPort=1; DOS box port at 209h,
+  CH/FCS/GrIP. DOS regression (QEMU, MS-DOS 7.1, JEMMEX + QPIEMU + HDPMI, SBEMU beta.80 /JOYMODE:0-3, JPORT):
+  standard, CH (D-pad up = all 4 lines), FCS (hat axis 4), GrIP frames, INT 15h - all OK
+  (/home/claude/padtest/gt/joyreg). Red Baron 3D installs and reaches its main menu in the VM; QEMU mouse clicks
+  did not reach its menus, so flying it with the pad is left for real hardware.
+- Not testable here / to check on the user's hardware: real wired 360 pad + x360c (fakepad's right stick showed on
+  Windows axis V, triggers did not move Z - check [Pad] RStickX/Triggers with the Pad keys tab); Start/Back
+  numbering of x360c; Red Baron 3D in flight; the D810 / P5PE-VM.
+- NEXT (user asked): CPU-usage optimisation in DOS (SBEMU) and Windows (SC55W, VxD), after this release.

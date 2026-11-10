@@ -24,6 +24,8 @@
 #include "install98.h"
 #include "pad.h"
 #include "joyout.h"
+#include "gameport.h"
+#include <commctrl.h>
 #include "resource.h"
 
 #ifndef BUILD_ID
@@ -389,8 +391,10 @@ static DWORD WINAPI audio_main(LPVOID)
             EnterCriticalSection(&g_cs);
             Options want = g_pending;
             LeaveCriticalSection(&g_cs);
-            SC55W_CONFIG a = config_for(want), b = config_for(cur);
-            if (!have || memcmp(&a, &b, sizeof a)) {
+            SC55W_CONFIG a = config_for(want);
+            static SC55W_CONFIG attached;            // what the VxD has (INI joystick keys included)
+            if (!have || memcmp(&a, &attached, sizeof a)) {
+                attached = a;
                 publish_state("Connecting the Sound Blaster");
                 set_step("attach");
                 DWORD st = vxd_attach(want);
@@ -854,8 +858,8 @@ static void note_input(const PadInput& in, DWORD raw)
         if (in.button[i] && !prev[i]) {
             char b[80];
             DWORD nb = raw & ~prev_raw;
-            int n = 0;
-            for (int k = 0; k < 32; k++) if (nb >> k & 1) { n = k + 1; break; }
+            int n = g_padmap.btn[i] >= 1 && g_padmap.btn[i] <= 32 && (raw >> (g_padmap.btn[i] - 1) & 1) ? g_padmap.btn[i] : 0;
+            for (int k = 0; k < 32 && !n; k++) if (nb >> k & 1) n = k + 1;
             if (n) snprintf(b, sizeof b, "%s (Windows button %d)", pad_button_name(i), n);
             else snprintf(b, sizeof b, "%s", pad_button_name(i));
             EnterCriticalSection(&g_cs);
@@ -894,6 +898,8 @@ static void pad_files_load()
 // a NUKED joystick (NUKEDJOY.VXD) shows what we feed it: never read it back as a pad
 static JoyOutSettings g_joyout;
 static PadInput g_padin[2];
+static DWORD g_rawbtn;                   // Windows buttons of the first pad (settings: learn)
+static std::string g_padname[2];
 static bool is_nuked_joystick(UINT j, const JOYCAPSA& c)
 {
     std::string v = c.szOEMVxD;
@@ -987,6 +993,8 @@ static DWORD WINAPI joy_main(LPVOID)
             if (in.present) note_input(in, ji[0].dwButtons);
             EnterCriticalSection(&g_cs);
             g_padin[0] = pin[0]; g_padin[1] = pin[1];
+            g_rawbtn = got[0] ? ji[0].dwButtons : 0;
+            g_padname[0] = ok[0] ? cap[0].szPname : ""; g_padname[1] = ok[1] ? cap[1].szPname : "";
             LeaveCriticalSection(&g_cs);
 
             // which game runs in the DOS box that has the keyboard (10 times a second)
@@ -1348,12 +1356,19 @@ static void settings_update(HWND d)
     SetDlgItemTextA(d, IDC_PREVIEW, t.c_str());
 }
 
+static HWND g_page[3];
+static bool joy_page_save(HWND p, std::string& note);
+static void pad_page_save(HWND p);
 static void settings_apply(HWND d, bool save)
 {
     Options o = settings_read(d);
     g_dlg_opt = o;
     g_opt = o;
-    push_options(o);
+    std::string note;
+    if (g_page[1]) joy_page_save(g_page[1], note);   // game port / NUKED joystick (SC55W.INI)
+    if (g_page[2]) pad_page_save(g_page[2]);         // pad keys and the pad's button map
+    push_options(o);                                 // re-attaches when the game port changed
+    if (!note.empty()) MessageBoxA(d, note.c_str(), APP_TITLE, MB_ICONINFORMATION);
     if (save) {
         if (!save_options(o))
             MessageBoxA(d, ("Could not write " + g_optpath).c_str(), APP_TITLE, MB_ICONEXCLAMATION);
@@ -1365,12 +1380,358 @@ static void settings_apply(HWND d, bool save)
     }
 }
 
-static INT_PTR CALLBACK settings_proc(HWND d, UINT m, WPARAM w, LPARAM l)
+
+// ---------------------------------------------------------------------------
+// settings: tabs. Page 0 "Sound and MIDI" = the controls of the main dialog itself;
+// pages 1-2 are child dialogs (IDD_PAGE_JOY, IDD_PAGE_PAD). Their settings live in SC55W.INI.
+static int g_tab;
+static const int g_tab_always[] = {IDC_TABS, IDC_PREVIEW, IDC_DEFAULTS, IDOK, IDC_APPLY, IDCANCEL};
+
+static BOOL CALLBACK tab_show_ctl(HWND c, LPARAM l)
+{
+    if (GetParent(c) != (HWND)l) return TRUE;                 // only the dialog's own controls
+    int id = GetDlgCtrlID(c);
+    for (int a : g_tab_always) if (id == a) return TRUE;
+    for (int i = 1; i < 3; i++) if (c == g_page[i]) return TRUE;
+    ShowWindow(c, g_tab == 0 ? SW_SHOW : SW_HIDE);
+    return TRUE;
+}
+
+static void tab_show(HWND d)
+{
+    g_tab = (int)SendDlgItemMessageA(d, IDC_TABS, TCM_GETCURSEL, 0, 0);
+    EnumChildWindows(d, tab_show_ctl, (LPARAM)d);
+    for (int i = 1; i < 3; i++) if (g_page[i]) ShowWindow(g_page[i], g_tab == i ? SW_SHOW : SW_HIDE);
+}
+
+static int ini_get(const char* sec, const char* key, int def) { return GetPrivateProfileIntA(sec, key, def, g_inipath.c_str()); }
+static void ini_put(const char* sec, const char* key, int v)
+{
+    char b[16];
+    snprintf(b, sizeof b, "%d", v);
+    WritePrivateProfileStringA(sec, key, b, g_inipath.c_str());
+}
+static unsigned ini_port()
+{
+    char pb[16];
+    GetPrivateProfileStringA("Joystick", "Port", "201", pb, sizeof pb, g_inipath.c_str());
+    unsigned long v = strtoul(pb, NULL, 16);
+    return v >= 0x200 && v <= 0x20F ? (unsigned)v : 0x201;
+}
+
+// --- Joystick page
+static void joy_page_status(HWND p)
+{
+    GamePortState g = gameport_state();
+    std::string t;
+    char b[160];
+    if (g.joystick) {
+        snprintf(b, sizeof b, "Windows joystick %d is the NUKED SB-EMU Joystick", g.joystick);
+        t = b;
+        u32 polls = g_sh ? g_sh->wjoy[0].polls : 0;
+        if (polls) { snprintf(b, sizeof b, " (%lu reads).", (unsigned long)polls); t += b; }
+        else t += " (no game has read it yet).";
+    } else t = "Not set up: Set up... adds it to Game Controllers.";
+    if (g.device) { snprintf(b, sizeof b, "\r\nNUKED game port in Device Manager at %X.", g.port); t += b; }
+    else t += "\r\nNo NUKED game port in Device Manager.";
+    SetDlgItemTextA(p, IDC_J_NSTAT, t.c_str());
+    EnableWindow(GetDlgItem(p, IDC_J_REMOVE), g.device || g.joystick || g.type);
+}
+
+static void joy_page_load(HWND p)
+{
+    static const char* types[] = {"Standard (2 sticks, 4 buttons)", "CH Flightstick Pro (hat)", "Thrustmaster FCS (hat)",
+                                  "Gravis GamePad Pro (GrIP)"};
+    if (!SendDlgItemMessageA(p, IDC_J_ADDR, CB_GETCOUNT, 0, 0)) {
+        for (int a = 0x200; a <= 0x20F; a++) { char b[8]; snprintf(b, sizeof b, "%X", a); cb_add(p, IDC_J_ADDR, b, a); }
+        for (int i = 0; i < 4; i++) cb_add(p, IDC_J_TYPE, types[i], i);
+        cb_add(p, IDC_J_MODE, "the pad: 6 axes, D-pad hat, 12 buttons", 0);
+        cb_add(p, IDC_J_MODE, "the game port as DOS sees it", 1);
+        SendDlgItemMessageA(p, IDC_J_MODE, CB_SETDROPPEDWIDTH, 170, 0);
+    }
+    JoyOutSettings js;
+    joyout_load(g_inipath, js);
+    check(p, IDC_J_PORTON, ini_int("Joystick", 1) != 0);
+    cb_select(p, IDC_J_ADDR, (int)ini_port());
+    cb_select(p, IDC_J_TYPE, js.type);
+    check(p, IDC_J_BIOS, ini_int("JoyBios", 1) != 0);
+    check(p, IDC_J_WINPORT, ini_get("Joystick", "WindowsPort", 0) != 0);
+    check(p, IDC_J_NUKED, js.nuked != 0);
+    cb_select(p, IDC_J_MODE, js.mode);
+    set_int(p, IDC_J_DZ, js.deadzone);
+    joy_page_status(p);
+}
+
+static bool joy_page_save(HWND p, std::string& note)
+{
+    char b[16];
+    WritePrivateProfileStringA("SC55W", "Joystick", checked(p, IDC_J_PORTON) ? "1" : "0", g_inipath.c_str());
+    WritePrivateProfileStringA("SC55W", "JoyBios", checked(p, IDC_J_BIOS) ? "1" : "0", g_inipath.c_str());
+    unsigned port = (unsigned)cb_get(p, IDC_J_ADDR, 0x201);
+    snprintf(b, sizeof b, "%X", port);
+    WritePrivateProfileStringA("Joystick", "Port", b, g_inipath.c_str());
+    ini_put("Joystick", "WindowsPort", checked(p, IDC_J_WINPORT));
+    JoyOutSettings js;
+    js.type = cb_get(p, IDC_J_TYPE, 0);
+    js.nuked = checked(p, IDC_J_NUKED);
+    js.mode = cb_get(p, IDC_J_MODE, 0);
+    js.deadzone = get_int(p, IDC_J_DZ, 0, 50, 10);
+    joyout_save(g_inipath, js);
+    if (gameport_set_port(port)) {               // the Device Manager entry follows the address
+        note += "Device Manager shows the NUKED game port at its new address after Windows is restarted "
+                "(DOS boxes use it now).\r\n";
+        return true;
+    }
+    return false;
+}
+
+// live test: what Windows gives (the pad), what DOS boxes get (the game port), NUKED joystick
+static void draw_stick(HDC dc, int x, int y, int w, int vx, int vy, const char* label)
+{
+    Rectangle(dc, x, y, x + w, y + w);
+    MoveToEx(dc, x + w / 2, y, NULL); LineTo(dc, x + w / 2, y + w);
+    MoveToEx(dc, x, y + w / 2, NULL); LineTo(dc, x + w, y + w / 2);
+    int px = x + 2 + (int)((long)(vx + 32768) * (w - 5) / 65535), py = y + 2 + (int)((long)(vy + 32768) * (w - 5) / 65535);
+    HBRUSH br = CreateSolidBrush(RGB(200, 0, 0));
+    HGDIOBJ ob = SelectObject(dc, br);
+    Ellipse(dc, px - 3, py - 3, px + 4, py + 4);
+    SelectObject(dc, ob);
+    DeleteObject(br);
+    TextOutA(dc, x, y + w + 1, label, (int)strlen(label));
+}
+
+static void joy_view_draw(const DRAWITEMSTRUCT* di)
+{
+    HDC dc = di->hDC;
+    RECT r = di->rcItem;
+    FillRect(dc, &r, (HBRUSH)(COLOR_BTNFACE + 1));
+    SetBkMode(dc, TRANSPARENT);
+    HGDIOBJ of = SelectObject(dc, GetStockObject(DEFAULT_GUI_FONT));
+    PadInput in;
+    std::string name;
+    EnterCriticalSection(&g_cs);
+    in = g_padin[0];
+    name = g_padname[0];
+    LeaveCriticalSection(&g_cs);
+    char b[200];
+    snprintf(b, sizeof b, "Pad: %s", in.present ? name.c_str() : "none (Control Panel > Game Controllers)");
+    TextOutA(dc, r.left, r.top, b, (int)strlen(b));
+    int y = r.top + 16, w = 48;
+    draw_stick(dc, r.left + 2, y, w, in.axis[PA_LX], in.axis[PA_LY], "Left");
+    draw_stick(dc, r.left + 62, y, w, in.axis[PA_RX], in.axis[PA_RY], "Right");
+    // buttons
+    static const char* bn[PB_COUNT] = {"A", "B", "X", "Y", "LB", "RB", "LT", "RT", "LS", "RS", "Back", "Start",
+                                       "Up", "Down", "Left", "Right"};
+    int bx = r.left + 122, by = y;
+    for (int i = 0; i < PB_COUNT; i++) {
+        RECT br = {bx + (i % 2) * 28, by + (i / 2) * 11, bx + (i % 2) * 28 + 26, by + (i / 2) * 11 + 10};
+        if (in.button[i]) FillRect(dc, &br, (HBRUSH)GetStockObject(GRAY_BRUSH));
+        else FrameRect(dc, &br, (HBRUSH)GetStockObject(GRAY_BRUSH));
+        TextOutA(dc, br.left + 2, br.top - 1, bn[i], (int)strlen(bn[i]));
+    }
+    // DOS game port
+    y = r.top + 96;
+    if (g_sh) {
+        snprintf(b, sizeof b, "DOS game port %X: %u %u %u %u  btn %c%c%c%c",
+                 ini_port(), g_sh->joy_axis[0] >> 8, g_sh->joy_axis[1] >> 8, g_sh->joy_axis[2] >> 8,
+                 g_sh->joy_axis[3] >> 8, g_sh->joy_buttons & 1 ? '1' : '-', g_sh->joy_buttons & 2 ? '2' : '-',
+                 g_sh->joy_buttons & 4 ? '3' : '-', g_sh->joy_buttons & 8 ? '4' : '-');
+        TextOutA(dc, r.left, y, b, (int)strlen(b));
+        snprintf(b, sizeof b, "  read %lu times by DOS programs", (unsigned long)g_sh->joy_reads);
+        TextOutA(dc, r.left, y + 12, b, (int)strlen(b));
+        const SC55W_WJOY& w0 = g_sh->wjoy[0];
+        if (w0.present) {
+            snprintf(b, sizeof b, "NUKED joystick: X %u Y %u Z %u R %u U %u",
+                     w0.axis[0] >> 8, w0.axis[1] >> 8, w0.axis[2] >> 8, w0.axis[3] >> 8, w0.axis[4] >> 8);
+            TextOutA(dc, r.left, y + 28, b, (int)strlen(b));
+            std::string bt;
+            for (int k = 0; k < 12; k++) if (w0.buttons >> k & 1) { char n[8]; snprintf(n, sizeof n, "%d ", k + 1); bt += n; }
+            snprintf(b, sizeof b, "  hat %s, buttons %s", w0.pov == 0xFFFF ? "centre" : w0.pov == 0 ? "up" :
+                     w0.pov == 9000 ? "right" : w0.pov == 18000 ? "down" : w0.pov == 27000 ? "left" : "diagonal",
+                     bt.empty() ? "none" : bt.c_str());
+            TextOutA(dc, r.left, y + 40, b, (int)strlen(b));
+        } else TextOutA(dc, r.left, y + 28, "NUKED joystick: off", 19);
+    } else TextOutA(dc, r.left, y, "SC55W.VXD is not attached", 25);
+    SelectObject(dc, of);
+}
+
+static INT_PTR CALLBACK joy_page_proc(HWND p, UINT m, WPARAM w, LPARAM l)
+{
+    switch (m) {
+    case WM_INITDIALOG:
+        joy_page_load(p);
+        SetTimer(p, 1, 100, NULL);
+        return TRUE;
+    case WM_TIMER:
+        if (IsWindowVisible(p)) {
+            InvalidateRect(GetDlgItem(p, IDC_J_VIEW), NULL, FALSE);
+            static int n;
+            if (++n % 10 == 0) joy_page_status(p);
+        }
+        return TRUE;
+    case WM_DRAWITEM:
+        if (w == IDC_J_VIEW) { joy_view_draw((const DRAWITEMSTRUCT*)l); return TRUE; }
+        return FALSE;
+    case WM_COMMAND:
+        switch (LOWORD(w)) {
+        case IDC_J_SETUP: {
+            std::string log;
+            unsigned port = (unsigned)cb_get(p, IDC_J_ADDR, 0x201);
+            bool restart = gameport_install(path_join(g_exedir, "JOY"), port, log);
+            logf("game port setup: %s", log.c_str());
+            joy_page_status(p);
+            MessageBoxA(p, (log + (restart ? "\r\nRestart Windows so that it loads the NUKED game port."
+                                           : "")).c_str(), APP_TITLE, MB_ICONINFORMATION);
+            return TRUE;
+        }
+        case IDC_J_REMOVE: {
+            if (MessageBoxA(p, "Remove the NUKED SB-EMU Game Port and the NUKED SB-EMU Joystick from Windows?",
+                            APP_TITLE, MB_YESNO | MB_ICONQUESTION) != IDYES) return TRUE;
+            std::string log;
+            gameport_remove(log);
+            logf("game port removed: %s", log.c_str());
+            joy_page_status(p);
+            MessageBoxA(p, (log + "\r\nRestart Windows to finish.").c_str(), APP_TITLE, MB_ICONINFORMATION);
+            return TRUE;
+        }
+        case IDC_J_CPL:
+            ShellExecuteA(p, "open", "control.exe", "joy.cpl", NULL, SW_SHOWNORMAL);
+            return TRUE;
+        }
+        if (HIWORD(w) == CBN_SELCHANGE || HIWORD(w) == BN_CLICKED || HIWORD(w) == EN_CHANGE)
+            SendMessageA(GetParent(p), WM_APP + 50, 0, 0);       // the main dialog: something changed
+        return FALSE;
+    }
+    return FALSE;
+}
+
+// --- Pad keys page
+static const char* const AXES[] = {"none", "X", "Y", "Z", "R", "U", "V"};
+static void pad_page_load(HWND p)
+{
+    if (!SendDlgItemMessageA(p, IDC_P_TRIG, CB_GETCOUNT, 0, 0))
+        for (int i = 0; i < 7; i++) {
+            cb_add(p, IDC_P_TRIG, AXES[i], i);
+            if (i) { cb_add(p, IDC_P_RX, AXES[i], i); cb_add(p, IDC_P_RY, AXES[i], i); }
+        }
+    check(p, IDC_P_KEYS, ini_int("PadKeys", 1) != 0);
+    for (int i = 0; i < PB_COUNT; i++) set_int(p, IDC_P_B0 + i, g_padmap.btn[i]);
+    auto axis_idx = [](char c) { for (int i = 1; i < 7; i++) if (AXES[i][0] == c) return i; return 0; };
+    cb_select(p, IDC_P_TRIG, axis_idx(g_padmap.trig));
+    cb_select(p, IDC_P_RX, axis_idx(g_padmap.rx) ? axis_idx(g_padmap.rx) : 5);
+    cb_select(p, IDC_P_RY, axis_idx(g_padmap.ry) ? axis_idx(g_padmap.ry) : 4);
+}
+
+static void pad_page_save(HWND p)
+{
+    WritePrivateProfileStringA("SC55W", "PadKeys", checked(p, IDC_P_KEYS) ? "1" : "0", g_inipath.c_str());
+    for (int i = 0; i < PB_COUNT; i++) ini_put("Pad", pad_button_name(i), get_int(p, IDC_P_B0 + i, 0, 32, 0));
+    WritePrivateProfileStringA("Pad", "Triggers", AXES[cb_get(p, IDC_P_TRIG, 3)], g_inipath.c_str());
+    WritePrivateProfileStringA("Pad", "RStickX", AXES[cb_get(p, IDC_P_RX, 5)], g_inipath.c_str());
+    WritePrivateProfileStringA("Pad", "RStickY", AXES[cb_get(p, IDC_P_RY, 4)], g_inipath.c_str());
+    pad_map_load();
+    // keys per game only work with the INT 21h watch, which needs a new attach (push_options)
+    g_padkeys = checked(p, IDC_P_KEYS) && g_vxd != INVALID_HANDLE_VALUE;
+    if (g_padkeys) pad_files_load();
+}
+
+static INT_PTR CALLBACK pad_page_proc(HWND p, UINT m, WPARAM w, LPARAM l)
 {
     (void)l;
     switch (m) {
     case WM_INITDIALOG:
+        pad_page_load(p);
+        SetTimer(p, 1, 100, NULL);
+        return TRUE;
+    case WM_TIMER:
+        if (IsWindowVisible(p)) {
+            static DWORD prev;
+            DWORD raw;
+            std::string t, pr, la;
+            EnterCriticalSection(&g_cs);
+            raw = g_rawbtn; t = g_pad_title; pr = g_pad_prog; la = g_pad_last;
+            LeaveCriticalSection(&g_cs);
+            // learn: a box has the focus and a new Windows button goes down
+            HWND f = GetFocus();
+            int id = f ? GetDlgCtrlID(f) : 0;
+            DWORD nb = raw & ~prev;
+            prev = raw;
+            if (GetParent(f) == p && id >= IDC_P_B0 && id <= IDC_P_B15 && nb) {
+                for (int k = 0; k < 32; k++) if (nb >> k & 1) { set_int(p, id, k + 1); break; }
+                if (id < IDC_P_B15) SetFocus(GetDlgItem(p, id + 1));
+            }
+            std::string s = "Layout now: " + t + (pr.empty() ? std::string("") : "  (for " + pr + ")") +
+                            "\r\nLast pad button: " + la;
+            char cur[300];
+            GetDlgItemTextA(p, IDC_P_STAT, cur, sizeof cur);
+            if (s != cur) SetDlgItemTextA(p, IDC_P_STAT, s.c_str());
+            char b[64];
+            snprintf(b, sizeof b, "Windows buttons down now: ");
+            std::string d = b;
+            for (int k = 0; k < 32; k++) if (raw >> k & 1) { snprintf(b, sizeof b, "%d ", k + 1); d += b; }
+            GetDlgItemTextA(p, IDC_P_LAST, cur, sizeof cur);
+            if (d != cur) SetDlgItemTextA(p, IDC_P_LAST, d.c_str());
+        }
+        return TRUE;
+    case WM_COMMAND:
+        switch (LOWORD(w)) {
+        case IDC_P_EDIT: {
+            std::string f = path_join(g_base, "PADUSER.TXT");
+            if (!is_file(f)) save_text(f, "; PADUSER.TXT - your own pad layouts (they win over PADMAP.TXT).\r\n"
+                                          "; See README98.TXT, \"Game pad buttons as keys\".\r\n");
+            ShellExecuteA(p, "open", "notepad.exe", f.c_str(), NULL, SW_SHOWNORMAL);
+            return TRUE;
+        }
+        case IDC_P_FOLDER: {
+            std::string f = path_join(g_base, "PADMAP");
+            CreateDirectoryA(f.c_str(), NULL);
+            ShellExecuteA(p, "open", f.c_str(), NULL, NULL, SW_SHOWNORMAL);
+            return TRUE;
+        }
+        case IDC_P_DEF: {
+            static const int def[PB_COUNT] = {1, 2, 3, 4, 5, 6, 0, 0, 9, 10, 7, 8, 0, 0, 0, 0};
+            for (int i = 0; i < PB_COUNT; i++) set_int(p, IDC_P_B0 + i, def[i]);
+            cb_select(p, IDC_P_TRIG, 3); cb_select(p, IDC_P_RX, 5); cb_select(p, IDC_P_RY, 4);
+            return TRUE;
+        }
+        }
+        if (HIWORD(w) == CBN_SELCHANGE || HIWORD(w) == BN_CLICKED || HIWORD(w) == EN_CHANGE)
+            SendMessageA(GetParent(p), WM_APP + 50, 0, 0);
+        return FALSE;
+    }
+    return FALSE;
+}
+
+static void pages_create(HWND d)
+{
+    HWND tab = GetDlgItem(d, IDC_TABS);
+    const char* names[] = {"Sound and MIDI", "Joystick", "Pad keys"};
+    for (int i = 0; i < 3; i++) {
+        TCITEMA it;
+        memset(&it, 0, sizeof it);
+        it.mask = TCIF_TEXT;
+        it.pszText = (char*)names[i];
+        SendMessageA(tab, TCM_INSERTITEMA, i, (LPARAM)&it);
+    }
+    RECT r;
+    GetWindowRect(tab, &r);
+    MapWindowPoints(NULL, d, (POINT*)&r, 2);
+    SendMessageA(tab, TCM_ADJUSTRECT, FALSE, (LPARAM)&r);
+    g_page[1] = CreateDialogParamA(g_inst, MAKEINTRESOURCEA(IDD_PAGE_JOY), d, joy_page_proc, 0);
+    g_page[2] = CreateDialogParamA(g_inst, MAKEINTRESOURCEA(IDD_PAGE_PAD), d, pad_page_proc, 0);
+    for (int i = 1; i < 3; i++)
+        SetWindowPos(g_page[i], HWND_TOP, r.left, r.top, r.right - r.left, r.bottom - r.top, SWP_HIDEWINDOW);
+    SendMessageA(tab, TCM_SETCURSEL, g_tab, 0);
+    tab_show(d);
+}
+
+static INT_PTR CALLBACK settings_proc(HWND d, UINT m, WPARAM w, LPARAM l)
+{
+    switch (m) {
+    case WM_INITDIALOG:
         g_dlg_opt = g_opt;
+        g_page[1] = g_page[2] = NULL;
+        pages_create(d);
         settings_fill_lists(d);
         settings_show(d, g_dlg_opt);
         check(d, IDC_AUTOSTART, autostart_get());
@@ -1424,11 +1785,15 @@ static INT_PTR CALLBACK settings_proc(HWND d, UINT m, WPARAM w, LPARAM l)
             settings_update(d);
         return FALSE;
     }
+    case WM_NOTIFY:
+        if (((NMHDR*)l)->idFrom == IDC_TABS && ((NMHDR*)l)->code == (UINT)TCN_SELCHANGE) { tab_show(d); return TRUE; }
+        return FALSE;
     case WM_CLOSE:
         SendMessageA(d, WM_COMMAND, IDCANCEL, 0);
         return TRUE;
     case WM_DESTROY:
         g_settings_dlg = NULL;
+        g_page[1] = g_page[2] = NULL;
         return TRUE;
     }
     return FALSE;
@@ -1565,6 +1930,7 @@ static LRESULT CALLBACK main_proc(HWND h, UINT m, WPARAM w, LPARAM l)
 int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR cmd, int)
 {
     g_inst = inst;
+    InitCommonControls();                      // the settings window's tabs
     std::string c = cmd ? cmd : "";
     for (auto& ch : c) ch = (char)toupper((unsigned char)ch);
     int remote = c.find("/SETTINGS") != std::string::npos ? 1 : c.find("/STATUS") != std::string::npos ? 2
@@ -1670,6 +2036,17 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR cmd, int)
 
     MSG msg;
     while (GetMessageA(&msg, NULL, 0, 0) > 0) {
+        if (g_settings_dlg && msg.message == WM_KEYDOWN && (msg.wParam == VK_TAB || msg.wParam == VK_NEXT ||
+            msg.wParam == VK_PRIOR) && (GetKeyState(VK_CONTROL) & 0x8000) &&
+            (msg.hwnd == g_settings_dlg || IsChild(g_settings_dlg, msg.hwnd))) {
+            // Ctrl+Tab / Ctrl+PgDn: next tab, Ctrl+Shift+Tab / Ctrl+PgUp: previous (as property sheets)
+            HWND tab = GetDlgItem(g_settings_dlg, IDC_TABS);
+            int n = (int)SendMessageA(tab, TCM_GETITEMCOUNT, 0, 0), i = (int)SendMessageA(tab, TCM_GETCURSEL, 0, 0);
+            bool back = msg.wParam == VK_PRIOR || (msg.wParam == VK_TAB && (GetKeyState(VK_SHIFT) & 0x8000));
+            SendMessageA(tab, TCM_SETCURSEL, (i + (back ? n - 1 : 1)) % n, 0);
+            tab_show(g_settings_dlg);
+            continue;
+        }
         if (g_settings_dlg && IsDialogMessageA(g_settings_dlg, &msg)) continue;
         if (g_status_dlg && IsDialogMessageA(g_status_dlg, &msg)) continue;
         TranslateMessage(&msg);
