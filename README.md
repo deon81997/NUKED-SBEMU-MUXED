@@ -76,7 +76,8 @@ repeat their key like a real keyboard, so menus and setup screens scroll when yo
 now also decides how far you push a stick before it presses a key, and holding the same key on the pad and a USB keyboard
 no longer lets go too early. Also fixed: keys could get stuck after fast repeating on some BIOSes. Tested with 13 more
 games from a shareware CD (Bio Menace, Duke 1, Gods, Keen 1/4/6, Keen Dreams, Major Stryker, Epic Pinball, Spear of
-Destiny, Wolf3D...) plus Doom II and the full Wolf3D, all played from the pad.
+Destiny, Wolf3D...) plus Doom II and the full Wolf3D, all played from the pad
+([screenshots](docs/padkeys-tests/README.md)).
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/09/2026: beta.79.** **Your pad presses the keys in plain DOS too!!** The
 per-game button layouts from beta.77-w98.2 now work outside Windows: SBEMU sees which game you start and gives your
