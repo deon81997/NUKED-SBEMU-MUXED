@@ -786,3 +786,25 @@
 - SBEMU /PADLOG prints only the answer (no banner, no QEMM/HDPMI notes).
 - Tested: QEMU usb-kbd + fakepad: pad Ctrl down, USB Ctrl down, pad up (no break), marker 39 B9, USB up -> 9D.
   86Box JEMMEX+QPIEMU scan-code run (Keen/Wolf folder/Default) with repeats.
+
+## Win98 w98.3 (on beta.80) - work in progress (2026-11-10)
+User asked for a Win98 overhaul: controllers in DOS boxes AND Windows games, a virtual NUKED game port (Device
+Manager, address 200-20F) for PCs whose sound driver has none, a tabbed settings window in SC55W (incl. a Joystick
+tab on top of the x360c driver), then release beta.80-w98.3; afterwards CPU-usage work in DOS + Windows.
+- Toolchain (DONE): the EXE needs msvcrt.dll + win32 threads. xPack MinGW is UCRT (112 bad imports on Win98) - do
+  not use it. win98/tools/build-gcc.sh builds GCC 13.2 (mingw-w64 v11.0.1, --with-default-msvcrt=msvcrt,
+  --enable-threads=win32) into /home/claude/gccb/prefix (~30 min). Then
+  PATH=/home/claude/gccb/tools/bin:/home/claude/gccb/prefix/bin:$PATH; sh tools/build-deps.sh; sh build98.sh.
+  tools/chkimp2.py out/SC55W.EXE (Win98 DLLs from FULL.866 in /home/claude/w98dll): only GetModuleHandleW and
+  LoadLibraryW W-STUB, same as shipped. VxD (Open Watcom + JWasm) and SC55MIDI.DRV rebuild byte-identical.
+- Windows' joystick polling (VJOYD, MSANALOG) is ring 0, so an I/O trap can't feed Windows games. Plan: a VJoyD
+  minidriver NUKEDJOY.VXD (original interface, Win95 DDK msjstick sample: github joncampbell123/
+  windows_sdk_collection win/win95/ddk-1995-07/ddk/mmedia/samples/msjstick/vxd/vjoyd.h). Facts:
+  VJOYD_Device_ID = 0x449 (MULTIMEDIA_OEM_ID 0x440 + 9), service 1 = VJOYD_Register_Device_Driver
+  (EAX poll, EBX cfg, ECX hwcaps, EDX joyid; call it in Sys_Dynamic_Device_Init - VJOYD loads the VxD named by
+  MediaResources\Joystick\<drv>\CurrentJoystickSettings\JoystickNOEMCallout and only registers on FIRST init, so
+  SC55W.EXE must never CreateFile it). Poll: int __stdcall poll(int type, JOYOEMPOLLDATA*) type 0..5 = POLL1..6,
+  6 = GETBUTTONS; data {id, do_other, JOYPOS jp (X Y Z R U V), dwPOV, dwButtons, dwButtonNumber};
+  return 1 OK, 0 FAIL (unplugged), -1 "you poll". hwcaps(joyid, {maxbuttons, maxaxes, numaxes}).
+  OEM type key: MediaProperties\PrivateProperties\Joystick\OEM\<name>: OEMName, OEMData (JOYREGHWSETTINGS),
+  OEMCallout = NUKEDJOY.VXD.
