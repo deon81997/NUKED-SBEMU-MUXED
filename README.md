@@ -547,7 +547,7 @@ Stuff this little pack pulled off that I'm REALLY proud of:
 - 🏆 **Starts twice as fast**: from 15 seconds to under 7 on a 366 MHz Celeron (a ROM check was secretly redone on almost every start)
 - 🏆 **A USB host written from scratch for plain DOS**: UHCI, OHCI, EHCI and xHCI, hubs four deep, hot-plugging, and not a single interrupt, so it never fights your sound chip
 - 🏆 **USB mouse right next to a laptop touchpad**, no memory manager needed, by talking to the BIOS's own mouse services
-- 🏆 **Your pad presses each game's own keys** in over 3500 DOS games: SBEMU watches which program DOS starts and picks that game's layout. 13 shareware games, Doom II and Wolf3D were played start to finish with nothing but the pad
+- 🏆 **Your pad presses each game's own keys** in over 3500 DOS games: SBEMU watches which program DOS starts and picks that game's layout. 13 shareware games, Doom II and the full Wolf3D were all played with nothing but the pad
 - 🏆 **Our own Windows 98 drivers**: a virtual Sound Blaster / OPL3 / MPU-401 for DOS boxes, a MIDI driver, a joystick driver and a virtual game port, **idling at 0.25% of the CPU**
 - 🏆 **CD music from CUE/BIN images mixed into the game's sound**, plus a patch so the virtual CD drive can let go of CUE images again
 - 🏆 **3D menus drawn by the CPU** at 640×480, with no 3D card, that still run on a 366 MHz Celeron
@@ -558,7 +558,7 @@ Stuff this little pack pulled off that I'm REALLY proud of:
 ## ★ 100% Homemade!! ★
 
 Every one of these was written from scratch for this pack (by me together with **Claude**). Only SBEMU, the
-emulator cores and the DOS drivers we bundle come from other people (see [Thanks](#-thanks-to-my-friends-)).
+emulator cores, the DOS drivers we bundle and the Xbox 360 driver for Windows 98 come from other people (see [Thanks](#-thanks-to-my-friends-)).
 
 <details open>
 <summary><b>&gt;&gt; Inside SBEMU &lt;&lt;</b></summary>
