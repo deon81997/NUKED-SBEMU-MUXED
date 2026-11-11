@@ -1583,6 +1583,7 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
         int j = (int)(s - Ms) * 2 + (in ? 0 : 1), left = len, done, nd, k, t = *tog;   /* toggles in the TDs (not the
                                                                      * ED's carry: one thing less the NEC can hold on to) */
         uint32_t cc0 = 0;
+        int si = 0;
         volatile uint32_t* ed = BED(h, j);
         volatile uint32_t* tail;
         uint64_t end;
@@ -1633,7 +1634,7 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
                 break;
             }
             if (done) { r = done > 0 ? 0 : -1; break; }
-            if (tsc() > end) { cc0 = OT(0)[0]; break; }
+            if (tsc() > end) { si = i; cc0 = OT(i < n ? i : 0)[0]; break; }   /* the TD it got stuck on */
             owr(h, O_CMDSTS, OS_BLF);
         }
         ed[0] |= ED_SKIP;
@@ -1652,11 +1653,16 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
         }
         owr(h, O_INTSTS, 0x06);
         if (r && OTD_CC(cc0) == 0xF)
-        {   /* not one packet went: this OHCI does not serve its bulk list -> the control ED from now, once more */
+        {   /* a TD that never went (P5PE-VM NEC: the CSW TD after the data TD, every time): this OHCI does not serve
+             * our bulk list properly -> the control ED from now (o_run_tds, multi-TD runs work there), once more */
             trace("[OHCI%d bulk list not served: disk on the control ED from now] ", HC[h].idx);
             HC[h].ctlbulk = 1;
-            if (csw) return -3;                               /* msd_cmd: again, the plain way (data, then CSW) */
-            return bulk(s, in, buf, len, timeout_us, NULL);
+            if (csw && si >= nd) r = 0;                        /* the data came: msd_cmd reads the CSW on its own */
+            else if (si == 0)
+            {
+                if (csw) return -3;                           /* msd_cmd: again, the plain way (data, then CSW) */
+                return bulk(s, in, buf, len, timeout_us, NULL);
+            }
         }
         if (r) return -1;
         for (i = 0; i < nd; ++i)
