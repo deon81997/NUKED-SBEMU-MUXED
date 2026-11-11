@@ -43,7 +43,7 @@
 
 <br><br>
 
-<a href="#-whats-new-"><img src="https://raw.githubusercontent.com/deon81997/NUKED-SBEMU-MUXED/ticker/ticker-hd.gif" width="600" alt="The newest news, scrolling"></a>
+<a href="#-whats-new-"><img src="https://github.com/deon81997/NUKED-SBEMU-MUXED/releases/download/news-ticker/ticker-hd.gif" width="600" alt="The newest news, scrolling"></a>
 
 <br><br>
 

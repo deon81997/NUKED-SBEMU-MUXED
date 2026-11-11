@@ -5,8 +5,8 @@
 
 Writes OUTDIR/ticker-hd.gif and OUTDIR/ticker-hd.txt (the text it was made from); prints "unchanged" and does
 nothing when OUTDIR/ticker-hd.txt already holds the same text. .github/workflows/ticker.yml runs it on every
-README.md change and pushes the result to the "ticker" branch (main is protected against the Actions bot);
-the README shows https://raw.githubusercontent.com/deon81997/NUKED-SBEMU-MUXED/ticker/ticker-hd.gif
+README.md change and uploads the result to the "news-ticker" pre-release (the Actions bot may not push branches);
+the README shows https://github.com/deon81997/NUKED-SBEMU-MUXED/releases/download/news-ticker/ticker-hd.gif
 """
 import os, re, sys
 HERE = os.path.dirname(os.path.abspath(__file__))

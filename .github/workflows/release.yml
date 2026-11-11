@@ -58,7 +58,7 @@ jobs:
           ZIP: ${{ steps.ver.outputs.zip }}
         run: |
           # previous release = newest release that isn't this version
-          prev=$(gh release list --limit 20 --json tagName --jq '.[].tagName' | grep -vx "$TAG" | head -n 1 || true)
+          prev=$(gh release list --limit 20 --json tagName --jq '.[].tagName' | grep -vx "$TAG" | grep '^v' | head -n 1 || true)
           {
             echo "## Changes"
             echo
