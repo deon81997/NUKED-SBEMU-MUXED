@@ -780,8 +780,24 @@ static void msg(const char* fmt, ...)
 }
 
 /* ---- the playlist: paths plus what song_info() found (filled in the background) */
-typedef struct { char* path; SongInfo si; int have; } PE;
+typedef struct { char* path; SongInfo si; int have, played; } PE;
 static PE* g_pl; static int g_npl, g_cap, g_cur = -1;
+/* path -> index hash (open addressing, case-insensitive like stricmp), so "already in the list?" stays O(1) with 10,000+
+   songs; rebuilt lazily after anything that moves or removes entries (pl_dirty) */
+static int* g_ht; static int g_htsz, g_htok;
+static void pl_dirty(void) { g_htok = 0; }
+static unsigned pl_hash(const char* s) { unsigned h = 2166136261u; for (; *s; s++) h = (h ^ (unsigned char)tolower((unsigned char)*s)) * 16777619u; return h; }
+static void ht_put(int i) { unsigned m = (unsigned)g_htsz - 1, k = pl_hash(g_pl[i].path) & m; while (g_ht[k] >= 0) k = (k + 1) & m; g_ht[k] = i; }
+static void ht_build(void)
+{
+    int i, sz = 256;
+    while (sz < g_npl * 2 + 2) sz *= 2;
+    if (sz != g_htsz) { free(g_ht); g_ht = (int*)malloc((size_t)sz * sizeof(int)); g_htsz = g_ht ? sz : 0; }
+    if (!g_ht) { g_htok = 0; return; }
+    memset(g_ht, 0xFF, (size_t)sz * sizeof(int));
+    for (i = 0; i < g_npl; i++) ht_put(i);
+    g_htok = 1;
+}
 /* DOS style for the screen: upper case, backslashes (DJGPP gives c:/sc55) */
 static void dosify(char* s) { for (; *s; s++) { if (*s == '/') *s = '\\'; else *s = (char)toupper((unsigned char)*s); } }
 static const char* base_of(const char* name)
@@ -809,37 +825,48 @@ static void pl_add(const char* p)
     full[0] = 0; _fixpath(p, full);
     memset(&g_pl[g_npl], 0, sizeof(PE));
     g_pl[g_npl].path = strdup(full[0] ? full : p);
-    if (g_pl[g_npl].path) g_npl++;
+    if (g_pl[g_npl].path)
+    {
+        g_npl++;
+        if (g_htok) { if (g_npl * 2 + 2 > g_htsz) g_htok = 0; else ht_put(g_npl - 1); }
+    }
 }
 static void pl_remove(int i)
 {
     if (i < 0 || i >= g_npl) return;
     free(g_pl[i].path);
     memmove(&g_pl[i], &g_pl[i + 1], (size_t)(g_npl - i - 1) * sizeof(PE));
-    g_npl--;
+    g_npl--; pl_dirty();
     if (i < g_cur) g_cur--;
     else if (i == g_cur) g_cur = -2 - i;           /* the playing song left the list: keep playing, next is i */
 }
-static void pl_clear(void) { int i; for (i = 0; i < g_npl; i++) free(g_pl[i].path); g_npl = 0; g_cur = -1; }
-static int pl_find(const char* path) { int i; for (i = 0; i < g_npl; i++) if (!stricmp(g_pl[i].path, path)) return i; return -1; }
+static void pl_clear(void) { int i; for (i = 0; i < g_npl; i++) free(g_pl[i].path); g_npl = 0; g_cur = -1; pl_dirty(); }
+static int pl_find(const char* path)
+{
+    int i; unsigned m, k;
+    if (!g_htok) ht_build();
+    if (!g_htok) { for (i = 0; i < g_npl; i++) if (!stricmp(g_pl[i].path, path)) return i; return -1; }   /* no memory for the hash */
+    m = (unsigned)g_htsz - 1; k = pl_hash(path) & m;
+    for (; g_ht[k] >= 0; k = (k + 1) & m) if (!stricmp(g_pl[g_ht[k]].path, path)) return g_ht[k];
+    return -1;
+}
 static const char* pl_name(int i) { return g_pl[i].have && g_pl[i].si.title[0] ? g_pl[i].si.title : base_of(g_pl[i].path); }
 static int cmp_str(const void* a, const void* b) { return stricmp(*(char* const*)a, *(char* const*)b); }
 /* every MIDI file in dir, sorted; returns how many were added */
 static int scan_dir(const char* dir)
 {
-    DIR* d = opendir(dir); struct dirent* de;
-    char** names = NULL; int n = 0, cap = 0, i; char path[300]; size_t dl = strlen(dir);
-    if (!d) return 0;
-    while ((de = readdir(d)) != NULL)
+    /* findfirst/findnext gives name, attributes and size in one DOS call per entry; readdir()+stat() cost several
+       DOS calls (and a directory search) per file, which made a 10,000 file folder take minutes on a slow PC */
+    struct ffblk ff; char** names = NULL; int n = 0, cap = 0, i, r; char path[300], pat[300]; size_t dl = strlen(dir);
+    const char* sep = (dl && dir[dl - 1] != '/' && dir[dl - 1] != '\\' && dir[dl - 1] != ':') ? "\\" : "";
+    snprintf(pat, sizeof pat, "%s%s*.*", dir, sep);
+    for (r = findfirst(pat, &ff, FA_RDONLY | FA_HIDDEN | FA_SYSTEM | FA_ARCH); !r; r = findnext(&ff))
     {
-        struct stat st;
-        if (!is_midi_name(de->d_name)) continue;
-        snprintf(path, sizeof path, "%s%s%s", dir, (dl && dir[dl - 1] != '/' && dir[dl - 1] != '\\' && dir[dl - 1] != ':') ? "\\" : "", de->d_name);
-        if (stat(path, &st) || S_ISDIR(st.st_mode)) continue;
+        if ((ff.ff_attrib & FA_DIREC) || !is_midi_name(ff.ff_name)) continue;
+        if ((size_t)snprintf(path, sizeof path, "%s%s%s", dir, sep, ff.ff_name) >= sizeof path) continue;   /* longer than DOS allows */
         if (n == cap) { char** t = (char**)realloc(names, (size_t)(cap ? cap * 2 : 64) * sizeof(char*)); if (!t) break; names = t; cap = cap ? cap * 2 : 64; }
         if ((names[n] = strdup(path))) n++;
     }
-    closedir(d);
     if (n > 1) qsort(names, (size_t)n, sizeof(char*), cmp_str);
     for (i = 0; i < n; i++) { pl_add(names[i]); free(names[i]); }
     free(names);
@@ -848,11 +875,13 @@ static int scan_dir(const char* dir)
 /* M3U: one path per line, '#' comments; relative paths are relative to the list */
 static int pl_load_m3u(const char* file)
 {
-    FILE* f = fopen(file, "r"); char line[300], dir[300], p[600]; int n = 0; char* e;
+    FILE* f = fopen(file, "r"); char line[1024], dir[300], p[1400]; int n = 0; char* e;
     if (!f) return -1;
     snprintf(dir, sizeof dir, "%s", file); e = strrchr(dir, '\\'); if (!e) e = strrchr(dir, '/'); if (e) e[1] = 0; else dir[0] = 0;
     while (fgets(line, sizeof line, f))
     {
+        size_t l = strlen(line);
+        if (l == sizeof line - 1 && line[l - 1] != '\n') { int c; while ((c = fgetc(f)) != EOF && c != '\n') ; }   /* rest of a too long line */
         line[strcspn(line, "\r\n")] = 0;
         if (!line[0] || line[0] == '#') continue;
         if (line[1] == ':' || line[0] == '\\' || line[0] == '/') snprintf(p, sizeof p, "%s", line);
@@ -869,9 +898,9 @@ static int pl_save_m3u(const char* file)
     fprintf(f, "#EXTM3U\n");
     for (i = 0; i < g_npl; i++)
     {
-        char p[300]; char* c;
+        char p[600];
         snprintf(p, sizeof p, "%s", g_pl[i].path);
-        dosify(p); (void)c;
+        dosify(p);
         if (g_pl[i].have && g_pl[i].si.ok > 0) fprintf(f, "#EXTINF:%ld,%s\n", (g_pl[i].si.ms + 500) / 1000, pl_name(i));
         fprintf(f, "%s\n", p);
     }
@@ -1295,6 +1324,7 @@ static void pl_sort_now(int mode)
     if (mode >= 1) for (i = 0; i < g_npl; i++) if (!g_pl[i].have) { mp_pump(); song_info(g_pl[i].path, &g_pl[i].si); g_pl[i].have = 1; }
     if (mode == 3) { for (i = g_npl - 1; i > 0; i--) { int j = rand() % (i + 1); PE t = g_pl[i]; g_pl[i] = g_pl[j]; g_pl[j] = t; } }
     else { pl_idx_cmp_mode = mode; qsort(g_pl, (size_t)g_npl, sizeof(PE), pe_cmp); }
+    pl_dirty();
     if (cur[0]) g_cur = pl_find(cur);
     pl_sel = pl_find(selp); if (pl_sel < 0) pl_sel = 0;
     list_keep(&pl_sel, &pl_top, g_npl);
@@ -1316,7 +1346,7 @@ static void page_playlist(void)
         int bg = sel ? 0x70 : 0x10, fg = sel ? 0x00 : cur ? 0x0E : 0x07;
         PE* e = &g_pl[i2];
         tui_fill(1, y, 80, 1, bg, ' ');
-        snprintf(b, sizeof b, "%3d", i2 + 1); tui_put(2, y, bg | (sel ? 0x08 : 0x08), b);
+        snprintf(b, sizeof b, "%5d", i2 + 1); tui_put(1, y, bg | 0x08, b);   /* cols 1-5: 99,999 songs before col 6 (the play mark) */
         if (cur) tui_cell(6, y, bg | (P.paused ? 0x0E : 0x0A), P.paused ? 0xBA : 0x10);
         { char fn[80]; snprintf(fn, sizeof fn, "%s", base_of(e->path)); dosify(fn); tui_putw(8, y, 13, bg | fg, fn); }
         if (e->have && e->si.title[0]) tui_putw(22, y, 39, bg | (sel ? 0x01 : 0x03), e->si.title);   /* file name first, then the title */
@@ -1363,7 +1393,7 @@ static void key_playlist(int k)
         int j = pl_sel + (k == K_CUP ? -1 : 1);
         if (j >= 0 && j < g_npl)
         {
-            PE t = g_pl[pl_sel]; g_pl[pl_sel] = g_pl[j]; g_pl[j] = t;
+            PE t = g_pl[pl_sel]; g_pl[pl_sel] = g_pl[j]; g_pl[j] = t; pl_dirty();
             if (g_cur == pl_sel) g_cur = j; else if (g_cur == j) g_cur = pl_sel;
             pl_sel = j; list_keep(&pl_sel, &pl_top, g_npl);
         }
@@ -1380,8 +1410,9 @@ static void key_playlist(int k)
 }
 
 /* ---- Files */
-typedef struct { char name[80]; int kind; long size; int mark; } Ent;    /* kind: 0 file, 1 folder, 2 drive, 3 playlist */
+typedef struct { char* name; int kind; long size; int mark; } Ent;   /* name: full long name (was char[80]: longer names were cut and could not be opened) */    /* kind: 0 file, 1 folder, 2 drive, 3 playlist */
 static Ent* fl_e; static int fl_n, fl_sel, fl_top, fl_loaded;
+static char fl_cwd[300];                  /* the folder shown, read once per fl_load (getcwd is a DOS call) */
 static SongInfo fl_si; static char fl_si_name[300]; static int fl_si_have;
 static int ent_cmp(const void* a, const void* b)
 {
@@ -1401,43 +1432,41 @@ static int drive_exists(int d)                    /* 0 = A: ; INT 21h 4408h: no 
 static void fl_add(const char* name, int kind, long size)
 {
     static int cap;
-    if (fl_n == cap) { Ent* t = (Ent*)realloc(fl_e, (size_t)(cap = cap ? cap * 2 : 128) * sizeof(Ent)); if (!t) return; fl_e = t; }
-    snprintf(fl_e[fl_n].name, sizeof fl_e[fl_n].name, "%s", name); dosify(fl_e[fl_n].name); fl_e[fl_n].kind = kind; fl_e[fl_n].size = size; fl_e[fl_n].mark = 0; fl_n++;
+    if (fl_n == cap) { Ent* t = (Ent*)realloc(fl_e, (size_t)(cap ? cap * 2 : 128) * sizeof(Ent)); if (!t) return; fl_e = t; cap = cap ? cap * 2 : 128; }
+    if (!(fl_e[fl_n].name = strdup(name))) return;
+    dosify(fl_e[fl_n].name); fl_e[fl_n].kind = kind; fl_e[fl_n].size = size; fl_e[fl_n].mark = 0; fl_n++;
 }
 static void fl_load(void)
 {
-    DIR* d = opendir("."); struct dirent* de; int i;
+    struct ffblk ff; int i, r;
+    for (i = 0; i < fl_n; i++) free(fl_e[i].name);
     fl_n = 0; fl_sel = fl_top = 0; fl_si_have = 0; fl_si_name[0] = 0;
-    if (d)
+    if (!getcwd(fl_cwd, sizeof fl_cwd)) fl_cwd[0] = 0;
+    /* one findfirst/findnext per entry (no stat): fast with thousands of files */
+    for (r = findfirst("*.*", &ff, FA_RDONLY | FA_HIDDEN | FA_SYSTEM | FA_ARCH | FA_DIREC); !r; r = findnext(&ff))
     {
-        while ((de = readdir(d)) != NULL)
-        {
-            struct stat st;
-            if (!strcmp(de->d_name, ".") || stat(de->d_name, &st)) continue;
-            if (S_ISDIR(st.st_mode)) fl_add(de->d_name, 1, 0);
-            else if (is_midi_name(de->d_name)) fl_add(de->d_name, 0, (long)st.st_size);
-            else if (is_m3u_name(de->d_name)) fl_add(de->d_name, 3, (long)st.st_size);
-        }
-        closedir(d);
+        if (!strcmp(ff.ff_name, ".")) continue;
+        if (ff.ff_attrib & FA_DIREC) fl_add(ff.ff_name, 1, 0);
+        else if (is_midi_name(ff.ff_name)) fl_add(ff.ff_name, 0, (long)ff.ff_fsize);
+        else if (is_m3u_name(ff.ff_name)) fl_add(ff.ff_name, 3, (long)ff.ff_fsize);
     }
     for (i = 2; i < 26; i++) if (drive_exists(i)) { char n[4] = { (char)('A' + i), ':', 0 }; fl_add(n, 2, 0); }
     if (fl_n > 1) qsort(fl_e, (size_t)fl_n, sizeof(Ent), ent_cmp);
     fl_loaded = 1;
-    { char cwd[260]; if (getcwd(cwd, sizeof cwd)) snprintf(g_lastdir, sizeof g_lastdir, "%s", cwd); }
+    if (fl_cwd[0]) snprintf(g_lastdir, sizeof g_lastdir, "%s", fl_cwd);
 }
 static const char* fl_nm(int i) { return fl_e[i].name; }
 static void fl_full(int i, char* out, size_t sz)
 {
-    char cwd[260];
-    if (!getcwd(cwd, sizeof cwd)) cwd[0] = 0;
-    snprintf(out, sz, "%s%s%s", cwd, (cwd[0] && cwd[strlen(cwd) - 1] != '/' && cwd[strlen(cwd) - 1] != '\\') ? "/" : "", fl_e[i].name);
+    const char* cwd = fl_cwd; size_t l = strlen(cwd);
+    snprintf(out, sz, "%s%s%s", cwd, (l && cwd[l - 1] != '/' && cwd[l - 1] != '\\') ? "/" : "", fl_e[i].name);
 }
 static void page_files(void)
 {
-    char cwd[260], b[120], t[16]; int r, i, marked = 0, x = 52;
+    char cwd[300], b[120], t[16]; int r, i, marked = 0, x = 52;
     if (!fl_loaded) fl_load();
     for (i = 0; i < fl_n; i++) marked += fl_e[i].mark;
-    if (!getcwd(cwd, sizeof cwd)) strcpy(cwd, "?");
+    snprintf(cwd, sizeof cwd, "%s", fl_cwd[0] ? fl_cwd : "?");
     dosify(cwd);
     snprintf(b, sizeof b, "Files \xFA %s", cwd);
     tui_fill(1, 2, 80, 22, 0x10, ' ');
@@ -1849,6 +1878,7 @@ static int start_index(int i)
         char err[64];
         if (i >= g_npl) i = 0;
         g_cur = i;
+        g_pl[i].played = 1;                                 /* shuffle: each song once (also songs that fail) */
         if (mp_start(g_pl[i].path, g_reset, err, sizeof err))
         {
             g_plays++;
@@ -1870,9 +1900,19 @@ static int next_index(int finished)
     if (finished && g_rep == 2) return g_cur;
     if (g_shuf && g_npl > 1)
     {
-        if (finished && g_rep == 0 && g_plays >= g_npl) return -1;
-        do n = rand() % g_npl; while (n == g_cur);
-        return n;
+        /* a random song not played yet (was: any song but this one, so with thousands of songs many came twice
+           before others came once); rand() is only 15 bits on some libcs, so combine two */
+        int left = 0, i, r;
+        for (i = 0; i < g_npl; i++) left += !g_pl[i].played && i != g_cur;
+        if (!left)
+        {
+            if (finished && g_rep == 0) return -1;
+            for (i = 0; i < g_npl; i++) g_pl[i].played = i == g_cur;
+            left = g_npl - (g_cur >= 0 && g_cur < g_npl);
+        }
+        r = (int)((((unsigned)rand() << 15) ^ (unsigned)rand()) % (unsigned)left);
+        for (i = 0; i < g_npl; i++) if (!g_pl[i].played && i != g_cur && r-- == 0) return i;
+        return 0;
     }
     n = g_cur + 1;
     if (n >= g_npl) return g_rep ? 0 : -1;
