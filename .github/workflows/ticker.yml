@@ -26,6 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}    # gh runs outside the checkout in the upload step
     steps:
       - uses: actions/checkout@v4
       - name: Pillow and the DejaVu fonts
