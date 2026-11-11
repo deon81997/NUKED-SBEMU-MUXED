@@ -1138,3 +1138,8 @@ User: games from the virtual CD give "no CD found", read errors or init errors.
 - User wants "Super Shareware Collection.iso" (archive.org) tested; the session has no network: ask for an upload.
 - Red Baron 3D (user upload, /home/claude/games/rb3d/RedBaron3D.iso) is a WINDOWS game: the "uCDD in a DOS box"
   plan gives a drive only to DOS programs; Windows games need a Windows 98 virtual CD driver (bigger job).
+- Later (network now on): user's "Super Shareware Collection.iso" (archive.org, 485 MB, 1994 SIMTEL/BBS ZIP CD) on M:
+  with SBEMU + SC-55 loaded (86Box): DIR M:\GAMES = all 284 entries (7-sector directory), COPY M:\GAMES\D*.ZIP and
+  W*.ZIP = 26 files bit-identical to the image, GO.COM (a TheDraw screen that exits) OK. Test disk 700 MB:
+  testrig/mkdisk.py MKDISK_SPC=32 (16 KB clusters), /tmp/runbig.sh = cdtest/run.sh with DISKMB=/CYL= (1422 cyl).
+  No read problem found outside the MENU disc-swap bug: waiting for the user's game names / error photos.

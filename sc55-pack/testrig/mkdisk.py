@@ -15,6 +15,8 @@ def carray(fn):
 
 SPT, HEADS, SEC = 63, 16, 512
 SPC, RES, NFAT, ROOTN = 4, 1, 2, 512
+import os as _os
+SPC = int(_os.environ.get("MKDISK_SPC", SPC))   # sectors per cluster (MKDISK_SPC=32: disks up to 1 GB)
 
 def dosname(n):
     n = n.upper()
