@@ -1165,3 +1165,13 @@ User: bug-hunt Win98 -> DOS ("Restart in MS-DOS mode", Shut Down -> MS-DOS, full
 - README98: SBEMU does not load in a DOS box; one line for C:\WINDOWS\DOSSTART.BAT (CALL C:\SC55\SC55.BAT).
 Zip = beta.91 zip + FILES\SC55\SBEMU.EXE, README98.TXT (x2). VERSION unchanged (beta.91).
 NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run the three switch paths.
+## SC-55 SSE2 PCM_Update experiment (2026-11-11, dropped, no code change)
+- Tried: split the voice loop into 3 passes (address/ROM/DPCM/interp/IRQ/envelopes in slot order; filter + volume +
+  pan + sends for all voices, 4 at a time with SSE2 PMADDWD; mix chain in slot order), CPUID pick, C fallback.
+  Bit-exact on both paths (sc55bench mk1-v2.00, 19.mid, 30 s: hash 1317ac59).
+- Result: slower. Callgrind 4 s: original 5.06 G Ir, SSE2 5.27 G, C split 5.45 G. Wall (best of 5): 2.30 / 2.50 / 2.66 s.
+  The vectorizable stage is only ~5.7% of all time (287M Ir scalar -> 106M SSE2), so the ceiling is ~3.6%, and the
+  split costs ~390M Ir. P-M/P4 run 128-bit SSE2 integer ops as 2x64, so the real gain would be even smaller.
+- The rest of PCM_Update (address generator, ROM reads, per-voice variable shifts) does not map to SSE2.
+- DOS note for any future SIMD: the SC-55 renders in the sound ISR with fnsave (vmpu_sc55.c), which does not save
+  XMM; SSE needs a CR4.OSFXSR check (e.g. probe under SIGILL) and fxsave/fxrstor around the render.
