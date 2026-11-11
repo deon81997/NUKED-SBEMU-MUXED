@@ -767,6 +767,7 @@ static void ohci_reset(int i)
     owr(i, O_HCCA, PHYS(h->fl));
     owr(i, O_CTLHEAD, PHYS(h->ctl)); owr(i, O_CTLCUR, 0);
     owr(i, O_BLKHEAD, PHYS(BED(i, 0))); owr(i, O_BLKCUR, 0);
+    if (PCI_ReadWord(h->bus, h->dev, h->func, 0) == 0x1033) h->ctlbulk = 1;   /* NEC: disks on the control ED (see bulk) */
     owr(i, O_INTSTS, 0xFFFFFFFFUL);
     owr(i, O_CONTROL, OC_OPER | OC_PLE | OC_CLE | OC_BLE | 3);
     rha = ord(i, O_RHDA);
@@ -1148,12 +1149,13 @@ static void otd(volatile uint32_t* t, uint32_t flags, uint32_t buf, int len, vol
  * OAltEd: a second control ED, used only for addresses other than 0 (Linux never rewrites a live ED's address);
  * OSplit: SET_ADDRESS's SETUP and status stage as two separate runs, 2 ms apart */
 static int OAltEd, OSplit;
+static int OTd0;                        /* o_run_tds: first TD (disk runs on the NEC alternate between two banks) */
 static int o_run_tds(const Dev* d, int ep, int mps, int n, uint32_t timeout_us)
 {
     uint64_t end;
     int i, r = -1, h = d->hc;
     volatile uint32_t* ed = (OAltEd && d->addr) ? HC[h].ctl + 8 : HC[h].ctl;
-    volatile uint32_t* tail = tdn(n);
+    volatile uint32_t* tail = tdn(OTd0 + n);
     uint32_t info = (uint32_t)d->addr | ((uint32_t)ep << 7) | (d->speed == SP_LS ? ED_LS : 0) | ((uint32_t)mps << 16);
     zero(tail, 4);
     fl(ed, 16);
@@ -1173,9 +1175,9 @@ static int o_run_tds(const Dev* d, int ep, int mps, int n, uint32_t timeout_us)
     }
     ed[0] = ED_SKIP | info;
     ed[1] = PHYS(tail);
-    ed[2] = PHYS(tdn(0));
+    ed[2] = PHYS(tdn(OTd0));
     ed[3] = ed == HC[h].ctl ? PHYS(HC[h].ctl + 8) : 0;       /* control list: main ED -> second ED (skipped) */
-    fl(TD, (n + 1) * 32); fl(CBuf, 512);
+    fl(TD, (OTd0 + n + 1) * 32); fl(CBuf, 512);
     ed[0] &= ~ED_SKIP;
     fl(ed, 16);
     owr(h, O_CMDSTS, OS_CLF);
@@ -1183,10 +1185,10 @@ static int o_run_tds(const Dev* d, int ep, int mps, int n, uint32_t timeout_us)
     for (;;)
     {
         int done = 1, err = 0;
-        fl(TD, n * 32); fl(ed, 16);
+        fl(TD, (OTd0 + n) * 32); fl(ed, 16);
         for (i = 0; i < n; ++i)
         {
-            uint32_t cc = OTD_CC(tdn(i)[0]);
+            uint32_t cc = OTD_CC(tdn(OTd0 + i)[0]);
             if (cc >= 0xE) { done = 0; break; }
             /* an error code with the ED not halted is a try the HC repeats (ErrorCount < 3: a device that
              * did not answer once, e.g. just after SET_ADDRESS); only a halted ED means the TD failed */
@@ -1198,7 +1200,7 @@ static int o_run_tds(const Dev* d, int ep, int mps, int n, uint32_t timeout_us)
         owr(h, O_CMDSTS, OS_CLF);
     }
     if (r)
-        trace("[o%08lx/%08lx ed%08lx %08lx ctl%08lx is%08lx ps%08lx fn%04lx] ", (unsigned long)tdn(0)[0], (unsigned long)tdn(n - 1)[0],
+        trace("[o%08lx/%08lx ed%08lx %08lx ctl%08lx is%08lx ps%08lx fn%04lx] ", (unsigned long)tdn(OTd0)[0], (unsigned long)tdn(OTd0 + n - 1)[0],
             (unsigned long)ed[0], (unsigned long)ed[2], (unsigned long)ord(h, O_CONTROL), (unsigned long)ord(h, O_INTSTS),
             (unsigned long)(d->parent < 0 ? ord(h, O_PORT + d->rootport * 4) : 0), (unsigned long)(ord(h, 0x3C) & 0xFFFF));
     ed[0] |= ED_SKIP;
@@ -1557,22 +1559,34 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
     }
     case T_OHCI:
         if (HC[h].ctlbulk)
-        {   /* on the control ED: one TD per packet, toggles given in the TDs (the ED is rewritten per endpoint) */
-            int left = len, t = *tog;
+        {   /* on the control ED (P5PE-VM NEC): runs of up to 16 packets, TDs in two banks used in turn and the ED
+             * restarted every run (the NEC answered from a cached TD: a CSW "came" but landed elsewhere) */
+            int done = 0, t = *tog, k;
+            static int bank;
             do
             {
-                int c = left > mps ? mps : left;
-                otd(tdn(n), (in ? OTD_IN : OTD_OUT) | (t ? OTD_T1 : OTD_T0), pb + (len - left), c, tdn(n + 1));
-                t ^= 1; left -= c; ++n;
-            } while (left > 0 && n < NTD - 1);
-            r = o_run_tds(d, ep, mps, n, timeout_us);
-            fl(TD, n * 32);
-            if (r)
-            {
-                for (i = 0; i < n && OTD_CC(tdn(i)[0]) == 0; ++i) ++pk;
-                *tog ^= pk & 1;
-                return -1;
-            }
+                int left = len - done;
+                n = 0;
+                bank ^= 1; OTd0 = bank ? 20 : 0;
+                do
+                {
+                    int c = left > mps ? mps : left;
+                    otd(tdn(OTd0 + n), (in ? OTD_IN : OTD_OUT) | (t ? OTD_T1 : OTD_T0), pb + done + n * mps, c, tdn(OTd0 + n + 1));
+                    t ^= 1; left -= c; ++n;
+                } while (left > 0 && n < 16);
+                HC[h].ctl[0] = ED_SKIP; HC[h].ctl[8] = ED_SKIP;   /* never the same info: o_run_tds restarts the list */
+                r = o_run_tds(d, ep, mps, n, timeout_us);
+                fl(TD, 40 * 32);
+                if (r)
+                {
+                    for (pk = 0, k = 0; k < n && OTD_CC(tdn(OTd0 + k)[0]) == 0; ++k) ++pk;
+                    t = *tog ^ ((done / mps + pk) & 1);
+                    *tog = t; OTd0 = 0;
+                    return -1;
+                }
+                done += n * mps < len - done ? n * mps : len - done;
+            } while (done < len);
+            OTd0 = 0;
             *tog = t;
             fl(buf, len ? len : 1);
             return len;
