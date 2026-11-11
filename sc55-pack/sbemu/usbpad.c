@@ -767,7 +767,7 @@ static void ohci_reset(int i)
     owr(i, O_HCCA, PHYS(h->fl));
     owr(i, O_CTLHEAD, PHYS(h->ctl)); owr(i, O_CTLCUR, 0);
     owr(i, O_BLKHEAD, PHYS(BED(i, 0))); owr(i, O_BLKCUR, 0);
-    if (PCI_ReadWord(h->bus, h->dev, h->func, 0) == 0x1033) h->ctlbulk = 1;   /* NEC: disks on the control ED (see bulk) */
+    if (PCI_ReadWord(h->bus, h->dev, h->func, 0) == 0x1033 || getenv("USBCTLBULK")) h->ctlbulk = 1;   /* USBCTLBULK: test */   /* NEC: disks on the control ED (see bulk) */
     owr(i, O_INTSTS, 0xFFFFFFFFUL);
     owr(i, O_CONTROL, OC_OPER | OC_PLE | OC_CLE | OC_BLE | 3);
     rha = ord(i, O_RHDA);
@@ -1149,7 +1149,7 @@ static void otd(volatile uint32_t* t, uint32_t flags, uint32_t buf, int len, vol
  * OAltEd: a second control ED, used only for addresses other than 0 (Linux never rewrites a live ED's address);
  * OSplit: SET_ADDRESS's SETUP and status stage as two separate runs, 2 ms apart */
 static int OAltEd, OSplit;
-static int DbgRuns;                     /* NEC disk runs traced TD by TD (the first 16) */
+static int DbgRuns, Fault, FaultN;      /* USBFAULT=n: every n-th NEC-path disk run is faked as "retired, not done" (test) */                     /* NEC disk runs traced TD by TD (the first 16) */
 static volatile uint32_t* OTb;          /* o_run_tds: its TDs (NULL = the TD pool; NEC disk runs rotate through banks) */
 #define OTDN(x) ((OTb ? OTb : TD) + (x) * 8)
 static int o_run_tds(const Dev* d, int ep, int mps, int n, uint32_t timeout_us)
@@ -1578,7 +1578,12 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
                     t ^= 1; left -= c; ++n;
                 } while (left > 0 && n < 16);
                 HC[h].ctl[0] = ED_SKIP; HC[h].ctl[8] = ED_SKIP;   /* never the same info: o_run_tds restarts the list */
-                r = o_run_tds(d, ep, mps, n, timeout_us);
+                if (Fault && ++FaultN % Fault == 0)
+                {   /* the NEC's habit, for testing in an emulator: TDs marked done (CC 0), nothing moved */
+                    for (k = 0; k < n; ++k) OTDN(k)[0] &= 0x0FFFFFFFUL;
+                    r = 0;
+                }
+                else r = o_run_tds(d, ep, mps, n, timeout_us);
                 fl(OTDN(0), 17 * 32);
                 if (DbgRuns < 16)                             /* the first runs, TD by TD: in/out, toggle, CC, bytes */
                 {
@@ -2670,6 +2675,12 @@ static int enumerate_(int di)
     wantmsd = mifc >= 0 && min && mout && (Flags & USBPAD_F_DISK) && k < MAX_MSD;
     if (mifc >= 0 && !wantmsd) trace("disk not used%s ", (Flags & USBPAD_F_DISK) ? "" : " (off)");
     if (wantmsd && HC[h].type == T_XHCI) { trace("disk on xHCI: not yet "); wantmsd = 0; }
+    if (wantmsd && HC[h].type == T_OHCI && HC[h].ctlbulk && !getenv("USBCTLBULK"))
+    {   /* NEC uPD720101 OHCI: disk transfers were marked done without being done, and try 10 froze the P5PE-VM
+         * (likely the chip following stale TDs). Left alone until disks go through its EHCI (USB 2.0) */
+        trace("disk on NEC OHCI: off (needs its USB 2.0 side) ");
+        wantmsd = 0;
+    }
     if (!used && !wantmsd)
     {
         snprintf(Desc, sizeof(Desc), "USB device %04X:%04X on %s: not used (no pad, keyboard, mouse or disk)", vid, pid, where(di));
@@ -3090,6 +3101,7 @@ int USBPAD_Init(uint64_t cps, int wait_ms, int flags, const char** msg)
     *msg = m;
     Cps = cps ? cps : 1000000000ULL;
     Flags = flags;
+    Fault = getenv("USBFAULT") ? atoi(getenv("USBFAULT")) : 0;
     HCn = UhciN = OhciN = EhciN = XhciN = EhciGiven = 0;
     pci_scan(hc_found);
     if (!HCn)

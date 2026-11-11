@@ -1217,3 +1217,9 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
   (This host's 86Box is not comparable with the earlier session's figures.)
 - Next ideas (other half of the time is the H8 MCU): TIMER_AdvanceSel 10%, MCU_Step 9%, MCU_Read 7% (page switch per
   read -> table). Redo the profile after any core change.
+- NEC uPD720101 OHCI + stick (P5PE-VM, tries 1-10, 2026-11-11): the chip marks disk TDs done (CC 0) without doing
+  them (buffer pointer and toggle unchanged: CBWs never sent, CSWs "received" into an untouched buffer); bulk list
+  and control ED alike. Try 10 (redo such runs) FROZE the PC, probably the chip following stale TDs. Disks on NEC
+  OHCI are now off (trace "disk on NEC OHCI: off"); the plan is its EHCI (session 7, test in QEMU: 86Box has no
+  EHCI). Test hooks: USBCTLBULK=1 (NEC path on any OHCI), USBFAULT=n (every n-th NEC-path run faked as not done);
+  86Box with USBFAULT=3 recovers, USBFAULT=1 fails cleanly without hanging.
