@@ -70,8 +70,8 @@ if __name__ == '__main__':
         m.button(f, top, big, bg, fg, icon, anim=True if anim else None)
     m.button('btn-top.gif', 'back to', 'TOP ^', (0, 0, 96), (255, 255, 255), ((255, 255, 0), '^', (0, 0, 96)))
     m.counter(85)
-    ticker("*** NEW!! beta.91: CD games from MENU find the right disc *** beta.90-w98.6: Windows 98 shows the "
-           "SC-55's real display *** beta.85: MIDPLAY's 3D view 3x smoother *** Port 220 says hi!! ***")
+    ticker("*** NEW!! beta.92: an empty CD drive no longer freezes the PC *** CD images from ANY drive, with a home folder *** "
+           "MIDPLAY plays folders with thousands of MIDI files *** Port 220 says hi!! ***")
     for f in sorted(os.listdir(m.OUT)):
         if f.startswith(('nav-', 'btn-top', 'ticker', 'counter')):
             p = os.path.join(m.OUT, f); print(f, Image.open(p).size, os.path.getsize(p))

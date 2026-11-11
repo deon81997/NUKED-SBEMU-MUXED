@@ -43,7 +43,7 @@
 
 <br><br>
 
-<a href="#-whats-new-"><img src="docs/90s/ticker-hd.gif" width="600" alt="NEW!! beta.91: CD games from MENU find the right disc, beta.90-w98.6: Windows 98 shows the SC-55's real display"></a>
+<a href="#-whats-new-"><img src="docs/90s/ticker-hd.gif" width="600" alt="NEW!! beta.92: an empty CD drive no longer freezes the PC, CD images from any drive, MIDPLAY with thousands of MIDI files"></a>
 
 <br><br>
 
@@ -309,7 +309,7 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 <tr><td>🔊</td><td><b>Sound Blaster 1.x / 2.0 / Pro / 16 + OPL3 FM</b> in pure DOS, on your PCI sound chip</td></tr>
 <tr><td>🎹</td><td><b>Roland SC-55 and SC-55mkII</b>: the real firmware, from your ROMs</td></tr>
 <tr><td>🎼</td><td><b>Roland MT-32 / CM-32L</b> (Munt), or any <code>.SF2</code> SoundFont</td></tr>
-<tr><td>💿</td><td><b>Virtual CD drive M:</b> that works like a real disc: ISO, CUE/BIN, multi-disc, CD music played by the drive and mixed in</td></tr>
+<tr><td>💿</td><td><b>Virtual CD drive M:</b> that works like a real disc: ISO, CUE/BIN, multi-disc, CD music played by the drive and mixed in. Pick images from any folder on any drive, with a home folder</td></tr>
 <tr><td>🎮</td><td><b>USB game pads</b> as gameport joysticks (up to two), plus USB keyboard and a USB mouse right next to your touchpad</td></tr>
 <tr><td>🕹️</td><td><b>The pad presses each game's own keys</b>: jump, fire, pogo, menu, for over 3500 DOS games, in DOS and Windows 98</td></tr>
 <tr><td>🪟</td><td><b>Windows 98</b>: SB / OPL3 / MPU for DOS boxes, a "NUKED SB-EMU" MIDI device, a joystick + game port for every game, and barely any CPU while idle</td></tr>
@@ -703,7 +703,8 @@ Stuff this little pack pulled off that I'm REALLY proud of:
 - 🏆 **Our own Windows 98 drivers**: a virtual Sound Blaster / OPL3 / MPU-401 for DOS boxes, a MIDI driver, a joystick driver and a virtual game port, **idling at 0.25% of the CPU**. Game sound grows its own buffer when Windows gets busy (Blood's gaps went from 56% of the time to 1%), and MIDPLAY shows the SC-55's live display in a DOS box, just like in DOS
 - 🏆 **A virtual CD drive that acts like a real one**: rebuilt from source with our own CD-audio part, first in line for games, and CD music from CUE/BIN images mixed into the game's sound
 - 🏆 **3D menus drawn by the CPU** at 640×480, with no 3D card, that still run on a 366 MHz Celeron, with a floor drawn row by row for 3x more frames, styles up to a third faster, and neon glow in your colour style (<kbd>F6</kbd>)
-- 🏆 **A MIDI player that never makes the music late**: MIDPLAY sends the notes from inside its own drawing code, so even the 3D view keeps the music within a few milliseconds (it was a quarter of a second)
+- 🏆 **A MIDI player that never makes the music late**: MIDPLAY sends the notes from inside its own drawing code, so even the 3D view keeps the music within a few milliseconds (it was a quarter of a second), and it browses and plays folders with thousands of MIDI files
+- 🏆 **Found and fixed a hidden freeze in the DOS extender itself**: an EMPTY virtual CD drive made HDPMI32I (under every 32-bit program in the pack) crash with an error it could not show, so the PC just hung. Tracked down with a register dump in an emulated PC, fixed in HDPMI's own source, plus a second fix so Borland's DOS extender (Super Street Fighter II Turbo) gets past its start-up
 - 🏆 **Found and fixed an FPU bug as old as SBEMU itself**: its sound interrupt and port handlers used the math unit without saving the game's values, which could garble 3D games; tracked down from a few black lines in MIDPLAY's 3D view
 - 🏆 **Tested like crazy** on emulated PCs: custom 86Box builds with a fake USB pad, a file-driven joystick and a strict keyboard controller, QEMU with a fake Xbox 360 pad, and real games driven by scripts
 
@@ -722,16 +723,16 @@ MPXPlay drivers, **Japheth**'s HX and Jemm, **vorvek**'s uCDD and everyone in [T
 
 Everything new on top of them was written by **Claude**, Anthropic's AI: the code, the bug hunting, the emulated
 test PCs, the docs and Port 220. My part was the ideas, the direction and the testing on my own PCs. The numbers (from this repo's
-history, November 4 - 10, 2026, at beta.91):
+history, November 4 - 11, 2026, at beta.92):
 
 <div align="center">
 
 | | |
 |---|---|
-| 🧑‍💻 **commits co-written by Claude** | **144 of 150** |
-| 📦 **releases** | **58** |
+| 🧑‍💻 **commits co-written by Claude** | **158 of 164** |
+| 📦 **releases** | **60** |
 | 📜 **new code** | **about 32,000 lines**: DOS programs, SBEMU additions, Windows 98 drivers, test rigs |
-| 📖 **docs** | a 1,410-line manual (README.TXT) and a 1,140-line dev diary (HANDOFF.md) |
+| 📖 **docs** | a 1,420-line manual (README.TXT) and a 1,260-line dev diary (HANDOFF.md) |
 | 🎨 **art** | Port 220 and every animated GIF on this page |
 
 </div>
