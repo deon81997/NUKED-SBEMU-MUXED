@@ -65,6 +65,8 @@ struct pcm_t
     int32_t  accum_l             = 0;
     int32_t  accum_r             = 0;
     int32_t  rcsum[2]{};
+    uint8_t  tv_addlow[8]{}; // calc_tv envelope step for the current tv_counter, by type & 7 (PCM_Update)
+    bool     tv_write[8]{};
     uint16_t idle_run[32]{}; // consecutive unchanged passes of a key-off voice (see PCM_Update)
     // wave ROM bank table for PCM_Update's sample reads (same bytes as PCM_ReadROM, without its branches)
     const uint8_t* rom_base[8]{};

@@ -1183,3 +1183,17 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
 - Test: devkit 86Box (user's sc55-devkit tar: djgpp + 86Box with usb_msd), testrig/86box/msdtest.sh.
   UHCI and OHCI pass (CRC of the first MB). Real hardware not tried: needs USBTEST on the D810 (UHCI) and the
   P5PE-VM NEC card (OHCI) with a stick, plus a check that the pads still work there.
+
+## SC-55 PCM_Update C speed-up + new PGO profiles (2026-11-11)
+- pcm.cpp (bit-exact, sc55bench mk1-v2.00 19.mid 30 s hash 1317ac59): address generator steps 3-4 (samp3, nibble_cmp5,
+  4th address step) only run when sub_phase_of >= 3; calc_tv's addlow/write come from pcm.tv_addlow/tv_write[type & 7],
+  filled once per sample from tv_counter (4-bit reverse table); addclip20b / plain products where the operand provably
+  fits 20 bits (DPCM deltas, interpolation steps, eram_unpack results). Tried and reverted: a 512-entry table for
+  calc_tv's type (more instructions).
+- Host callgrind 4 s: 5.06 G -> 4.85 G Ir (-4.1%).
+- sc55/pgo/*.gcda regenerated (pgo.sh steps 1-3) in 86Box P2B-LS PII-400 booting MS-DOS 7.1 (IO.SYS/MSDOS.SYS/COMMAND.COM
+  from the user's MS-DOS 7.1 CD, BOOT/DOS71INS.IMG; testrig/mkdisk.py MKDISK_BOOT=msdos, needs testrig/rufus).
+- DOS SC55WAV same VM, old vs new, alternating x2: 19475/19509 -> 20457/20457 frames/s (+4.9%), WAV md5 8cf65a57 all four.
+  (This host's 86Box is not comparable with the earlier session's figures.)
+- Next ideas (other half of the time is the H8 MCU): TIMER_AdvanceSel 10%, MCU_Step 9%, MCU_Read 7% (page switch per
+  read -> table). Redo the profile after any core change.
