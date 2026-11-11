@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""Rebuilds the README's news ticker (docs/90s/ticker-hd.gif) from the newest "What's NEW!!" entries in README.md,
-and the ticker's alt text (docs/90s/ticker-hd.txt keeps the text the GIF was made from). Run by .github/workflows/ticker.yml on every push that changes README.md; prints
-"unchanged" when the text is the same as last time (the GIF is then left alone).
+"""Builds the README's news ticker from the newest "What's NEW!!" entries in README.md.
 
-    python3 docs/90s/ticker_news.py [count]      (default: the 3 newest entries)
+    python3 docs/90s/ticker_news.py OUTDIR [count]     (default: the 3 newest entries)
+
+Writes OUTDIR/ticker-hd.gif and OUTDIR/ticker-hd.txt (the text it was made from); prints "unchanged" and does
+nothing when OUTDIR/ticker-hd.txt already holds the same text. .github/workflows/ticker.yml runs it on every
+README.md change and pushes the result to the "ticker" branch (main is protected against the Actions bot);
+the README shows https://raw.githubusercontent.com/deon81997/NUKED-SBEMU-MUXED/ticker/ticker-hd.gif
 """
 import os, re, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 README = os.path.join(ROOT, 'README.md')
-STAMP = os.path.join(HERE, 'ticker-hd.txt')       # the text the GIF was made from
 
 
 def news(count):
@@ -29,21 +31,22 @@ def news(count):
 
 
 def main():
-    count = int(sys.argv[1]) if len(sys.argv) > 1 else 3
+    out = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else HERE
+    count = int(sys.argv[2]) if len(sys.argv) > 2 else 3
+    stamp = os.path.join(out, 'ticker-hd.txt')
     items = news(count)
     if not items:
         sys.exit('no news entries found in README.md')
     text = '*** NEW!! ' + ' *** '.join(items) + ' *** Port 220 says hi!! ***'
-    old = open(STAMP, encoding='utf-8').read().strip() if os.path.exists(STAMP) else ''
+    old = open(stamp, encoding='utf-8').read().strip() if os.path.exists(stamp) else ''
     if text == old:
         print('unchanged'); return
-    import nav90s
+    import make90s, nav90s
+    os.makedirs(out, exist_ok=True)
+    make90s.OUT = out
+    nav90s.m.OUT = out
     nav90s.ticker(text)
-    open(STAMP, 'w', encoding='utf-8').write(text + '\n')
-    alt = text.replace('"', "'").replace('*** ', '').replace(' ***', '').strip()
-    s = open(README, encoding='utf-8').read()
-    s = re.sub(r'(<img src="docs/90s/ticker-hd\.gif" width="600" alt=")[^"]*(")', lambda m: m.group(1) + alt + m.group(2), s)
-    open(README, 'w', encoding='utf-8').write(s)
+    open(stamp, 'w', encoding='utf-8').write(text + '\n')
     print('ticker:', text)
 
 

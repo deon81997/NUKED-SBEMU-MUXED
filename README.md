@@ -43,7 +43,7 @@
 
 <br><br>
 
-<a href="#-whats-new-"><img src="docs/90s/ticker-hd.gif" width="600" alt="NEW!! beta.92: An empty CD drive no longer freezes the PC!! beta.91-w98.7: Windows 98 to DOS, cleaned up!! beta.91: CD games from MENU find the right disc!! Port 220 says hi!!"></a>
+<a href="#-whats-new-"><img src="https://raw.githubusercontent.com/deon81997/NUKED-SBEMU-MUXED/ticker/ticker-hd.gif" width="600" alt="The newest news, scrolling"></a>
 
 <br><br>
 
