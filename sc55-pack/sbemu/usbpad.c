@@ -1580,7 +1580,9 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
     {   /* one TD per packet, no buffer rounding: a short packet ends with DataUnderrun and halts the ED, so
          * nothing after it is taken as data (86Box's OHCI also wants packet-sized TDs). csw: the CSW goes on
          * the same IN chain, so a command is two runs */
-        int j = (int)(s - Ms) * 2 + (in ? 0 : 1), left = len, done, nd, k;
+        int j = (int)(s - Ms) * 2 + (in ? 0 : 1), left = len, done, nd, k, t = *tog;   /* toggles in the TDs (not the
+                                                                     * ED's carry: one thing less the NEC can hold on to) */
+        uint32_t cc0 = 0;
         volatile uint32_t* ed = BED(h, j);
         volatile uint32_t* tail;
         uint64_t end;
@@ -1590,8 +1592,8 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
             do
             {
                 int c = left > mps ? mps : left;
-                otd(OT(n), in ? OTD_IN : OTD_OUT, pb + (len - left), c, OT(n + 1));   /* toggle from the ED's carry */
-                left -= c; ++n;
+                otd(OT(n), (in ? OTD_IN : OTD_OUT) | (t ? OTD_T1 : OTD_T0), pb + (len - left), c, OT(n + 1));
+                t ^= 1; left -= c; ++n;
             } while (left > 0 && n < OTN - 2);
         nd = n;
         if (csw) { otd(OT(n), OTD_IN, PHYS(csw), 13, OT(n + 1)); ++n; }
@@ -1631,17 +1633,17 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
                 break;
             }
             if (done) { r = done > 0 ? 0 : -1; break; }
-            if (tsc() > end) break;
+            if (tsc() > end) { cc0 = OT(0)[0]; break; }
             owr(h, O_CMDSTS, OS_BLF);
         }
         ed[0] |= ED_SKIP;
         fl(ed, 16);
-        if (!r && !(ed[2] & ED_HALT)) *tog = (ed[2] & 2) != 0;   /* all retired: head = tail already */
-        else
+        for (i = 0; i < n && (OTD_CC(OT(i)[0]) == 0 || (OTD_CC(OT(i)[0]) == 9 && i < nd)); ++i) ++pk;   /* packets that went */
+        *tog ^= pk & 1;
+        if (r || (ed[2] & ED_HALT))
         {
             if (!(ed[2] & ED_HALT)) wait_us(1100);              /* timeout: out of the HC's hands first */
             fl(ed, 16);
-            *tog = (ed[2] & 2) != 0;
             if (r) trace("[ob%08lx ed%08lx %08lx %08lx bh%08lx bc%08lx ctl%08lx fn%04lx] ", (unsigned long)OT(i < n ? i : 0)[0],
                 (unsigned long)ed[0], (unsigned long)ed[1], (unsigned long)ed[2], (unsigned long)ord(h, O_BLKHEAD),
                 (unsigned long)ord(h, O_BLKCUR), (unsigned long)ord(h, O_CONTROL), (unsigned long)(ord(h, 0x3C) & 0xFFFF));
@@ -1649,7 +1651,7 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
             fl(ed, 16);
         }
         owr(h, O_INTSTS, 0x06);
-        if (r && OTD_CC(OT(0)[0]) == 0xF)
+        if (r && OTD_CC(cc0) == 0xF)
         {   /* not one packet went: this OHCI does not serve its bulk list -> the control ED from now, once more */
             trace("[OHCI%d bulk list not served: disk on the control ED from now] ", HC[h].idx);
             HC[h].ctlbulk = 1;
