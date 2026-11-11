@@ -1598,9 +1598,9 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
                     *tog = t; OTb = NULL;
                     return -1;
                 }
-                /* what really came: a TD whose buffer pointer did not move got nothing. The NEC retires an IN TD
-                 * with "no error" and no data when the packet had the other toggle (P5PE-VM: CSWs "received", the
-                 * buffer untouched); then the toggle is the other one: once more with it */
+                /* what really went: a TD whose buffer pointer and toggle did not move was not done at all, even with
+                 * "no error" (P5PE-VM NEC, try 9: {o31: t0 c0 0} - the CBW never went out; CSWs "received" into an
+                 * untouched buffer): the same run again, same toggle */
                 for (k = 0; k < n; ++k)
                 {
                     uint32_t st = pb + done + (uint32_t)(k * mps), cbp = OTDN(k)[1];
@@ -1609,10 +1609,10 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
                     got += (int)(cbp - st);
                     break;
                 }
-                if (in && len && got == 0 && retry++ < 1)
+                if (len && got == 0 && (int)((OTDN(0)[0] >> 24) & 1) == t0 && retry++ < 4)
                 {
-                    trace("[tog? %d] ", t0);
-                    t = t0 ^ 1;
+                    trace("[redo] ");
+                    t = t0;
                     continue;
                 }
                 if (k < n) { t = t0 ^ ((k + 1) & 1); done += got; break; }   /* short: the end */
