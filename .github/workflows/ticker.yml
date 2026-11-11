@@ -9,6 +9,7 @@ on:
       - 'README.md'
       - 'docs/90s/ticker_news.py'
       - 'docs/90s/nav90s.py'
+      - '.github/workflows/ticker.yml'
   workflow_dispatch:
 
 permissions:
@@ -31,7 +32,7 @@ jobs:
         run: python3 docs/90s/ticker_news.py
       - name: Commit it if the news changed
         run: |
-          if git diff --quiet; then echo "news unchanged"; exit 0; fi
+          if [ -z "$(git status --porcelain README.md docs/90s)" ]; then echo "news unchanged"; exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add README.md docs/90s/ticker-hd.gif docs/90s/ticker-hd.txt
