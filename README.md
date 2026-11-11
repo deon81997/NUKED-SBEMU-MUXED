@@ -76,6 +76,12 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.91.** **CD games from MENU find the right disc!!** Starting a second
+CD game from MENU in the same session kept the FIRST game's disc in drive M: (uCDD has one drive and refused the
+second mount), so the game said "no CD", or failed with read or init errors. MENU now takes the old disc out first,
+and if a disc still cannot be mounted it says so and does not start the game. Tested in 86Box: disc swap works, and
+Doom runs straight from the virtual drive with SBEMU and the SC-55 loaded (its WAD read back bit-identical).
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.90-w98.6.** **Windows 98 catches up with DOS!!** MIDPLAY in a Windows
 DOS box now shows the SC-55's (or MT-32's) REAL display, live, just like in DOS: the Windows driver answers its
 front-panel query now. The Windows side also runs on the same CPUs as DOS: SC55W.EXE picks the fast SSE2 build on a
@@ -102,15 +108,15 @@ accents all change, also in MIDPLAY. **F6** in the 3D menu cycles them. Titles a
 Carousel: glowing markers for every place on the ring, "2 / 5" and arrows. Module: brushed metal, a backlit LCD
 glow and a machined knob with a pointer line. No speed lost: Panels even went from 10.1 to 11.2 frames a second.
 
-<img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.87.** **Cleaner 3D screens!!** The bigger letters on every 3D screen
-(menu, SETTINGS, CD images, GAMETEST, MIDPLAY) now have their stair-steps smoothed: rounder curves, crisp straight
-strokes. In the Carousel and Module menus the description no longer runs into the key help: it gets its own three
-lines and the keys sit below a divider.
-
 <details>
 <summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
 
 <br>
+
+<img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.87.** **Cleaner 3D screens!!** The bigger letters on every 3D screen
+(menu, SETTINGS, CD images, GAMETEST, MIDPLAY) now have their stair-steps smoothed: rounder curves, crisp straight
+strokes. In the Carousel and Module menus the description no longer runs into the key help: it gets its own three
+lines and the keys sit below a divider.
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.86.** **Snappier 3D menus, and the version on screen!!** The MENU now
 shows which version you run (yellow, under the logo), no more digging in SBLOG.TXT. The 3D menu styles got quicker:

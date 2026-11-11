@@ -898,13 +898,18 @@ static int write_go(const ITEM* it, int saved_only)
     if (g && g->cd[0])       /* the game's CD image on drive M: first (same steps as CD images > Enter) */
         fprintf(f, "IF NOT \"%%CDVM%%\"==\"1\" CALL C:\\CDSET\\CDON.BAT\r\n"
                    "ECHO Mounting %s on drive M: ...\r\n"
+                   /* the disc that is in first: uCDD has one drive, a second -mount fails ("No uCDD drive is
+                    * free") and the game then read the OLD disc - "no CD", read or init errors (beta.90) */
+                   "C:\\CDSET\\UCDD.EXE -unmount > NUL\r\n"
                    "C:\\CDSET\\UCDD.EXE -mount C:\\CDIMAGES\\%s > NUL\r\n"
                    "IF ERRORLEVEL 1 GOTO NOCD\r\n"
                    "ECHO %s> C:\\CDSET\\MOUNTED.FLG\r\n"
                    "GOTO CDOK\r\n"
                    ":NOCD\r\n"
                    "ECHO The CD image %s could not be mounted (see MENU > CD-ROM > CD images).\r\n"
+                   "ECHO The game is not started: it would not find its disc.\r\n"
                    "PAUSE\r\n"
+                   "GOTO GOEND\r\n"
                    ":CDOK\r\n", g->cd, g->cd, g->cd, g->cd);
     if (profile) /* the resident SBEMU takes these over (the same way GAMETEST sets its test options) */
         fprintf(f, "ECHO Using this game's SBEMU settings: %s\r\n"
@@ -915,6 +920,7 @@ static int write_go(const ITEM* it, int saved_only)
         fprintf(f, "%.*s\r\n", len, s);
         s += len; if (*s == '|') ++s;
     }
+    if (g && g->cd[0]) fprintf(f, ":GOEND\r\n");
     fprintf(f, "%c:\r\nCD %s\r\n", toupper((unsigned char)g_home[0]), g_home + 2);
     if (profile) /* back to the saved settings (defaults first, so the saved ones win) */
         fprintf(f, "%s\\SBEMU.EXE /VMPU /VSCROM:ROMS /VSCAHEAD:50 /VTIMER:1 /VSCFX:1 /VSCAUTO:1 %s > NUL\r\n", g_home, g_optfile);

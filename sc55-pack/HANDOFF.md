@@ -1124,3 +1124,17 @@ uCDD/SHSUCDX inside the DOS box; user: the virtual CD "doesn't work with games p
 Zip = beta.89-w98.5 zip + WIN98\SC55W.EXE (launcher), SC55WM.EXE, SC55W2.EXE, SC55W.VXD, SOURCE.ZIP (+launch.c,
 buildall.sh), README98.TXT (x2); DOS MIDPLAY.EXE, SBEMU.EXE, SC55MENU.EXE (version beta.90).
 NEXT: virtual CD in a DOS box under Windows (+ CD music via the VxD) and the virtual-CD-with-games problems.
+
+## beta.91 (2026-11-10): MENU game profiles with a CD image mounted over the old disc (RELEASED, tag v1.0.0-beta.91-usb)
+User: games from the virtual CD give "no CD found", read errors or init errors.
+- Found: MENUGO.BAT (sc55menu.c write_go, game profile with a CD image) ran `UCDD -mount` without `-unmount`; uCDD has
+  one drive -> "No uCDD drive is free", errorlevel 1, M: keeps the OLD disc; MENU printed the error, PAUSE, then
+  started the game anyway (wrong disc). Reproduced in 86Box (rcd root: SUPER.ISO then TISO.ISO). Fixed: -unmount
+  first; on failure the game is not started (GOTO GOEND). CDIMG.BAT and CDGUI already unmounted first.
+- Checked OK in 86Box (rcd: root0 + C:\CDSET + C:\CDIMAGES, LASTDRIVE=Z): user's Supergames_1.iso on M:, with
+  SBEMU + SC-55 loaded: COPY of GAMES\DOOM\DOOM1.WAD bit-identical, DOOM1 -timedemo demo1 from M: completes.
+- Asked the user for game names, error text (photo), launch path, ISO or CUE, image location, version. Other
+  candidates: games installed from a real CD at D: that look for D:; running a game from its installed folder.
+- User wants "Super Shareware Collection.iso" (archive.org) tested; the session has no network: ask for an upload.
+- Red Baron 3D (user upload, /home/claude/games/rb3d/RedBaron3D.iso) is a WINDOWS game: the "uCDD in a DOS box"
+  plan gives a drive only to DOS programs; Windows games need a Windows 98 virtual CD driver (bigger job).
