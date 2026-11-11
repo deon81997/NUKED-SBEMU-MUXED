@@ -14,8 +14,11 @@
  *     under its DOS (8.3) name and there must be one BIN; a CUE that names a long file name (very
  *     common: "Game (Track 1).bin") cannot be opened by DOS - F (fix) writes a corrected copy NAME_.CUE
  *     that points to the short name. The original file is never changed.
- * Sub-folders of the images folder (one per game) are listed and can be opened.
- * The sort order, folder and selection are kept in <toolsdir>\CDGUI.CFG.
+ * Any folder on any drive can be opened (D: next drive, Backspace: folder above), so images can live
+ * on a second disk or a USB drive too. G goes to the home folder, F2 makes the current folder the home
+ * folder. The sort order, the last folder, the home folder and the selection are kept in
+ * <toolsdir>\CDGUI.CFG. An image outside the images folder is mounted (and remembered) by its full path.
+ * An empty or unreadable drive is skipped (the DPMI host answers DOS critical errors with "Fail").
  *
  * GPL-2.0-or-later. */
 #include <stdio.h>
@@ -26,6 +29,7 @@
 #include <dir.h>
 #include "tui.h"
 #include "form3d.h"
+#include "crit24.h"
 
 #define MAXIMG 300
 #define MAXTR 99
@@ -63,7 +67,8 @@ typedef struct { char name[13]; long size; int dir; } ROOTENT;
 static IMG g_img[MAXIMG];
 static int g_n, g_sel, g_top, g_sort, g_nimg, g_ndir;
 static char g_home[160] = "C:\\SC55", g_imgdir[160] = "C:\\CDIMAGES", g_tools[160] = "C:\\CDSET";
-static char g_sub[80];                 /* folder inside the images folder, "" = the images folder itself */
+static char g_cur[160];                /* the folder shown: "D:\\GAMES\\ISO", a drive root is "D:" */
+static char g_homedir[160];            /* where G goes (F2 sets it); default the images folder */
 static char g_mounted[96], g_label[16];
 static int g_cdon;
 static int g_phase;
@@ -75,18 +80,32 @@ static int g_phase;
 #define DW 29
 
 /* ---------------------------------------------------------------- paths */
+static void upcase(char* s) { for (; *s; s++) *s = (char)toupper((unsigned char)*s); }
 static void path_of(char* out, size_t sz, const char* dir, const char* f) { snprintf(out, sz, "%s\\%s", dir, f); }
-static void cur_dir(char* out, size_t sz)
-{
-    if (g_sub[0]) snprintf(out, sz, "%s\\%s", g_imgdir, g_sub); else snprintf(out, sz, "%s", g_imgdir);
-}
-static void in_cur(char* out, size_t sz, const char* f) { char d[200]; cur_dir(d, sizeof d); path_of(out, sz, d, f); }
-/* the image's name relative to the images folder: DUKE3D.CUE or GAMES\DUKE3D.CUE */
+static void cur_dir(char* out, size_t sz) { snprintf(out, sz, "%s%s", g_cur, strlen(g_cur) == 2 ? "\\" : ""); }
+static void in_cur(char* out, size_t sz, const char* f) { path_of(out, sz, g_cur, f); }
+/* the image's name relative to the images folder (DUKE3D.CUE or GAMES\DUKE3D.CUE, what MOUNTED.FLG and
+ * the menu's GAMES.CFG always used), or its full path when it is somewhere else (D:\ISO\DUKE3D.CUE) */
 static void rel_of(char* out, size_t sz, const IMG* m)
 {
-    if (g_sub[0]) snprintf(out, sz, "%s\\%s", g_sub, m->file); else snprintf(out, sz, "%s", m->file);
+    size_t n = strlen(g_imgdir);
+    if (!strcasecmp(g_cur, g_imgdir)) snprintf(out, sz, "%s", m->file);
+    else if (!strncasecmp(g_cur, g_imgdir, n) && g_cur[n] == '\\') snprintf(out, sz, "%s\\%s", g_cur + n + 1, m->file);
+    else path_of(out, sz, g_cur, m->file);
 }
-static void upcase(char* s) { for (; *s; s++) *s = (char)toupper((unsigned char)*s); }
+/* full path of a name from MOUNTED.FLG / rel_of */
+static void abs_of(char* out, size_t sz, const char* rel)
+{
+    if (strchr(rel, ':')) snprintf(out, sz, "%s", rel); else path_of(out, sz, g_imgdir, rel);
+}
+static int dir_ok(const char* d) { return crit_dir_ok(d); }
+static void go_dir(const char* d)
+{
+    snprintf(g_cur, sizeof g_cur, "%s", d);
+    upcase(g_cur);
+    if (strlen(g_cur) > 2 && g_cur[strlen(g_cur) - 1] == '\\') g_cur[strlen(g_cur) - 1] = 0;
+}
+
 
 static long file_size(const char* path)
 {
@@ -378,13 +397,13 @@ static void scan(void)
     static const int types[] = { T_CUE, T_ISO, T_BIN, T_MDM };
     char pat[200]; struct ffblk ff; int t, r, i, j;
     g_n = 0;
-    if (g_sub[0]) { memset(&g_img[0], 0, sizeof g_img[0]); strcpy(g_img[0].file, ".."); g_img[0].type = T_UP; g_n = 1; }
+    if (strlen(g_cur) > 2) { memset(&g_img[0], 0, sizeof g_img[0]); strcpy(g_img[0].file, ".."); g_img[0].type = T_UP; g_n = 1; }
     in_cur(pat, sizeof pat, "*.*");
     for (r = findfirst(pat, &ff, FA_DIREC | FA_RDONLY | FA_ARCH); r == 0 && g_n < MAXIMG; r = findnext(&ff))
     {
         IMG* m = &g_img[g_n];
         if (!(ff.ff_attrib & FA_DIREC) || ff.ff_name[0] == '.') continue;
-        if (strlen(g_sub) + strlen(ff.ff_name) + 2 > sizeof g_sub) continue;
+        if (strlen(g_cur) + strlen(ff.ff_name) + 2 > sizeof g_cur) continue;
         memset(m, 0, sizeof *m);
         snprintf(m->file, sizeof m->file, "%s", ff.ff_name);
         upcase(m->file);
@@ -476,7 +495,7 @@ static void cfg_save(void)
     char path[200]; FILE* f;
     path_of(path, sizeof path, g_tools, "CDGUI.CFG");
     if (!(f = fopen(path, "w"))) return;
-    fprintf(f, "SORT=%d\nDIR=%s\nSEL=%s\n", g_sort, g_sub, g_n ? g_img[g_sel].file : "");
+    fprintf(f, "SORT=%d\nCUR=%s\nHOME=%s\nSEL=%s\n", g_sort, g_cur, g_homedir, g_n ? g_img[g_sel].file : "");
     fclose(f);
 }
 static void cfg_load(char* sel, size_t sz)
@@ -489,11 +508,14 @@ static void cfg_load(char* sel, size_t sz)
     {
         line[strcspn(line, "\r\n")] = 0;
         if (!strncmp(line, "SORT=", 5)) { g_sort = atoi(line + 5); if (g_sort < 0 || g_sort >= S_COUNT) g_sort = 0; }
-        else if (!strncmp(line, "DIR=", 4)) snprintf(g_sub, sizeof g_sub, "%s", line + 4);
+        else if (!strncmp(line, "DIR=", 4) && line[4]) { char d[200]; path_of(d, sizeof d, g_imgdir, line + 4); go_dir(d); }  /* before beta.92 */
+        else if (!strncmp(line, "CUR=", 4) && line[4]) go_dir(line + 4);
+        else if (!strncmp(line, "HOME=", 5) && line[5]) snprintf(g_homedir, sizeof g_homedir, "%s", line + 5);
         else if (!strncmp(line, "SEL=", 4)) snprintf(sel, sz, "%s", line + 4);
     }
     fclose(f);
-    if (g_sub[0]) { char d[200]; struct ffblk ff; cur_dir(d, sizeof d); if (findfirst(d, &ff, FA_DIREC) != 0) g_sub[0] = 0; }
+    if (!dir_ok(g_homedir)) snprintf(g_homedir, sizeof g_homedir, "%s", g_imgdir);
+    if (!dir_ok(g_cur)) go_dir(g_homedir);   /* the last folder is gone (USB drive unplugged?): home */
 }
 
 /* ---------------------------------------------------------------- text helpers */
@@ -693,7 +715,7 @@ static void draw(void)
         tui_printf(62, 24, (BG << 4) | 0x0B, "%s \xFA %dx%d", tui_theme_name[tui_theme], tui_cols, tui_rows);
     }
     tui_fill(1, 25, 80, 1, 0x30, ' ');
-    tui_put(2, 25, 0x30, "Enter mount  I install  C files  U eject  F fix  S sort  F1 help  Esc back");
+    tui_put(2, 25, 0x30, "Enter mount  D drive  G home  F2 set home  I install  U eject  F1 help  Esc");
 }
 
 static void anim(unsigned long t) { g_phase = (int)(t % 6); draw_header(); }
@@ -775,7 +797,7 @@ static void c3_build(F3VIEW* v)
     snprintf(v->foot, sizeof v->foot, "%d image%s, %d folder%s   %s", g_nimg, g_nimg == 1 ? "" : "s", g_ndir, g_ndir == 1 ? "" : "s",
              g_label[0] ? "" : "");
     if (g_label[0]) snprintf(v->foot + strlen(v->foot), sizeof v->foot - strlen(v->foot), "disc in M: labelled %s", g_label);
-    v->keys = "Enter mount  I install  C files  U eject  F fix  S sort  F1 help  F8 text";
+    v->keys = "Enter mount  D drive  G home  F2 set home  I install  U eject  F1 help  F8 text";
 }
 
 /* ---------------------------------------------------------------- pop-ups */
@@ -785,6 +807,8 @@ static void help(void)
         "\x18\x19 PgUp PgDn Home End   choose",
         "Enter       mount the disc (or open a folder)",
         "Backspace   back to the folder above",
+        "D           next drive (second disk, USB drive...)",
+        "G / F2      go to / set the home folder",
         "I           mount and run the disc's INSTALL/SETUP",
         "C           list the files on the disc",
         "U           eject the disc in drive M:",
@@ -804,7 +828,7 @@ static void help(void)
     memcpy(save, tui_scr, sizeof save);
     tui_zoom(x, y, w, h, 0x1F);
     tui_window(x, y, w, h, 0x1F, "CD images - keys");
-    for (i = 0; i < n; i++) tui_put(x + 3, y + 2 + i, i >= 12 ? 0x17 : 0x1F, lines[i]);
+    for (i = 0; i < n; i++) tui_put(x + 3, y + 2 + i, i >= 14 ? 0x17 : 0x1F, lines[i]);
     tui_key();
     memcpy(tui_scr, save, sizeof save);
     tui_anim = a;
@@ -877,7 +901,7 @@ static int mount(const IMG* m, const char* run)
         snprintf(eject_old, sizeof eject_old, "%s\\UCDD.EXE -unmount > %s\\CDOUT.TXT\r\n"
                  "IF ERRORLEVEL 1 GOTO STUCK\r\n"
                  "IF EXIST %s\\MOUNTED.FLG DEL %s\\MOUNTED.FLG\r\n", g_tools, g_tools, g_tools, g_tools);
-    path_of(img, sizeof img, g_imgdir, rel);
+    abs_of(img, sizeof img, rel);
     if (run)
     {
         const char* ext = strrchr(run, '.');
@@ -1019,10 +1043,10 @@ static int can_mount(const IMG* m)
 
 static void go_up(void)
 {
-    char was[16], *s = strrchr(g_sub, '\\');
-    snprintf(was, sizeof was, "%s", s ? s + 1 : g_sub);
-    if (!g_sub[0]) return;
-    if (s) *s = 0; else g_sub[0] = 0;
+    char was[16], *s = strrchr(g_cur, '\\');
+    if (strlen(g_cur) <= 2 || !s) return;
+    snprintf(was, sizeof was, "%s", s + 1);
+    *s = 0;
     g_sel = g_top = 0;
     scan();
     select_file(was);
@@ -1036,15 +1060,19 @@ int main(int argc, char** argv)
     if (argc > 1 && argv[1][0]) snprintf(g_home, sizeof g_home, "%s", argv[1]);
     if (argc > 2 && argv[2][0]) snprintf(g_imgdir, sizeof g_imgdir, "%s", argv[2]);
     if (argc > 3 && argv[3][0]) snprintf(g_tools, sizeof g_tools, "%s", argv[3]);
+    upcase(g_imgdir);
+    snprintf(g_homedir, sizeof g_homedir, "%s", g_imgdir);
+    go_dir(g_imgdir);
     { char p[200]; path_of(p, sizeof p, g_tools, "CDRUN.BAT"); remove(p); }
     cfg_load(sel, sizeof sel);
     read_state();
     /* after a mount, open the folder of the disc in the drive */
     if (g_mounted[0] && strchr(g_mounted, '.'))
     {
-        char* s = strrchr(g_mounted, '\\');
-        if (s) { snprintf(g_sub, sizeof g_sub, "%.*s", (int)(s - g_mounted), g_mounted); snprintf(sel, sizeof sel, "%s", s + 1); }
-        else { g_sub[0] = 0; snprintf(sel, sizeof sel, "%s", g_mounted); }
+        char full[200], *s;
+        abs_of(full, sizeof full, g_mounted);
+        s = strrchr(full, '\\');
+        if (s) { *s = 0; if (dir_ok(full)) { go_dir(full); snprintf(sel, sizeof sel, "%s", s + 1); } }
     }
     scan();
     select_file(sel);
@@ -1089,6 +1117,28 @@ int main(int argc, char** argv)
         else if (c == K_HOME) g_sel = 0;
         else if (c == K_END) g_sel = g_n ? g_n - 1 : 0;
         else if (c == 8 || c == K_LEFT) go_up();
+        else if (c == 'd' || c == 'D')
+        {   /* the next drive that can be read (C: and up; A:/B: are floppies) */
+            int d0 = g_cur[0], k;
+            for (k = 1; k <= 24; k++)
+            {
+                char nd[4]; snprintf(nd, sizeof nd, "%c:", 'C' + (d0 - 'C' + k) % 24);
+                if (dir_ok(nd)) { go_dir(nd); g_sel = g_top = 0; scan(); break; }
+            }
+        }
+        else if (c == 'g' || c == 'G')
+        {
+            if (!dir_ok(g_homedir)) ui_message("Home folder", "The home folder cannot be read (a USB drive that is not plugged in?).");
+            else { go_dir(g_homedir); g_sel = g_top = 0; scan(); }
+        }
+        else if (c == K_F2)
+        {
+            char q[220];
+            snprintf(g_homedir, sizeof g_homedir, "%s", g_cur);
+            cfg_save();
+            snprintf(q, sizeof q, "%s is now the home folder: this screen opens here when the last folder is gone, and G comes back here.", g_cur);
+            ui_message("Home folder", q);
+        }
         else if (c == 'r' || c == 'R') { char keep[13]; snprintf(keep, sizeof keep, "%s", m ? m->file : ""); scan(); read_state(); select_file(keep); }
         else if (c == 's' || c == 'S') { g_sort = (g_sort + 1) % S_COUNT; sort_list(); }
         else if (c == K_F1 || c == 'h' || c == 'H' || c == '?') { if (g3) { c3_text_begin(); help(); c3_text_end(); } else help(); }
@@ -1144,10 +1194,10 @@ int main(int argc, char** argv)
             if (m->type == T_UP) go_up();
             else if (m->type == T_DIR)
             {
-                if (g_sub[0]) strcat(g_sub, "\\");
-                strcat(g_sub, m->file);
-                g_sel = g_top = 0;
-                scan();
+                char d[200];
+                path_of(d, sizeof d, g_cur, m->file);
+                if (!dir_ok(d)) ui_message("Folder", "That folder cannot be read.");
+                else { go_dir(d); g_sel = g_top = 0; scan(); }
             }
             else if (c == K_RIGHT) ;
             else if (!can_mount(m)) ;

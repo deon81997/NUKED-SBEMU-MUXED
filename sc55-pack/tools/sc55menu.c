@@ -23,6 +23,7 @@
 #include "tui.h"
 #include "safewr.h"
 #include "mpuport.h"
+#include "crit24.h"
 
 static int MPU = 0x330;          /* the MPU-401 port from the saved settings (/P) */
 #define NGAMES 4
@@ -173,11 +174,12 @@ static ITEM* add(int cat, const char* label, const char* desc, int kind, const c
  * One line per game:  name|program|arguments|SBEMU options|CD image
  *   program        full path of the .EXE / .COM / .BAT
  *   SBEMU options  used while this game runs (on top of the saved settings), e.g. /VSCSET:mk1-v1.21 /K:22050
- *   CD image       a file in C:\CDIMAGES mounted on drive M: before the game starts ("" = none)
+ *   CD image       mounted on drive M: before the game starts ("" = none): a name in C:\CDIMAGES
+ *                  (GAMES\DUKE3D.CUE) or a full path anywhere else (D:\ISO\DUKE3D.CUE)
  * Made from GAMETEST's games the first time. GTBEST.CFG (GAMETEST): BEST<n>=<clock x10>|<options>; a
  * profile whose program is GAMETEST game n uses those options too (its own come after them and win). */
 #define MAXGP 24
-typedef struct { char name[32], exe[80], args[64], opts[120], cd[13]; } GAMEP;
+typedef struct { char name[32], exe[80], args[64], opts[120], cd[96]; } GAMEP;
 static GAMEP g_gp[MAXGP];
 static int g_ngp;
 static char g_gtpath[NGAMES][80], g_best[NGAMES][120]; static int g_bestclk[NGAMES];
@@ -395,7 +397,7 @@ static void build_menu(void)
           " be loaded from CONFIG.SYS (BOOTCFG.BAT does that) - see DOSMODE\\CDROM-D810.TXT.", IT_BAT, c, 0, 1, NULL); }
     if (access("C:\\CDSET\\GUI.BAT", R_OK) == 0)
     { snprintf(c, sizeof c, "CALL C:\\CDSET\\GUI.BAT %s", g_home);
-      add(C_CD, "CD images", "Mount .CUE/.BIN, .ISO or .MDM disc images from C:\\CDIMAGES as drive M:. Shows each image's"
+      add(C_CD, "CD images", "Mount .CUE/.BIN, .ISO or .MDM disc images from any folder on any drive (D: next drive, F2 home folder) as drive M:. Shows each image's"
           " tracks and size, fixes CUE files that name a long BIN file name DOS cannot open (F), and tells you if the"
           " mount worked. CD-audio tracks play through SBEMU - start games with HYBRID.BAT for that.", IT_BAT, c, 0, 0, NULL); }
     /* Files */
@@ -591,16 +593,34 @@ static int pent_cmp(const void* a, const void* b)
     if (x->dir != y->dir) return y->dir - x->dir;
     return strcmp(x->name, y->name);
 }
-/* picks a program (.EXE .COM .BAT) with a folder browser; T types the path. Returns 1 with out set. */
-static int pick_program(char* out, size_t sz)
+/* folder browser over every drive. cd = 0: picks a program (.EXE .COM .BAT), T types the path;
+ * cd = 1: picks a disc image (.CUE .ISO .MDM) for drive M:, N = no image; an image in C:\CDIMAGES is
+ * returned by its name there (GAMES\DUKE3D.CUE, as before), anything else by its full path.
+ * Tab: next drive, G: the CD images screen's home folder. Returns 1 with out set. */
+static int img_ext(const char* x) { return x && (!strcasecmp(x, ".CUE") || !strcasecmp(x, ".ISO") || !strcasecmp(x, ".MDM")); }
+static int prg_ext(const char* x) { return x && (!strcasecmp(x, ".EXE") || !strcasecmp(x, ".COM") || !strcasecmp(x, ".BAT")); }
+static void cd_home(char* out, size_t sz)     /* the home folder set in the CD images screen (F2 there) */
+{
+    char line[200]; FILE* f = fopen("C:\\CDSET\\CDGUI.CFG", "r");
+    snprintf(out, sz, "C:\\CDIMAGES\\");
+    if (!f) return;
+    while (fgets(line, sizeof line, f))
+        if (!strncmp(line, "HOME=", 5) && line[5] > ' ')
+        { line[strcspn(line, "\r\n")] = 0; snprintf(out, sz, "%s%s", line + 5, line[strlen(line) - 1] == '\\' ? "" : "\\"); }
+    fclose(f);
+}
+static int pick_file(char* out, size_t sz, int cd)
 {
     static PENT e[400];
     char dir[160], pat[200];
-    int n, sel = 0, top = 0, i, c;
+    int n, sel = 0, top = 0, i, c, res = 0;
     uint16_t save[TUI_H][TUI_W];
-    snprintf(dir, sizeof dir, "%s", out[0] && out[1] == ':' ? out : "C:\\");
+    if (cd && out[0] && !strchr(out, ':')) snprintf(dir, sizeof dir, "C:\\CDIMAGES\\%s", out);
+    else snprintf(dir, sizeof dir, "%s", out[0] && out[1] == ':' ? out : cd ? "" : "C:\\");
+    if (!dir[0]) cd_home(dir, sizeof dir);
     { char* bs = strrchr(dir, '\\'); if (bs && out[0]) bs[1] = 0; }
-    if (access(dir, D_OK) != 0) snprintf(dir, sizeof dir, "C:\\");
+    crit_on();
+    if (!crit_dir_ok(dir)) { if (cd) cd_home(dir, sizeof dir); if (!crit_dir_ok(dir)) snprintf(dir, sizeof dir, "C:\\"); }
     memcpy(save, tui_scr, sizeof save);
     tui_zoom(10, 3, 60, 21, 0x1F);
     for (;;)
@@ -614,7 +634,7 @@ static int pick_program(char* out, size_t sz)
             const char* x = strrchr(ff.ff_name, '.');
             int isdir = (ff.ff_attrib & FA_DIREC) != 0;
             if (ff.ff_name[0] == '.') continue;
-            if (!isdir && !(x && (!strcasecmp(x, ".EXE") || !strcasecmp(x, ".COM") || !strcasecmp(x, ".BAT")))) continue;
+            if (!isdir && !(cd ? img_ext(x) : prg_ext(x))) continue;
             snprintf(e[n].name, sizeof e[n].name, "%s", ff.ff_name); e[n++].dir = isdir;
         }
         qsort(e, (size_t)n, sizeof e[0], pent_cmp);
@@ -624,7 +644,7 @@ static int pick_program(char* out, size_t sz)
             char b[80];
             if (sel < top) top = sel;
             if (sel >= top + 15) top = sel - 14;
-            tui_window(10, 3, 60, 21, 0x1F, "Choose the game's program");
+            tui_window(10, 3, 60, 21, 0x1F, cd ? "Choose the game's CD image" : "Choose the game's program");
             tui_putw(12, 4, 56, 0x1E, dir);
             for (i = 0; i < 15; i++)
             {
@@ -633,77 +653,56 @@ static int pick_program(char* out, size_t sz)
                 snprintf(b, sizeof b, " %s%s", e[k].name, e[k].dir == 1 ? "\\" : e[k].dir == 2 ? "  (up)" : "");
                 tui_putw(12, 6 + i, 56, k == sel ? 0x5F : (e[k].dir ? 0x1B : 0x1F), b);
             }
-            if (!n) tui_put(13, 6, 0x17, "(no programs or folders here)");
-            tui_put(12, 22, 0x13, "Enter open/choose  Bksp up  Tab drive  T type path  Esc");
+            if (!n) tui_put(13, 6, 0x17, cd ? "(no disc images or folders here)" : "(no programs or folders here)");
+            tui_put(12, 22, 0x13, cd ? "Enter open/choose  Bksp up  Tab drive  G home  N none  Esc"
+                                     : "Enter open/choose  Bksp up  Tab drive  T type path  Esc");
             c = tui_key();
-            if (c == K_ESC) { memcpy(tui_scr, save, sizeof save); return 0; }
+            if (c == K_ESC) goto done;
             if (c == K_UP && sel > 0) sel--;
             else if (c == K_DOWN && sel + 1 < n) sel++;
             else if (c == K_PGUP) { sel -= 15; if (sel < 0) sel = 0; }
             else if (c == K_PGDN) { sel += 15; if (sel >= n) sel = n ? n - 1 : 0; }
-            else if (c == 't' || c == 'T')
+            else if (!cd && (c == 't' || c == 'T'))
             {
                 char t[80]; snprintf(t, sizeof t, "%s", out);
                 if (tui_input("Program", "Full path of the program, e.g. C:\\DUKE3D\\DUKE3D.EXE", t, sizeof t, 1) && t[0])
-                { snprintf(out, sz, "%s", t); memcpy(tui_scr, save, sizeof save); return 1; }
+                { snprintf(out, sz, "%s", t); res = 1; goto done; }
             }
+            else if (cd && (c == 'n' || c == 'N')) { out[0] = 0; res = 1; goto done; }
+            else if (cd && (c == 'g' || c == 'G')) { cd_home(dir, sizeof dir); if (!crit_dir_ok(dir)) snprintf(dir, sizeof dir, "C:\\"); sel = top = 0; break; }
             else if (c == 8 && strlen(dir) > 3) { dir[strlen(dir) - 1] = 0; *(strrchr(dir, '\\') + 1) = 0; sel = top = 0; break; }
             else if (c == K_TAB)
-            {   /* next drive that has a disc (C: and up, floppies skipped) */
+            {   /* next drive that can be read (C: and up, floppies skipped) */
                 int d = toupper((unsigned char)dir[0]), k;
                 for (k = 1; k <= 24; k++)
                 {
                     char nd[8]; int dl = 'C' + (d - 'C' + k) % 24;
                     snprintf(nd, sizeof nd, "%c:\\", dl);
-                    if (access(nd, D_OK) == 0) { snprintf(dir, sizeof dir, "%s", nd); break; }
+                    if (crit_dir_ok(nd)) { snprintf(dir, sizeof dir, "%s", nd); break; }
                 }
                 sel = top = 0; break;
             }
             else if (c == K_ENTER && n)
             {
                 if (e[sel].dir == 2) { dir[strlen(dir) - 1] = 0; *(strrchr(dir, '\\') + 1) = 0; sel = top = 0; break; }
-                if (e[sel].dir == 1) { strncat(dir, e[sel].name, sizeof dir - strlen(dir) - 2); strcat(dir, "\\"); sel = top = 0; break; }
-                snprintf(out, sz, "%s%s", dir, e[sel].name);
-                memcpy(tui_scr, save, sizeof save);
-                return 1;
+                if (e[sel].dir == 1)
+                {
+                    char nd[160]; snprintf(nd, sizeof nd, "%s%s\\", dir, e[sel].name);
+                    if (!crit_dir_ok(nd)) { tui_message("Folder", "That folder cannot be read."); continue; }
+                    snprintf(dir, sizeof dir, "%s", nd); sel = top = 0; break;
+                }
+                if (cd && !strncasecmp(dir, "C:\\CDIMAGES\\", 12)) snprintf(out, sz, "%s%s", dir + 12, e[sel].name);
+                else snprintf(out, sz, "%s%s", dir, e[sel].name);
+                res = 1; goto done;
             }
         }
     }
-}
-/* picks a disc image in C:\CDIMAGES (or none) */
-static void pick_cd(char* out)
-{
-    static char f[100][13];
-    struct ffblk ff; int n = 1, r, sel = 0, top = 0, i, c, t;
-    static const char* pats[] = { "C:\\CDIMAGES\\*.CUE", "C:\\CDIMAGES\\*.ISO", "C:\\CDIMAGES\\*.MDM" };
-    uint16_t save[TUI_H][TUI_W];
-    strcpy(f[0], "");
-    for (t = 0; t < 3; t++)
-        for (r = findfirst(pats[t], &ff, FA_RDONLY | FA_ARCH); r == 0 && n < 100; r = findnext(&ff))
-            snprintf(f[n++], 13, "%s", ff.ff_name);
-    for (i = 0; i < n; i++) if (!strcasecmp(f[i], out)) sel = i;
-    memcpy(save, tui_scr, sizeof save);
-    tui_zoom(24, 4, 32, 18, 0x1F);
-    for (;;)
-    {
-        if (sel < top) top = sel;
-        if (sel >= top + 13) top = sel - 12;
-        tui_window(24, 4, 32, 18, 0x1F, "CD image");
-        for (i = 0; i < 13; i++)
-        {
-            int k = top + i; char b[40];
-            if (k < n) snprintf(b, sizeof b, " %s", k ? f[k] : "(no CD image)"); else b[0] = 0;
-            tui_putw(26, 6 + i, 28, k == sel ? 0x5F : 0x1F, b);
-        }
-        tui_put(26, 20, 0x13, n > 1 ? "Enter choose   Esc back" : "No images in C:\\CDIMAGES");
-        c = tui_key();
-        if (c == K_ESC) break;
-        if (c == K_UP && sel > 0) sel--;
-        if (c == K_DOWN && sel + 1 < n) sel++;
-        if (c == K_ENTER) { strcpy(out, f[sel]); break; }
-    }
+done:
+    crit_off();
     memcpy(tui_scr, save, sizeof save);
+    return res;
 }
+static int pick_program(char* out, size_t sz) { return pick_file(out, sz, 0); }
 
 static void draw_header(void);
 static void draw_status(void);
@@ -716,8 +715,8 @@ static void game_editor(void)
         "Added after the program, e.g. -nosound or /setup. Leave empty for none.",
         "Used only while this game runs, on top of your saved settings, e.g. /VSCSET:mk1-v1.21 /K:22050 /VSCVOICES:16."
         " Needs SBEMU loaded. Empty = your saved settings (plus GAMETEST's best, if any).",
-        "A disc image from C:\\CDIMAGES mounted on drive M: before the game starts (games that check for their CD,"
-        " or have CD music). Enter picks one." };
+        "A disc image mounted on drive M: before the game starts (games that check for their CD, or have CD music)."
+        " Enter picks one on any drive; N in there = none." };
     int sel = 0, fld = -1, c, i, dirty = 0;
     for (;;)
     {
@@ -735,7 +734,7 @@ static void game_editor(void)
         tui_panel(31, 7, 49, 17, 7, 0x1F, g ? g->name : "New game");
         if (g)
         {
-            const char* val[5]; char cdb[20];
+            const char* val[5]; char cdb[100];
             snprintf(cdb, sizeof cdb, "%s", g->cd[0] ? g->cd : "(none)");
             val[0] = g->name; val[1] = g->exe; val[2] = g->args; val[3] = g->opts; val[4] = cdb;
             for (i = 0; i < 5; i++)
@@ -789,7 +788,7 @@ static void game_editor(void)
                 else if (fld == 1) dirty |= pick_program(g->exe, sizeof g->exe);
                 else if (fld == 2) dirty |= tui_input("Arguments", "Added after the program (empty = none):", g->args, sizeof g->args, 0);
                 else if (fld == 3) dirty |= tui_input("SBEMU options for this game", "e.g. /VSCSET:mk1-v1.21 /K:22050  (empty = your saved settings)", g->opts, sizeof g->opts, 1);
-                else { pick_cd(g->cd); dirty = 1; }
+                else dirty |= pick_file(g->cd, sizeof g->cd, 1);
                 for (i = 0; g->name[i]; i++) if (g->name[i] == '|') g->name[i] = ' ';
                 for (i = 0; g->args[i]; i++) if (g->args[i] == '|') g->args[i] = ' ';
                 for (i = 0; g->opts[i]; i++) if (g->opts[i] == '|') g->opts[i] = ' ';
@@ -901,7 +900,7 @@ static int write_go(const ITEM* it, int saved_only)
                    /* the disc that is in first: uCDD has one drive, a second -mount fails ("No uCDD drive is
                     * free") and the game then read the OLD disc - "no CD", read or init errors (beta.90) */
                    "C:\\CDSET\\UCDD.EXE -unmount > NUL\r\n"
-                   "C:\\CDSET\\UCDD.EXE -mount C:\\CDIMAGES\\%s > NUL\r\n"
+                   "C:\\CDSET\\UCDD.EXE -mount %s%s > NUL\r\n"
                    "IF ERRORLEVEL 1 GOTO NOCD\r\n"
                    "ECHO %s> C:\\CDSET\\MOUNTED.FLG\r\n"
                    "GOTO CDOK\r\n"
@@ -910,7 +909,7 @@ static int write_go(const ITEM* it, int saved_only)
                    "ECHO The game is not started: it would not find its disc.\r\n"
                    "PAUSE\r\n"
                    "GOTO GOEND\r\n"
-                   ":CDOK\r\n", g->cd, g->cd, g->cd, g->cd);
+                   ":CDOK\r\n", g->cd, strchr(g->cd, ':') ? "" : "C:\\CDIMAGES\\", g->cd, g->cd, g->cd);
     if (profile) /* the resident SBEMU takes these over (the same way GAMETEST sets its test options) */
         fprintf(f, "ECHO Using this game's SBEMU settings: %s\r\n"
                    "%s\\SBEMU.EXE /VMPU /VSCROM:ROMS %s %s > NUL\r\n", opts, g_home, g_optfile, opts);
