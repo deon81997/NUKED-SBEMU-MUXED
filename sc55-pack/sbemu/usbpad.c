@@ -1519,7 +1519,6 @@ static int send_out(int k, const uint8_t* data, int len)
 #define OTN    260
 #define DCMD   16384                    /* most data per SCSI command (the data buffer) */
 #define OT(i)  ((volatile uint32_t*)(DBuf + 0x1000) + (i) * 4)
-static uint32_t OSkip[MAX_HC][MAX_MSD * 2];   /* OHCI: frame number when the disk ED was last skipped */
 static int BulkCsw;                     /* OHCI: the CSW came with the data (13 bytes) */
 static uint32_t le32(const uint8_t* p) { return p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24; }
 static void put32(uint8_t* p, uint32_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24); }
@@ -1557,13 +1556,12 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
     case T_OHCI:
     {   /* one TD per packet, no buffer rounding: a short packet ends with DataUnderrun and halts the ED, so
          * nothing after it is taken as data (86Box's OHCI also wants packet-sized TDs). csw: the CSW goes on
-         * the same IN chain, so a command is two runs on two EDs; an ED is only rewritten 2 frames after it
-         * was last skipped (OSkip), which has nearly always passed already: no fixed wait */
+         * the same IN chain, so a command is two runs */
         int j = (int)(s - Ms) * 2 + (in ? 0 : 1), left = len, done, nd, k;
         volatile uint32_t* ed = BED(h, j);
         volatile uint32_t* tail;
         uint64_t end;
-        uint32_t cc, f0 = OSkip[h][j];
+        uint32_t cc, f0;
         BulkCsw = 0;
         if (!(csw && !len))
             do
@@ -1576,13 +1574,23 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
         if (csw) { otd(OT(n), OTD_IN, PHYS(csw), 13, OT(n + 1)); ++n; }
         tail = OT(n);
         zero(tail, 4);
-        for (k = 0; k < 50 && ((ord(h, 0x3C) - f0) & 0xFFFF) < 2; ++k) wait_us(100);
-        ed[0] = ED_SKIP | (uint32_t)d->addr | ((uint32_t)ep << 7) | (d->speed == SP_LS ? ED_LS : 0) | ((uint32_t)mps << 16);
-        ed[1] = PHYS(tail);
-        ed[2] = PHYS(OT(0)) | (*tog ? 2 : 0);
-        fl(OT(0), (n + 1) * 16); fl(ed, 16);
-        ed[0] &= ~ED_SKIP;
-        fl(ed, 16);
+        /* as o_run_tds does for a changed control ED (the NEC uPD720101 keeps a copy of an ED it has read: on
+         * the P5PE-VM the first bulk IN after the CBW was never even looked at, CC NOT ACCESSED for 5 s): take
+         * the bulk list out of use for 2 frames, write the ED, restart the list from its head */
+        {
+            uint32_t c = ord(h, O_CONTROL);
+            owr(h, O_CONTROL, c & ~OC_BLE);
+            f0 = ord(h, 0x3C) & 0xFFFF;
+            for (k = 0; k < 40 && ((ord(h, 0x3C) - f0) & 0xFFFF) < 2; ++k) wait_us(250);
+            owr(h, O_BLKCUR, 0);
+            ed[0] = ED_SKIP | (uint32_t)d->addr | ((uint32_t)ep << 7) | (d->speed == SP_LS ? ED_LS : 0) | ((uint32_t)mps << 16);
+            ed[1] = PHYS(tail);
+            ed[2] = PHYS(OT(0)) | (*tog ? 2 : 0);
+            fl(OT(0), (n + 1) * 16); fl(ed, 16);
+            ed[0] &= ~ED_SKIP;
+            fl(ed, 16);
+            owr(h, O_CONTROL, c | OC_BLE);
+        }
         owr(h, O_CMDSTS, OS_BLF);
         end = tsc() + us2c(timeout_us);
         r = -1;
@@ -1605,7 +1613,6 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
         }
         ed[0] |= ED_SKIP;
         fl(ed, 16);
-        OSkip[h][j] = ord(h, 0x3C) & 0xFFFF;
         if (!r && !(ed[2] & ED_HALT)) *tog = (ed[2] & 2) != 0;   /* all retired: head = tail already */
         else
         {
@@ -1764,7 +1771,7 @@ static void msd_add(int di, int ifc, int in, int out, int mps)
     {
         USBPAD_Disk* u = &s->lun[l];
         memset(r, 0, 36);
-        if (msd_simple(s, l, 0x12, 36, r) != 0) { trace("inq! "); continue; }
+        if (msd_simple(s, l, 0x12, 36, r) != 0 && msd_simple(s, l, 0x12, 36, r) != 0) { trace("inq! "); continue; }   /* once more after the reset */
         if ((r[0] & 0x1F) != 0 && (r[0] & 0x1F) != 0x0E) { trace("lun%d type %02x ", l, r[0] & 0x1F); continue; }
         s->lok[l] = 1;
         u->vid = D[di].vid; u->pid = D[di].pid; u->gen = MsGen; u->lun = l;
