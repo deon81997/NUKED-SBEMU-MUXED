@@ -230,7 +230,7 @@ int main(int argc, char** argv)
     tk = ticks(); while (ticks() == tk) {}
     a = tsc(); tk = ticks(); while (ticks() - tk < 4) {}
     cps = (tsc() - a) * 18206 / 4000; Cps = cps;
-    out("USBTEST - USB pad / keyboard / mouse finder (same code as SBEMU /JOY)\nCPU %lu MHz\n", (unsigned long)(cps / 1000000));
+    out("USBTEST - USB pad / keyboard / mouse / disk finder (same code as SBEMU /JOY), test build 11: USB 2.0 disks\nCPU %lu MHz\n", (unsigned long)(cps / 1000000));
     if (PadOn)
     {   /* the same files and look-up as SBEMU (its folder = this program's) */
         char dir[260], where[64], d[600];
