@@ -1596,7 +1596,7 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
                 t ^= 1; left -= c; ++n;
             } while (left > 0 && n < OTN - 2);
         nd = n;
-        if (csw) { otd(OT(n), OTD_IN, PHYS(csw), 13, OT(n + 1)); ++n; }
+        if (csw) { otd(OT(n), OTD_IN | (t ? OTD_T1 : OTD_T0), PHYS(csw), 13, OT(n + 1));   /* its toggle too: the NEC does not carry the data TDs' toggle in the ED */ ++n; }
         tail = OT(n);
         zero(tail, 4);
         /* as o_run_tds does for a changed control ED (the NEC uPD720101 keeps a copy of an ED it has read: on
