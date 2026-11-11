@@ -43,7 +43,7 @@
 
 <br><br>
 
-<a href="#-whats-new-"><img src="docs/90s/ticker.gif" width="600" alt="NEW!! beta.91: CD games from MENU find the right disc, beta.90-w98.6: Windows 98 shows the SC-55's real display"></a>
+<a href="#-whats-new-"><img src="docs/90s/ticker-hd.gif" width="600" alt="NEW!! beta.91: CD games from MENU find the right disc, beta.90-w98.6: Windows 98 shows the SC-55's real display"></a>
 
 <br><br>
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The README's site-map buttons, the "back to top" button and the scrolling news ticker (original, Pillow).
 
-    python3 docs/90s/nav90s.py       -> nav-*.gif, btn-top.gif, ticker.gif (and the counter) next to this script
+    python3 docs/90s/nav90s.py       -> nav-*.gif, btn-top.gif, ticker-hd.gif (and the counter) next to this script
 """
 import os
 from PIL import Image, ImageDraw
@@ -32,36 +32,36 @@ def ticker(text, width=1200, height=64, step=20):
     """an LED news ticker, drawn at 4x (1200x64, shown 600 wide): smooth amber letters behind a dot-matrix
     grid, a soft glow, scrolling right to left"""
     from PIL import ImageFilter, ImageChops
-    font = m.F('DejaVuSansMono-Bold.ttf', 40)
+    font = m.F('DejaVuSansMono-Bold.ttf', 52)
     probe = ImageDraw.Draw(Image.new('L', (1, 1)))
     tw = int(probe.textlength(text, font=font))
     strip = Image.new('L', (tw + width, height), 0)
     ImageDraw.Draw(strip).text((width, height // 2), text, font=font, fill=255, anchor='lm')
-    glow = strip.filter(ImageFilter.GaussianBlur(5))
-    # LED grid: 4x4 cells, 3x3 lit dot with the corners trimmed, dark gaps between
+    glow = strip.filter(ImageFilter.GaussianBlur(3))
+    # LED grid: 4x4 cells, square 3x3 dots, 1-pixel dark gaps (big dots keep the text easy to read)
     cell = Image.new('L', (4, 4), 0)
     for yy in range(3):
         for xx in range(3):
-            cell.putpixel((xx, yy), 255 if (xx, yy) not in ((0, 0), (2, 0), (0, 2), (2, 2)) else 150)
+            cell.putpixel((xx, yy), 255)
     grid = Image.new('L', (width, height), 0)
     for yy in range(0, height, 4):
         for xx in range(0, width, 4):
             grid.paste(cell, (xx, yy))
-    amber = Image.new('RGB', (width, height), (255, 176, 0))
-    dim = Image.new('RGB', (width, height), (40, 22, 0))   # unlit LEDs, faintly visible
+    amber = Image.new('RGB', (width, height), (255, 196, 40))
+    dim = Image.new('RGB', (width, height), (22, 12, 0))   # unlit LEDs, faintly visible
     black = Image.new('RGB', (width, height), (0, 0, 0))
     frames = []
     for x in range(0, tw + width - width // 3, step):
         lit = strip.crop((x, 0, x + width, height))
         dots = Image.composite(Image.composite(amber, dim, lit), black, grid)   # light shows through the dots only
-        halo = Image.composite(Image.new('RGB', (width, height), (110, 50, 0)), black,
+        halo = Image.composite(Image.new('RGB', (width, height), (70, 32, 0)), black,
                                glow.crop((x, 0, x + width, height)))
         im = ImageChops.add(dots, halo)
         ImageDraw.Draw(im).rectangle([0, 0, width - 1, height - 1], outline=(90, 90, 90), width=2)
         frames.append(im)
     pal = frames[len(frames) // 2].quantize(colors=16, method=Image.MEDIANCUT)
     frames = [f.quantize(palette=pal, dither=Image.NONE) for f in frames]
-    frames[0].save(os.path.join(m.OUT, 'ticker.gif'), save_all=True, append_images=frames[1:],
+    frames[0].save(os.path.join(m.OUT, 'ticker-hd.gif'), save_all=True, append_images=frames[1:],
                    duration=50, loop=0, optimize=True, disposal=2)
 
 
