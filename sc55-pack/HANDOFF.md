@@ -1103,3 +1103,24 @@ stereo 44000, I7 D1 H5, FX + music on SB/OPL).
 - Possible better fix later: let the VxD boost the system VM (Adjust_Exec_Priority / Call_Priority_VM_Event) while DOS
   DMA sound plays, for low latency without the bigger buffer.
 Zip = beta.89 zip + FILES\WIN98\SC55W.EXE (Pentium M build), SOURCE.ZIP, README98.TXT (x2).
+
+## beta.90-w98.6 (2026-11-10): Windows parity - LCD panel in DOS boxes, Pentium II/III build, MIDPLAY clock in Windows
+User picked (Windows-vs-DOS gaps): SC-55 LCD ("just do it in a DOS box"), virtual CD + CD music ("DOS box" approach:
+uCDD/SHSUCDX inside the DOS box; user: the virtual CD "doesn't work with games properly" - ask which games), PII build.
+- LCD: SC55W_SHARED gets lcd_seq + lcd[152] at the END (NUKEDJOY's wjoy offset unchanged; it checks no size/version);
+  SC55W_IF_VERSION 8, size check 529560. Helper: Sc55 attaches a null LCD_Backend (the core only keeps LCD_Data with a
+  backend, as sc55synth.cpp in DOS), MidiSynth::lcd()/kind() (SC-55 LCD RAM + CG, MT-32 getDisplayState, SF2 kind 1);
+  audio loop publishes the SBEMU B0h packet every 100 ms ('L', on, kind, load permille, shed, 80 + 64 bytes).
+  VxD mpu_write: B0h copies sh->lcd into lcd_pkt, data port returns its 150 bytes, status 3Fh while bytes wait.
+  Tested in the 86Box Win98 VM: MIDPLAY /P:300 /V:1 in a DOS box shows the live panel ("the module's real display").
+- PII: win98/buildall.sh builds SC55WM.EXE (pentium-m SSE2), SC55W2.EXE (pentium2, build98p2/b98p2 objects) and
+  SC55W.EXE = helper/launch.c (i386, CPUID bit 26 -> starts the right one with the same command line, waits, returns
+  its exit code). build98.sh takes EXE= and OD=. install98 copies/removes both builds; the Run key gets the launcher.
+  Tested: the PII VM runs SC55W2.EXE through the launcher.
+- MIDPLAY clock in a Windows DOS box: clock_init timed 3 BIOS ticks; Windows delivers ticks late and in bursts ->
+  per_us tiny -> the song ran to its end at once and hung there. Now INT 2Fh AX=1600h (enhanced mode) -> 18 ticks,
+  retried while not 20 MHz..10 GHz. VM: 22.9 s emulated = 23 s of song.
+- NOTE: "MPU 330h" in the first test = the ESS card's own MPU (mpu_find); with /P:300 our MPU (correct).
+Zip = beta.89-w98.5 zip + WIN98\SC55W.EXE (launcher), SC55WM.EXE, SC55W2.EXE, SC55W.VXD, SOURCE.ZIP (+launch.c,
+buildall.sh), README98.TXT (x2); DOS MIDPLAY.EXE, SBEMU.EXE, SC55MENU.EXE (version beta.90).
+NEXT: virtual CD in a DOS box under Windows (+ CD music via the VxD) and the virtual-CD-with-games problems.

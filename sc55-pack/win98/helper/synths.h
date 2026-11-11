@@ -36,6 +36,8 @@ public:
     virtual std::string describe() const = 0;
     virtual void all_notes_off() {}
     virtual void set_fx(bool on) { (void)on; }       // SC-55 only (/VSCFX, /VSCAUTO)
+    virtual int lcd(uint8_t* data80, uint8_t* cg64) { (void)data80; (void)cg64; return 0; }  // 1 = display on (MPU B0h panel)
+    virtual int kind() const { return 0; }          // panel synth byte: 0 SC-55, 1 SoundFont, 2 MT-32
     float gain = 1.0f;                                // output gain (/VSCGAIN x /VMIDIVOL)
 };
 

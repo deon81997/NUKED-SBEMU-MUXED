@@ -605,6 +605,19 @@ static DWORD WINAPI audio_main(LPVOID)
                 logf("Windows MIDI volume: left %u%%, right %u%%", (unsigned)((v & 0xFFFF) * 100 / 65535), (unsigned)((v >> 16) * 100 / 65535));
             last_vol = v; last_set = vs;
         }
+        if (g_sh) {                         // the front panel for DOS programs (MPU B0h, as SBEMU): ~10 times a second
+            static DWORD lcd_t;
+            if (now - lcd_t >= 100) {
+                uint8_t p[150]; memset(p, 0, sizeof p);
+                lcd_t = now;
+                p[0] = 'L';
+                if (eng.midi) { p[1] = (uint8_t)(eng.midi->lcd(p + 6, p + 86) ? 1 : 0); p[2] = (uint8_t)eng.midi->kind(); }
+                int pm = (int)(load * 1000); if (pm < 0) pm = 0; if (pm > 65535) pm = 65535;
+                p[3] = (uint8_t)(pm & 255); p[4] = (uint8_t)(pm >> 8); p[5] = (uint8_t)(shed ? 1 : 0);
+                memcpy((void*)g_sh->lcd, p, sizeof p);
+                g_sh->lcd_seq++;
+            }
+        }
         if (g_sh) {                         // TraceFile=1 in SC55W.INI: the VxD's DMA/IRQ/DSP trace into SC55W.TRC
             static int tr_on = -1; static FILE* trf; static uint32_t tr_last; static std::string tr_path; static DWORD tr_t;
             if (tr_on < 0) {
@@ -708,6 +721,10 @@ static void autostart_set(bool on)
     if (on) {
         char b[MAX_PATH];
         GetModuleFileNameA(NULL, b, sizeof b);
+        {   // start through the launcher SC55W.EXE (it picks SC55WM.EXE or SC55W2.EXE for this CPU)
+            std::string l = path_join(dir_of(b), "SC55W.EXE");
+            if (is_file(l)) lstrcpynA(b, l.c_str(), sizeof b);
+        }
         std::string v = short_path(b) + " /BOOT";
         RegSetValueExA(k, "SC55W", 0, REG_SZ, (const BYTE*)v.c_str(), (DWORD)v.size() + 1);
     } else {

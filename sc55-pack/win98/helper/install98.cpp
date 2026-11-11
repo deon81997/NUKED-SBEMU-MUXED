@@ -467,7 +467,7 @@ int run_install(HINSTANCE inst)
     std::string ini = join(wdir, "SC55W.INI");
 
     // program files
-    const char* files[] = {"SC55W.EXE", "SC55W.VXD", "SC55MIDI.DRV", "README98.TXT"};
+    const char* files[] = {"SC55W.EXE", "SC55WM.EXE", "SC55W2.EXE", "SC55W.VXD", "SC55MIDI.DRV", "README98.TXT"};
     bool ok = true;
     for (const char* f : files) {
         std::string s = join(src, f);
@@ -607,7 +607,7 @@ int run_uninstall(HINSTANCE)
     // files in use (the driver, this program) go at the next start
     SetFileAttributesA(join(sys_dir(), "SC55MIDI.DRV").c_str(), FILE_ATTRIBUTE_NORMAL);
     wininit_line("NUL=" + shortp(join(sys_dir(), "SC55MIDI.DRV")));
-    const char* files[] = {"SC55W.EXE", "SC55W.VXD", "SC55MIDI.DRV", "SC55W.INI", "SC55W.LOG", "README98.TXT"};
+    const char* files[] = {"SC55W.EXE", "SC55WM.EXE", "SC55W2.EXE", "SC55W.VXD", "SC55MIDI.DRV", "SC55W.INI", "SC55W.LOG", "README98.TXT"};
     for (const char* f : files) {
         std::string p = join(wdir, f);
         if (!exists(p)) continue;

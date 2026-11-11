@@ -93,11 +93,14 @@ static u8  mpu_q[8];
 static int mpu_qn;
 
 static void mpu_queue(u8 v) { if (mpu_qn < 8) mpu_q[mpu_qn++] = v; }
+static u8  lcd_pkt[150];      /* MPU command B0h: the front panel, read from the data port */
+static int lcd_pos = 150;
 
 static u8 mpu_read(u32 port)
 {
     if (port == (u32)cfg.mpu_port + 1)
-        return (u8)(mpu_qn ? 0x3F : 0xBF);   /* bit6 0 = ready, bit7 0 = data waiting */
+        return (u8)((mpu_qn || lcd_pos < 150) ? 0x3F : 0xBF);   /* bit6 0 = ready, bit7 0 = data waiting */
+    if (lcd_pos < 150) return lcd_pkt[lcd_pos++];
     if (mpu_qn) {
         u8 v = mpu_q[0];
         int i;
@@ -111,6 +114,14 @@ static u8 mpu_read(u32 port)
 static void mpu_write(u32 port, u8 v)
 {
     if (port == (u32)cfg.mpu_port + 1) {
+        if (v == 0xB0) {                     /* front panel (as SBEMU): 150 bytes follow on the data port */
+            int i;
+            for (i = 0; i < 150; i++) lcd_pkt[i] = sh ? sh->lcd[i] : 0;
+            if (!sh || lcd_pkt[0] != 'L') { for (i = 0; i < 150; i++) lcd_pkt[i] = 0; lcd_pkt[0] = 'L'; }
+            lcd_pos = 0;
+            return;
+        }
+        lcd_pos = 150;
         if (v == 0xFF) { mpu_uart = 0; mpu_qn = 0; mpu_queue(0xFE); }
         else if (v == 0x3F) { mpu_uart = 1; mpu_queue(0xFE); }
         else if (!mpu_uart) mpu_queue(0xFE);
@@ -1084,7 +1095,7 @@ static u32 attach(u32 user_addr)
     dsp.rate = 22050;
     dsp.blocksize = 0x800;
     irq_status = 0; irq_line = 0; owner_vm = 0;
-    mpu_uart = 0; mpu_qn = 0;
+    mpu_uart = 0; mpu_qn = 0; lcd_pos = 150;
     opl_ctrl = opl_status = 0;
     pcm_rate_sent = 0;
     sh = s;
@@ -1167,7 +1178,7 @@ int __cdecl sc_ioctl(u32 code, u8 *in, u32 inlen, u8 *out, u32 outlen)
     }
     case IOCTL_SC55W_RESET:
         dsp_reset();
-        mpu_uart = 0; mpu_qn = 0;
+        mpu_uart = 0; mpu_qn = 0; lcd_pos = 150;
         return 0;
     case IOCTL_SC55W_KEYS: {
         u32 owner = vxd_kbd_owner(), r = 0, i, brk = 1;

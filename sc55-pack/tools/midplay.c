@@ -63,12 +63,25 @@ static uint32_t bios_tick(void) { return _farpeekl(_dos_ds, 0x46C); }
 static void clock_init(void)
 {
     uint32_t t; uint64_t a;
+    int win, n, tries;
+    __dpmi_regs r;
     g_tsc = cpu_has_tsc();
     if (!g_tsc) return;
-    t = bios_tick(); while (bios_tick() == t) {}
-    t = bios_tick(); a = rdtsc64();
-    while (bios_tick() - t < 3 && bios_tick() >= t) {}
-    CK.per_us = (double)(rdtsc64() - a) / (3 * 54925.4);
+    /* in a Windows DOS box the BIOS tick is virtual: Windows delivers it late and in bursts, so 3 ticks
+     * (165 ms) could come almost at once and the CPU looked like a few MHz - songs then ran to their end
+     * in seconds. There: a whole second (18 ticks), and again while the result is not a plausible CPU. */
+    memset(&r, 0, sizeof r); r.x.ax = 0x1600; __dpmi_int(0x2F, &r);
+    win = r.h.al != 0 && r.h.al != 0x80;
+    n = win ? 18 : 3;
+    for (tries = 0; tries < 4; tries++)
+    {
+        t = bios_tick(); while (bios_tick() == t) {}
+        t = bios_tick(); a = rdtsc64();
+        while (bios_tick() - t < (uint32_t)n && bios_tick() >= t) {}
+        CK.per_us = (double)(rdtsc64() - a) / (n * 54925.4);
+        if (CK.per_us >= 20 && CK.per_us <= 10000) break;      /* 20 MHz .. 10 GHz */
+        n = 18;
+    }
     if (CK.per_us < 1) CK.per_us = 1;
     CK.tsc0 = CK.wtsc = rdtsc64(); CK.base = 0; CK.last = 0; CK.wtick = bios_tick(); CK.cand = 0;
 }

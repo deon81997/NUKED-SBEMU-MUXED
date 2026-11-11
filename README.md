@@ -76,6 +76,13 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.90-w98.6.** **Windows 98 catches up with DOS!!** MIDPLAY in a Windows
+DOS box now shows the SC-55's (or MT-32's) REAL display, live, just like in DOS: the Windows driver answers its
+front-panel query now. The Windows side also runs on the same CPUs as DOS: SC55W.EXE picks the fast SSE2 build on a
+Pentium 4 / M and newer, and a Pentium II build on a Pentium II / III or Athlon XP (before, those could not run it at
+all). And a MIDPLAY fix: in a Windows DOS box its clock could think the CPU ran at a few MHz (Windows delivers the
+BIOS timer late and in bursts) and raced to the end of a song; it now calibrates over a full second there.
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.89-w98.5.** **Blood sounds right in Windows 98!!** Blood's effects
 (Sound Blaster 16, 44 kHz) came out in short bursts with gaps in a Windows DOS box. Recorded in our Windows 98 test PC:
 only about 40 ms of sound in every 120 ms. The cause: a full-screen DOS game gets most of the CPU, and Windows then
@@ -100,16 +107,16 @@ glow and a machined knob with a pointer line. No speed lost: Panels even went fr
 strokes. In the Carousel and Module menus the description no longer runs into the key help: it gets its own three
 lines and the keys sit below a divider.
 
+<details>
+<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
+
+<br>
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.86.** **Snappier 3D menus, and the version on screen!!** The MENU now
 shows which version you run (yellow, under the logo), no more digging in SBLOG.TXT. The 3D menu styles got quicker:
 Panels' moving background now uses whole-number math (it did a slow float conversion for every pixel), and
 Carousel's see-through mirror floor is drawn row by row like MIDPLAY's. 86Box, Pentium II 450 at full 640x480:
 Panels 8.5 -> 10.1 frames a second, Carousel 8.6 -> 11.4.
-
-<details>
-<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
-
-<br>
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.85.** **MIDPLAY's 3D view, 3x smoother!!** On the D810 it showed
 only 5-6 pictures a second. It used to rest between frames to leave the CPU to the music, which is no longer needed

@@ -3,6 +3,7 @@
 #include "synths.h"
 #include "romscan.h"
 #include "emu.h"
+#include "lcd.h"
 #include "pcm.h"
 #include "rom_io.h"
 #include "mt32emu.h"
@@ -95,6 +96,13 @@ static bool is_reset_sysex(const std::vector<uint8_t>& s)
 // ======================================================================
 // SC-55
 // ======================================================================
+// the core only keeps its LCD contents while a backend is attached; this one draws nothing
+// (the DOS port does the same, sc55synth.cpp), the contents go to DOS programs as the B0h panel
+namespace { struct NullLcd final : LCD_Backend {
+    bool Start(const lcd_t&) override { return true; }
+    void Stop() override {}
+    void Render() override {}
+}; NullLcd g_null_lcd; }
 class Sc55 : public MidiSynth {
 public:
     Emulator emu;
@@ -121,6 +129,13 @@ public:
     }
 
     void post(const uint8_t* p, size_t n) { for (size_t i = 0; i < n; i++) emu.PostMIDI(p[i]); }
+    int lcd(uint8_t* data80, uint8_t* cg64) override
+    {
+        lcd_t& l = emu.GetLCD();
+        memcpy(data80, l.LCD_Data, 80);
+        memcpy(cg64, l.LCD_CG, 64);
+        return 1;
+    }
 
     void midi_byte(uint8_t b) override
     {
@@ -193,7 +208,8 @@ MidiSynth* create_sc55(const Options& o, const std::string& romdir, int out_rate
         fclose(f);
     }
     LoadRomset(info, nullptr);                       // unscrambles the wave ROMs in memory
-    if (!s->emu.Init(EMU_Options{})) { err = "SC-55 emulator init failed"; delete s; return nullptr; }
+    EMU_Options eo{}; eo.lcd_backend = &g_null_lcd;
+    if (!s->emu.Init(eo)) { err = "SC-55 emulator init failed"; delete s; return nullptr; }
     if (!s->emu.LoadRoms((Romset)ch.romset, info)) { err = "SC-55 ROM load failed"; delete s; return nullptr; }
     s->emu.Reset();
     s->emu.GetPCM().enable_oversampling = false;     // 32 kHz: half the CPU of 64 kHz
@@ -215,6 +231,15 @@ MidiSynth* create_sc55(const Options& o, const std::string& romdir, int out_rate
 class Mt32 : public MidiSynth {
 public:
     MT32Emu::Synth synth;
+    int kind() const override { return 2; }
+    int lcd(uint8_t* data80, uint8_t* cg64) override
+    {   // the MT-32's 20-character display, as SBEMU's MT32_GetLCD
+        char b[64]; memset(b, 0, sizeof b);
+        bool led = synth.getDisplayState(b, false);
+        memset(data80, ' ', 80); memset(cg64, 0, 64);
+        for (int i = 0; i < 20 && b[i]; i++) data80[i] = (uint8_t)b[i];
+        (void)led; return 1;      // SBEMU reports the panel as on whenever the MT-32 is loaded
+    }
     MT32Emu::FileStream ctl_file, pcm_file;
     const MT32Emu::ROMImage *ctl = nullptr, *pcm = nullptr;
     std::string desc;
@@ -342,6 +367,7 @@ struct Chorus {
 
 class Sf2 : public MidiSynth {
 public:
+    int kind() const override { return 1; }
     tsf* t = nullptr;
     std::string file;
     MidiParser parser;

@@ -25,9 +25,15 @@ inside Windows 98:
     Manager (see "Joystick" in section 3).
 
 It is made for the Dell Latitude D810 with the SigmaTel AC'97 WDM driver,
-but works with any sound card that has a Windows 98 driver. It needs a
-CPU with SSE2: Pentium 4, Pentium M, Celeron D or M, Athlon 64 or newer
-(a Pentium II / III or Athlon XP cannot run SC55W.EXE).
+but works with any sound card that has a Windows 98 driver. It runs on
+the same CPUs as the DOS pack, Pentium II and newer: SC55W.EXE starts
+SC55WM.EXE on CPUs with SSE2 (Pentium 4, Pentium M, Celeron D or M,
+Athlon 64 and newer; the faster build) and SC55W2.EXE on a Pentium II /
+III or Athlon XP (since beta.90-w98.6; before, those CPUs could not run
+it at all).
+
+MIDPLAY in a DOS box shows the SC-55's (or MT-32's) real display, as in
+DOS: this program answers its front panel query (MPU command B0h).
 
 It does NOT replace "Restart in MS-DOS mode" for games that need it (games
 that want all of the memory, or that do not run in a DOS box): use the DOS
