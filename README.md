@@ -76,6 +76,8 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.91-w98.7.** **Windows 98 to DOS, cleaned up!!** If you started SC55 (SBEMU) inside a Windows 98 DOS box it used to fail with a confusing "both modes disabled" message, and on some setups it could even grab the sound card from under Windows. Now it says plainly that Windows is running and that the Windows part (SC55W) already gives DOS boxes their sound, and stops. After "Restart in MS-DOS mode" it loads as always. README98 also shows the one line to put in DOSSTART.BAT so the SC-55 starts by itself in MS-DOS mode.
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.91.** **CD games from MENU find the right disc!!** Starting a second
 CD game from MENU in the same session kept the FIRST game's disc in drive M: (uCDD has one drive and refused the
 second mount), so the game said "no CD", or failed with read or init errors. MENU now takes the old disc out first,
@@ -102,14 +104,15 @@ code paths are hot, and the compiler used that to lay out the code. 86Box, Penti
 (18000 -> 20456 audio frames a second, the WAV identical to the last byte), and live in SBEMU the SC-55 load went
 from 340% to 302% of that slow test PC. More headroom on every PC, and slower PCs get closer to real time.
 
+<details>
+<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.88.** **The 3D menus get a 90s glow-up!!** The 3D screens now take
 their colours from the text menu's colour style (Groovy, Sunset, Ocean, Neon, Candy, Midnight): sky, grid floor and
 accents all change, also in MIDPLAY. **F6** in the 3D menu cycles them. Titles and the chosen item glow like neon.
 Carousel: glowing markers for every place on the ring, "2 / 5" and arrows. Module: brushed metal, a backlit LCD
 glow and a machined knob with a pointer line. No speed lost: Panels even went from 10.1 to 11.2 frames a second.
 
-<details>
-<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
 
 <br>
 

@@ -1143,3 +1143,25 @@ User: games from the virtual CD give "no CD found", read errors or init errors.
   W*.ZIP = 26 files bit-identical to the image, GO.COM (a TheDraw screen that exits) OK. Test disk 700 MB:
   testrig/mkdisk.py MKDISK_SPC=32 (16 KB clusters), /tmp/runbig.sh = cdtest/run.sh with DISKMB=/CYL= (1422 cyl).
   No read problem found outside the MENU disc-swap bug: waiting for the user's game names / error photos.
+
+## beta.91-w98.7 (2026-11-10): Windows 98 -> DOS transition review (RELEASED, tag v1.0.0-beta.91-w98.7-usb)
+User: bug-hunt Win98 -> DOS ("Restart in MS-DOS mode", Shut Down -> MS-DOS, full-screen DOS box) with the pack installed.
+- NOT tested in 86Box: the Win98 VM image (user's QuickInstall FULL.866 / qi.iso) and the 86Box build are not in the
+  repo, so this session had no Win98 rig. Code review only + DJGPP build (andrewwutw build-djgpp v3.4 gcc 12.2.0).
+- Found + fixed: SBEMU in a Windows DOS box (SC55.BAT run there). It had no Windows check: HDPMI32I does not install
+  under Windows' DPMI, so it ended with "Both real mode & protected mode support are disabled" (confusing); with a DPMI
+  host that lets it through it would program the PCI card under the Windows driver. main.c now checks INT 2Fh AX=1600h
+  before DPMI_Init: AL not 0/80h -> yellow message (SC55W gives DOS boxes the sound; use Restart in MS-DOS mode), exit 1.
+  SET SBEMU_IN_WINDOWS=1 skips the check. In MS-DOS mode Windows is unloaded (AL=0), so nothing changes there.
+- Checked, no change: VxD unload path (shutdown_all -> IOCTL DETACH -> CloseHandle, FILE_FLAG_DELETE_ON_CLOSE ->
+  Sys_Dynamic_Device_Exit -> detach + Cancel_Time_Out): every trap removed (SB 16 ports, 388, MPU, IRQ, DMA 8/16,
+  joy port, INT 15h/21h hooks, min timer period); sc_tick after DETACH is safe (xf.active=0, sh checked). WM_ENDSESSION
+  reaches the hidden top-level window and sets [State] Step=ok (no false "did not finish starting" next boot).
+  AUTOEXEC.BAT: only the REM [SC55W] + SET BLASTER pair, never added over a user BLASTER line. Nothing touches
+  CONFIG.SYS or DOSSTART.BAT. The VxD never programs the real card (ESS Solo-1 legacy 220/388/330 stays the Windows
+  driver's; SBEMU has no ESS Solo-1 driver, so on the 86Box Solo-1 VM DOS-mode SBEMU stops at "No usable sound card").
+- Minor, left: the joystick thread is not joined in shutdown_all (it only gets failing DeviceIoControl calls after
+  the handle closes; the process ends anyway).
+- README98: SBEMU does not load in a DOS box; one line for C:\WINDOWS\DOSSTART.BAT (CALL C:\SC55\SC55.BAT).
+Zip = beta.91 zip + FILES\SC55\SBEMU.EXE, README98.TXT (x2). VERSION unchanged (beta.91).
+NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run the three switch paths.

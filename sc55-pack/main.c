@@ -1566,6 +1566,23 @@ int main(int argc, char* argv[])
         MAIN_Options[OPT_HDMA].value = MAIN_Options[OPT_DMA].value; //only one low DMA channel allowed, use same channel for hdma & low dma.
     }
 
+    /* Inside a Windows 98 DOS box (window or full screen) Windows owns the sound card: SBEMU would either fail with
+     * "both modes disabled" or, with a DPMI host that lets it through, program the PCI card under the Windows driver
+     * (hang). SC55W.EXE already gives DOS boxes the SB / OPL / MPU there. "Restart in MS-DOS mode" unloads Windows
+     * (AL = 0 here), so SBEMU loads as usual after the switch. */
+    {
+        __dpmi_regs wr; memset(&wr, 0, sizeof wr);
+        wr.x.ax = 0x1600; __dpmi_int(0x2F, &wr);
+        if(wr.h.al != 0 && wr.h.al != 0x80 && !getenv("SBEMU_IN_WINDOWS"))
+        {
+            MAIN_D("running inside Windows %d.%02d: not loading\n", wr.h.al, wr.h.ah);
+            MAIN_CPrintf(YELLOW, "Windows is running: SBEMU is not loaded in a DOS box.\n");
+            printf("In Windows 98, NUKED SB-EMU for Windows (C:\\SC55\\WIN98\\SC55W.EXE, keyboard icon next to\n"
+                   "the clock) gives DOS boxes the Sound Blaster, OPL3 and SC-55. For SBEMU use Start > Shut Down >\n"
+                   "\"Restart in MS-DOS mode\" and run SC55 there.\n");
+            return 1;
+        }
+    }
     MAIN_Step("DPMI init");
     DPMI_Init();
     MAIN_Step("looking for QEMM / QPIEMU and HDPMI");

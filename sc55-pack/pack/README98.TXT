@@ -39,6 +39,13 @@ It does NOT replace "Restart in MS-DOS mode" for games that need it (games
 that want all of the memory, or that do not run in a DOS box): use the DOS
 pack there, as before.
 
+SBEMU itself does not load in a DOS box while Windows runs (it says so and
+stops: Windows owns the sound card there). After Start > Shut Down >
+"Restart in MS-DOS mode" Windows is gone and C:\SC55\SC55.BAT works as in
+plain DOS. To start it there by itself, add this line to
+C:\WINDOWS\DOSSTART.BAT (Windows runs that file only in MS-DOS mode):
+     CALL C:\SC55\SC55.BAT
+
 
 -----------------------------------------------------------------------------
  1. INSTALLING
