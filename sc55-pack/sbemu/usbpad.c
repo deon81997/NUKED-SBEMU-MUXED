@@ -1149,6 +1149,7 @@ static void otd(volatile uint32_t* t, uint32_t flags, uint32_t buf, int len, vol
  * OAltEd: a second control ED, used only for addresses other than 0 (Linux never rewrites a live ED's address);
  * OSplit: SET_ADDRESS's SETUP and status stage as two separate runs, 2 ms apart */
 static int OAltEd, OSplit;
+static int DbgRuns;                     /* NEC disk runs traced TD by TD (the first 16) */
 static volatile uint32_t* OTb;          /* o_run_tds: its TDs (NULL = the TD pool; NEC disk runs rotate through banks) */
 #define OTDN(x) ((OTb ? OTb : TD) + (x) * 8)
 static int o_run_tds(const Dev* d, int ep, int mps, int n, uint32_t timeout_us)
@@ -1562,11 +1563,11 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
         if (HC[h].ctlbulk)
         {   /* on the control ED (P5PE-VM NEC): runs of up to 16 packets, TDs in two banks used in turn and the ED
              * restarted every run (the NEC answered from a cached TD: a CSW "came" but landed elsewhere) */
-            int done = 0, t = *tog, k;
+            int done = 0, t = *tog, k, retry = 0;
             static int bank;
             do
             {
-                int left = len - done;
+                int left = len - done, got = 0, t0 = t;
                 n = 0;
                 bank = (bank + 1) % 7;                        /* 7 banks of 17 TD slots in DBuf + 0x1000: a slot */
                 OTb = (volatile uint32_t*)(DBuf + 0x1000) + bank * 17 * 8;   /* comes back only 7 runs later */
@@ -1579,19 +1580,48 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
                 HC[h].ctl[0] = ED_SKIP; HC[h].ctl[8] = ED_SKIP;   /* never the same info: o_run_tds restarts the list */
                 r = o_run_tds(d, ep, mps, n, timeout_us);
                 fl(OTDN(0), 17 * 32);
+                if (DbgRuns < 16)                             /* the first runs, TD by TD: in/out, toggle, CC, bytes */
+                {
+                    ++DbgRuns;
+                    trace("{%s%d:", in ? "i" : "o", len);
+                    for (k = 0; k < n && k < 4; ++k)
+                    {
+                        uint32_t w = OTDN(k)[0], cbp = OTDN(k)[1], st = pb + done + (uint32_t)(k * mps);
+                        trace(" t%lu c%lx %ld", (unsigned long)((w >> 24) & 1), (unsigned long)OTD_CC(w), cbp ? (long)(cbp - st) : -1L);
+                    }
+                    trace("} ");
+                }
                 if (r)
                 {
                     for (pk = 0, k = 0; k < n && OTD_CC(OTDN(k)[0]) == 0; ++k) ++pk;
-                    t = *tog ^ ((done / mps + pk) & 1);
+                    t = t0 ^ (pk & 1);
                     *tog = t; OTb = NULL;
                     return -1;
                 }
-                done += n * mps < len - done ? n * mps : len - done;
+                /* what really came: a TD whose buffer pointer did not move got nothing. The NEC retires an IN TD
+                 * with "no error" and no data when the packet had the other toggle (P5PE-VM: CSWs "received", the
+                 * buffer untouched); then the toggle is the other one: once more with it */
+                for (k = 0; k < n; ++k)
+                {
+                    uint32_t st = pb + done + (uint32_t)(k * mps), cbp = OTDN(k)[1];
+                    int c = (len - done - k * mps) > mps ? mps : len - done - k * mps;
+                    if (!cbp || !c) { got += c; continue; }
+                    got += (int)(cbp - st);
+                    break;
+                }
+                if (in && len && got == 0 && retry++ < 1)
+                {
+                    trace("[tog? %d] ", t0);
+                    t = t0 ^ 1;
+                    continue;
+                }
+                if (k < n) { t = t0 ^ ((k + 1) & 1); done += got; break; }   /* short: the end */
+                done += got;
             } while (done < len);
             OTb = NULL;
             *tog = t;
             fl(buf, len ? len : 1);
-            return len;
+            return done;
         }
     {   /* one TD per packet, no buffer rounding: a short packet ends with DataUnderrun and halts the ED, so
          * nothing after it is taken as data (86Box's OHCI also wants packet-sized TDs). csw: the CSW goes on
