@@ -19,4 +19,10 @@ Review for 2,000-10,000 files, deep folders, long names. No fixed-size song arra
 - **Playlist number column:** `%3d` ran into the play mark at 10,000+ songs. It is now `%5d` at column 1.
 - **Shuffle with many songs:** shuffle picked any song except the current one, so songs repeated long before every song had played. It now picks only songs not played yet (PE.played, combining two rand() calls for >32k), then refills; Repeat off stops when all songs have played.
 - Not changed: F5 sort by title or length reads every unread song first (synchronously, music keeps playing via mp_pump). With 10k files that takes a while and shows no progress. The 3D view shows only "Song n/N" (no file list), so it was not affected.
-- Built clean with DJGPP gcc 12.2 (`make output/midplay.exe`). **Not yet run in 86Box:** this workspace had no 86Box build or VM images. Next: make a FAT16 image with 10k generated .MID files in nested folders with long names, then check /D load time, browser scrolling, ^A, F5, and shuffle.
+- Built clean with DJGPP gcc 12.2 (`make output/midplay.exe`).
+- **Tested in 86Box** (user's Win98 VM w86, P2B-LS PII-450, DOS box full screen, `/X` dry mode). A third disk e.img was made with scripts outside the repo: an MBR+FAT16 writer with LFN entries, plus 12,020 generated .MID files. E:\BIG has 5,000 8.3 names and 5,000 names of about 95 characters (~50,000 directory entries, under the FAT 65,536 limit). E:\TREE has 50 folders x 40 files; E:\DEEP is 12 levels deep (path 235 characters).
+  - `/D:E:\BIG` (10,000 files): old build about 13-14 min, new build about 8 s including 1 s of play.
+  - Playlist: 10,000 rows, End shows `10000` cleanly, all song infos are read in the background within a few minutes, and F5 (name/title/length/shuffle) takes under 1 s once they are read.
+  - Browser: long-named files open and play (side panel shows info); ^A over 10,000 files already in the list takes under 1 s ("No new songs here").
+  - 3D view: "Song 8086/10000" OK.
+  - Not finished: shuffle each-once (/H /T log on TREE\Folder 00) and the DEEP folder. Seen but not changed: the browser shows only the first 34 characters of a name, so very long names that start the same look alike (the side panel shows the title). MIDPLAY leaves DOS in the last browsed folder.
