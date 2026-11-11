@@ -76,6 +76,8 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/11/2026: beta.92.** **An empty CD drive no longer freezes the PC!!** If a game or tool looked at the virtual CD drive M: while no disc was in it, the DOS extender under all the 32-bit programs (HDPMI32I) crashed with an error it could not show, and the PC just seemed to hang: a likely cause of the "read error / init error" freezes with CD games. Found with a register dump in 86Box and fixed in HDPMI; the program now simply gets "not ready". The same HDPMI also fixes the Borland extender (SSF2 Turbo's MAKESWP). **CD images from ANY drive:** the CD images screen and MENU's game CD picker open any folder on any drive (D or Tab = next drive), remember the last folder, and F2 / G set and open your home folder. Also in this build: MIDPLAY handles thousands of MIDI files, and the SC-55 sound chip code is about 4% faster (same sound bit for bit).
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.91-w98.7.** **Windows 98 to DOS, cleaned up!!** If you started SC55 (SBEMU) inside a Windows 98 DOS box it used to fail with a confusing "both modes disabled" message, and on some setups it could even grab the sound card from under Windows. Now it says plainly that Windows is running and that the Windows part (SC55W) already gives DOS boxes their sound, and stops. After "Restart in MS-DOS mode" it loads as always. README98 also shows the one line to put in DOSSTART.BAT so the SC-55 starts by itself in MS-DOS mode.
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.91.** **CD games from MENU find the right disc!!** Starting a second
@@ -98,14 +100,14 @@ runs our sound program only in short turns, so its 80 ms buffer ran dry in betwe
 (160, then 300 ms) while a DOS game plays sound and the output keeps running dry, and shrinks back a minute later.
 Gaps in the Blood test: 56% of the time before, 1% now (the game's own pauses).
 
+<details>
+<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.89.** **The SC-55 needs 11-14% less CPU, same sound bit for bit!!**
 The SC-55 emulation is now built with profile-guided optimization: we ran an instrumented build in DOS to record which
 code paths are hot, and the compiler used that to lay out the code. 86Box, Pentium II 450: SC55WAV renders 13.6% faster
 (18000 -> 20456 audio frames a second, the WAV identical to the last byte), and live in SBEMU the SC-55 load went
 from 340% to 302% of that slow test PC. More headroom on every PC, and slower PCs get closer to real time.
-
-<details>
-<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.88.** **The 3D menus get a 90s glow-up!!** The 3D screens now take
 their colours from the text menu's colour style (Groovy, Sunset, Ocean, Neon, Candy, Midnight): sky, grid floor and

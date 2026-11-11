@@ -1,0 +1,28 @@
+diff --git a/Src/HDPMI/HDPMI.ASM b/Src/HDPMI/HDPMI.ASM
+index 4d71640..684a353 100644
+--- a/Src/HDPMI/HDPMI.ASM
++++ b/Src/HDPMI/HDPMI.ASM
+@@ -3501,6 +3501,8 @@ endif
+ 	jnz @F
+ 	mov [esp+4].IRET32.rIP, _FRTIN2_		;int 23h returns C flag!
+ @@:
++	push byte ptr _FLATSEL_		;DS may still hold a real-mode segment here: allocxsel
++	pop ds				;pushes/pops DS -> GPF on an int 24h (empty CD drive)
+ 	cmp bx,LOWWORD offset RMCB24	;for Int 24 BP holds a segment, must be translated
+ 	mov bx,ax
+ 	jnz @F
+@@ -4202,6 +4204,14 @@ _DATA32C ends
+ emuspecregmove2:
+ ife ?EMUMOVCR0REG
+ 	mov al,[esi]
++	cmp al,0C0h		; mov cr0, eax? (Borland 32RTM): allowed like HDPMI v3.21,
++	jnz @F			; PE and PG stay set
++	mov eax, [esp]
++	or eax, 80000001h
++	mov cr0, eax
++	inc esi
++	jmp done_emuclisti
++@@:
+ 	and al,0F8h
+ 	cmp al,0C0h		; mov cr0, reg?
+ 	jz done			; return and do a GPF

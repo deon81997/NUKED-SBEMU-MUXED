@@ -734,6 +734,10 @@ CONTENTS
     * Changing discs: CDIMG and the CD images screen take the old disc out
       first, and games are told that the disc was changed.
     * It uses no CPU while nothing reads the disc.
+    * An EMPTY drive M: no longer freezes the PC (beta.92): a program that
+      looked at M: with no disc in it made the DOS extender (HDPMI32I)
+      crash with an invisible error, and the PC seemed to hang. Now the
+      program gets "not ready", as with a real empty drive.
   The driver is uCDD 0.9.5-a3 (source: third_party/ucdd in the project, our
   additions in src/sbemulink.asm) and SHSUCDX 3.09 with one added option,
   /P:M (M: first). Games that look for a CD drive by trying the letters
@@ -744,12 +748,18 @@ CONTENTS
       The CD images screen, in the menu's style. The list shows every
       .CUE, .ISO, .MDM and loose .BIN with its size and disc label, and
       the folders inside C:\CDIMAGES (one folder per game works too).
+      Since beta.92 any folder on any drive can be opened (images on a
+      second disk or a USB drive): D goes to the next drive (an empty CD
+      drive is skipped), G to your home folder, and F2 makes the folder
+      you are in the home folder. The screen opens in the last folder you
+      used. An image outside C:\CDIMAGES is mounted by its full path.
       The panel on the right shows, without mounting the disc: its label
       and date, the tracks as a coloured strip (blue = data, yellow =
       CD music) with the length of the music, the INSTALL/SETUP program
       on the disc, and anything that needs fixing.
          Up/Down/PgUp/PgDn   choose          Enter   mount (or open a folder)
          Backspace           folder above    I       mount and run the
+         D  next drive       G  home folder  F2      set home folder
                                                      disc's INSTALL/SETUP
          C                   files on the disc
          U                   eject           F       fix the CUE (see below)
