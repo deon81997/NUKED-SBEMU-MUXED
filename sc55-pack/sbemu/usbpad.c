@@ -627,10 +627,12 @@ static int ehci_setup(int i)
     for (n = 0; n < 50 && !(erd(i, E_STS) & ES_HALT); ++n) wait_us(1000);
     ewr(i, E_INTR, 0);
     trace("EHCI %02x:%02x.%x: %d ports, %d companions, cap %02lx -> %s\n", h->bus, h->dev, h->func, h->nports, h->ncc,
-        (unsigned long)(rd(h->mmio) & 0xFF), h->ncc ? "ports to companions" : "driven directly");
-    if (h->ncc)
+        (unsigned long)(rd(h->mmio) & 0xFF), !h->ncc ? "driven directly" : (Flags & USBPAD_F_DISK) && !getenv("USBNOHS") ?
+        "high speed here, the rest to companions" : "ports to companions");
+    if (h->ncc && (!(Flags & USBPAD_F_DISK) || getenv("USBNOHS")))
     {
-        /* all ports to the companions. CONFIGFLAG=0 alone does it on paper, but give every port away
+        /* all ports to the companions (pads, keyboards, mice are full / low speed; with USB disks the EHCI keeps
+         * the ports and gives full / low speed devices to the companions one by one, see ehci_to_cc). CONFIGFLAG=0 alone does it on paper, but give every port away
          * explicitly too (Port Owner, which is only writable while CONFIGFLAG=1) and power it: an empty port
          * can otherwise stay with the halted EHCI, so a device plugged in later is never seen, and on a card
          * no BIOS has set up the port power can still be off */
@@ -1731,6 +1733,7 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
     }
     case T_EHCI:
         qtd(qtdn(0), in ? 1 : 0, *tog, pb, len, NULL);
+        for (i = 2; len && i <= 4; ++i) qtdn(0)[3 + i] = (pb & ~0xFFFUL) + (uint32_t)i * 0x1000;   /* 5 pages: 16 KB runs */
         r = e_run(d, ep, mps, 1, timeout_us);
         if (r) return -1;
         got = len - (int)((qtdn(0)[2] >> 16) & 0x7FFF);
@@ -1778,7 +1781,7 @@ static int msd_cmd(Msd* s, int lun, const uint8_t* cdb, int cdblen, int in, uint
     }
     while (!comb && done < len)
     {
-        int c = len - done > BCHUNK ? BCHUNK : (int)(len - done);
+        int max = HC[s->hc].type == T_EHCI ? DCMD : BCHUNK, c = len - done > (uint32_t)max ? max : (int)(len - done);
         if (!in) memcpy(db, data + done, c);
         r = bulk(s, in, db, c, 5000000, NULL);
         if (r < 0) { msd_clear(s, in); break; }              /* STALL: the CSW says how it ended */
@@ -2918,6 +2921,17 @@ static void root_gone(int h, int p)
     if (!HC[h].own && Cur != h) uhci_run(h, 0);
 }
 
+/* EHCI with companions run in high-speed mode (USB disks): a full / low speed device on root port CurPort goes to
+ * the companion controller (Port Owner), as Linux does; the port comes back to the EHCI by itself on unplug */
+static void ehci_to_cc(void)
+{
+    eport_set(Cur, CurPort, EP_PO, EP_PE);
+    trace("EHCI%d.%d: fs/ls -> companion ", HC[Cur].idx, CurPort + 1);
+    if (!HC[Cur].own) uhci_run(Cur, 0);
+    Cur = -1; S = S_SCAN;
+    NextScan = tsc() + us2c(100000);
+}
+
 /* root port enumeration did not give anything usable */
 static void root_fail(int ignore)
 {
@@ -3006,7 +3020,7 @@ static void step(void)
         if (t < Until) return;
         v = pstat(Cur, CurPort);
         if (!(v & PS_CCS)) { root_fail(0); return; }
-        if (HC[Cur].type == T_EHCI && (v & PS_LS)) { root_fail(2); return; }  /* low speed on a hub-only EHCI */
+        if (HC[Cur].type == T_EHCI && (v & PS_LS)) { if (HC[Cur].ncc) ehci_to_cc(); else root_fail(2); return; }  /* low speed */
         p_reset_start(Cur, CurPort);
         S = S_RESET; Until = t + us2c(55000);
         return;
@@ -3015,7 +3029,11 @@ static void step(void)
     {
         int v;
         if (t < Until) return;
-        if (!p_reset_end(Cur, CurPort)) { trace("noenable "); root_fail(HC[Cur].type == T_EHCI ? 2 : 1); return; }
+        if (!p_reset_end(Cur, CurPort))
+        {
+            if (HC[Cur].type == T_EHCI && HC[Cur].ncc) { ehci_to_cc(); return; }   /* full speed: the companion's */
+            trace("noenable "); root_fail(HC[Cur].type == T_EHCI ? 2 : 1); return;
+        }
         v = pstat(Cur, CurPort);
         trace("%s ", (v & PS_HS) ? "hs" : (v & PS_LS) ? "ls" : "fs");
         if (dev_new(Cur, -1, 0, CurPort, (v & PS_HS) ? SP_HS : (v & PS_LS) ? SP_LS : SP_FS) < 0) { root_fail(1); return; }

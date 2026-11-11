@@ -1223,3 +1223,7 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
   OHCI are now off (trace "disk on NEC OHCI: off"); the plan is its EHCI (session 7, test in QEMU: 86Box has no
   EHCI). Test hooks: USBCTLBULK=1 (NEC path on any OHCI), USBFAULT=n (every n-th NEC-path run faked as not done);
   86Box with USBFAULT=3 recovers, USBFAULT=1 fails cleanly without hanging.
+- Session 7 part 1 (2026-11-11): EHCI high speed for disks (USBPAD_F_DISK only; SBEMU unchanged), FS/LS devices
+  handed to the companions per port. QEMU rig testrig/qemu-usbdisk.sh (QEMU built here, see its header). Passes
+  in QEMU (HS stick 5 MB/s emulated, hot-plug, keyboard / mouse on the companions). Next: the user's P5PE-VM
+  (NEC EHCI) with the stick; USBNOHS=1 gives the old behaviour.

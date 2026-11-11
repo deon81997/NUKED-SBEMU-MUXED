@@ -190,6 +190,11 @@ media: detect by a valid BPB / exFAT / NTFS signature at LBA 0.
    512-byte packets, qTDs of up to 16 KB, PING for OUT. This changes the pad path on every EHCI board, so it
    needs its own regression pass (86Box regress.py, then the D810 and the P5PE-VM with the pad). Keep a
    switch to go back to the old "all ports to the companions" mode if a board misbehaves.
+   DONE (first part, 2026-11-11): with `USBPAD_F_DISK` an EHCI with companions keeps its ports (CONFIGFLAG 1);
+   after the port reset a full / low speed device goes to its companion (`ehci_to_cc`, Port Owner), high speed
+   stays (disks); without the flag (SBEMU now) or with `USBNOHS` the old "all ports to companions". EHCI bulk
+   runs of up to 16 KB (5-page qTD). QEMU (ICH9 EHCI + 3 UHCI, testrig/qemu-usbdisk.sh): stick at high speed
+   1 MB in 0.2 s, FS keyboard / mouse handed to UHCI, unplug / replug of both work. Real NEC EHCI: untested.
 8. **Later.** xHCI bulk rings, CBI/UFI USB floppy drives. Then docs, SBEMU option text, release.
 
 ## 9. Risks / open questions
