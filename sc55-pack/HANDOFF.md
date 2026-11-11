@@ -1183,6 +1183,8 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
 - Test: devkit 86Box (user's sc55-devkit tar: djgpp + 86Box with usb_msd), testrig/86box/msdtest.sh.
   UHCI and OHCI pass (CRC of the first MB). Real hardware not tried: needs USBTEST on the D810 (UHCI) and the
   P5PE-VM NEC card (OHCI) with a stick, plus a check that the pads still work there.
+- Session 2 start (same day): pads keep working during disk requests (MsdBusy -> light step from the interrupt,
+  untested); OHCI data + CSW in one run and no fixed per-transfer wait (86Box OHCI 1 MB 2.6 s -> 1.8 s).
 
 ## SC-55 PCM_Update C speed-up + new PGO profiles (2026-11-11)
 - pcm.cpp (bit-exact, sc55bench mk1-v2.00 19.mid 30 s hash 1317ac59): address generator steps 3-4 (samp3, nibble_cmp5,

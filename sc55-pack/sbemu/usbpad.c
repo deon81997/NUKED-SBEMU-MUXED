@@ -294,12 +294,13 @@ typedef struct
 static Msd       Ms[MAX_MSD];
 static uint32_t  MsGen;
 static void msd_gone(int di);
+static volatile int MsdBusy, InLight;   /* a disk request holds Busy / its interrupt-time light step runs */
 
 static xmsmem_t Mem;
 #define M_TD    0x0000                  /* NTD control TDs, 64 bytes apart */
 #define M_CBUF  0x0C00                  /* control data, 512 bytes */
 #define M_PIPE  0x1000                  /* + pipe * 0x800: TDs 0, IN buffer 0x100, OUT 0x140, xHCI rings 0x200 / 0x400 */
-#define M_DISKSZ 0x2000                /* after the controllers: CBW 0, CSW 0x40, small replies 0x80, data 0x1000 */
+#define M_DISKSZ 0x6000                /* after the controllers: CBW 0, CSW 0x40, small replies 0x80, OHCI TDs 0x1000, data 0x2000 */
 #define M_HC    0x4000                  /* + controller * 0x2000: frame list / HCCA 0, control QH 0x1000, pipe QHs 0x1080 */
 static volatile uint32_t* TD;
 static uint8_t*  CBuf;
@@ -1513,13 +1514,19 @@ static int send_out(int k, const uint8_t* data, int len)
  * is made (no periodic transfers). UHCI: the TDs go on the control QH (one transfer at a time anyway); OHCI: the
  * disk's own IN / OUT EDs on the bulk list (put there at reset; only head / tail are written, while skipped:
  * no tail append, see oslow); EHCI: the async QH as for control transfers. xHCI: not yet. */
-#define BCHUNK 2048                     /* bytes per bulk run (UHCI: 32 TDs of 64) */
+#define BCHUNK 2048                     /* bytes per bulk run (UHCI: 32 TDs of 64; EHCI) */
+#define OCHUNK 16384                    /* OHCI: per run, one 16-byte TD per packet (OT) */
+#define OTN    260
+#define DCMD   16384                    /* most data per SCSI command (the data buffer) */
+#define OT(i)  ((volatile uint32_t*)(DBuf + 0x1000) + (i) * 4)
+static uint32_t OSkip[MAX_HC][MAX_MSD * 2];   /* OHCI: frame number when the disk ED was last skipped */
+static int BulkCsw;                     /* OHCI: the CSW came with the data (13 bytes) */
 static uint32_t le32(const uint8_t* p) { return p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24; }
 static void put32(uint8_t* p, uint32_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24); }
 static void put32be(uint8_t* p, uint32_t v) { p[0] = (uint8_t)(v >> 24); p[1] = (uint8_t)(v >> 16); p[2] = (uint8_t)(v >> 8); p[3] = (uint8_t)v; }
 
-/* one bulk transfer of len (<= BCHUNK) bytes at buf (inside DBuf): bytes moved (IN: less = short packet), -1 = failed */
-static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us)
+/* one bulk transfer of len (<= BCHUNK, OHCI OCHUNK) bytes at buf (inside DBuf): bytes moved (IN: less = short packet), -1 = failed */
+static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint8_t* csw)
 {
     const Dev* d = &D[s->dev];
     int h = s->hc, ep = in ? s->in : s->out, mps = s->mps, *tog = in ? &s->tin : &s->tout, got = 0, pk = 0, n = 0, i, r;
@@ -1549,24 +1556,31 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us)
     }
     case T_OHCI:
     {   /* one TD per packet, no buffer rounding: a short packet ends with DataUnderrun and halts the ED, so
-         * nothing after it is taken as data (86Box's OHCI also wants packet-sized TDs) */
-        volatile uint32_t* ed = BED(h, (int)(s - Ms) * 2 + (in ? 0 : 1));
+         * nothing after it is taken as data (86Box's OHCI also wants packet-sized TDs). csw: the CSW goes on
+         * the same IN chain, so a command is two runs on two EDs; an ED is only rewritten 2 frames after it
+         * was last skipped (OSkip), which has nearly always passed already: no fixed wait */
+        int j = (int)(s - Ms) * 2 + (in ? 0 : 1), left = len, done, nd, k;
+        volatile uint32_t* ed = BED(h, j);
         volatile uint32_t* tail;
         uint64_t end;
-        uint32_t cc;
-        int left = len, done;
-        do
-        {
-            int c = left > mps ? mps : left;
-            otd(tdn(n), in ? OTD_IN : OTD_OUT, pb + (len - left), c, tdn(n + 1));   /* toggle from the ED's carry */
-            left -= c; ++n;
-        } while (left > 0 && n < NTD - 1);
-        tail = tdn(n);
+        uint32_t cc, f0 = OSkip[h][j];
+        BulkCsw = 0;
+        if (!(csw && !len))
+            do
+            {
+                int c = left > mps ? mps : left;
+                otd(OT(n), in ? OTD_IN : OTD_OUT, pb + (len - left), c, OT(n + 1));   /* toggle from the ED's carry */
+                left -= c; ++n;
+            } while (left > 0 && n < OTN - 2);
+        nd = n;
+        if (csw) { otd(OT(n), OTD_IN, PHYS(csw), 13, OT(n + 1)); ++n; }
+        tail = OT(n);
         zero(tail, 4);
+        for (k = 0; k < 50 && ((ord(h, 0x3C) - f0) & 0xFFFF) < 2; ++k) wait_us(100);
         ed[0] = ED_SKIP | (uint32_t)d->addr | ((uint32_t)ep << 7) | (d->speed == SP_LS ? ED_LS : 0) | ((uint32_t)mps << 16);
         ed[1] = PHYS(tail);
-        ed[2] = PHYS(tdn(0)) | (*tog ? 2 : 0);
-        fl(TD, (n + 1) * 32); fl(ed, 16);
+        ed[2] = PHYS(OT(0)) | (*tog ? 2 : 0);
+        fl(OT(0), (n + 1) * 16); fl(ed, 16);
         ed[0] &= ~ED_SKIP;
         fl(ed, 16);
         owr(h, O_CMDSTS, OS_BLF);
@@ -1575,13 +1589,13 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us)
         for (;;)
         {
             int halt;
-            fl(TD, n * 32); fl(ed, 16);
+            fl(OT(0), n * 16); fl(ed, 16);
             halt = (ed[2] & ED_HALT) != 0;
             for (done = 1, i = 0; i < n; ++i)
             {
-                cc = OTD_CC(tdn(i)[0]);
+                cc = OTD_CC(OT(i)[0]);
                 if (cc == 0) continue;
-                if (cc == 9 && in) break;                         /* short packet: the end */
+                if (cc == 9 && in && i < nd) break;              /* short packet: the end of the data */
                 if (cc >= 0xE || !halt) done = 0; else done = -1;
                 break;
             }
@@ -1591,23 +1605,30 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us)
         }
         ed[0] |= ED_SKIP;
         fl(ed, 16);
-        wait_us(1100);                                        /* out of the HC's hands before the next rewrite */
-        fl(ed, 16); fl(TD, n * 32);
-        *tog = (ed[2] & 2) != 0;
-        if (r) trace("[ob%08lx ed%08lx] ", (unsigned long)tdn(i < n ? i : 0)[0], (unsigned long)ed[2]);
-        ed[2] = PHYS(tail) | (*tog ? 2 : 0);                  /* also clears the halt */
-        fl(ed, 16);
+        OSkip[h][j] = ord(h, 0x3C) & 0xFFFF;
+        if (!r && !(ed[2] & ED_HALT)) *tog = (ed[2] & 2) != 0;   /* all retired: head = tail already */
+        else
+        {
+            if (!(ed[2] & ED_HALT)) wait_us(1100);              /* timeout: out of the HC's hands first */
+            fl(ed, 16);
+            *tog = (ed[2] & 2) != 0;
+            if (r) trace("[ob%08lx ed%08lx] ", (unsigned long)OT(i < n ? i : 0)[0], (unsigned long)ed[2]);
+            ed[2] = PHYS(tail) | (*tog ? 2 : 0);              /* also clears the halt */
+            fl(ed, 16);
+        }
         owr(h, O_INTSTS, 0x06);
         if (r) return -1;
-        for (i = 0; i < n; ++i)
+        for (i = 0; i < nd; ++i)
         {
             uint32_t st = pb + (uint32_t)(i * mps), c = (uint32_t)((len - i * mps) > mps ? mps : len - i * mps);
-            cc = OTD_CC(tdn(i)[0]);
+            cc = OTD_CC(OT(i)[0]);
             if (cc == 0) { got += (int)c; continue; }
-            if (cc == 9) got += tdn(i)[1] ? (int)(tdn(i)[1] - st) : (int)c;
+            if (cc == 9) got += OT(i)[1] ? (int)(OT(i)[1] - st) : (int)c;
             break;
         }
+        if (csw && OTD_CC(OT(nd)[0]) == 0 && (i == nd)) BulkCsw = 13;
         fl(buf, len ? len : 1);
+        if (csw) fl(csw, 16);
         return got;
     }
     case T_EHCI:
@@ -1637,32 +1658,40 @@ static void msd_reset(Msd* s)                         /* reset recovery (BOT 5.3
     msd_clear(s, 1); msd_clear(s, 0);
 }
 
-/* one SCSI command; data (len bytes, in or out) goes through DBuf + 0x1000 in BCHUNK pieces.
+/* one SCSI command; data (len <= DCMD bytes, in or out) goes through DBuf + 0x2000 in BCHUNK pieces (OHCI IN: one run).
  * 0 = good, 1 = check condition (REQUEST SENSE tells), -1 = transport failed (reset recovery done) */
 static int msd_cmd(Msd* s, int lun, const uint8_t* cdb, int cdblen, int in, uint8_t* data, uint32_t len, uint32_t* moved)
 {
-    uint8_t *cbw = DBuf, *csw = DBuf + 0x40, *db = DBuf + 0x1000;
+    uint8_t *cbw = DBuf, *csw = DBuf + 0x40, *db = DBuf + 0x2000;
+    int comb = HC[s->hc].type == T_OHCI && (in || !len) && len <= OCHUNK, havecsw = 0;
     uint32_t done = 0, tag = ++s->tag;
     int r = 0, k;
     memset(cbw, 0, 31);
     put32(cbw, 0x43425355UL); put32(cbw + 4, tag); put32(cbw + 8, len);
     cbw[12] = in ? 0x80 : 0; cbw[13] = (uint8_t)lun; cbw[14] = (uint8_t)cdblen;
     memcpy(cbw + 15, cdb, cdblen);
-    if (bulk(s, 0, cbw, 31, 1000000) != 31) { trace("cbw! "); msd_reset(s); return -1; }
-    while (done < len)
+    if (bulk(s, 0, cbw, 31, 1000000, NULL) != 31) { trace("cbw! "); msd_reset(s); return -1; }
+    if (comb)                                                 /* OHCI: data and CSW in one run */
+    {
+        r = bulk(s, 1, db, (int)len, 5000000, csw);
+        if (r < 0) msd_clear(s, 1);
+        else { memcpy(data, db, r); done = (uint32_t)r; havecsw = BulkCsw == 13; }
+    }
+    while (!comb && done < len)
     {
         int c = len - done > BCHUNK ? BCHUNK : (int)(len - done);
         if (!in) memcpy(db, data + done, c);
-        r = bulk(s, in, db, c, 5000000);
+        r = bulk(s, in, db, c, 5000000, NULL);
         if (r < 0) { msd_clear(s, in); break; }              /* STALL: the CSW says how it ended */
         if (in) memcpy(data + done, db, r);
         done += r;
         if (r < c) break;                                     /* short packet: no more data */
     }
     if (moved) *moved = done;
-    for (k = 0; k < 2; ++k)
+    if (havecsw) r = 13;
+    for (k = 0; k < 2 && !havecsw; ++k)
     {
-        r = bulk(s, 1, csw, 13, 5000000);
+        r = bulk(s, 1, csw, 13, 5000000, NULL);
         if (r == 13) break;
         msd_clear(s, 1);
     }
@@ -1775,7 +1804,7 @@ const USBPAD_Disk* USBPAD_DiskInfo(int n)
     int l;
     Msd* s = msd_find(n, &l);
     if (!s) return NULL;
-    if (!s->lun[l].ready && Inited && !Busy) { Busy = 1; msd_check(s, l); Busy = 0; }
+    if (!s->lun[l].ready && Inited && !Busy) { Busy = 1; MsdBusy = 1; msd_check(s, l); MsdBusy = 0; Busy = 0; }
     return &s->lun[l];
 }
 
@@ -1786,12 +1815,12 @@ int USBPAD_DiskRead(int n, uint32_t lba, int count, void* buf)
     Msd* s = msd_find(n, &l);
     if (!s) return USBPAD_E_NODISK;
     if (!Inited || Busy) return USBPAD_E_BUSY;
-    Busy = 1;
-    if (!s->lun[l].ready && !msd_check(s, l)) { Busy = 0; return USBPAD_E_NOTREADY; }
+    Busy = 1; MsdBusy = 1;
+    if (!s->lun[l].ready && !msd_check(s, l)) { MsdBusy = 0; Busy = 0; return USBPAD_E_NOTREADY; }
     while (count > 0 && !r)
     {
         USBPAD_Disk* u = &s->lun[l];
-        int c = count, max = 32768 / (int)u->bsize;
+        int c = count, max = DCMD / (int)u->bsize;
         uint8_t cdb[10] = { 0 };
         uint32_t moved;
         if (c > max) c = max;
@@ -1812,7 +1841,7 @@ int USBPAD_DiskRead(int n, uint32_t lba, int count, void* buf)
         }
         lba += (uint32_t)c; count -= c; p += (uint32_t)c * u->bsize;
     }
-    Busy = 0;
+    MsdBusy = 0; Busy = 0;
     return r;
 }
 
@@ -2903,9 +2932,21 @@ static void step(void)
     }
 }
 
+/* while a disk request (caller's context) holds Busy, an interrupt still collects pad / keyboard / mouse reports:
+ * the light step only reads each pipe's own TDs and re-arms them, never the control or bulk path in use */
+static void light_during_disk(void)
+{
+    int l;
+    if (!MsdBusy || InLight) return;
+    InLight = 1; l = Light; Light = 1;
+    step();
+    Light = l; InLight = 0;
+}
+
 void USBPAD_Poll(void)
 {
-    if (!Inited || Busy) return;
+    if (!Inited) return;
+    if (Busy) { light_during_disk(); return; }
     Busy = 1;
     Light = 0;
     step();
@@ -2916,7 +2957,8 @@ void USBPAD_Poll(void)
  * (enumeration, hub checks, recovery), so the game's stick timing is not disturbed */
 void USBPAD_PollLight(void)
 {
-    if (!Inited || Busy) return;
+    if (!Inited) return;
+    if (Busy) { light_during_disk(); return; }
     Busy = 1;
     Light = 1;
     step();

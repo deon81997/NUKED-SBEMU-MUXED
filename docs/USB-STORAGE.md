@@ -164,8 +164,13 @@ media: detect by a valid BPB / exFAT / NTFS signature at LBA 0.
    86Box (devkit build, its own `usb_msd`): UHCI 1 MB in 1.5 s, OHCI 2.6 s, CRC matches the image, pads on
    the other ports kept working. Found: OHCI needs one TD per packet without buffer rounding (86Box flags a
    multi-packet TD as DataOverrun; also makes a short packet halt the ED so the CSW is never read as data).
-   For session 2: the sound IRQ's poll is skipped while a disk request holds `Busy` (pads pause for the
-   request); OHCI waits 1.1 ms after each transfer (slow, 3 per command).
+   Done early in session 2 (2026-11-11): while a disk request holds `Busy`, an interrupt's `USBPAD_Poll` /
+   `PollLight` still runs the light step (`MsdBusy`), so pad / keyboard / mouse reports keep coming; not
+   tested yet (USBTEST has no interrupt; needs SBEMU using the disk). OHCI: data + CSW in one run on the IN
+   ED (16 KB per command, 260 TDs at DBuf + 0x1000), an ED is rewritten only 2 frames after its last skip
+   (no fixed 1.1 ms wait): 86Box 1 MB in 1.8 s (was 2.6 s). Target speed is CD-ROM class (2x-4x =
+   300-600 KB/s): most installed games only check for the CD, CD-audio from an image is the steady load
+   (176 KB/s); USB 1.1 is enough, so EHCI high speed (session 7) is optional.
    Original plan: `Msd` table, interface match, bulk QH / bulk-list ED, CBW/data/CSW,
    GET_MAX_LUN, INQUIRY, READ CAPACITY, READ 10. `USBPAD_F_DISK` flag. 86Box `usb_msd.c` (read only).
    USBTEST: capacity + sector dump. Check pads still work with a stick plugged.
