@@ -1,0 +1,40 @@
+# Rebuilds the README's scrolling news ticker (docs/90s/ticker-hd.gif) whenever README.md changes, from the
+# newest "What's NEW!!" entries (docs/90s/ticker_news.py). Commits the new GIF only when the news text changed.
+name: News ticker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'README.md'
+      - 'docs/90s/ticker_news.py'
+      - 'docs/90s/nav90s.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ticker
+  cancel-in-progress: true
+
+jobs:
+  ticker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pillow and the DejaVu fonts
+        run: |
+          sudo apt-get install -y -q fonts-dejavu-core > /dev/null
+          pip install -q pillow
+      - name: Rebuild the ticker
+        run: python3 docs/90s/ticker_news.py
+      - name: Commit it if the news changed
+        run: |
+          if git diff --quiet; then echo "news unchanged"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md docs/90s/ticker-hd.gif docs/90s/ticker-hd.txt
+          git commit -m "News ticker: rebuilt from the newest README news"
+          git pull --rebase -q origin main
+          git push origin HEAD:main
