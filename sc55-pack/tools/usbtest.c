@@ -4,6 +4,7 @@
  *   USBTEST            USB controllers found, what was done with each, what is on their ports, then live:
  *                      both pads (sticks, triggers, buttons), USB keys pressed, mouse movement, every plug /
  *                      unplug. Esc (PS/2 or USB keyboard) quits.
+ *                      USB disks: model, size, and the first bytes of block 0 (S: again).
  *   USBTEST FILE       the same, also written to FILE (for a bug report)
  *   USBTEST FILE /T:n  ... and stop by itself after n seconds
  *   USBTEST /PAD:GAME.EXE  also: the pad layout SBEMU would use for that program (PADMAP.TXT / PADUSER.TXT next to
@@ -25,6 +26,46 @@
 #include "padmap.h"
 
 static FILE* Log;
+static void out(const char* f, ...);
+static unsigned long long Cps;
+static inline unsigned long long tsc(void);
+static void disks(void)                 /* USB disks: what they are, and block 0 */
+{
+    static uint8_t b[4096];
+    int n, i, r;
+    for (n = 0; n < USBPAD_Disks(); ++n)
+    {
+        const USBPAD_Disk* u = USBPAD_DiskInfo(n);
+        if (!u) break;
+        out("\nUSB disk %d: %04X:%04X LUN %d \"%s %s\" ", n, u->vid, u->pid, u->lun, u->vendor, u->product);
+        if (!u->ready) { out("no medium\n"); continue; }
+        out("%lu blocks of %lu bytes (%lu MB)\n", (unsigned long)u->blocks, (unsigned long)u->bsize,
+            (unsigned long)((unsigned long long)u->blocks * u->bsize >> 20));
+        r = USBPAD_DiskRead(n, 0, 1, b);
+        if (r) { out("  block 0: read error %d\n", r); continue; }
+        out("  block 0:");
+        for (i = 0; i < 32; ++i) out("%s%02X", i % 16 ? " " : "\n   ", b[i]);
+        out("\n   ... %02X %02X at 1FEh (%s)\n", b[510], b[511], b[510] == 0x55 && b[511] == 0xAA ? "boot record" : "no boot record");
+        {   /* read test: the first MB (or less), CRC-32 to compare with the image on another PC */
+            uint32_t crc = 0xFFFFFFFFUL, blk = 0, want = 1048576UL / u->bsize, j;
+            uint64_t t0 = tsc();
+            int per = (int)(sizeof b / u->bsize), e;
+            if (want > u->blocks) want = u->blocks;
+            while (blk < want)
+            {
+                int c = want - blk > (uint32_t)per ? per : (int)(want - blk);
+                if ((r = USBPAD_DiskRead(n, blk, c, b)) != 0) break;
+                for (j = 0; j < (uint32_t)c * u->bsize; ++j)
+                    for (crc ^= b[j], e = 0; e < 8; ++e) crc = (crc >> 1) ^ (0xEDB88320UL & (0UL - (crc & 1)));
+                blk += (uint32_t)c;
+            }
+            t0 = tsc() - t0;
+            if (r) out("  read test: error %d at block %lu\n", r, (unsigned long)blk);
+            else out("  read test: %lu KB in %lu ms, CRC-32 %08lX\n", (unsigned long)(want * u->bsize >> 10),
+                     (unsigned long)(t0 * 1000 / (Cps ? Cps : 1)), (unsigned long)~crc);
+        }
+    }
+}
 static int Ui;                      /* full-screen view (on the screen; plain text when redirected) */
 static char Text[16384];            /* what out() wrote, for the Steps panel */
 
@@ -188,7 +229,7 @@ int main(int argc, char** argv)
     if (Ui) { tu_start(argv[0]); draw(1); tu_poll(); }
     tk = ticks(); while (ticks() == tk) {}
     a = tsc(); tk = ticks(); while (ticks() - tk < 4) {}
-    cps = (tsc() - a) * 18206 / 4000;
+    cps = (tsc() - a) * 18206 / 4000; Cps = cps;
     out("USBTEST - USB pad / keyboard / mouse finder (same code as SBEMU /JOY)\nCPU %lu MHz\n", (unsigned long)(cps / 1000000));
     if (PadOn)
     {   /* the same files and look-up as SBEMU (its folder = this program's) */
@@ -219,7 +260,7 @@ int main(int argc, char** argv)
     }
     out("Looking for USB controllers and devices (up to 3 s)...\n");
     USBPAD_SetHid(kb, ms);
-    n = USBPAD_Init(cps, 3000, USBPAD_F_KBD | USBPAD_F_MOUSE, &msg);
+    n = USBPAD_Init(cps, 3000, USBPAD_F_KBD | USBPAD_F_MOUSE | USBPAD_F_DISK, &msg);
     out("%s\n", USBPAD_Trace());
     out("\nResult: %s\n", msg);
     Result = msg;
@@ -229,7 +270,8 @@ int main(int argc, char** argv)
         if (Ui) { Result = "Nothing usable: no USB controller with a pad, keyboard or mouse. The log has every step."; draw(0); tu_wait_key(); tu_end(); }
         return 1;
     }
-    out("\nLive view - plug / unplug, move the sticks, type, move the mouse. Esc quits\n(closes by itself after 2 minutes without a key). D: pipe state, R: restart pipes.\n");
+    disks();
+    out("\nLive view - plug / unplug, move the sticks, type, move the mouse. Esc quits\n(closes by itself after 2 minutes without a key). D: pipe state, R: restart pipes, S: USB disks.\n");
     {
         int shown = (int)strlen(USBPAD_Trace());
         t = start = tsc();
@@ -244,6 +286,7 @@ int main(int argc, char** argv)
             {
                 ch = USBPAD_Changes();
                 out("\n-- %s\n-- in use now:\n%s", USBPAD_Describe(), USBPAD_Devices()[0] ? USBPAD_Devices() : "(nothing)\n");
+                if (USBPAD_Have() & USBPAD_HAVE_DISK) disks();
             }
             if (KNew)
             {
@@ -257,6 +300,7 @@ int main(int argc, char** argv)
                 draw(0);
                 { int k = tu_poll(); if (k) KeySeen = 1; if (k == 27) break;
                   if (k == 'd' || k == 'D') dump("key D");
+                  if (k == 's' || k == 'S') disks();
                   if (k == 'r' || k == 'R') { dump("before R"); USBPAD_Rearm(); out("\n-- R: every pipe restarted\n"); } }
                 for (i = 0; i < USBPAD_PADS; ++i)
                 {

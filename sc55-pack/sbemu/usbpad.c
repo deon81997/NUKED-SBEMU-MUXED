@@ -81,6 +81,7 @@ extern void PCI_WriteDWord(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg, 
 #define UHCI_LEGSUP 0xC0
 #define TD_ACTIVE (1UL << 23)
 #define TD_STALL  (1UL << 22)
+#define TD_SPD    (1UL << 29)           /* short packet stops the queue */
 #define TD_ERRMASK 0x00760000UL         /* stall, buffer, babble, crc/timeout, bitstuff (not NAK) */
 #define TD_LS     (1UL << 26)
 #define TD_CERR3  (3UL << 27)
@@ -114,6 +115,7 @@ extern void PCI_WriteDWord(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg, 
 #define OC_IR     (1UL << 8)
 #define OS_HCR    (1UL << 0)
 #define OS_CLF    (1UL << 1)
+#define OS_BLF    (1UL << 2)
 #define OS_OCR    (1UL << 3)
 #define OP_CCS    (1UL << 0)
 #define OP_PES    (1UL << 1)
@@ -245,6 +247,7 @@ typedef struct
 static HCI      HC[MAX_HC];
 static int      HCn, UhciN, OhciN, EhciN, XhciN, EhciGiven;
 #define PQ(h, k) (HC[h].pq + (k) * 32)
+#define BED(h, k) (HC[h].ctl + 0x200 + (k) * 4)   /* OHCI bulk EDs (+0x800 from the control ED) */
 
 typedef struct
 {
@@ -278,13 +281,29 @@ typedef struct { int id, off, size; int32_t lmin, lmax; } HidF;    /* id -1 = no
 typedef struct { int ids; HidF ax[6], hat, btn; int nbtn; } HidMap;  /* ax: X Y Z Rx Ry Rz */
 static HidMap    Hm[MAX_PIPE];
 
+/* USB disks (mass storage, bulk-only transport + SCSI; docs/USB-STORAGE.md): one per interface, its LUNs are drives */
+#define MAX_MSD   2
+#define MAX_LUN   4
+typedef struct
+{
+    int used, dev, hc, ifc, in, out, mps, tin, tout, nlun;
+    uint32_t tag;
+    int lok[MAX_LUN];                   /* LUN is a disk (INQUIRY type 0 / 0Eh) */
+    USBPAD_Disk lun[MAX_LUN];
+} Msd;
+static Msd       Ms[MAX_MSD];
+static uint32_t  MsGen;
+static void msd_gone(int di);
+
 static xmsmem_t Mem;
 #define M_TD    0x0000                  /* NTD control TDs, 64 bytes apart */
 #define M_CBUF  0x0C00                  /* control data, 512 bytes */
 #define M_PIPE  0x1000                  /* + pipe * 0x800: TDs 0, IN buffer 0x100, OUT 0x140, xHCI rings 0x200 / 0x400 */
+#define M_DISKSZ 0x2000                /* after the controllers: CBW 0, CSW 0x40, small replies 0x80, data 0x1000 */
 #define M_HC    0x4000                  /* + controller * 0x2000: frame list / HCCA 0, control QH 0x1000, pipe QHs 0x1080 */
 static volatile uint32_t* TD;
 static uint8_t*  CBuf;
+static uint8_t*  DBuf;                  /* disk transfers (M_DISKSZ) */
 static uint32_t  PBase;
 #define PHYS(p) (PBase + (uint32_t)((volatile uint8_t*)(p) - (volatile uint8_t*)Mem.linearptr))
 
@@ -735,12 +754,18 @@ static void ohci_reset(int i)
         PQ(i, k)[3] = k + 1 < MAX_PIPE ? PHYS(PQ(i, k + 1)) : 0;
     }
     for (k = 0; k < 32; ++k) h->fl[k] = PHYS(PQ(i, 0));
-    fl(h->fl, 256); fl(h->ctl, 0x400);
+    for (k = 0; k < MAX_MSD * 2; ++k)                         /* bulk list: 2 EDs per USB disk (IN, OUT), skipped unless used */
+    {
+        zero(BED(i, k), 4);
+        BED(i, k)[0] = ED_SKIP;
+        BED(i, k)[3] = k + 1 < MAX_MSD * 2 ? PHYS(BED(i, k + 1)) : 0;
+    }
+    fl(h->fl, 256); fl(h->ctl, 0x900);
     owr(i, O_HCCA, PHYS(h->fl));
     owr(i, O_CTLHEAD, PHYS(h->ctl)); owr(i, O_CTLCUR, 0);
-    owr(i, O_BLKHEAD, 0); owr(i, O_BLKCUR, 0);
+    owr(i, O_BLKHEAD, PHYS(BED(i, 0))); owr(i, O_BLKCUR, 0);
     owr(i, O_INTSTS, 0xFFFFFFFFUL);
-    owr(i, O_CONTROL, OC_OPER | OC_PLE | OC_CLE | 3);
+    owr(i, O_CONTROL, OC_OPER | OC_PLE | OC_CLE | OC_BLE | 3);
     rha = ord(i, O_RHDA);
     h->nports = (int)(rha & 0xFF);
     if (h->nports > MAX_PORT) h->nports = MAX_PORT;
@@ -1025,6 +1050,9 @@ static void devlist(void)
         if (!q->used || n > (int)sizeof(DevList) - 80) continue;
         n += snprintf(DevList + n, sizeof(DevList) - n, "%s %04X:%04X on %s\n", pipe_name(q), D[q->dev].vid, D[q->dev].pid, where(q->dev));
     }
+    for (k = 0; k < MAX_MSD; ++k)
+        if (Ms[k].used && n <= (int)sizeof(DevList) - 80)
+            n += snprintf(DevList + n, sizeof(DevList) - n, "USB disk %04X:%04X on %s\n", D[Ms[k].dev].vid, D[Ms[k].dev].pid, where(Ms[k].dev));
     ++Changes;
 }
 
@@ -1037,6 +1065,7 @@ static void dev_free(int di)                    /* and everything behind it */
     h = D[di].hc;
     for (i = 0; i < MAX_DEV; ++i) if (D[i].used && D[i].parent == di) dev_free(i);
     for (i = 0; i < MAX_PIPE; ++i) if (P[i].used && P[i].dev == di) pipe_stop(i);
+    msd_gone(di);
     if (HC[h].type == T_XHCI && D[di].slot)
     {
         x_cmd(h, 0, TRB_TYPE(TT_DISSLOT) | ((uint32_t)D[di].slot << 24), NULL);
@@ -1054,6 +1083,7 @@ static uint32_t td_tok(int pid, int addr, int ep, int tog, int len)
 }
 static volatile uint32_t* tdn(int i) { return TD + i * 8; }
 
+static int UShort;                      /* u_run_tds: a short packet ends the run (bulk IN) */
 static int u_run_tds(int h, int n, uint32_t timeout_us)
 {
     uint64_t end = tsc() + us2c(timeout_us);
@@ -1071,6 +1101,7 @@ static int u_run_tds(int h, int n, uint32_t timeout_us)
             uint32_t cs = tdn(i)[1];
             if (cs & TD_ACTIVE) { done = 0; break; }
             if (cs & TD_ERRMASK) { qh[1] = LP_T; fl(qh, 16); return -1; }
+            if (UShort && (((cs + 1) ^ ((tdn(i)[2] >> 21) + 1)) & 0x7FF)) break;
         }
         if (done) { qh[1] = LP_T; fl(qh, 16); return 0; }
         if (tsc() > end)
@@ -1209,7 +1240,7 @@ static uint32_t e_ch(const Dev* d, int ep, int mps, int ctl, int async)
     uint32_t eps = d->speed == SP_HS ? 2 : d->speed == SP_LS ? 1 : 0;
     return (uint32_t)d->addr | ((uint32_t)ep << 8) | (eps << 12) | (ctl ? (1UL << 14) : 0) |
            (async ? (1UL << 15) : 0) | ((uint32_t)mps << 16) |
-           (ctl && d->speed != SP_HS ? (1UL << 27) : 0) | (async && d->speed == SP_HS ? (4UL << 28) : 0);
+           (ctl && ep == 0 && d->speed != SP_HS ? (1UL << 27) : 0) | (async && d->speed == SP_HS ? (4UL << 28) : 0);
 }
 static uint32_t e_caps(const Dev* d, uint32_t smask, uint32_t cmask)
 {
@@ -1475,6 +1506,314 @@ static int send_out(int k, const uint8_t* data, int len)
     if (r != 0) return -1;
     q->otog ^= 1;
     return 0;
+}
+
+/* ================================================================== USB disks: bulk-only transport (BOT) + SCSI
+ * Synchronous, from the caller's context (USBPAD_Disk*) or from enumeration; nothing runs while no disk request
+ * is made (no periodic transfers). UHCI: the TDs go on the control QH (one transfer at a time anyway); OHCI: the
+ * disk's own IN / OUT EDs on the bulk list (put there at reset; only head / tail are written, while skipped:
+ * no tail append, see oslow); EHCI: the async QH as for control transfers. xHCI: not yet. */
+#define BCHUNK 2048                     /* bytes per bulk run (UHCI: 32 TDs of 64) */
+static uint32_t le32(const uint8_t* p) { return p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24; }
+static void put32(uint8_t* p, uint32_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24); }
+static void put32be(uint8_t* p, uint32_t v) { p[0] = (uint8_t)(v >> 24); p[1] = (uint8_t)(v >> 16); p[2] = (uint8_t)(v >> 8); p[3] = (uint8_t)v; }
+
+/* one bulk transfer of len (<= BCHUNK) bytes at buf (inside DBuf): bytes moved (IN: less = short packet), -1 = failed */
+static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us)
+{
+    const Dev* d = &D[s->dev];
+    int h = s->hc, ep = in ? s->in : s->out, mps = s->mps, *tog = in ? &s->tin : &s->tout, got = 0, pk = 0, n = 0, i, r;
+    uint32_t pb = PHYS(buf);
+    fl(buf, len ? len : 1);
+    switch (HC[h].type)
+    {
+    case T_UHCI:
+    {
+        int left = len, t = *tog;
+        do
+        {
+            int c = left > mps ? mps : left;
+            tdn(n)[1] = td_cs(d) | (in ? TD_SPD : 0);
+            tdn(n)[2] = td_tok(in ? PID_IN : PID_OUT, d->addr, ep, t, c);
+            tdn(n)[3] = c ? pb + (len - left) : 0;
+            t ^= 1; left -= c; ++n;
+        } while (left > 0 && n < NTD);
+        for (i = 0; i < n; ++i) tdn(i)[0] = (i + 1 < n) ? (PHYS(tdn(i + 1)) | LP_VF) : LP_T;
+        UShort = in;
+        r = u_run_tds(h, n, timeout_us);
+        UShort = 0;
+        for (i = 0; i < n && !(tdn(i)[1] & TD_ACTIVE); ++i)
+            if (!(tdn(i)[1] & TD_ERRMASK)) { got += (tdn(i)[1] + 1) & 0x7FF; ++pk; }
+        if (r) { *tog ^= pk & 1; return -1; }
+        break;
+    }
+    case T_OHCI:
+    {   /* one TD per packet, no buffer rounding: a short packet ends with DataUnderrun and halts the ED, so
+         * nothing after it is taken as data (86Box's OHCI also wants packet-sized TDs) */
+        volatile uint32_t* ed = BED(h, (int)(s - Ms) * 2 + (in ? 0 : 1));
+        volatile uint32_t* tail;
+        uint64_t end;
+        uint32_t cc;
+        int left = len, done;
+        do
+        {
+            int c = left > mps ? mps : left;
+            otd(tdn(n), in ? OTD_IN : OTD_OUT, pb + (len - left), c, tdn(n + 1));   /* toggle from the ED's carry */
+            left -= c; ++n;
+        } while (left > 0 && n < NTD - 1);
+        tail = tdn(n);
+        zero(tail, 4);
+        ed[0] = ED_SKIP | (uint32_t)d->addr | ((uint32_t)ep << 7) | (d->speed == SP_LS ? ED_LS : 0) | ((uint32_t)mps << 16);
+        ed[1] = PHYS(tail);
+        ed[2] = PHYS(tdn(0)) | (*tog ? 2 : 0);
+        fl(TD, (n + 1) * 32); fl(ed, 16);
+        ed[0] &= ~ED_SKIP;
+        fl(ed, 16);
+        owr(h, O_CMDSTS, OS_BLF);
+        end = tsc() + us2c(timeout_us);
+        r = -1;
+        for (;;)
+        {
+            int halt;
+            fl(TD, n * 32); fl(ed, 16);
+            halt = (ed[2] & ED_HALT) != 0;
+            for (done = 1, i = 0; i < n; ++i)
+            {
+                cc = OTD_CC(tdn(i)[0]);
+                if (cc == 0) continue;
+                if (cc == 9 && in) break;                         /* short packet: the end */
+                if (cc >= 0xE || !halt) done = 0; else done = -1;
+                break;
+            }
+            if (done) { r = done > 0 ? 0 : -1; break; }
+            if (tsc() > end) break;
+            owr(h, O_CMDSTS, OS_BLF);
+        }
+        ed[0] |= ED_SKIP;
+        fl(ed, 16);
+        wait_us(1100);                                        /* out of the HC's hands before the next rewrite */
+        fl(ed, 16); fl(TD, n * 32);
+        *tog = (ed[2] & 2) != 0;
+        if (r) trace("[ob%08lx ed%08lx] ", (unsigned long)tdn(i < n ? i : 0)[0], (unsigned long)ed[2]);
+        ed[2] = PHYS(tail) | (*tog ? 2 : 0);                  /* also clears the halt */
+        fl(ed, 16);
+        owr(h, O_INTSTS, 0x06);
+        if (r) return -1;
+        for (i = 0; i < n; ++i)
+        {
+            uint32_t st = pb + (uint32_t)(i * mps), c = (uint32_t)((len - i * mps) > mps ? mps : len - i * mps);
+            cc = OTD_CC(tdn(i)[0]);
+            if (cc == 0) { got += (int)c; continue; }
+            if (cc == 9) got += tdn(i)[1] ? (int)(tdn(i)[1] - st) : (int)c;
+            break;
+        }
+        fl(buf, len ? len : 1);
+        return got;
+    }
+    case T_EHCI:
+        qtd(qtdn(0), in ? 1 : 0, *tog, pb, len, NULL);
+        r = e_run(d, ep, mps, 1, timeout_us);
+        if (r) return -1;
+        got = len - (int)((qtdn(0)[2] >> 16) & 0x7FFF);
+        pk = got ? (got + mps - 1) / mps : 1;
+        break;
+    default:
+        return -1;
+    }
+    *tog ^= pk & 1;
+    fl(buf, len ? len : 1);
+    return got;
+}
+
+static void msd_clear(Msd* s, int in)                 /* CLEAR_FEATURE(ENDPOINT_HALT), toggle back to DATA0 */
+{
+    control(s->dev, 0x02, 1, 0, (uint16_t)(in ? s->in | 0x80 : s->out), 0);
+    if (in) s->tin = 0; else s->tout = 0;
+}
+static void msd_reset(Msd* s)                         /* reset recovery (BOT 5.3.4) */
+{
+    trace("msd-reset ");
+    control(s->dev, 0x21, 0xFF, 0, (uint16_t)s->ifc, 0);
+    msd_clear(s, 1); msd_clear(s, 0);
+}
+
+/* one SCSI command; data (len bytes, in or out) goes through DBuf + 0x1000 in BCHUNK pieces.
+ * 0 = good, 1 = check condition (REQUEST SENSE tells), -1 = transport failed (reset recovery done) */
+static int msd_cmd(Msd* s, int lun, const uint8_t* cdb, int cdblen, int in, uint8_t* data, uint32_t len, uint32_t* moved)
+{
+    uint8_t *cbw = DBuf, *csw = DBuf + 0x40, *db = DBuf + 0x1000;
+    uint32_t done = 0, tag = ++s->tag;
+    int r = 0, k;
+    memset(cbw, 0, 31);
+    put32(cbw, 0x43425355UL); put32(cbw + 4, tag); put32(cbw + 8, len);
+    cbw[12] = in ? 0x80 : 0; cbw[13] = (uint8_t)lun; cbw[14] = (uint8_t)cdblen;
+    memcpy(cbw + 15, cdb, cdblen);
+    if (bulk(s, 0, cbw, 31, 1000000) != 31) { trace("cbw! "); msd_reset(s); return -1; }
+    while (done < len)
+    {
+        int c = len - done > BCHUNK ? BCHUNK : (int)(len - done);
+        if (!in) memcpy(db, data + done, c);
+        r = bulk(s, in, db, c, 5000000);
+        if (r < 0) { msd_clear(s, in); break; }              /* STALL: the CSW says how it ended */
+        if (in) memcpy(data + done, db, r);
+        done += r;
+        if (r < c) break;                                     /* short packet: no more data */
+    }
+    if (moved) *moved = done;
+    for (k = 0; k < 2; ++k)
+    {
+        r = bulk(s, 1, csw, 13, 5000000);
+        if (r == 13) break;
+        msd_clear(s, 1);
+    }
+    if (r != 13 || le32(csw) != 0x53425355UL || le32(csw + 4) != tag || csw[12] > 1)
+    {
+        trace("csw! ");
+        msd_reset(s);
+        return -1;
+    }
+    return csw[12];
+}
+
+static int msd_simple(Msd* s, int lun, uint8_t op, int alloc, uint8_t* out)   /* 6-byte CDB, alloc bytes in */
+{
+    uint8_t cdb[6] = { 0 };
+    cdb[0] = op; cdb[4] = (uint8_t)alloc;
+    return msd_cmd(s, lun, cdb, 6, 1, out, (uint32_t)alloc, NULL);
+}
+static uint32_t msd_sense(Msd* s, int lun)            /* key << 16 | ASC << 8 | ASCQ, 0xFFFFFF = no answer */
+{
+    uint8_t* r = DBuf + 0x80;
+    memset(r, 0, 18);
+    if (msd_simple(s, lun, 0x03, 18, r) != 0) return 0xFFFFFFUL;
+    return (uint32_t)(r[2] & 15) << 16 | (uint32_t)r[12] << 8 | r[13];
+}
+
+/* is there a medium, how big: TEST UNIT READY (+ sense), READ CAPACITY(10). Short: also runs from enumeration */
+static int msd_check(Msd* s, int l)
+{
+    USBPAD_Disk* u = &s->lun[l];
+    uint8_t cdb[10] = { 0 }, *r = DBuf + 0x80;
+    int k, t;
+    u->ready = 0;
+    for (k = 0; k < 3; ++k)
+    {
+        t = msd_simple(s, l, 0x00, 0, r);
+        if (t == 0) break;
+        if (t < 0) return 0;
+        t = (int)(msd_sense(s, l) >> 16);
+        if (t != 6) { trace("lun%d not ready (%06lx) ", l, (unsigned long)msd_sense(s, l)); return 0; }   /* 6: unit attention, try again */
+    }
+    cdb[0] = 0x25;
+    memset(r, 0, 8);
+    if (msd_cmd(s, l, cdb, 10, 1, r, 8, NULL) != 0) { msd_sense(s, l); trace("cap! "); return 0; }
+    u->blocks = ((uint32_t)r[0] << 24 | (uint32_t)r[1] << 16 | (uint32_t)r[2] << 8 | r[3]);
+    u->bsize  = ((uint32_t)r[4] << 24 | (uint32_t)r[5] << 16 | (uint32_t)r[6] << 8 | r[7]);
+    if (u->blocks != 0xFFFFFFFFUL) ++u->blocks;                /* last LBA -> count (> 2 TB: later, READ CAPACITY 16) */
+    if (u->bsize < 512 || u->bsize > 4096 || (u->bsize & (u->bsize - 1))) { trace("bsize %lu! ", (unsigned long)u->bsize); return 0; }
+    u->ready = 1;
+    trace("lun%d %lu x %lu ", l, (unsigned long)u->blocks, (unsigned long)u->bsize);
+    return 1;
+}
+
+static void msd_add(int di, int ifc, int in, int out, int mps)
+{
+    int m, l;
+    Msd* s;
+    uint8_t* r = DBuf + 0x80;
+    for (m = 0; m < MAX_MSD && Ms[m].used; ++m) {}
+    if (m == MAX_MSD) { trace("msd: no room "); return; }
+    s = &Ms[m];
+    memset(s, 0, sizeof(*s));
+    s->dev = di; s->hc = D[di].hc; s->ifc = ifc; s->in = in; s->out = out; s->mps = mps;
+    s->nlun = 1;
+    if (control(di, 0xA1, 0xFE, 0, (uint16_t)ifc, 1) == 0) s->nlun = (CBuf[16] & 15) + 1;   /* GET_MAX_LUN (STALL: one) */
+    if (s->nlun > MAX_LUN) s->nlun = MAX_LUN;
+    trace("msd if%d in%d out%d mps%d luns %d ", ifc, in, out, mps, s->nlun);
+    ++MsGen;
+    for (l = 0; l < s->nlun; ++l)
+    {
+        USBPAD_Disk* u = &s->lun[l];
+        memset(r, 0, 36);
+        if (msd_simple(s, l, 0x12, 36, r) != 0) { trace("inq! "); continue; }
+        if ((r[0] & 0x1F) != 0 && (r[0] & 0x1F) != 0x0E) { trace("lun%d type %02x ", l, r[0] & 0x1F); continue; }
+        s->lok[l] = 1;
+        u->vid = D[di].vid; u->pid = D[di].pid; u->gen = MsGen; u->lun = l;
+        memcpy(u->vendor, r + 8, 8); memcpy(u->product, r + 16, 16);
+        for (m = 7; m >= 0 && u->vendor[m] == ' '; --m) u->vendor[m] = 0;
+        for (m = 15; m >= 0 && u->product[m] == ' '; --m) u->product[m] = 0;
+        msd_check(s, l);
+    }
+    s->used = 1;
+}
+
+static void msd_gone(int di)
+{
+    int m;
+    for (m = 0; m < MAX_MSD; ++m)
+        if (Ms[m].used && Ms[m].dev == di) { Ms[m].used = 0; ++MsGen; }
+}
+
+static Msd* msd_find(int n, int* lun)                 /* drive n -> disk + LUN */
+{
+    int m, l;
+    for (m = 0; m < MAX_MSD; ++m)
+        for (l = 0; Ms[m].used && l < Ms[m].nlun; ++l)
+            if (Ms[m].lok[l] && n-- == 0) { *lun = l; return &Ms[m]; }
+    return NULL;
+}
+
+int USBPAD_Disks(void)
+{
+    int n = 0, l;
+    while (msd_find(n, &l)) ++n;
+    return n;
+}
+
+const USBPAD_Disk* USBPAD_DiskInfo(int n)
+{
+    int l;
+    Msd* s = msd_find(n, &l);
+    if (!s) return NULL;
+    if (!s->lun[l].ready && Inited && !Busy) { Busy = 1; msd_check(s, l); Busy = 0; }
+    return &s->lun[l];
+}
+
+int USBPAD_DiskRead(int n, uint32_t lba, int count, void* buf)
+{
+    int l, r = 0, k;
+    uint8_t* p = (uint8_t*)buf;
+    Msd* s = msd_find(n, &l);
+    if (!s) return USBPAD_E_NODISK;
+    if (!Inited || Busy) return USBPAD_E_BUSY;
+    Busy = 1;
+    if (!s->lun[l].ready && !msd_check(s, l)) { Busy = 0; return USBPAD_E_NOTREADY; }
+    while (count > 0 && !r)
+    {
+        USBPAD_Disk* u = &s->lun[l];
+        int c = count, max = 32768 / (int)u->bsize;
+        uint8_t cdb[10] = { 0 };
+        uint32_t moved;
+        if (c > max) c = max;
+        if (lba >= u->blocks || (uint32_t)c > u->blocks - lba) { r = USBPAD_E_IO; break; }
+        cdb[0] = 0x28; put32be(cdb + 2, lba); cdb[7] = (uint8_t)(c >> 8); cdb[8] = (uint8_t)c;
+        for (k = 0; k < 2; ++k)
+        {
+            int t = msd_cmd(s, l, cdb, 10, 1, p, (uint32_t)c * u->bsize, &moved);
+            if (t == 0 && moved == (uint32_t)c * u->bsize) break;
+            if (t > 0)
+            {
+                uint32_t sn = msd_sense(s, l);
+                trace("read %lu: sense %06lx ", (unsigned long)lba, (unsigned long)sn);
+                if ((sn >> 16) == 6 && !msd_check(s, l)) { r = USBPAD_E_NOTREADY; break; }   /* medium changed */
+                if ((sn >> 16) == 2) { u->ready = 0; r = USBPAD_E_NOTREADY; break; }
+            }
+            if (k == 1) r = USBPAD_E_IO;
+        }
+        lba += (uint32_t)c; count -= c; p += (uint32_t)c * u->bsize;
+    }
+    Busy = 0;
+    return r;
 }
 
 /* the IN endpoint of pipe k: two TDs used in turn on OHCI / EHCI (the empty tail is filled, a new
@@ -2027,6 +2366,7 @@ static int enumerate_(int di)
     int h = d->hc;
     uint8_t* b = CBuf + 16;
     int total, pos, cfgval, ishub, p, nf = 0, cur = -1, k, i, used = 0, pads = 0, kbds = 0, mice = 0;
+    int mifc = -1, inmsd = 0, min = 0, mout = 0, mmps = 64, wantmsd;
     Fn f[MAX_PIPE];
     uint16_t vid, pid;
     int att = d->parent < 0 ? HC[h].fails[d->rootport] : 0;   /* earlier failed tries of this root port */
@@ -2137,6 +2477,8 @@ static int enumerate_(int di)
             int c = b[pos + 5], s = b[pos + 6], pr = b[pos + 7], t = -1;
             cur = -1;
             if (c == 9) ishub = 1;
+            inmsd = 0;
+            if (c == 8 && pr == 0x50 && (s == 6 || s == 5 || s == 2) && b[pos + 3] == 0 && mifc < 0) { mifc = b[pos + 2]; inmsd = 1; continue; }
             if (b[pos + 3] != 0 || nf >= MAX_PIPE) continue;
             int kind = PK_360;
             if (c == 0xFF && s == 0x5D && (pr == 0x01 || pr == 0x81)) t = PT_PAD;
@@ -2151,6 +2493,11 @@ static int enumerate_(int di)
         }
         else if (type == 0x21 && cur >= 0 && pos + 8 < total)                      /* HID descriptor: report length */
             f[cur].hidlen = b[pos + 7] | b[pos + 8] << 8;
+        else if (type == 5 && inmsd && pos + 6 < total && (b[pos + 3] & 3) == 2)   /* disk: bulk IN / OUT */
+        {
+            mmps = b[pos + 4] | (b[pos + 5] & 7) << 8;
+            if (b[pos + 2] & 0x80) min = b[pos + 2] & 0x0F; else mout = b[pos + 2] & 0x0F;
+        }
         else if (type == 5 && cur >= 0 && pos + 6 < total && (b[pos + 3] & 3) == 3)
         {
             Fn* x = &f[cur];
@@ -2193,9 +2540,13 @@ static int enumerate_(int di)
         if (f[i].type == PT_PAD) ++pads; else if (f[i].type == PT_KBD) ++kbds; else ++mice;
         ++used;
     }
-    if (!used)
+    for (k = 0; k < MAX_MSD && Ms[k].used; ++k) {}
+    wantmsd = mifc >= 0 && min && mout && (Flags & USBPAD_F_DISK) && k < MAX_MSD;
+    if (mifc >= 0 && !wantmsd) trace("disk not used%s ", (Flags & USBPAD_F_DISK) ? "" : " (off)");
+    if (wantmsd && HC[h].type == T_XHCI) { trace("disk on xHCI: not yet "); wantmsd = 0; }
+    if (!used && !wantmsd)
     {
-        snprintf(Desc, sizeof(Desc), "USB device %04X:%04X on %s: not used (no pad, keyboard or mouse)", vid, pid, where(di));
+        snprintf(Desc, sizeof(Desc), "USB device %04X:%04X on %s: not used (no pad, keyboard, mouse or disk)", vid, pid, where(di));
         return -1;
     }
     if (control(di, 0x00, 9, (uint16_t)cfgval, 0, 0) != 0) return 0;
@@ -2278,6 +2629,11 @@ static int enumerate_(int di)
         start_in(k);
         trace("+%s ", pipe_name(q));
         if (!Desc[0]) snprintf(Desc, sizeof(Desc), "%s %04X:%04X on %s", pipe_name(q), vid, pid, where(di));
+    }
+    if (wantmsd)
+    {
+        msd_add(di, mifc, min, mout, mmps);
+        if (!Desc[0]) snprintf(Desc, sizeof(Desc), "USB disk %04X:%04X on %s", vid, pid, where(di));
     }
     devlist();
     return 1;
@@ -2582,6 +2938,7 @@ int USBPAD_Have(void)
         if (P[k].used)
             r |= P[k].type == PT_KBD ? USBPAD_HAVE_KBD : P[k].type == PT_MOUSE ? USBPAD_HAVE_MOUSE
                 : P[k].pad ? USBPAD_HAVE_PAD2 : USBPAD_HAVE_PAD1;
+    for (k = 0; k < MAX_MSD; ++k) if (Ms[k].used) r |= USBPAD_HAVE_DISK;
     return r;
 }
 
@@ -2601,7 +2958,7 @@ int USBPAD_Init(uint64_t cps, int wait_ms, int flags, const char** msg)
         snprintf(m, sizeof(m), "no USB controller found");
         return 0;
     }
-    size = M_HC + (uint32_t)HCn * 0x2000;
+    size = M_HC + (uint32_t)HCn * 0x2000 + M_DISKSZ;
     if (!pds_dpmi_xms_allocmem(&Mem, size))
     {
         snprintf(m, sizeof(m), "out of XMS memory");
@@ -2612,6 +2969,8 @@ int USBPAD_Init(uint64_t cps, int wait_ms, int flags, const char** msg)
     memset(base, 0, size);
     TD    = (volatile uint32_t*)(base + M_TD);
     CBuf  = base + M_CBUF;
+    DBuf  = base + M_HC + HCn * 0x2000;
+    memset(Ms, 0, sizeof(Ms));
     for (i = 0; i < HCn; ++i)
     {
         uint8_t* blk = base + M_HC + i * 0x2000;          /* 4K-aligned */

@@ -35,12 +35,32 @@ typedef struct
 /* USBPAD_Init flags: which kinds of device to use (pads always) */
 #define USBPAD_F_KBD   1
 #define USBPAD_F_MOUSE 2
+#define USBPAD_F_DISK  4        /* USB disks (mass storage, bulk-only): see docs/USB-STORAGE.md */
 
 /* USBPAD_Have() bits */
 #define USBPAD_HAVE_PAD1  1
 #define USBPAD_HAVE_PAD2  2
 #define USBPAD_HAVE_KBD   4
 #define USBPAD_HAVE_MOUSE 8
+#define USBPAD_HAVE_DISK  16
+
+/* USB disks: every LUN (card reader slot) that is a disk is one drive, numbered 0.. in the order found */
+typedef struct
+{
+    int      ready;                /* medium there and its size known */
+    uint32_t blocks, bsize;        /* number of blocks, bytes per block (512..4096) */
+    uint16_t vid, pid;
+    int      lun;
+    uint32_t gen;                  /* differs after an unplug / re-plug */
+    char     vendor[9], product[17];
+} USBPAD_Disk;
+#define USBPAD_E_NODISK   -1
+#define USBPAD_E_NOTREADY -2       /* no medium */
+#define USBPAD_E_IO       -3
+#define USBPAD_E_BUSY     -4       /* called from inside USBPAD_Poll (an interrupt): try again later */
+int  USBPAD_Disks(void);                                     /* drives now */
+const USBPAD_Disk* USBPAD_DiskInfo(int n);                   /* NULL = no drive n; checks the medium again if not ready */
+int  USBPAD_DiskRead(int n, uint32_t lba, int count, void* buf);   /* count blocks; 0 or USBPAD_E_* */
 
 /* called from inside USBPAD_Poll / PollLight for every new report:
  * keyboard: the 8-byte boot report (modifiers, 0, six key usages); all zero = every key released

@@ -1175,3 +1175,11 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
 - The rest of PCM_Update (address generator, ROM reads, per-voice variable shifts) does not map to SSE2.
 - DOS note for any future SIMD: the SC-55 renders in the sound ISR with fnsave (vmpu_sc55.c), which does not save
   XMM; SSE needs a CR4.OSFXSR check (e.g. probe under SIGILL) and fxsave/fxrstor around the render.
+## USB disks, session 1 (2026-11-11, DOS session, not released)
+- Plan and status: docs/USB-STORAGE.md (section 8). Code in sbemu/usbpad.c ("USB disks" block), API in usbpad.h
+  (USBPAD_F_DISK, USBPAD_Disks/DiskInfo/DiskRead). SBEMU does not use it yet (no flag passed); USBTEST does.
+- Other changes for it: OHCI reset now puts 4 skipped bulk EDs on the bulk list and sets BLE; UHCI u_run_tds
+  can stop at a short packet (UShort, bulk only); EHCI e_ch sets the control-endpoint flag only for endpoint 0.
+- Test: devkit 86Box (user's sc55-devkit tar: djgpp + 86Box with usb_msd), testrig/86box/msdtest.sh.
+  UHCI and OHCI pass (CRC of the first MB). Real hardware not tried: needs USBTEST on the D810 (UHCI) and the
+  P5PE-VM NEC card (OHCI) with a stick, plus a check that the pads still work there.

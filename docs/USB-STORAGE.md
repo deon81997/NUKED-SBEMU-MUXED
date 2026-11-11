@@ -1,6 +1,6 @@
 # USB mass storage for SBEMU: design (no code yet)
 
-Status: research and design only, 2026-11-10. Builds on `sc55-pack/sbemu/usbpad.c` (our own polled USB host:
+Status: session 1 done 2026-11-11 (see 8); the rest is design. Builds on `sc55-pack/sbemu/usbpad.c` (our own polled USB host:
 UHCI / OHCI / EHCI / xHCI, hubs, Xbox 360 / HID pads, boot keyboards and mice). Goal: USB sticks and card
 readers as a DOS drive letter, at the same time as the pads, with no CPU cost while the drive is idle.
 
@@ -158,7 +158,15 @@ media: detect by a valid BPB / exFAT / NTFS signature at LBA 0.
 
 ## 8. Work plan by session
 
-1. **BOT core on UHCI and OHCI.** `Msd` table, interface match, bulk QH / bulk-list ED, CBW/data/CSW,
+1. **BOT core on UHCI and OHCI.** DONE 2026-11-11: `usbpad.c` (Msd table, `bulk()`, `msd_cmd()`, GET_MAX_LUN,
+   INQUIRY, TUR + sense, READ CAPACITY 10, READ 10), `USBPAD_Disks / DiskInfo / DiskRead`, `USBPAD_F_DISK`;
+   EHCI-direct path written but untested; xHCI skipped. USBTEST lists disks, block 0 and a 1 MB read with CRC-32.
+   86Box (devkit build, its own `usb_msd`): UHCI 1 MB in 1.5 s, OHCI 2.6 s, CRC matches the image, pads on
+   the other ports kept working. Found: OHCI needs one TD per packet without buffer rounding (86Box flags a
+   multi-packet TD as DataOverrun; also makes a short packet halt the ED so the CSW is never read as data).
+   For session 2: the sound IRQ's poll is skipped while a disk request holds `Busy` (pads pause for the
+   request); OHCI waits 1.1 ms after each transfer (slow, 3 per command).
+   Original plan: `Msd` table, interface match, bulk QH / bulk-list ED, CBW/data/CSW,
    GET_MAX_LUN, INQUIRY, READ CAPACITY, READ 10. `USBPAD_F_DISK` flag. 86Box `usb_msd.c` (read only).
    USBTEST: capacity + sector dump. Check pads still work with a stick plugged.
 2. **Robustness + write.** REQUEST SENSE loop, unit attention, BOT reset recovery, WRITE 10, write-protect,
