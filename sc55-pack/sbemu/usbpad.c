@@ -241,6 +241,8 @@ typedef struct
     uint32_t ignore;                    /* root ports: nothing usable there, skip until unplugged */
     uint8_t  fails[MAX_PORT];
     int      run;                       /* UHCI: running (only while it has a device, as in beta.44) */
+    int      ctlbulk;                   /* OHCI whose bulk list was not served (P5PE-VM NEC): disk transfers on the
+                                         * control ED instead (o_run_tds, as the pads' OUT reports) */
     int      oslow;                     /* OHCI that misses tail-appended TDs (NEC uPD720101): every new IN TD
                                          * goes in by rewriting the ED while it is skipped for a frame */
 } HCI;
@@ -1554,6 +1556,27 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
         break;
     }
     case T_OHCI:
+        if (HC[h].ctlbulk)
+        {   /* on the control ED: one TD per packet, toggles given in the TDs (the ED is rewritten per endpoint) */
+            int left = len, t = *tog;
+            do
+            {
+                int c = left > mps ? mps : left;
+                otd(tdn(n), (in ? OTD_IN : OTD_OUT) | (t ? OTD_T1 : OTD_T0), pb + (len - left), c, tdn(n + 1));
+                t ^= 1; left -= c; ++n;
+            } while (left > 0 && n < NTD - 1);
+            r = o_run_tds(d, ep, mps, n, timeout_us);
+            fl(TD, n * 32);
+            if (r)
+            {
+                for (i = 0; i < n && OTD_CC(tdn(i)[0]) == 0; ++i) ++pk;
+                *tog ^= pk & 1;
+                return -1;
+            }
+            *tog = t;
+            fl(buf, len ? len : 1);
+            return len;
+        }
     {   /* one TD per packet, no buffer rounding: a short packet ends with DataUnderrun and halts the ED, so
          * nothing after it is taken as data (86Box's OHCI also wants packet-sized TDs). csw: the CSW goes on
          * the same IN chain, so a command is two runs */
@@ -1619,11 +1642,20 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
             if (!(ed[2] & ED_HALT)) wait_us(1100);              /* timeout: out of the HC's hands first */
             fl(ed, 16);
             *tog = (ed[2] & 2) != 0;
-            if (r) trace("[ob%08lx ed%08lx] ", (unsigned long)OT(i < n ? i : 0)[0], (unsigned long)ed[2]);
+            if (r) trace("[ob%08lx ed%08lx %08lx %08lx bh%08lx bc%08lx ctl%08lx fn%04lx] ", (unsigned long)OT(i < n ? i : 0)[0],
+                (unsigned long)ed[0], (unsigned long)ed[1], (unsigned long)ed[2], (unsigned long)ord(h, O_BLKHEAD),
+                (unsigned long)ord(h, O_BLKCUR), (unsigned long)ord(h, O_CONTROL), (unsigned long)(ord(h, 0x3C) & 0xFFFF));
             ed[2] = PHYS(tail) | (*tog ? 2 : 0);              /* also clears the halt */
             fl(ed, 16);
         }
         owr(h, O_INTSTS, 0x06);
+        if (r && OTD_CC(OT(0)[0]) == 0xF)
+        {   /* not one packet went: this OHCI does not serve its bulk list -> the control ED from now, once more */
+            trace("[OHCI%d bulk list not served: disk on the control ED from now] ", HC[h].idx);
+            HC[h].ctlbulk = 1;
+            if (csw) return -3;                               /* msd_cmd: again, the plain way (data, then CSW) */
+            return bulk(s, in, buf, len, timeout_us, NULL);
+        }
         if (r) return -1;
         for (i = 0; i < nd; ++i)
         {
@@ -1670,7 +1702,7 @@ static void msd_reset(Msd* s)                         /* reset recovery (BOT 5.3
 static int msd_cmd(Msd* s, int lun, const uint8_t* cdb, int cdblen, int in, uint8_t* data, uint32_t len, uint32_t* moved)
 {
     uint8_t *cbw = DBuf, *csw = DBuf + 0x40, *db = DBuf + 0x2000;
-    int comb = HC[s->hc].type == T_OHCI && (in || !len) && len <= OCHUNK, havecsw = 0;
+    int comb = HC[s->hc].type == T_OHCI && !HC[s->hc].ctlbulk && (in || !len) && len <= OCHUNK, havecsw = 0;
     uint32_t done = 0, tag = ++s->tag;
     int r = 0, k;
     memset(cbw, 0, 31);
@@ -1681,7 +1713,8 @@ static int msd_cmd(Msd* s, int lun, const uint8_t* cdb, int cdblen, int in, uint
     if (comb)                                                 /* OHCI: data and CSW in one run */
     {
         r = bulk(s, 1, db, (int)len, 5000000, csw);
-        if (r < 0) msd_clear(s, 1);
+        if (r == -3) comb = 0;
+        else if (r < 0) msd_clear(s, 1);
         else { memcpy(data, db, r); done = (uint32_t)r; havecsw = BulkCsw == 13; }
     }
     while (!comb && done < len)
