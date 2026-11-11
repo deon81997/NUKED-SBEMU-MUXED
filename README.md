@@ -690,14 +690,14 @@ works for some people.
 
 Stuff this little pack pulled off that I'm REALLY proud of:
 
-- 🏆 **A real Roland SC-55 inside a DOS sound card emulator**, running Roland's own firmware, and then made **about 20% faster without changing a single sample** of what it plays (checked bit for bit)
+- 🏆 **A real Roland SC-55 inside a DOS sound card emulator**, running Roland's own firmware, and then made **about 20% faster without changing a single sample** of what it plays, and **13.6% faster again** with a profile-guided build recorded in DOS itself (checked bit for bit, down to the last byte of a WAV)
 - 🏆 **Starts twice as fast**: from 15 seconds to under 7 on a 366 MHz Celeron (a ROM check was secretly redone on almost every start)
 - 🏆 **A USB host for plain DOS built into a sound emulator**: UHCI, OHCI, EHCI and xHCI, hubs four deep, hot-plugging, and not a single interrupt, so it never fights your sound chip (it learned from crazii's USBDDOS and Yeo Kheng Meng's xhci98)
 - 🏆 **USB mouse right next to a laptop touchpad**, no memory manager needed, by talking to the BIOS's own mouse services
 - 🏆 **Your pad presses each game's own keys** in over 3500 DOS games: SBEMU watches which program DOS starts and picks that game's layout. 13 shareware games, Doom II and the full Wolf3D were all played with nothing but the pad
-- 🏆 **Our own Windows 98 drivers**: a virtual Sound Blaster / OPL3 / MPU-401 for DOS boxes, a MIDI driver, a joystick driver and a virtual game port, **idling at 0.25% of the CPU**
+- 🏆 **Our own Windows 98 drivers**: a virtual Sound Blaster / OPL3 / MPU-401 for DOS boxes, a MIDI driver, a joystick driver and a virtual game port, **idling at 0.25% of the CPU**. Game sound grows its own buffer when Windows gets busy (Blood's gaps went from 56% of the time to 1%), and MIDPLAY shows the SC-55's live display in a DOS box, just like in DOS
 - 🏆 **A virtual CD drive that acts like a real one**: rebuilt from source with our own CD-audio part, first in line for games, and CD music from CUE/BIN images mixed into the game's sound
-- 🏆 **3D menus drawn by the CPU** at 640×480, with no 3D card, that still run on a 366 MHz Celeron, with a floor drawn row by row for 3x more frames
+- 🏆 **3D menus drawn by the CPU** at 640×480, with no 3D card, that still run on a 366 MHz Celeron, with a floor drawn row by row for 3x more frames, styles up to a third faster, and neon glow in your colour style (<kbd>F6</kbd>)
 - 🏆 **A MIDI player that never makes the music late**: MIDPLAY sends the notes from inside its own drawing code, so even the 3D view keeps the music within a few milliseconds (it was a quarter of a second)
 - 🏆 **Found and fixed an FPU bug as old as SBEMU itself**: its sound interrupt and port handlers used the math unit without saving the game's values, which could garble 3D games; tracked down from a few black lines in MIDPLAY's 3D view
 - 🏆 **Tested like crazy** on emulated PCs: custom 86Box builds with a fake USB pad, a file-driven joystick and a strict keyboard controller, QEMU with a fake Xbox 360 pad, and real games driven by scripts
@@ -717,16 +717,16 @@ MPXPlay drivers, **Japheth**'s HX and Jemm, **vorvek**'s uCDD and everyone in [T
 
 Everything new on top of them was written by **Claude**, Anthropic's AI: the code, the bug hunting, the emulated
 test PCs, the docs and Port 220. My part was the ideas, the direction and the testing on my own PCs. The numbers (from this repo's
-history, November 4 - 10, 2026, at beta.82):
+history, November 4 - 10, 2026, at beta.91):
 
 <div align="center">
 
 | | |
 |---|---|
-| 🧑‍💻 **commits co-written by Claude** | **122 of 128** |
-| 📦 **releases** | **48** |
-| 📜 **new code** | **about 30,000 lines**: DOS programs, SBEMU additions, Windows 98 drivers, test rigs |
-| 📖 **docs** | a 1,370-line manual (README.TXT) and a 940-line dev diary (HANDOFF.md) |
+| 🧑‍💻 **commits co-written by Claude** | **144 of 150** |
+| 📦 **releases** | **58** |
+| 📜 **new code** | **about 32,000 lines**: DOS programs, SBEMU additions, Windows 98 drivers, test rigs |
+| 📖 **docs** | a 1,410-line manual (README.TXT) and a 1,140-line dev diary (HANDOFF.md) |
 | 🎨 **art** | Port 220 and every animated GIF on this page |
 
 </div>
