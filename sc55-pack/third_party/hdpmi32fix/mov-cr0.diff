@@ -1,0 +1,19 @@
+diff --git a/Src/HDPMI/HDPMI.ASM b/Src/HDPMI/HDPMI.ASM
+index 4d71640..304bed1 100644
+--- a/Src/HDPMI/HDPMI.ASM
++++ b/Src/HDPMI/HDPMI.ASM
+@@ -4202,6 +4202,14 @@ _DATA32C ends
+ emuspecregmove2:
+ ife ?EMUMOVCR0REG
+ 	mov al,[esi]
++	cmp al,0C0h		; mov cr0, eax? (Borland 32RTM): allowed like HDPMI v3.21,
++	jnz @F			; PE and PG stay set
++	mov eax, [esp]
++	or eax, 80000001h
++	mov cr0, eax
++	inc esi
++	jmp done_emuclisti
++@@:
+ 	and al,0F8h
+ 	cmp al,0C0h		; mov cr0, reg?
+ 	jz done			; return and do a GPF
