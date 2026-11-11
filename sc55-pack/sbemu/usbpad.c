@@ -1745,7 +1745,8 @@ static int msd_cmd(Msd* s, int lun, const uint8_t* cdb, int cdblen, int in, uint
     }
     if (r != 13 || le32(csw) != 0x53425355UL || le32(csw + 4) != tag || csw[12] > 1)
     {
-        trace("csw! ");
+        trace("csw! (r%d %02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x %02x tag %02lx) ", r, csw[0], csw[1], csw[2], csw[3],
+            csw[4], csw[5], csw[6], csw[7], csw[8], csw[9], csw[10], csw[11], csw[12], (unsigned long)tag);
         msd_reset(s);
         return -1;
     }
@@ -1814,6 +1815,7 @@ static void msd_add(int di, int ifc, int in, int out, int mps)
         memset(r, 0, 36);
         if (msd_simple(s, l, 0x12, 36, r) != 0 && msd_simple(s, l, 0x12, 36, r) != 0) { trace("inq! "); continue; }   /* once more after the reset */
         if ((r[0] & 0x1F) != 0 && (r[0] & 0x1F) != 0x0E) { trace("lun%d type %02x ", l, r[0] & 0x1F); continue; }
+        trace("inq %02x %02x %02x %02x %.8s ", r[0], r[1], r[2], r[3], (const char*)r + 8);
         s->lok[l] = 1;
         u->vid = D[di].vid; u->pid = D[di].pid; u->gen = MsGen; u->lun = l;
         memcpy(u->vendor, r + 8, 8); memcpy(u->product, r + 16, 16);
