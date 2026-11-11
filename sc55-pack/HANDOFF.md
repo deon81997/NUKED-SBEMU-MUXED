@@ -1150,7 +1150,18 @@ User: bug-hunt Win98 -> DOS ("Restart in MS-DOS mode", Shut Down -> MS-DOS, full
   p2bls with NO video - set gfxcard = virge_dx_pci; run86box.sh's `pgrep -f "Xvfb :9"` matches itself, start Xvfb by hand):
   plain FreeDOS (ke2043, HDPMI32I via INSTALL=, SHELL=SBEMU.EXE, ES1371): SBEMU goes past the new Windows check to the
   QEMM/HDPMI steps - no false "Windows is running" in plain DOS. testrig/rufus (ms-sys inc) cloned sparse for mkdisk.py.
-- NOT tested in a Win98 VM: the Win98 VM image (user's QuickInstall FULL.866 / qi.iso) and the 86Box build are not in the
+- Win98 VM (user upload win98-vm.tar.xz = the w86 VM: P2B-LS PII-450, ESS Solo-1, Win98 + SC55W, D: = d.img FAT16 transfer
+  disk; cfg points the CD at ../../w98qi/qi.iso, absent - harmless). A third IDE disk on 1:0 was NOT seen by Windows
+  ("Not ready reading drive E"): put test files on a rebuilt d.img (mkdisk.py build DIR d.img 120). Killing the VM
+  makes Windows re-detect the ESS (driver: C:\DRIVER) and SC55W report "did not finish starting" (expected).
+  Full-screen DOS box: old SBEMU -> "Both real mode & protected mode support are disabled" (HDPMI32I does not install
+  under Windows); new SBEMU -> the Windows message (rewrapped to 80 columns, checked windowed too).
+  Restart in MS-DOS mode: DOSSTART.BAT = C:\essolo.com (added by the ESS INF: legacy SB 220/5/1, MPU 330); HDPMI32I
+  loads; new SBEMU passes the check and stops at "No supported soundcard found!" (SBEMU has no ESS Solo-1 driver).
+  EXIT -> Windows restarts, SC55W starts without a false warning; SC55W.LOG: attach OK, SC-55 up in 22 s, start-up
+  complete, [State] Step=ok. Win98's Shut Down > MS-DOS is this same path. Not covered: an SBEMU-supported PCI card
+  after the switch in this VM (ICH AC'97 state after Windows was handled in beta.53/54).
+- Earlier note (before the VM arrived): the Win98 VM image (user's QuickInstall FULL.866 / qi.iso) and the 86Box build are not in the
   repo, so this session had no Win98 rig. Code review only + DJGPP build (andrewwutw build-djgpp v3.4 gcc 12.2.0).
 - Found + fixed: SBEMU in a Windows DOS box (SC55.BAT run there). It had no Windows check: HDPMI32I does not install
   under Windows' DPMI, so it ended with "Both real mode & protected mode support are disabled" (confusing); with a DPMI
