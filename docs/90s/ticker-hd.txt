@@ -1,1 +1,0 @@
-*** NEW!! beta.92: An empty CD drive no longer freezes the PC!! *** beta.91-w98.7: Windows 98 to DOS, cleaned up!! *** beta.91: CD games from MENU find the right disc!! *** Port 220 says hi!! ***

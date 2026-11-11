@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Rebuilds the README's news ticker (docs/90s/ticker-hd.gif) from the newest "What's NEW!!" entries in README.md,
-and the ticker's alt text. Run by .github/workflows/ticker.yml on every push that changes README.md; prints
+and the ticker's alt text (docs/90s/ticker-hd.txt keeps the text the GIF was made from). Run by .github/workflows/ticker.yml on every push that changes README.md; prints
 "unchanged" when the text is the same as last time (the GIF is then left alone).
 
     python3 docs/90s/ticker_news.py [count]      (default: the 3 newest entries)
