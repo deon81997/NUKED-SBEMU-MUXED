@@ -1146,7 +1146,11 @@ User: games from the virtual CD give "no CD found", read errors or init errors.
 
 ## beta.91-w98.7 (2026-11-10): Windows 98 -> DOS transition review (RELEASED, tag v1.0.0-beta.91-w98.7-usb)
 User: bug-hunt Win98 -> DOS ("Restart in MS-DOS mode", Shut Down -> MS-DOS, full-screen DOS box) with the pack installed.
-- NOT tested in 86Box: the Win98 VM image (user's QuickInstall FULL.866 / qi.iso) and the 86Box build are not in the
+- 86Box (user's sc55-devkit upload: 86Box + ROMs + DJGPP; only p2bls/virge ROMs, so 6via90ap-es1371.cfg falls back to
+  p2bls with NO video - set gfxcard = virge_dx_pci; run86box.sh's `pgrep -f "Xvfb :9"` matches itself, start Xvfb by hand):
+  plain FreeDOS (ke2043, HDPMI32I via INSTALL=, SHELL=SBEMU.EXE, ES1371): SBEMU goes past the new Windows check to the
+  QEMM/HDPMI steps - no false "Windows is running" in plain DOS. testrig/rufus (ms-sys inc) cloned sparse for mkdisk.py.
+- NOT tested in a Win98 VM: the Win98 VM image (user's QuickInstall FULL.866 / qi.iso) and the 86Box build are not in the
   repo, so this session had no Win98 rig. Code review only + DJGPP build (andrewwutw build-djgpp v3.4 gcc 12.2.0).
 - Found + fixed: SBEMU in a Windows DOS box (SC55.BAT run there). It had no Windows check: HDPMI32I does not install
   under Windows' DPMI, so it ended with "Both real mode & protected mode support are disabled" (confusing); with a DPMI
