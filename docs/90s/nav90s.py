@@ -28,27 +28,41 @@ NAV = [
 ]
 
 
-def ticker(text, width=300, step=5):
-    """an LED news ticker: amber dot-matrix-ish letters scrolling right to left"""
-    font = m.F('DejaVuSansMono-Bold.ttf', 11)
-    probe = ImageDraw.Draw(Image.new('RGB', (1, 1)))
+def ticker(text, width=1200, height=64, step=20):
+    """an LED news ticker, drawn at 4x (1200x64, shown 600 wide): smooth amber letters behind a dot-matrix
+    grid, a soft glow, scrolling right to left"""
+    from PIL import ImageFilter, ImageChops
+    font = m.F('DejaVuSansMono-Bold.ttf', 40)
+    probe = ImageDraw.Draw(Image.new('L', (1, 1)))
     tw = int(probe.textlength(text, font=font))
-    strip = Image.new('RGB', (tw + width, 16), (0, 0, 0))
-    d = m.crisp(ImageDraw.Draw(strip))
-    d.text((width, 1), text, font=font, fill=(255, 176, 0))
+    strip = Image.new('L', (tw + width, height), 0)
+    ImageDraw.Draw(strip).text((width, height // 2), text, font=font, fill=255, anchor='lm')
+    glow = strip.filter(ImageFilter.GaussianBlur(5))
+    # LED grid: 4x4 cells, 3x3 lit dot with the corners trimmed, dark gaps between
+    cell = Image.new('L', (4, 4), 0)
+    for yy in range(3):
+        for xx in range(3):
+            cell.putpixel((xx, yy), 255 if (xx, yy) not in ((0, 0), (2, 0), (0, 2), (2, 2)) else 150)
+    grid = Image.new('L', (width, height), 0)
+    for yy in range(0, height, 4):
+        for xx in range(0, width, 4):
+            grid.paste(cell, (xx, yy))
+    amber = Image.new('RGB', (width, height), (255, 176, 0))
+    dim = Image.new('RGB', (width, height), (40, 22, 0))   # unlit LEDs, faintly visible
+    black = Image.new('RGB', (width, height), (0, 0, 0))
     frames = []
     for x in range(0, tw + width - width // 3, step):
-        im = Image.new('RGB', (width, 16), (0, 0, 0))
-        im.paste(strip.crop((x, 0, x + width, 16)), (0, 0))
-        px = im.load()
-        for yy in range(1, 16, 2):               # LED look: dark lines between the rows of dots
-            for xx in range(width):
-                r, g, b = px[xx, yy]
-                px[xx, yy] = (r // 3, g // 3, b // 3)
-        dd = ImageDraw.Draw(im)
-        dd.rectangle([0, 0, width - 1, 15], outline=(90, 90, 90))
+        lit = strip.crop((x, 0, x + width, height))
+        dots = Image.composite(Image.composite(amber, dim, lit), black, grid)   # light shows through the dots only
+        halo = Image.composite(Image.new('RGB', (width, height), (110, 50, 0)), black,
+                               glow.crop((x, 0, x + width, height)))
+        im = ImageChops.add(dots, halo)
+        ImageDraw.Draw(im).rectangle([0, 0, width - 1, height - 1], outline=(90, 90, 90), width=2)
         frames.append(im)
-    m.save(frames, 'ticker.gif', 50)
+    pal = frames[len(frames) // 2].quantize(colors=16, method=Image.MEDIANCUT)
+    frames = [f.quantize(palette=pal, dither=Image.NONE) for f in frames]
+    frames[0].save(os.path.join(m.OUT, 'ticker.gif'), save_all=True, append_images=frames[1:],
+                   duration=50, loop=0, optimize=True, disposal=2)
 
 
 if __name__ == '__main__':
@@ -56,8 +70,8 @@ if __name__ == '__main__':
         m.button(f, top, big, bg, fg, icon, anim=True if anim else None)
     m.button('btn-top.gif', 'back to', 'TOP ^', (0, 0, 96), (255, 255, 255), ((255, 255, 0), '^', (0, 0, 96)))
     m.counter(85)
-    ticker("*** NEW!! beta.85: MIDPLAY's 3D view 3x smoother *** beta.84: 3D games safe from SBEMU's FPU bug *** "
-           "beta.83: MIDPLAY made over *** virtual CDs work like a real disc *** Port 220 says hi!! ***")
+    ticker("*** NEW!! beta.91: CD games from MENU find the right disc *** beta.90-w98.6: Windows 98 shows the "
+           "SC-55's real display *** beta.85: MIDPLAY's 3D view 3x smoother *** Port 220 says hi!! ***")
     for f in sorted(os.listdir(m.OUT)):
         if f.startswith(('nav-', 'btn-top', 'ticker', 'counter')):
             p = os.path.join(m.OUT, f); print(f, Image.open(p).size, os.path.getsize(p))
