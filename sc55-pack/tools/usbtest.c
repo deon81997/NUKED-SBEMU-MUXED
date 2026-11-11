@@ -31,7 +31,7 @@ static unsigned long long Cps;
 static inline unsigned long long tsc(void);
 static void disks(void)                 /* USB disks: what they are, and block 0 */
 {
-    static uint8_t b[4096];
+    static uint8_t b[16384];                /* 16 KB per read: one SCSI command (DCMD) */
     int n, i, r;
     for (n = 0; n < USBPAD_Disks(); ++n)
     {

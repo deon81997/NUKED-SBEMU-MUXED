@@ -1227,3 +1227,7 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
   handed to the companions per port. QEMU rig testrig/qemu-usbdisk.sh (QEMU built here, see its header). Passes
   in QEMU (HS stick 5 MB/s emulated, hot-plug, keyboard / mouse on the companions). Next: the user's P5PE-VM
   (NEC EHCI) with the stick; USBNOHS=1 gives the old behaviour.
+- P5PE-VM, USBTEST 11 (2026-11-11): WORKS. NEC EHCI "high speed here, the rest to companions"; Logitech receiver
+  handed to OHCI 2 and working; stick 13FE:3600 (15288 MB) on EHCI 1 port 3 at high speed, block 0 + 1 MB read
+  test OK (CRC A7A6D2B4, same as the slow OHCI run), 1 MB in 1.5 s with 4 KB reads (USBTEST now reads 16 KB per
+  command). Speed next: e_run switches the async schedule off/on per transfer (3 per command).
