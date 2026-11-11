@@ -1,6 +1,6 @@
 # Rebuilds the README's scrolling news ticker whenever README.md changes, from the newest "What's NEW!!"
-# entries (docs/90s/ticker_news.py), and puts it on the "ticker" branch: main does not take pushes from the
-# Actions bot (repository rule). The README shows
+# entries (docs/90s/ticker_news.py), and adds it to the "ticker" branch: main does not take pushes from the
+# Actions bot (repository rule), and the ticker branch must already exist (the bot may not create branches). The README shows
 #   https://raw.githubusercontent.com/deon81997/NUKED-SBEMU-MUXED/ticker/ticker-hd.gif
 name: News ticker
 
@@ -31,9 +31,7 @@ jobs:
           sudo apt-get install -y -q fonts-dejavu-core > /dev/null
           pip install -q pillow
       - name: The ticker branch as it is now
-        run: |
-          mkdir -p "$RUNNER_TEMP/t"
-          if git fetch -q origin ticker; then git archive FETCH_HEAD | tar -x -C "$RUNNER_TEMP/t"; fi
+        run: git clone -q --depth 1 -b ticker "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" "$RUNNER_TEMP/t"
       - name: Rebuild the ticker
         id: build
         run: |
@@ -43,9 +41,8 @@ jobs:
         if: steps.build.outputs.changed == '1'
         run: |
           cd "$RUNNER_TEMP/t"
-          git init -q -b ticker
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add ticker-hd.gif ticker-hd.txt
           git commit -q -m "News ticker: $(cat ticker-hd.txt | cut -c1-120)"
-          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ticker
+          git push -q origin ticker      # a normal push: the branch rules forbid force-pushes
