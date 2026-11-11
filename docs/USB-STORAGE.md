@@ -170,7 +170,7 @@ media: detect by a valid BPB / exFAT / NTFS signature at LBA 0.
    ED (16 KB per command, 260 TDs at DBuf + 0x1000), an ED is rewritten only 2 frames after its last skip
    (no fixed 1.1 ms wait): 86Box 1 MB in 1.8 s (was 2.6 s). Target speed is CD-ROM class (2x-4x =
    300-600 KB/s): most installed games only check for the CD, CD-audio from an image is the steady load
-   (176 KB/s); USB 1.1 is enough, so EHCI high speed (session 7) is optional.
+   (176 KB/s); USB 1.1 is enough for that, but USB 2.0 high speed is required too (user, 2026-11-11): session 7.
    Original plan: `Msd` table, interface match, bulk QH / bulk-list ED, CBW/data/CSW,
    GET_MAX_LUN, INQUIRY, READ CAPACITY, READ 10. `USBPAD_F_DISK` flag. 86Box `usb_msd.c` (read only).
    USBTEST: capacity + sector dump. Check pads still work with a stick plugged.
@@ -184,9 +184,13 @@ media: detect by a valid BPB / exFAT / NTFS signature at LBA 0.
 5. **Redirector skeleton + exFAT read-only.** INT 2Fh stub, CDS setup, the 11xxh calls, 8.3 aliases,
    exFAT reader. FAT32-on-6.22 through the same path (a small FAT reader).
 6. **NTFS read-only.** MFT, runlists, index B+ trees, attribute lists, sparse; refuse compressed/encrypted.
-7. **Optional / later.** EHCI HS for sticks on companion boards (set CONFIGFLAG, hand FS/LS ports to the
-   companions per port with PORT_OWNER, as Linux does: changes the pad path, so needs its own regression
-   pass), xHCI bulk rings, CBI/UFI USB floppy drives. Then docs, SBEMU option text, release.
+7. **USB 2.0 high speed (required).** EHCI HS for sticks on boards with companions too (the NEC card, the
+   D810's ICH6): set CONFIGFLAG so every port starts on EHCI, and hand each FS/LS device (pads, keyboards,
+   mice) to its companion with PORT_OWNER after the reset, as Linux does. HS bulk on the async QH with
+   512-byte packets, qTDs of up to 16 KB, PING for OUT. This changes the pad path on every EHCI board, so it
+   needs its own regression pass (86Box regress.py, then the D810 and the P5PE-VM with the pad). Keep a
+   switch to go back to the old "all ports to the companions" mode if a board misbehaves.
+8. **Later.** xHCI bulk rings, CBI/UFI USB floppy drives. Then docs, SBEMU option text, release.
 
 ## 9. Risks / open questions
 
