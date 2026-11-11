@@ -1577,9 +1577,9 @@ int main(int argc, char* argv[])
         {
             MAIN_D("running inside Windows %d.%02d: not loading\n", wr.h.al, wr.h.ah);
             MAIN_CPrintf(YELLOW, "Windows is running: SBEMU is not loaded in a DOS box.\n");
-            printf("In Windows 98, NUKED SB-EMU for Windows (C:\\SC55\\WIN98\\SC55W.EXE, keyboard icon next to\n"
-                   "the clock) gives DOS boxes the Sound Blaster, OPL3 and SC-55. For SBEMU use Start > Shut Down >\n"
-                   "\"Restart in MS-DOS mode\" and run SC55 there.\n");
+            printf("In Windows 98, NUKED SB-EMU for Windows (C:\\SC55\\WIN98\\SC55W.EXE, keyboard icon\n"
+                   "next to the clock) gives DOS boxes the Sound Blaster, OPL3 and SC-55.\n"
+                   "For SBEMU: Start > Shut Down > \"Restart in MS-DOS mode\", then run SC55.\n");
             return 1;
         }
     }
