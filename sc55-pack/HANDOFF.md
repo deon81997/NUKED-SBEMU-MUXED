@@ -1329,6 +1329,13 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
   now skipped as corrupt. Speed: exFAT FAT-chain files read adjacent clusters in one command (fragmented
   2.5 MB file 628 -> 95 commands). test/fuzz.sh: corrupts random bytes in sectors read one at a time
   (metadata) under ASan/UBSan; exFAT 512/4K + NTFS 512/4K, 220 runs: no crash, no hang.
+- Windows-style names: test/mkdosnames.sh (ntfs-3g system.ntfs_dos_name on 300 files = Win32 + DOS $FILE_NAME
+  pairs in the B+ tree): every DOS name listed and opened right (checkwin.py: 301 checked, 0 bad).
+- For a real Windows volume: test/win/MKVHD.BAT + mkvhd.ps1 (run as admin on Windows 7..11; diskpart makes two
+  96 MB fixed VHDs, NTFS with 8dot3 on + exFAT, fills them: long/unicode names, 600-file folder, hidden/system/
+  read-only, fragmented, 64 MB sparse, compressed, ADS, 150 hard links -> $ATTRIBUTE_LIST; writes FSRNTFS.TXT /
+  FSREXFAT.TXT with Windows' own 8.3 names, sizes, attributes, MD5). Check: `python3 test/win/checkwin.py
+  FSTEST FSRNTFS.VHD FSRNTFS.TXT`. Script not yet run on Windows (no Windows here); waiting for the user.
 - Still not tested: volumes made by Windows itself (real 8dot3 names, Windows $MFT/index layout; needs a
   small VHD/stick image from a Windows XP+ PC; Win98 cannot make NTFS/exFAT), speed on the real PCs.
 - USB session (2026-11-11): USBPAD_DiskWrite (WRITE 10, same path as reads), USBPAD_E_WP + USBPAD_Disk.wp (MODE SENSE
