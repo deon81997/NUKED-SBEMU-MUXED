@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* SC55MENU - one screen for everything in NUKED SB-EMU (the SC-55 pack). Started by C:\SC55\MENU.BAT.
  *
  * The menu never starts SBEMU (or a game) itself: it writes the chosen command to MENUGO.BAT and

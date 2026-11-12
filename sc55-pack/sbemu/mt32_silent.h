@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* forced into every Munt source file (see the makefile): the library must never print, because it runs
  * inside SBEMU's sound interrupt. <cstdio> comes first so its own #undefs do not remove these. */
 #include <cstdio>

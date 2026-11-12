@@ -1,3 +1,4 @@
+; SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 ; SBT.COM - plays 1 s of a 440 Hz square wave on SB 220h, DMA 1, 8-bit single cycle (DSP 14h).
 ; "SBT P" does the same from a 16-bit DPMI client (to test SBEMU16).
         cpu     586

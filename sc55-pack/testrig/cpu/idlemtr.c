@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* idlemtr.c - IDLEMTR.EXE: how much CPU is left for the program in front (test rig, DOS).
  * IDLEMTR seconds [file] [label]: counts a busy loop between BIOS timer ticks for that long and
  * appends "label loops-per-tick" to the file. Compare a run with SBEMU loaded against one without:

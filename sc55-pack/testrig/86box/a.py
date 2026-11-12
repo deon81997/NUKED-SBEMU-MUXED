@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # a.py SOCK cmd...   one automation request per argument; prints JSON replies (long fields cut)
 # pseudo-commands:  @type:TEXT (types TEXT, '\n' = Enter)   @screen (prints the text screen)
 import socket, sys, json

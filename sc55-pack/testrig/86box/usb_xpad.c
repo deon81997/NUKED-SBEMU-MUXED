@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /*
  * 86Box    Emulation of a wired Xbox 360 controller (045E:028E) on USB,
  *          for testing DOS USB host code. Local test addition.

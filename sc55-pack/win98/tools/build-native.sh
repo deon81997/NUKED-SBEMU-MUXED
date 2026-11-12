@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # native (Linux) build of the helper engine + test, for checking the audio
 set -e
 N=/home/claude/nsc55j; M=/home/claude/munt/mt32emu; S=/home/claude/sbemu-src/sbemu; O=/home/claude/nopl3

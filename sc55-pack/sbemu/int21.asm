@@ -1,3 +1,4 @@
+; SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 ; INT 21h stub for SBEMU (beta.79): which program is running, for the pad layout per game (padmap.c).
 ; nasm -f bin int21.asm -o int21.bin; the bytes are in main.c (MAIN_I21Stub). Data at 0..BFh, entry at C0h.
 ;

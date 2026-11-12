@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """genmid.py OUT.MID [seconds] [density]: busy format-1 test song: 16 channels, 16th notes (density x),
 program changes, volume/pan/expression sweeps, pitch bends, a tempo change."""
 import struct, sys, random

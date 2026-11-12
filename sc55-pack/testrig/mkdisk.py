@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """mkdisk.py - bootable FreeDOS FAT16 hard-disk image from a host folder, and file extraction.
    mkdisk.py build <folder> <image> [MB]      folder becomes C:\\ (KERNEL.SYS must be in it)
                                               MKDISK_BOOT=msdos: MS-DOS 7.1 boot record (IO.SYS, MSDOS.SYS in the

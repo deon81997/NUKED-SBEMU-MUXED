@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """Check fsread against a volume Windows made with mkvhd.ps1.
    python3 checkwin.py FSTEST VOLUME.VHD VOLUME.TXT
 FSTEST = host build of test/fstest.c. Compares, for every file and folder Windows listed:

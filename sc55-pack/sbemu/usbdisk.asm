@@ -1,3 +1,4 @@
+; SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 ; USB disk block device stub for SBEMU (USB disks session 4). nasm -f bin; bytes go to usbdiskbin.h
 ; (tools/mkusbdisk.sh). A DOS block device header + strategy / interrupt routines; the interrupt routine
 ; far-calls SBEMU's protected-mode handler (DPMI real-mode callback, RETF style) with ES:BX = request header.

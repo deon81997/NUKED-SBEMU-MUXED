@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # msdtest.sh NAME [ohci] : USB disk test in the devkit 86Box (usb_msd). Needs /home/claude/vm with c/ (FreeDOS
 # KERNEL.SYS + COMMAND.COM from testrig/rufus/res/freedos, JEMMEX.EXE + CONFIG.SYS, HDPMI32I.EXE, USBTEST.EXE, AUTOEXEC.BAT
 # "HDPMI32I -r -x" / "USBTEST C:\UT.TXT /T:15") and vm/86box.cfg = p2bls-uhci.cfg + "usb_msd = usb_msd" in [Ports] and

@@ -1,3 +1,4 @@
+; SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 ; vxd98.inc - minimal Windows 98 VxD definitions for JWasm (flat model).
 ; Numbers and layouts taken from the Windows 98 DDK (vmm.inc, vpicd.inc,
 ; vdmad.inc, vwin32.inc, shell.inc) and cross-checked against hte's tables.

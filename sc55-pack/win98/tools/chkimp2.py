@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """chkimp.py without pefile: imports and the Windows 98 DLLs' exports read with i686-w64-mingw32-objdump -p.
 Usage: chkimp2.py file.exe [more...]   (DLL dir: $W98DLL or /home/claude/w98dll)"""
 import os, re, subprocess, sys

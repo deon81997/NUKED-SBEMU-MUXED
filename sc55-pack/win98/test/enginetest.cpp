@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 // enginetest.cpp - native test of the helper engine with a simulated VxD.
 // Feeds timestamped MIDI / OPL events and an SB PCM stream, writes a WAV.
 // usage: enginetest <romdir> <synth: sc55|mt32|none> <out.wav> [extra options]

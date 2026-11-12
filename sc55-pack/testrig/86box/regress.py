@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """regress.py - the pack's regression run in 86Box (headless, scripted through the automation socket).
 
     regress.py [--out DIR] [--only NAME,...] [--vm1 DIR] [--vm2 DIR] [--build DIR]

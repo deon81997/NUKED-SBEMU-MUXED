@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """86Box test PC driver: start/stop the VM, type, press keys, take screenshots.
    Display :86 (Xvfb + openbox), VM in /home/claude/86rig/vm, ROMs /home/claude/86box/roms."""
 import os, subprocess, time, sys

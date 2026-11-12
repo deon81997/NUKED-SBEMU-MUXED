@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED (code from SBEMU's vmpu.c, crazii et al.) */
 /* vmpu_sf.c - the original TinySoundFont back end (sbemu/vmpu.c), compiled next to the SC-55 back end
  * under other names. vmpu_sc55.c forwards to these when SBEMU is started with /VSF:file.sf2. */
 #include <sbemucfg.h>

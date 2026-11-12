@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /*
  * nukedjoy.c - NUKEDJOY.VXD poll routines (called by VJoyD at ring 0, __stdcall).
  * The joystick state is the helper's (SC55W.EXE) SC55W_SHARED.wjoy[], reached through

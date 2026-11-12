@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """drive86.py VMDIR: boot the 86Box VM (stepped emulated time), press pad buttons per C:\\STAGE.TXT stage."""
 import json, os, socket, subprocess, sys, time
 V = sys.argv[1]; TR = '/home/claude/NUKED-SBEMU-MUXED/sc55-pack/testrig'

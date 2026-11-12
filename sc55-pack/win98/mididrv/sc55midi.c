@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /*
  * sc55midi.c - SC55MIDI.DRV, a 16-bit Windows MIDI output driver for
  * Windows 98. It shows up as the MIDI device "NUKED SB-EMU" and hands every

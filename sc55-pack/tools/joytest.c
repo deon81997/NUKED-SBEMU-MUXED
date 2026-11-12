@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* JOYTEST - shows what a DOS game sees on the gameport (port 201h).
  *   JOYTEST              live view: four axes in microseconds, as bars and as a dot per stick, four buttons;
  *                        G switches to the GrIP view; Esc or Q quits

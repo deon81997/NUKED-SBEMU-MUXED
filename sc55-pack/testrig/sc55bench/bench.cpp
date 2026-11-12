@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 // host bench for our Nuked-SC55 fork: render a MIDI file through sc55synth's C API, time it, FNV-hash every sample
 #include "sc55synth.h"
 #include <cstdio>

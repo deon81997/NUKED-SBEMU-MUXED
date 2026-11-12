@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # Make Windows-made test volumes for fsread (Windows 7..11, PowerShell 2+, run as administrator).
 # Creates FSRNTFS.VHD and FSREXFAT.VHD (96 MB fixed VHDs) next to this script, formats them with
 # Windows itself, fills them with test files and writes FSRNTFS.TXT / FSREXFAT.TXT (what Windows

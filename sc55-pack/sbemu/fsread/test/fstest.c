@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* fsread host test: fstest IMAGE [part_lba] [sector_size]
  * Walks the whole tree with findfirst/findnext, opens every entry by its 8.3 path
  * (and by its long path when ASCII), reads files in odd-sized chunks and prints

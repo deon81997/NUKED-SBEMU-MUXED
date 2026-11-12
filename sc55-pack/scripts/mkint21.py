@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """Assemble sbemu/int21.asm with NASM and write sbemu/int21bin.h (the INT 21h EXEC stub's bytes for main.c)."""
 import subprocess, sys, os, tempfile
 here = os.path.dirname(os.path.abspath(__file__))

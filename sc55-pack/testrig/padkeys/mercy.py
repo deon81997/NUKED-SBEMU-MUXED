@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """mercy.py PACK.866 OUTDIR [name ...] - extract files (all, or the names given, case-insensitive) from a MercyPak v2 pack"""
 import struct, sys, os
 f = open(sys.argv[1], 'rb'); out = sys.argv[2]; want = {n.upper() for n in sys.argv[3:]}

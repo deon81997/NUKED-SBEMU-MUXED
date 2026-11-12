@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* USB pads, keyboards and mice for SBEMU.
  *
  * A small USB host written for SBEMU's resident setting:

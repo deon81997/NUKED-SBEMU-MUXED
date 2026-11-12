@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* fsread: exFAT reader + the parts shared with ntfs.c (names, patterns, dispatch).
  * See fsread.h. Read-only, C99, no libc beyond memcpy/memcmp/memset. */
 #include <string.h>

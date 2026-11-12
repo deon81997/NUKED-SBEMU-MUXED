@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* jport.c - JPORT.EXE: log a game port the way DOS games read it (test rig).
  * JPORT [port hex] [seconds] [file] [g]: every 250 ms one line: axis times in port reads (loop counts),
  * '-' = never timed out (no stick), button bits (1 = pressed), INT 15h AH=84h answer.

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 // opl_sleep_test.cpp - host test of the Nuked OPL3 sleep in sbemu/opl3emu.cpp (beta.81): notes wake it, a keyed-on
 // silent voice (output flickering -1/0) goes to sleep. Build from sc55-pack:
 //   g++ -O1 -DSBEMU -Isbemu -Ithird_party/nuked-opl3-fast -o /tmp/oplt testrig/cpu/opl_sleep_test.cpp sbemu/opl3emu.cpp sbemu/dbopl.cpp -x c third_party/nuked-opl3-fast/opl3.c

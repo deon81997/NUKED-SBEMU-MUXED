@@ -1,3 +1,4 @@
+; SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 ; KEYLOG - prints every keyboard byte (port 60h, from INT 9) in hex for N seconds (default 25)
         .model tiny
         .code

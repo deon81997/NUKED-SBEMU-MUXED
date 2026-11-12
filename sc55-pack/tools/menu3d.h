@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* menu3d.h - the optional 3D menu of SC55MENU (included by sc55menu.c, uses its items and actions).
  *
  * The text menu stays the main one. F8 (or Settings > 3D menu) switches to this one and back; the choice

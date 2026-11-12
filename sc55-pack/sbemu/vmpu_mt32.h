@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 #ifndef VMPU_MT32_H
 #define VMPU_MT32_H
 /* Roland MT-32 / CM-32L back end (Munt), see vmpu_mt32.cpp */

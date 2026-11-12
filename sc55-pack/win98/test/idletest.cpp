@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 // idletest.cpp - native test: does the helper engine let its synths sleep when nothing plays,
 // and what does each second of audio cost? usage: idletest <romdir> <sc55|mt32|sf2> [options]
 #include "../helper/engine.h"

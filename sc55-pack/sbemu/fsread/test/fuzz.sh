@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # fuzz.sh IMAGE SS N: corrupt a few random bytes in sectors the reader really reads (logged by
 # FSTEST_LOG: single-sector reads = metadata), N times; fstest must never crash (ASan) or hang (20 s). Build fstest with ASan first.
 img=$1; ss=$2; n=$3; FS=${FSTEST:-/tmp/fstest}; t=/tmp/fz.$$

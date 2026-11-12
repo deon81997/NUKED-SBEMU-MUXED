@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /*
  * sc55wif.h - interface shared by SC55W.VXD (ring 0, Open Watcom C) and
  * SC55W.EXE (ring 3, MinGW). Plain C, fixed-size types, no padding surprises.

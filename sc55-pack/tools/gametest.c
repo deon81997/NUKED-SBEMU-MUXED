@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* GAMETEST - runs DOS games with SBEMU's self-measurement (SBDIAG) and collects the results.
  *
  * Menu program: pick the games (Duke Nukem 3D, Doom, Doom II, one more of your choice), the test length

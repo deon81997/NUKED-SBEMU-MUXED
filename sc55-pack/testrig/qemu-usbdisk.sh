@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # qemu-usbdisk.sh NAME [extra qemu args] (USB disks, session 7). QEMU 8.2.2 built from github qemu/qemu: configure
 # --target-list=i386-softmmu --disable-docs --disable-werror --disable-tools --disable-gtk --disable-sdl --disable-vnc
 # --disable-slirp --disable-capstone; gitlab is blocked, so subprojects dtc / keycodemapdb / berkeley-*float-3 come

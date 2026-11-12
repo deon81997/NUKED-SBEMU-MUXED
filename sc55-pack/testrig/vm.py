@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """vm.py - run the DOS test PC in QEMU (headless) and drive it through the HMP monitor.
    python3 vm.py start            boots c.img (AC97 sound card like the D810, 486/Pentium-class TCG CPU)
    python3 vm.py shot NAME        screenshot to shots/NAME.png

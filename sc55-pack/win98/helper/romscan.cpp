@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 // romscan.cpp - identify ROM dumps by SHA-256 (SC-55, via Nuked-SC55's
 // romset table) and by Munt's ROM database (MT-32 / CM-32L).
 // Plain ANSI file APIs only, so it runs on Windows 98.

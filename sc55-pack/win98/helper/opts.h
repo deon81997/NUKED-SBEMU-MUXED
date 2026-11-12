@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 // opts.h - SBEMU-style options shared with the DOS pack (C:\SC55\SBOPTS.TXT).
 // The Windows helper reads and writes the same file, so settings made in
 // DOS (SETTINGS.BAT / SBSET) and in Windows stay the same.

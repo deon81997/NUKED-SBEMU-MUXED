@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 #ifndef _VDIAG_H_
 #define _VDIAG_H_
 /* SBEMU self-diagnostics for SBDIAG.EXE: measures where the CPU time goes while a game runs.

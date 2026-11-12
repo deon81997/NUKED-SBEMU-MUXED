@@ -1,3 +1,4 @@
+; SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 ; J15.COM - INT 15h AH=84h (BIOS joystick) test: prints the INT 15h vector, CF + AL for DX=0, AX BX CX DX + CF for DX=1.
 ; nasm -f bin -o J15.COM j15.asm
 org 100h

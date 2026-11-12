@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 // w98main.cpp - SC55W.EXE, the Windows 98 side of NUKED SB-EMU.
 //
 // Loads SC55W.VXD (Sound Blaster 16 / OPL3 / MPU-401 for DOS boxes, plus the

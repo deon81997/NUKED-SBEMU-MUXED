@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* fsread: NTFS reader. See fsread.h. Read-only, C99, no libc beyond memcpy/memcmp/memset.
  * MFT records and INDX blocks are read on demand into the caller's work buffer
  * (reca = base record, recb = extension record via $ATTRIBUTE_LIST, idx = one index

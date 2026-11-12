@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* fsread: read-only exFAT + NTFS reader for the SBEMU USB storage redirector
  * (docs/USB-STORAGE.md 5b). Plain C99, no libc beyond memcpy/memcmp/memset.
  *

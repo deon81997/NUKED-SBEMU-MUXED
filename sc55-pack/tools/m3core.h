@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* m3core.h - the CPU-drawn 640x480 VESA graphics core shared by the 3D menu (menu3d.h) and MIDPLAY's
  * 3D view: VBE mode set and present, timing, colours, panels, bevels, text in the pack's fonts, a small
  * perspective-correct 3D rasterizer with z-buffer, boxes, knobs, the starry sky and the mirror floor. */

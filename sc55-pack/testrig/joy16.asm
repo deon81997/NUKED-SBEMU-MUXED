@@ -1,3 +1,4 @@
+; SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 ; JOY16.COM - test for SBEMU16: (1) real mode: SBEMU's info port 206h after a write to 201h;
 ; (2) as a 16-bit DPMI client (HDPMI16): Jazz Jackrabbit's gameport loop, counts printed 5 times.
         cpu     586

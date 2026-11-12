@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* form3d.h - 3D list screens for SETTINGS, CD images and GAMETEST (since beta.77), in the 3D menu's styles.
  *
  * A program fills an F3VIEW (title, status, optional tabs, rows of label + value, a description) every

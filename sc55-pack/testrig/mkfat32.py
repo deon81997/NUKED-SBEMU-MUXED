@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """mkfat32.py - bootable MS-DOS 7.1 / Windows 98 FAT32 hard-disk image from a host folder (long names kept).
    mkfat32.py build <folder> <image> [MB]   folder becomes C:\\ (IO.SYS + MSDOS.SYS of MS-DOS 7.1 in it)
    mkfat32.py ls <image> [path]             list a folder (long names)

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # dosmeas.sh LABEL SBEMU.EXE "SBEMU options" : one 86Box run, appends to /tmp/dosmeas.txt
 L=$1; X=$2; O=$3; R=/home/claude/padtest/cpu/root-$L; V=/home/claude/padtest/cpu/vm-$L
 rm -rf $R; cp -r /home/claude/padtest/cpu/root $R; cp $X $R/SC55/SBEMU.EXE

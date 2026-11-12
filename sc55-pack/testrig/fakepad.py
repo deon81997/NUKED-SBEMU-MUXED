@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """fakepad.py - a pretend USB Xbox 360 pad for QEMU (usbredir protocol, device side).
 
    python3 fakepad.py PORT SCRIPT     listens on 127.0.0.1:PORT; QEMU connects with

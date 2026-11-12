@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 // joyout.h - what the pad becomes besides keys: the stick type of the DOS game port
 // (CH Flightstick Pro / Thrustmaster FCS / Gravis GrIP, as SBEMU's /JOYMODE) and the
 // NUKED joysticks Windows programs see (NUKEDJOY.VXD, Game Controllers type

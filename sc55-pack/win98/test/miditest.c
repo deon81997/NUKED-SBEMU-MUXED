@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* miditest.c - plays through the "NUKED SB-EMU" MIDI device and the MIDI
  * Mapper; writes C:\MIDITEST.LOG */
 #include <windows.h>

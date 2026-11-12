@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* KMTEST - keyboard and mouse test: what DOS programs see from the keyboard (BIOS INT 16h, with the
  * scan code) and from the mouse driver (INT 33h: position, buttons, wheel). With SBEMU's USB keyboard /
  * mouse support (/JOY:1 /USBKB:1 /USBMS:1) the USB keyboard and mouse show here like PS/2 ones.

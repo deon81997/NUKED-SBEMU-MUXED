@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # Win98 SE test VM (QuickInstall): QEMU pc, P3+SSE2, 128 MB, SB16, PIIX3 UHCI. EXTRA = more args
 cd /home/claude/w98vm
 exec timeout ${T:-7000} /home/claude/src/qemu/build/qemu-system-i386 -M pc -cpu pentium3,+sse2 -m 128 \

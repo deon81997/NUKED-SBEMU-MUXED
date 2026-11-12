@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* compat98.c - replacements for Windows Vista+ KERNEL32 functions that
  * MinGW-w64's libstdc++/libgcc reference. Defining the __imp_ pointers here
  * makes the linker use these instead of importing from KERNEL32, so the EXE

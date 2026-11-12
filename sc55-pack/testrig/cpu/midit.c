@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* midit.c - MIDIT.EXE: wake-up test for SC55W's sleeping sound output (test rig, Windows 9x).
  * MIDIT count gap_ms [log]: on the "NUKED SB-EMU" MIDI device, `count` times: piano C5 for 500 ms, then
  * `gap_ms` of silence (long enough for the output to go to sleep). Appends start times (GetTickCount) to log.

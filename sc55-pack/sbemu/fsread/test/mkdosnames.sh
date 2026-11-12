@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # NTFS image with Windows-style name pairs (Win32 long name + DOS 8.3 name) on 300 files, made with
 # ntfs-3g's system.ntfs_dos_name; writes dn.img, dn.txt (checkwin.py listing format) into $1.
 #   sh mkdosnames.sh /tmp && python3 win/checkwin.py FSTEST /tmp/dn.img /tmp/dn.txt

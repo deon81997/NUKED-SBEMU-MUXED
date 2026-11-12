@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """mkcd.py - test CD images from a folder (ISO 9660, 8.3 names, any depth).
 
   mkcd.py iso  SRCDIR OUT.ISO [LABEL]                       2048-byte sectors

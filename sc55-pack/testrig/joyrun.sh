@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # joyrun.sh IMG [QEMU USB ARGS...] - run the DOS test PC with fakepad.py on port 4711 for $SECS seconds (default 60).
 # PAD=script picks the pad script. Writes qemu.log and shot.ppm (screen at the end) in the current folder.
 HERE=$(cd "$(dirname "$0")" && pwd)

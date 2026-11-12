@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # Cross-build SC55W.EXE for Windows 98 (Pentium M / SSE2) with MinGW-w64.
 set -e
 cd "$(dirname "$0")"

@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # build NUKEDJOY.VXD (VJoyD minidriver) with JWasm + Open Watcom, like vxd/build.sh
 set -e
 cd "$(dirname "$0")"

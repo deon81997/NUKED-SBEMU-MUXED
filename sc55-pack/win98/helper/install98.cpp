@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 // install98.cpp - set up / remove NUKED SB-EMU in Windows 98.
 //
 // Install (SC55W.EXE /INSTALL, run from the pack's FILES\WIN98 folder):

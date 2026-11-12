@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* measw.c - MEASW.EXE: runs a measurement script in the Windows 9x test VM without a console window
  * (a console window is a DOS box to SC55W: it would count as "a DOS game has the keyboard").
  * MEASW script.txt - lines:  run CMD (and wait) | start CMD | sleep MS | ini FILE SECTION KEY VALUE |

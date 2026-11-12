@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 // gameport.h - the NUKED SB-EMU Game Port (a stand-in device for PCs whose sound card has none)
 // and the "NUKED SB-EMU Joystick" in Game Controllers, set up and removed without the Add New
 // Hardware wizard. The device is written into the registry exactly as Windows 98 writes it when

@@ -1,3 +1,4 @@
+; SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 ; sc55w.asm - SC55W.VXD shell: device declaration, control dispatch,
 ; I/O trap stub, timer, IRQ and DMA glue, and cdecl wrappers around the
 ; VMM/VxD services used by the C core (sbcore.c).

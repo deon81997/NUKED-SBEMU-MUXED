@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """Write a Windows 9x-compatible .ICO (8-bit paletted BMP entries + AND mask)."""
 import struct, sys
 from PIL import Image, ImageDraw

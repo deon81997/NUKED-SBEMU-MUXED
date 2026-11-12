@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* toolui.h - the common screen of the pack's small test programs (JOYTEST, KMTEST, MPUTEST, USBTEST,
  * TIMETEST), so they look like MENU, MIDPLAY and GAMETEST: a header band, raised panels, a hint line and a
  * key bar, in the style, font and display mode chosen in MENU (THEME.CFG; Shift at start = safe mode).

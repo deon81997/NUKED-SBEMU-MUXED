@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # Builds the Windows 98 cross compiler: GCC 13.2 for i686-w64-mingw32 with the OLD msvcrt.dll
 # runtime and the win32 thread model (what Ubuntu's mingw-w64 package used to give).
 # xPack / most new MinGW builds use UCRT (api-ms-win-crt-*.dll) and POSIX threads: those

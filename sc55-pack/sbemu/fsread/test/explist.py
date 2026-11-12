@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 import os, sys
 # expected "L path size fnv64" / "D path" lines for a mounted tree (matches fstest)
 root = sys.argv[1]

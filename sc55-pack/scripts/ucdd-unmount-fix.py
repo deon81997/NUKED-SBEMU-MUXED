@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """Patch the pack's uCDD 0.9.5-a2 (mount-only build with the SBCDA1 CD-audio mailbox for SBEMU /VCDA).
 
 That build points the unit's audio entry at its mailbox handler when an image with audio tracks is mounted,

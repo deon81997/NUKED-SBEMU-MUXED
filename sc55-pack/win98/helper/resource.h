@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 #define IDI_APP         1
 #define IDD_SETTINGS    100
 #define IDD_STATUS      101

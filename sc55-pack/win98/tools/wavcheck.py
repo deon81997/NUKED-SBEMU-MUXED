@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 import sys, wave, numpy as np
 w = wave.open(sys.argv[1]); r = w.getframerate()
 x = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).reshape(-1, 2).astype(float) / 32768

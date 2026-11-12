@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 // romscan.h - find the SC-55 and MT-32 ROM sets in a folder by content
 #pragma once
 #include <string>

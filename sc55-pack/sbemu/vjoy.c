@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* Virtual gameport for SBEMU: port 201h answers like an analog PC joystick, with the position and
  * buttons of the USB Xbox 360 pad(s). One pad: /JOYAX and /JOYBT give all four axes and buttons (joystick
  * B = its right stick by default). Two pads: pad 1 is joystick A and pad 2 joystick B, each with the first

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """drive86s.py VMDIR STEPS: 86Box (stepped emulated time) + emulated 360 pad; when C:\\STAGE.TXT says REAL, run STEPS
 (wait s | shot NAME | pad STATE | tap STATE [hold]). PNG screenshots into $SHOTS."""
 import json, os, socket, subprocess, sys, time

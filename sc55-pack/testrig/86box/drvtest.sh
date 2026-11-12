@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # drvtest.sh NAME [ohci] "DOS cmd" ... : USB disk drive letters (session 4) in the devkit 86Box (P2B-LS, ES1371, usb_msd).
 # /home/claude/vm86: c/ (boot folder as for testrig/qemu-usbdrive.sh; C= another one, MKDISK_BOOT=msdos for MS-DOS),
 # vm/86box.cfg = p2bls-uhci.cfg + "usb_msd = usb_msd" in [Ports] + hdd_02 msd.img (63, 16, 260, 0, scsi; location 0:00).

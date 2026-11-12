@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* CDCHK2.EXE - virtual CD test: CDCHK2 DRIVE: LIST [SEEKLIST] [LOG]
    reads every file in LIST (path size crc32) from DRIVE with varying chunk sizes, checks size + CRC,
    counts files via findfirst, random-seek reads from GAME\DATA\BIG.DAT (SEEKLIST: offset len crc).

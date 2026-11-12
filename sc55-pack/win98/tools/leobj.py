@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 import struct,sys
 for f in sys.argv[1:]:
     d=open(f,'rb').read(); le=struct.unpack_from('<I',d,0x3c)[0]

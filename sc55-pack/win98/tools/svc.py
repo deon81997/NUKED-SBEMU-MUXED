@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 import re,sys
 # enumerate services in DDK .inc service tables (sequential numbering)
 for fn in sys.argv[1:]:

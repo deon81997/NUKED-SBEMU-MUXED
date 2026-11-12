@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # k.py SOCK keyspec... : 'enter' 'esc' 'tab' 'alt+f4' 'win+r' or '@type:..' or 'shot' or 'sleep:N'
 import socket, sys, json, time
 s = socket.socket(socket.AF_UNIX); s.connect(sys.argv[1]); f = s.makefile('rwb')

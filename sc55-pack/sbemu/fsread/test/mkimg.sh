@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # Build exFAT / NTFS test images with real mkfs + FUSE (needs sudo, loop devices,
 # exfatprogs, exfat-fuse, ntfs-3g, attr) and write the expected listing next to each.
 #   sh mkimg.sh OUTDIR

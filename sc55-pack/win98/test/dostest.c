@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* dostest.c - exercise a Sound Blaster 16 at 220h/IRQ5/DMA1/HDMA5,
  * AdLib at 388h and an MPU-401 at 330h the way DOS games do.
  * Writes results to C:\DOSTEST.LOG. Open Watcom, 16-bit DOS, small model. */

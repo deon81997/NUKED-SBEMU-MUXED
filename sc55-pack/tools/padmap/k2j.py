@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """k2j.py keyb2joypad.cpp OUT.json : decode DOSBox Pure's Keyb2Joypad tables (data only, nothing executed).
 Output: list of {title, year, hashes:[...], binds:[{btn, keys:[...], name}]}"""
 import sys, re, zlib, json

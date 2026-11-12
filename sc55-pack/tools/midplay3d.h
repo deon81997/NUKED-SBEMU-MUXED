@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* midplay3d.h - MIDPLAY's 3D view (S cycles: channel table -> SC-55 panel -> 3D). Included by midplay.c.
  *
  * 640x480 VESA, drawn by the CPU with the 3D menu's core (m3core.h): a NUKED SB-EMU module whose LCD shows the

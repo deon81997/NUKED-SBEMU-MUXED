@@ -1,3 +1,4 @@
+; SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 ; nukedjoy.asm - NUKEDJOY.VXD: VJoyD joystick minidriver (original interface, Win95 DDK
 ; msjstick sample). VJoyD loads it when a joystick's type names it (OEMCallout =
 ; NUKEDJOY.VXD); on that first load it registers its poll, hw caps and joystick id

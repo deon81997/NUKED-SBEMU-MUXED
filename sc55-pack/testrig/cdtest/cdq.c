@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* CDQ.EXE [LOG] - shows the SBCDA1 mailbox of the uCDD driver (state, flags, pos) */
 #include <stdio.h>
 #include <string.h>

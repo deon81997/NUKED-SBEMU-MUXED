@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 import socket, sys, time
 # qk.py SOCK item... ; item: "t:text" types text, "k:key" sends a key combo, "s:sec" sleeps, "shot:file"
 s = socket.socket(socket.AF_UNIX); s.connect(sys.argv[1]); s.settimeout(5)

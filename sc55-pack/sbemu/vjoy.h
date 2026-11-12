@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 #ifndef SBEMU_VJOY_H
 #define SBEMU_VJOY_H
 /* Virtual gameport (port 201h) fed by the USB Xbox 360 pad (usbpad.c). */

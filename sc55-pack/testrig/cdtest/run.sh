@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # run.sh ROOT VMDIR [maxsecs] [cfgsed]: DOS disk from ROOT, 86Box P2B-LS PII-450 dynarec, until C:\STAGE.TXT = DONE;
 # prints the result files (R.LOG MNT.TXT CDON.TXT DIR.TXT)
 R=$1; V=$2; MAX=${3:-900}; H=/home/claude/NUKED-SBEMU-MUXED/sc55-pack/testrig

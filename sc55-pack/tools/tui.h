@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* tui.h - flicker-free text screens for the pack's menu programs (SC55MENU, GAMETEST).
  *
  * Everything is drawn into an 80x25 buffer first; tui_flush() then copies only the rows that changed

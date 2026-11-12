@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* Host test for sbemu/cdlink.c (engine, resampler, CUE parser). gcc -DCDLINK_HOSTTEST */
 #include <stdio.h>
 #include <stdlib.h>

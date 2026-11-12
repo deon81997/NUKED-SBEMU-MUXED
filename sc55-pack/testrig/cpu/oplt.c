@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* OPLT.EXE: three FM notes (1 s each) 5 s apart on the AdLib port 388h - Nuked OPL3 sleep/wake test */
 #include <pc.h>
 #include <dos.h>

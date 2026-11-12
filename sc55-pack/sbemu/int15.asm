@@ -1,3 +1,4 @@
+; SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 ; INT 15h stub for SBEMU (beta.76, mouse delivery beta.78). Data at 0..1Fh, INT 15h entry at 20h, deliver at 24h.
 bits 16
 org 0

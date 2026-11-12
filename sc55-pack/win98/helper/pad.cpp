@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 // pad.cpp - game pad -> keys / game port for DOS boxes, with a layout per game.
 //
 // Layouts come from PADMAP.TXT (made by PADCONV from the user's own download of DOSBox Pure's

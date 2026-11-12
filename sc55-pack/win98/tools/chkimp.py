@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """Check a PE file's imports against the real Windows 98 DLL exports.
 Usage: chkimp.py file.exe [more...]   (DLL dir: /home/claude/w98dll)"""
 import pefile, sys, os

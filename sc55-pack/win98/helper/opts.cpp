@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 // opts.cpp - parse/format SBEMU-style option lines (see opts.h)
 #include "opts.h"
 #include <cctype>

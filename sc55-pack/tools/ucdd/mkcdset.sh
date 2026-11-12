@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # Builds the virtual CD programs of C:\CDSET into output/cdset (needs NASM):
 #   UCDD.EXE    uCDD 0.9.5-a3 (third_party/ucdd), mount-only, with the drive's own CD-Audio + the SBEMU
 #               mailbox (src/sbemulink.asm, define SBEMU_LINK)

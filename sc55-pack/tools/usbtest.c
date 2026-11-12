@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 #include <pc.h>
 #include "mpuport.h"
 /* USBTEST - finds USB pads, keyboards and mice the same way SBEMU /JOY does, and shows every step.

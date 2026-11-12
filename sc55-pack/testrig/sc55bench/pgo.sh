@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # pgo.sh - how sc55/pgo/*.gcda were made (profile-guided build of the SC-55 core, beta.89). Run from sc55-pack.
 # 1. instrumented SC55WAV in a copy of the tree (same flags + -fprofile-generate):
 #      tar --exclude=output -cf - . | (mkdir -p /tmp/pgotree && tar -C /tmp/pgotree -xf -)

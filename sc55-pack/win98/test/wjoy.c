@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* wjoy.c - WJOY.EXE: log the Windows joysticks (winmm), test rig.
  * WJOY [seconds] [file]: the joysticks Windows has (name, VxD, axes, buttons, ranges), then every
  * 500 ms each one's position. MinGW (msvcrt), console. */

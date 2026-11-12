@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # cpurun.sh ROOTDIR VMDIR [maxsecs]: build a DOS disk from ROOTDIR, run it in 86Box (P2B-LS, Pentium II 450,
 # ES1371, OPTi USB card, emulated 360 pad when VMDIR/env says so) until C:\STAGE.TXT says DONE, then print C:\M.LOG.
 R=$1; V=$2; MAX=${3:-900}; H=$(cd "$(dirname "$0")/.." && pwd)

@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # Builds what build98.sh links besides our own code, for one CPU target:
 #   $N/$OBJ/*.o          Nuked-SC55 core (this repo's upstream/Nuked-SC55, config.h = sc55/config/config.h)
 #   $M/$LIB/libmt32emu.a Munt mt32emu (github.com/munt/munt d885a95, 2.8.5, static, internal resampler)

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* vxdtest.c - load a dynamic VxD, call it, write the result to a log. */
 #include <windows.h>
 #include <stdio.h>

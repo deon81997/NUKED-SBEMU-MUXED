@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* TIMETEST - checks whether a game's fast timer interrupt loses ticks while SBEMU renders music.
  *
  * Games like Duke Nukem 3D speed the PC timer (IRQ 0) up to several hundred Hz and time their MIDI

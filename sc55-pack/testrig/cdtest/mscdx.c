@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* MSCDX.EXE - checks the MSCDEX interface like DOS games use it (INT 2Fh AX=15xxh).
    MSCDX DRIVE IMAGE [LOG]   IMAGE = the same image on C: (.ISO = 2048-byte sectors, .BIN = 2352-byte raw) to
    compare sectors with. Writes every answer; "BAD" lines are mismatches with what a real drive returns. */

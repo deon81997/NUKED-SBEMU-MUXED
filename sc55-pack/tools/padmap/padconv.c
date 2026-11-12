@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* padconv.c - turn DOSBox Pure's keyb2joypad.cpp (the Keyb2Joypad game pad layouts by Jemy Murphy
  * and bigjim, downloaded by the user) into PADMAP.TXT, the layout file of NUKED SB-EMU.
  *

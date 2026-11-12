@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """drive.py IMG [qemu usb args...]: boot the DOS test disk in QEMU with fakepad (live), press pad buttons for each
 test stage (C:\\STAGE.TXT), quit when DONE. Env: QEMU, TMAX (s)."""
 import os, subprocess, sys, time

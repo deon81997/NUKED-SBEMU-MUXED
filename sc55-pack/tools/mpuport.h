@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* mpuport.h - find SBEMU's MPU-401, whatever port it was set to.
  *
  * mpu_probe(port)  1 if an MPU-401 answers a reset at that port.

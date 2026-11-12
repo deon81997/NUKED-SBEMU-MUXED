@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # qemu-usbdrive.sh NAME "DOS cmd" ... (USB disks session 4: DOS drive letters). QEMU 8.2.2 (Ubuntu's qemu-system-x86
 # works too). /home/claude/vm/c = boot folder: FreeDOS KERNEL.SYS + COMMAND.COM (testrig/rufus/res/freedos),
 # JEMMEX.EXE + HDPMI32I.EXE (release zip), SBEMU.EXE, DELAY.COM (10 s wait, INT 1Ah), CONFIG.SYS

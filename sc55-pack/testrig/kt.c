@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* KT - asks SBEMU to type a key script (same MPU side channel as GAMETEST): KT 80 0A 20 17 13 1C ... (hex) */
 #include <stdio.h>
 #include <stdlib.h>

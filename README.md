@@ -757,6 +757,7 @@ Everything listed here was written for this pack by **Claude**. Some of it is br
 the test tools, the pad-keys system, the test rigs); some of it builds on other people's projects, and those rows say
 **based on...** so you know whose shoulders it stands on. SBEMU itself, the emulator cores, the DOS drivers we bundle
 and the Xbox 360 driver for Windows 98 are their original authors' work (see [Thanks](#-thanks-to-my-friends-)).
+Want to use our drivers in your own project? See [Take Our Drivers!!](#-take-our-drivers-).
 
 <details open>
 <summary><b>&gt;&gt; Inside SBEMU &lt;&lt;</b></summary>
@@ -816,6 +817,61 @@ and the Xbox 360 driver for Windows 98 are their original authors' work (see [Th
 | `k2j.py` | reads DOSBox Pure's button layouts |
 | uCDD + SHSUCDX build scripts | the CD drivers rebuilt from their sources with our changes |
 | `make90s.py`, `port220.py` | every animated GIF on this page, Port 220 included |
+</details>
+
+<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+
+<div align="center"><img src="docs/90s/fd-soulsphere.gif" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
+
+## ★ Take Our Drivers!! ★
+
+<div align="center"><img src="docs/90s/ic-sparkle.gif" alt=""> <b><font color="#00ff00">Building your own DOS or Windows 98 project? Borrow our drivers!!</font></b> <img src="docs/90s/ic-sparkle.gif" alt=""></div>
+
+Every driver and library on this list is free software under the **GNU GPL, version 2 or later** (see
+[COPYING](COPYING); each of our source files starts with `SPDX-License-Identifier: GPL-2.0-or-later`). Use it, change
+it and ship it, as long as your project is GPL-compatible and you share your source too. It can't go into closed-source
+programs. The parts **based on** other people's work (see the table above) keep their authors' credit and come under
+the same GPL.
+
+**How easy is it to lift out?** &nbsp; ★★★ = drop it in &nbsp; ★★ = needs a little glue &nbsp; ★ = tied to SBEMU, but a good example
+
+<details open>
+<summary><b>&gt;&gt; DOS drivers and libraries &lt;&lt;</b></summary>
+
+| Driver | What it does | Reuse |
+|---|---|---|
+| exFAT + NTFS reader ([`fsread/`](sc55-pack/sbemu/fsread)) | reads exFAT and NTFS volumes, read-only, in plain C99. All disk access goes through one function you give it, and it never loads a whole FAT or MFT into memory. Fuzz-tested | ★★★ no DOS needed: any small program, boot loader or embedded gadget |
+| USB host ([`usbpad.c`](sc55-pack/sbemu/usbpad.c)) | its own USB driver for UHCI, OHCI and EHCI (USB 1.1 and 2.0, companions handed over), no USB interrupt needed. Finds Xbox 360 pads, HID pads, keyboards, mice and disks, with fixes for the NEC uPD720101 | ★★★ needs DJGPP, DPMI and PCI access; `USBTEST` already uses it on its own |
+| USB disks as DOS drives ([`usbdisk.c`](sc55-pack/sbemu/usbdisk.c) + `.asm`) | sticks and card readers get a drive letter: read and write, FAT12/16/32, MBR / GPT / no partition table, card swaps, each stick keeps its letter | ★★ needs the USB host and a resident DPMI program; a stand-alone USB disk TSR could be built from it |
+| USB keyboard + mouse as PS/2 ([`vkbc.c`](sc55-pack/sbemu/vkbc.c)) | USB keys and mouse fed through the PC's own keyboard controller (8042), so BIOS, DOS and games see a plain PS/2 keyboard and mouse | ★★ needs the USB host and an 8042 |
+| Virtual game port ([`vjoy.c`](sc55-pack/sbemu/vjoy.c)) | port 201h answers like an analog joystick from one or two USB pads, plus INT 15h joystick, CH / FCS / GrIP stick types and pad buttons as keys | ★ needs I/O port trapping (QEMM / HDPMI style) |
+| SC-55 MPU-401 ([`vmpu_sc55.c`](sc55-pack/sbemu/vmpu_sc55.c)) | a Roland SC-55 / SC-55mkII on port 330h through Nuked-SC55, with MT-32 (Munt) and SoundFont back ends | ★ tied to SBEMU's port trapping and mixer |
+| CD music link ([`cdlink.c`](sc55-pack/sbemu/cdlink.c)) | the virtual CD drive's music mixed into the sound card output | ★ SBEMU only |
+| `SBEMU16` ([`sbemu16.asm`](sc55-pack/tools/sbemu16.asm)) | sound and joystick ports for 16-bit protected-mode games (Jazz Jackrabbit, Borland 16-bit), with HDPMI16I | ★★★ small and stand-alone |
+| HDPMI32I fixes ([`hdpmi32fix/`](sc55-pack/third_party/hdpmi32fix)) | an empty CD drive no longer freezes the PC, and Borland's 32RTM extender (Super Street Fighter II Turbo) starts | ★★★ helps every program that runs on HDPMI32I |
+</details>
+
+<details>
+<summary><b>&gt;&gt; Windows 98 drivers &lt;&lt;</b></summary>
+
+| Driver | What it does | Reuse |
+|---|---|---|
+| `SC55W.VXD` ([`win98/vxd`](sc55-pack/win98/vxd)) | virtual Sound Blaster, OPL3 and MPU-401 for DOS boxes, handing the sound to a Windows program | ★★ a working example of a DOS-box sound VxD (JWasm + Open Watcom) |
+| `NUKEDJOY.VXD` ([`win98/joy`](sc55-pack/win98/joy)) | joystick minidriver: our USB pad shows up in Game Controllers like a real joystick | ★★★ a small template for any custom Windows 98 joystick |
+| `SC55MIDI.DRV` ([`win98/mididrv`](sc55-pack/win98/mididrv)) | 16-bit MIDI output driver: the SC-55 is a MIDI device for every Windows program | ★★★ a template for any software MIDI synth on Windows 9x |
+</details>
+
+<details>
+<summary><b>&gt;&gt; Tools you can use without the pack &lt;&lt;</b></summary>
+
+| Tool | What it does |
+|---|---|
+| `JOYTEST`, `KMTEST`, `USBTEST` | game port, keyboard / mouse and USB checks on any DOS PC, no SBEMU needed |
+| `SC55WAV`, `SC55LOG` | does my SC-55 ROM work, and is my PC fast enough? No sound card needed |
+| `MIDPLAY`, `MPUTEST`, `TIMETEST` | MIDI player, test tune and timer check for any MPU-401 at 330h (a real card works too) |
+| `PADCONV` | turns DOSBox Pure's `keyb2joypad.cpp` into a readable button list per game |
+| `mkdisk.py`, `mkfat32.py`, `mkiso.py` | build bootable FAT disk images and test CDs from a folder on a PC ([`testrig`](sc55-pack/testrig)) |
+| 86Box + QEMU test rigs | drive an emulated PC by script: keys, screenshots, CPU registers, fake USB pads and sticks |
 </details>
 
 <div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """drive2.py IMG STEPS: QEMU + fakepad; when C:\\STAGE.TXT says REAL, run STEPS: lines 'wait s' | 'shot NAME' |
 'pad STATE' (held) | 'tap STATE [hold]' | 'quit'. Screenshots as PNG in /home/claude/padtest/shots."""
 import os, subprocess, sys, time, socket

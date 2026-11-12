@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # mkkeen.py KEYLOG.COM KEEN4E.EXE : KEYLOG wrapped in an MZ header (CS:IP = PSP:100h), padded to
 # 103224 bytes, so its id (name + size) is Commander Keen 4's (B408B7B3) in PADMAP.TXT
 import struct, sys

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* cpuload.c - CPULOAD.EXE: how much CPU Windows programs leave over (test rig, Windows 9x).
  * CPULOAD seconds [file] [label]: an idle-priority thread counts a loop for that long and appends
  * "label loops-per-second" to the file. The drop between two runs is what the other programs took.

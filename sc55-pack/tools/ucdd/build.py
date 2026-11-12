@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """Build the pack's mount-only uCDD driver (UCDD.EXE) from third_party/ucdd with NASM.
 
 Same EXE layout as upstream scripts/build.py (driver entry at IP 32, stack in the 1 KB gap after the main

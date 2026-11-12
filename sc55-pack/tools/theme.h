@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* theme.h - the looks of the pack's menus: Classic (standard DOS colours) and the Groovy family (own
  * palettes in the VGA DAC). Kept in <home>\THEME.CFG; switched with F3 in MENU. Both turn the attribute blink bit
  * into bright backgrounds; theme_plain() puts the normal DOS text colours back. */

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* USB keyboard and mouse for DOS programs, through the PC's own keyboard controller (8042).
  *
  * Keyboard: each USB boot report is compared with the last one; pressed / released keys become set 1 scan

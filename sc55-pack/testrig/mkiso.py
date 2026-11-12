@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """mkiso.py - minimal ISO9660 image: one folder SUPPORT with one file (for Duke 3D Atomic's CD check).
    mkiso.py out.iso [VOLUME]"""
 import struct, sys

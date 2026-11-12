@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* padmap.c - game pad buttons -> keyboard keys with a layout per game, for the DOS USB pad (SBEMU) and USBTEST.
  *
  * The same files and rules as the Windows 98 part (win98/helper/pad.cpp), in plain C:
