@@ -1370,3 +1370,32 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
   starts gets a letter.
 - Stick pulled out during a COPY (QEMU EHCI, SBEMU /USBDISK:1): DOS says "drive not ready" (Abort/Retry/Fail), no
   hang (a transport failure now checks the root port's connect bit: the port monitor cannot run during a request).
+
+## USB disks, session 5: exFAT / NTFS drive letters (2026-11-12, new files only, NOT hooked into SBEMU yet)
+- New: sbemu/usbredir.c/.h, stub sbemu/usbredir.asm -> sbemu/usbredirbin.h (committed; nasm + od like usbdiskbin.h).
+  Uses sbemu/fsread (exfat.c, ntfs.c) and only the usbpad.h disk API. main.c / makefile NOT changed (DOS session's
+  files): the hook-up below was tested in a scratch copy only. To turn it on, the DOS session adds:
+  - makefile SBEMU_SRC after sbemu/usbdisk.c: `sbemu/usbredir.c sbemu/fsread/exfat.c sbemu/fsread/ntfs.c`, and a
+    usbredirbin.h rule like usbdiskbin.h's (`USBREDIR_Stub`), `output/sbemu/usbredir.o: sbemu/usbredirbin.h`.
+  - main.c: `#include "sbemu/usbredir.h"`; after the USBDISK_Install block (inside `if(MAIN_Options[OPT_USBDISK].value)`):
+    `if(USBREDIR_Install()) MAIN_CPrintf(LIGHTGREEN, "USB disk: %s\n", USBREDIR_Msg()); MAIN_D("USB redirector: %s\n", USBREDIR_Msg());`
+    and `USBREDIR_Uninstall();` just before `USBDISK_Uninstall();`. README.TXT /USBDISK text: exFAT / NTFS read-only.
+- How: INT 2Fh AH=11h network redirector. Stub (254 bytes, DPMI_HighMalloc UMB) filters in real mode by drive (table
+  per subfunction: SDA first filename "X:", SFT dev-info bit 15 + drive, CDS at ES:DI, DTA search block with 'US'
+  magic) and chains everything else at once; ours far-call a RETF RMCB (UR_Req, STI inside). CDS: "X:\", C000h,
+  backslash 2, no DPB; letters = next free after USBDISK's (up to LASTDRIVE, max 8 partitions). Functions: chdir,
+  close (drops SFT handle count), commit/lock/unlock ok, read, disk space (scaled to <= 2 GB, AH=0), get attr,
+  open, extended open, findfirst/next (synthesised . and ..), seek from end; write / create / delete / rename /
+  mkdir / rmdir / set attr -> 05h (files may be opened read/write, writes fail). Slots: 48 files (SFT 0Bh slot,
+  1Bh id), 24 searches (oldest reused). Cache 32 x 4 KB. Sticks followed by gen + lun; unplug -> 15h not ready;
+  re-plug (any port) -> all its drives remount; card swap: boot sector CRC after 2 s idle. NTFS times are UTC.
+- Tested in QEMU 8.2 (Ubuntu), EHCI, sticks hot-plugged after boot, SBEMU /JOY:1 /USBDISK:1 (scratch build):
+  stick 1 = MBR NTFS + exFAT (D: E:), stick 2 = GPT exFAT (F:). FreeDOS (FreeCom) and MS-DOS 7.1 (IO.SYS/COMMAND.COM
+  from the user's Win98 QuickInstall ISO: testrig/padkeys/isols.py OSROOTS/1/FULL.866 + mercy.py; MSDOS.SYS
+  BootGUI=0; rig C=c71 MKDISK_BOOT=msdos): DIR (aliases LONGFI~1, DATAF~10, wildcards), CD into a USB dir +
+  relative TYPE, free space right, 300 KB COPY from all three byte-exact, COPY to / DEL / REN / MD refused and the
+  disk unchanged; unplug -> D:/E: fail, F: still right (renumbered disk); re-plug (copy of the image, new QEMU
+  drive) -> D: and E: back, copy exact. DJGPP program (HDPMI, PM -> INT 21h -> our RMCB): read/copy exact, lseek
+  SEEK_END, opendir (32 entries), stat / fstat / findfirst sizes right, open for write -1.
+- Not tested: MS-DOS 6.22, real PCs, games (DOS/4GW) running from such a drive while music plays, NTFS volumes
+  > 2 GB free space display (scaled), FAT32 on DOS < 7.10 (would need a FAT reader in fsread: not done).
