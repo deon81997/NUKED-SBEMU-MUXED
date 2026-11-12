@@ -1042,6 +1042,13 @@ CONTENTS
        (PS/2 or USB keyboard).
        Since beta.67 USBTEST will not start while SBEMU is loaded: both
        driving the same USB controllers crashed a PC (EMM386 error 06).
+       Since beta.93 USBTEST also finds USB sticks and card readers (USB
+       disks): name, size, the start of block 0 and a 1 MB read test. A
+       USB 2.0 port reads them at high speed, the pads and keyboards on
+       the same ports are handed to the USB 1.1 side as before. Test only
+       for now: SBEMU does not give them a drive letter yet. NEC uPD720101
+       USB cards: USB 2.0 sticks work; a USB 1.1-only stick is not used on
+       that card (its USB 1.1 side froze a PC with one).
 
 
 =============================================================================

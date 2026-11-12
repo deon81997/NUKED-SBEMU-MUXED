@@ -1231,3 +1231,14 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
   handed to OHCI 2 and working; stick 13FE:3600 (15288 MB) on EHCI 1 port 3 at high speed, block 0 + 1 MB read
   test OK (CRC A7A6D2B4, same as the slow OHCI run), 1 MB in 1.5 s with 4 KB reads (USBTEST now reads 16 KB per
   command). Speed next: e_run switches the async schedule off/on per transfer (3 per command).
+
+## beta.93 (2026-11-11): USB disks in USBTEST, USB 2.0 speed (RELEASED, tag v1.0.0-beta.93-usb)
+- Zip = beta.92 zip with SBEMU.EXE, USBTEST.EXE, SC55MENU.EXE (version) and README.TXT (USBTEST note) swapped in.
+- SBEMU does not pass USBPAD_F_DISK: its USB behaviour is beta.92's (86Box P2B-LS: resident, both pads found, same
+  screen as beta.92). Changed under it anyway: OHCI bulk list with 4 skipped EDs + BLE, EHCI e_ch control flag only
+  for endpoint 0 (EHCI-direct boards' pad LED OUT; spec-correct, untested on real hw), step() turns the disks' async
+  schedule off 100 ms after the last disk request.
+- Speed (USBTEST 1 MB read): QEMU EHCI 0.13 s, 86Box UHCI 1.2 s, 86Box OHCI 1.4 s; real NEC EHCI 1.5 s with the
+  old 4 KB reads (retest with beta.93's 16 KB). Idle cost: none (no periodic disk work, async schedule off).
+- Next: session 4 (DOS drive letter), session 2 rest (writes, unplug during a request). Parallel prompts for the
+  user: docs/USB-STORAGE.md section 8.
