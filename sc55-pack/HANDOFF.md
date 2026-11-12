@@ -1304,6 +1304,14 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
   `gcc -std=c99 -D_FILE_OFFSET_BITS=64 -D_POSIX_C_SOURCE=200809L test/fstest.c exfat.c ntfs.c` and
   `./a.out /tmp/fsimg/ntfs.img 0 512 | grep '^[LD]' | sort | diff - <(sort /tmp/fsimg/ntfs.exp)`.
 - DJGPP gcc 12.2: both files compile with -Wall -Wextra, no warnings, ~23 KB code.
-- Not tested: Windows-made volumes (real 8dot3 names, $MFT in many runs), exFAT TexFAT second FAT, volumes with
-  cluster > 2 MB (NTFS refuses), speed on real hardware (alias numbering re-scans a directory when listing is not
-  sequential).
+- Later the same day: exFAT second FAT (NumberOfFats=2, ActiveFat=1, FAT 1 zeroed) and NTFS 64 KB / 2 MB clusters
+  (2 MB = Windows' maximum) match Linux. Fixed: alias cache would not move back, so a second listing after an
+  open near the end of a big folder re-scanned it per entry (276k reads -> 395). fstest `bench` mode prints
+  device commands behind a 64-sector cache (what a USB stick would see, ~1 ms each at full speed).
+- DOS (DJGPP build, QEMU -cpu pentium, FreeDOS + HDPMI32I, image as 2nd/3rd IDE disk read with INT 13h AH=42h:
+  `FSTEST 0x81 0 512 [bench]`): full exFAT walk and 2 MB-cluster NTFS walk identical to Linux. Bench (exFAT,
+  emulated): list 1500-file folder 0.27 s / 389 cmds, 3 MB read 0.55 s / 98 cmds, open by alias there
+  0.16 s / 777 cmds, by long name 0.05 s / 394. NTFS listing costs one MFT record read per entry (1500 files
+  ~1700 cmds). Reading the image as a file through FreeDOS instead is ~5 ms per seek: too slow, use INT 13h.
+- Still not tested: volumes made by Windows itself (real 8dot3 names, Windows $MFT/index layout; needs a
+  small VHD/stick image from a Windows XP+ PC; Win98 cannot make NTFS/exFAT), speed on the real PCs.

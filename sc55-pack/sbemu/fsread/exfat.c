@@ -251,8 +251,7 @@ void fsr_acput(fsr_vol *v, uint64_t dir, const char *key, uint32_t pos, uint32_t
     fsr_acache *c = 0; int i;
     for (i = 0; i < FSR_ACACHE; i++)
         if (v->ac[i].used && v->ac[i].dir == dir && !memcmp(v->ac[i].key, key, 9)) c = &v->ac[i];
-    if (!c) { c = &v->ac[v->acn]; v->acn = (v->acn + 1) % FSR_ACACHE; }
-    else if (c->pos > pos) return;
+    if (!c) { c = &v->ac[v->acn]; v->acn = (v->acn + 1) % FSR_ACACHE; }   /* else: move it (latest use wins) */
     c->used = 1; c->dir = dir; c->pos = pos; c->n = n; memcpy(c->key, key, 9); c->st = *st;
 }
 

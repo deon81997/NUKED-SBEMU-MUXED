@@ -7,14 +7,57 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "../fsread.h"
 
-static FILE *img; static int ss = 512; static long reads;
-static int rd(void *ctx, uint64_t lba, int n, void *buf)
+#ifdef __DJGPP__
+#define fseeko(f, o, w) fseek(f, (long)(o), w)
+#define off_t long
+#endif
+/* device = image file; single-sector reads go through a direct-mapped cache of
+ * NCACHE sectors (like the redirector's sector cache), devcmds = what a USB stick would see */
+#define NCACHE 64
+static FILE *img; static int ss = 512; static long reads, devcmds;
+static uint8_t cdat[NCACHE][4096]; static uint64_t ctag[NCACHE];
+#ifdef __DJGPP__
+#include <dpmi.h>
+#include <go32.h>
+#include <sys/movedata.h>
+static int bdrive;   /* fstest 0x81 ...: read BIOS disk 81h with INT 13h AH=42h */
+static int bios(uint64_t lba, int n, uint8_t *buf)
 {
-    (void)ctx; reads++;
+    while (n > 0) {
+        int k = n > 16 ? 16 : n; __dpmi_regs r; uint8_t pk[16] = { 16, 0 };
+        pk[2] = (uint8_t)k; pk[4] = 32; pk[6] = (uint8_t)(__tb >> 4); pk[7] = (uint8_t)(__tb >> 12);
+        memcpy(pk + 8, &lba, 8);
+        dosmemput(pk, 16, __tb);
+        memset(&r, 0, sizeof r);
+        r.h.ah = 0x42; r.h.dl = (uint8_t)bdrive; r.x.ds = __tb >> 4; r.x.si = __tb & 15;
+        __dpmi_int(0x13, &r);
+        if (r.x.flags & 1) return -1;
+        dosmemget(__tb + 32, k * ss, buf);
+        buf += k * ss; lba += k; n -= k;
+    }
+    return 0;
+}
+#endif
+static int dev(uint64_t lba, int n, void *buf)
+{
+    devcmds++;
+#ifdef __DJGPP__
+    if (bdrive) return bios(lba, n, (uint8_t *)buf);
+#endif
     if (fseeko(img, (off_t)(lba * ss), SEEK_SET)) return -1;
     return fread(buf, ss, n, img) == (size_t)n ? 0 : -1;
+}
+static int rd(void *ctx, uint64_t lba, int n, void *buf)
+{
+    unsigned h = (unsigned)(lba % NCACHE);
+    (void)ctx; reads++;
+    if (n != 1) return dev(lba, n, buf);
+    if (ctag[h] != lba + 1) { if (dev(lba, 1, cdat[h])) { ctag[h] = 0; return -1; } ctag[h] = lba + 1; }
+    memcpy(buf, cdat[h], ss);
+    return 0;
 }
 
 static fsr_vol v; static int errs;
@@ -65,8 +108,26 @@ int main(int argc, char **argv)
 {
     static uint8_t work[FSR_WORK_MIN]; uint64_t lba = argc > 2 ? strtoull(argv[2], 0, 0) : 0, fr; int r;
     if (argc > 3) ss = atoi(argv[3]);
+#ifdef __DJGPP__
+    if (!strncmp(argv[1], "0x8", 3)) bdrive = (int)strtol(argv[1], 0, 0); else
+#endif
     if (!(img = fopen(argv[1], "rb"))) return 2;
     if ((r = fsr_mount(&v, rd, 0, lba, work, sizeof work))) { printf("mount failed %d\n", r); return 1; }
+    if (argc > 4 && !strcmp(argv[4], "bench")) {   /* timings + device commands per step */
+        static const char *step[] = { "list \\MANY (1500 files)", "read \\CONTIG.BIN (3 MB)",
+            "open \\MANY\\FIL~1499.DAT", "open \\many\\file with long name 1499.dat", "list \\MANY again" };
+        int k;
+        for (k = 0; k < 5; k++) {
+            clock_t t = clock(); long r0 = reads, d0 = devcmds; fsr_find s; fsr_dirent d; fsr_file f; int n = 0; int32_t g;
+            if (k == 0 || k == 4) { for (r = fsr_findfirst(&v, "\\MANY", 0, 0x16, &s, &d); !r; r = fsr_findnext(&v, &s, &d)) n++; }
+            if (k == 1) { if (!(r = fsr_open(&v, "\\CONTIG.BIN", &f, 0))) while ((g = fsr_read(&v, &f, buf, 32768)) > 0) n += g; }
+            if (k == 2) r = fsr_open(&v, "\\MANY\\FIL~1499.DAT", &f, &d);
+            if (k == 3) r = fsr_open(&v, "\\many\\file with long name 1499.dat", &f, &d);
+            printf("%-42s %6.2f s  n=%d rc=%d  lib reads %ld  device cmds %ld\n", step[k],
+                   (double)(clock() - t) / CLOCKS_PER_SEC, n, r, reads - r0, devcmds - d0);
+        }
+        return 0;
+    }
     if (argc > 5 && !strcmp(argv[4], "cat")) {
         fsr_file f; int32_t n;
         if ((r = fsr_open(&v, argv[5], &f, 0))) { fprintf(stderr, "open %d\n", r); return 1; }
