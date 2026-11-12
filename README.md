@@ -9,7 +9,7 @@
 
 <table>
 <tr>
-<td align="center" valign="top"><picture><img src="docs/90s/fd-marine-shoot.gif" alt="Freedoom marine"></picture><br><br><picture><img src="docs/90s/tux-waddle.gif" width="120" alt="Tux"></picture><br><br><picture><img src="docs/90s/fd-soulsphere.gif" alt="soul sphere"></picture><br><br><picture><img src="docs/90s/port220-small.gif" width="96" alt="Port 220"></picture><br><br><picture><img src="docs/90s/vox-port220.gif" width="110" alt="Port 220 in voxels"></picture><br><br><picture><img src="docs/90s/fd-hatchling.gif" alt="Freedoom hatchling"></picture><br><br><picture><img src="docs/90s/ic-speaker.gif" alt="speaker"></picture><br><br><picture><img src="docs/90s/vox-flopsy.gif" width="100" alt="Flopsy in voxels"></picture><br><br><picture><img src="docs/90s/fd-zombie.gif" alt="Freedoom zombie"></picture></td>
+<td align="center" valign="top"><picture><img src="docs/90s/fd-marine-shoot.gif" alt="Freedoom marine"></picture><br><br><picture><img src="docs/90s/tux-waddle.gif" width="120" alt="Tux"></picture><br><br><picture><img src="docs/90s/fd-soulsphere.gif" alt="soul sphere"></picture><br><br><picture><img src="docs/90s/port220-small.gif" width="96" alt="Port 220"></picture><br><br><picture><img src="docs/90s/fd-hatchling.gif" alt="Freedoom hatchling"></picture><br><br><picture><img src="docs/90s/ic-speaker.gif" alt="speaker"></picture><br><br><picture><img src="docs/90s/vox-flopsy.gif" width="100" alt="Flopsy in voxels"></picture><br><br><picture><img src="docs/90s/fd-zombie.gif" alt="Freedoom zombie"></picture><br><br><picture><img src="docs/90s/ic-rocket.gif" alt="rocket"></picture></td>
 <td align="center" valign="top">
 
 <picture><img src="docs/90s/title.gif" width="560" alt="NUKED SB-EMU"></picture>
@@ -20,7 +20,7 @@
 
 <br><br>
 
-<picture><img src="docs/90s/port220-hello.gif" width="400" alt="Port 220, the NUKED SB-EMU mascot, says hi"></picture>
+<picture><img src="docs/90s/port220-hello.gif" width="400" alt="Port 220, the NUKED SB-EMU mascot, says hi"></picture> <picture><img src="docs/90s/vox-claude.gif" width="130" alt="Claude as a voxel buddy, typing"></picture>
 
 <h3>~ What's inside my PC?? ~</h3><sub>(everything NUKED SB-EMU does for your DOS games: click a part!!)</sub><br>
 <a href="#-supported-sound-chips-"><img src="docs/90s/vox-part-soundcard.gif" width="130" alt="Sound Blaster 16 on any PCI sound card"></a>
@@ -46,7 +46,7 @@
 <br><br>
 
 </td>
-<td align="center" valign="top"><picture><img src="docs/90s/fd-serpentipede-attack.gif" alt="Freedoom serpentipede"></picture><br><br><picture><img src="docs/90s/mascot-canvaskid.gif" width="120" alt="Canvas Kid"></picture><br><br><picture><img src="docs/90s/fd-keycard.gif" alt="keycard"></picture><br><br><picture><img src="docs/90s/vox-pc.gif" width="110" alt="A voxel DOS PC"></picture><br><br><picture><img src="docs/90s/fd-potion.gif" alt="potion"></picture><br><br><picture><img src="docs/90s/ic-cd.gif" alt="CD"></picture><br><br><picture><img src="docs/90s/vox-sc55.gif" width="120" alt="A voxel sound module"></picture><br><br><picture><img src="docs/90s/fd-trilobite.gif" alt="Freedoom trilobite"></picture></td>
+<td align="center" valign="top"><picture><img src="docs/90s/fd-serpentipede-attack.gif" alt="Freedoom serpentipede"></picture><br><br><picture><img src="docs/90s/mascot-canvaskid.gif" width="120" alt="Canvas Kid"></picture><br><br><picture><img src="docs/90s/fd-keycard.gif" alt="keycard"></picture><br><br><picture><img src="docs/90s/vox-pc.gif" width="110" alt="A voxel DOS PC"></picture><br><br><picture><img src="docs/90s/fd-potion.gif" alt="potion"></picture><br><br><picture><img src="docs/90s/ic-cd.gif" alt="CD"></picture><br><br><picture><img src="docs/90s/vox-sc55.gif" width="120" alt="A voxel sound module"></picture><br><br><picture><img src="docs/90s/fd-trilobite.gif" alt="Freedoom trilobite"></picture><br><br><picture><img src="docs/90s/vox-port220.gif" width="110" alt="Port 220 in voxels"></picture><br><br><picture><img src="docs/90s/fd-worm.gif" alt="Freedoom worm"></picture></td>
 </tr>
 </table>
 
