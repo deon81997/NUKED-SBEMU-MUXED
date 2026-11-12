@@ -1,0 +1,56 @@
+NUKED SB-EMU - FREE TEST GAMES
+==============================
+
+Five shareware games to try the pack with. Each ZIP is the authors' own,
+untouched shareware archive (taken from the 1994 "Super Shareware Collection"
+CD; only the CD's "_" was dropped from three file names). They are shareware:
+if you like one, the full game is sold today by its rights holder.
+
+They are offered here as separate free downloads, exactly as their own
+licence files allow for online services and BBSes. They are NOT part of the
+NUKED SB-EMU pack and are not covered by its GPL licence. Do not sell them,
+and pass them on only as the complete, unmodified ZIP files.
+
+  PINBALL.ZIP   Epic Pinball (Epic MegaGames)          SB / SB Pro / GUS
+                digital music + sound: SBEMU's Sound Blaster, DMA and mixing
+  ELECTRO.ZIP   Electro Man (Epic MegaGames / XLAND)   SB + AdLib music
+                OPL3 (FM) music next to Sound Blaster effects
+  HEART.ZIP     Heartlight (Epic MegaGames / XLAND)    SB + AdLib music
+                a light game for slow PCs; joystick
+  GOT100.ZIP    God of Thunder (Software Creations)    SB effects + AdLib music
+                a 286 game: real-mode sound (needs JEMM + QPIEMU, SC55JEM)
+  BATS20.ZIP    Invasion of the Mutant Space Bats      Sound Blaster, joystick
+                of Doom (Pop Software)
+
+What their licences say (from the files inside each ZIP):
+  Epic MegaGames (LICENSE.DOC): bulletin boards and online services may
+    distribute the game "as long as no files are altered or removed".
+  Software Creations (VENDOR.TXT): may be freely distributed over BBS
+    systems with no files added or removed; collections need permission
+    (so these stay separate downloads, never inside the pack zip).
+  Pop Software (READ.ME / VENDOR.DOC): "Please share BATS.ZIP by giving it
+    to your friends and uploading it to your favorite BBS."
+
+Two more great test games - get them from their original places:
+  Doom 1.9 shareware (doom19s.zip): OPL, Sound Blaster and General MIDI
+    music -> the SC-55. idgames mirrors, e.g.
+    https://mirrors.lug.mtu.edu/idgames/idstuff/doom/
+  Duke Nukem 3D 1.3D shareware (3dduke13.zip): General MIDI music through
+    the SC-55, fast timer (TIMETEST / SBDIAG). Its LICENSE.TXT allows free
+    sharing; e.g. https://archive.org/details/3dduke13SW
+
+How to use:
+  1. Copy the ZIP to the PC (or a USB stick with /USBDISK:1, or a CD image).
+  2. Unzip it into a folder, e.g. C:\GAMES\PINBALL (PKUNZIP or 7-Zip).
+  3. Start the SC-55 (SC55, or SC55JEM for real-mode games), run the game's
+     setup and pick Sound Blaster at 220h, the IRQ / DMA SBEMU shows
+     (SBSET or the BLASTER line), and AdLib / OPL music where offered.
+  4. Or add it to MENU > Games so the menu starts it with the right
+     settings.
+
+SHA-256 of the ZIPs as published here:
+  c4e668089f4764e77a47db6197146c76490339b21044dbc2f30ce81137b3d8cf  BATS20.ZIP
+  dd09095e2e8aa78bca06edb24b5f7896826b4ba803fc7b22b194945922660772  ELECTRO.ZIP
+  08404dc700253b808d9e0e2e29ec27c8692ba9e9f14f12e41e73ae95ce2175b5  GOT100.ZIP
+  5f14283e591990661708f1b337f540194d87fc51a19ae687bbdb0acee4f2d62e  HEART.ZIP
+  a39831826bd4df1e7753694c1961ffe9b4596698cf3094144944aa61dccc4746  PINBALL.ZIP

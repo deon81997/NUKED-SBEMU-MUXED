@@ -907,6 +907,13 @@ the same GPL.
 | **GSCDROM.SYS** (LG) | LG drives XCDROM doesn't like (optional) | [DOS Days](https://www.dosdays.co.uk/topics/Software/optical_downloads.php) | `FILES\GSCDROM` |
 | **QEMM 8 / 9** | `SC55QMM.BAT` only (optional) | Out of print; JEMMEX + QPIEMU (included) does the same job | `FILES\QEMM` |
 
+**Free test games!!** <img src="docs/90s/ic-pad.gif" alt=""> Five shareware games whose own licences let them be shared online, as
+untouched original ZIPs in [`testgames/`](testgames) (separate from the pack, not under its GPL):
+**Epic Pinball**, **Electro Man**, **Heartlight** (Epic MegaGames), **God of Thunder** (Software Creations) and
+**Invasion of the Mutant Space Bats of Doom** (Pop Software). [TESTGAMES.TXT](testgames/TESTGAMES.TXT) says what each one
+tests (Sound Blaster, OPL music, real-mode sound, joystick), how to set it up, and where to get the Doom and Duke Nukem 3D
+shareware from their own sources.
+
 <div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
 <div align="center"><img src="docs/90s/mascot-flopsy.gif" alt=""> <img src="docs/90s/ic-news.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-news.gif" alt=""> <img src="docs/90s/fd-worm.gif" alt=""></div>
