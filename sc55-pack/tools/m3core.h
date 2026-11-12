@@ -193,11 +193,21 @@ static void m3_pal252(void)
         m3_dg[y][x * 256 + v] = (unsigned char)((g > 6 ? 6 : g) * 6);
         m3_db[y][x * 256 + v] = (unsigned char)(b > 5 ? 5 : b);
     }
-    outportb(0x3C8, 0);                                                /* the VGA DAC (6 bits per colour) */
-    for (i = 0; i < 256; i++)
     {
-        int r = i < 252 ? i / 42 * 63 / 5 : 0, g = i < 252 ? i / 6 % 7 * 63 / 6 : 0, b = i < 252 ? i % 6 * 63 / 5 : 0;
-        outportb(0x3C9, r); outportb(0x3C9, g); outportb(0x3C9, b);
+        unsigned char pal[1024]; __dpmi_regs r;
+        for (i = 0; i < 256; i++)
+        {
+            pal[i * 4 + 2] = (unsigned char)(i < 252 ? i / 42 * 63 / 5 : 0); pal[i * 4 + 1] = (unsigned char)(i < 252 ? i / 6 % 7 * 63 / 6 : 0);
+            pal[i * 4 + 0] = (unsigned char)(i < 252 ? i % 6 * 63 / 5 : 0); pal[i * 4 + 3] = 0;
+        }
+        if (m3_mode != 0x13 && m3_vbever >= 2)
+        {   /* VBE 4F09h first: some cards' DAC in VESA modes is not VGA compatible */
+            dosmemput(pal, 1024, __tb);
+            memset(&r, 0, sizeof r); r.x.ax = 0x4F09; r.h.bl = 0; r.x.cx = 256; r.x.dx = 0; r.x.es = __tb >> 4; r.x.di = __tb & 15; __dpmi_int(0x10, &r);
+            if (r.x.ax == 0x004F) return;
+        }
+        outportb(0x3C8, 0);                                            /* the VGA DAC (6 bits per colour) */
+        for (i = 0; i < 256; i++) { outportb(0x3C9, pal[i * 4 + 2]); outportb(0x3C9, pal[i * 4 + 1]); outportb(0x3C9, pal[i * 4]); }
     }
 }
 static int m3_refresh;            /* the refresh rate set (Hz, 0 = the BIOS's own) */

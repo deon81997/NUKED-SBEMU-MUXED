@@ -654,7 +654,8 @@ CONTENTS
      U            all channels on again (muting only stops new notes on that
                   channel; the song's timing does not change)
      [ and ]      speed -5% / +5% (25% to 400%), BACKSPACE back to 100%
-     R            repeat: off, all, one  L repeat all  H shuffle
+     R            repeat: off, all, one  L repeat all
+     H            shuffle: off > all songs > this folder only (beta.96)
      S            view: channel table > SC-55 front panel > 3D view
                   (remembered in MIDPLAY.CFG)
      B            file explorer        Q or ESC   quit
@@ -665,12 +666,25 @@ CONTENTS
   SC-55 FRONT PANEL: with SBEMU beta.34 and later it is the emulated
   module's REAL display, read from SBEMU 10 times a second (with the MT-32:
   its 20-character LCD); otherwise it is worked out from the MIDI file.
-  3D VIEW (640x480 VESA): a module with the synth's live display, a
-  keyboard lighting up the notes in each channel's colour and 16 channel
-  columns on the floor. Always sharp, full 640x480, as many frames as the
-  PC can draw (up to 60 a second; since beta.85 about 3x more than before).
-  F4 there switches to half resolution if your PC shows few frames (it
-  tells you).
+  3D VIEW: a module with the synth's live display, a keyboard lighting up
+  the notes in each channel's colour and 16 channel columns on the floor.
+  SCREEN MODE (beta.96): Options > "3D screen mode" lists every mode your
+  graphics card offers - 320x200 VGA, 640x480, 800x600, 1024x768 ... in
+  256 colours (dithered), 15/16/24/32 bit. Options > "3D refresh rate"
+  (cards with VBE 3.0 only): 60, 70, 72, 75, 85 or 100 Hz - pick only a
+  rate your monitor can show. A new mode asks "Keep this mode? Y = yes":
+  if the screen stays black, press any other key (or wait 10 s) and the
+  last mode comes back. A mode that cannot be set falls back to the last
+  good one, then 640x480, then VGA 320x200, then the text views.
+  The 3D view draws at most one frame per screen refresh and almost nothing
+  while paused or stopped. F4 there switches to half resolution if your PC
+  shows few frames (it tells you).
+  IN A WINDOWS 98 DOS BOX: the 3D view uses VGA 320x200 by default, the one
+  graphics mode Windows can show in a window (VESA modes in a window stayed
+  black). A VESA mode can still be picked for a full-screen DOS box
+  (ALT+ENTER); it asks Y to keep it. Text and SC-55 panel views use plain
+  80x25 text there (MENU's tweaked/VESA text modes need full-screen DOS),
+  and MIDPLAY gives its idle time back to Windows.
 
   Playlist page (file name, title, length): UP/DOWN/PGUP/PGDN pick, ENTER
   plays, DEL removes, CTRL+UP/DOWN moves a song, type letters to jump to a
@@ -686,10 +700,17 @@ CONTENTS
   at the end ("C:  drive"). The panel on the right shows the title,
   length, format and tracks of the file under the cursor.
 
+  SHUFFLE (beta.96): a real random order - every song plays once before any
+  song comes again; P goes back through the order; a new round never starts
+  with the song that just played; songs added while it plays are fitted in;
+  "this folder" shuffles only the playing song's folder. The order and the
+  place in it are kept in MIDPLAY.SHF, so the next start carries on.
+
   Options page (F2, saved in MIDPLAY.CFG): view, repeat, shuffle, the reset
   sent before each song (GS, GM or none), speed, pause between songs, what
   to play at start (the last playlist, from the song and spot where you
-  quit, or the MIDI files next to MIDPLAY), screen mode, style and font.
+  quit, or the MIDI files next to MIDPLAY), screen mode, style, font, 3D
+  screen mode and 3D refresh rate.
   When you quit, the playlist is kept in MIDPLAY.M3U.
 
   Smoother on slow PCs: the music is sent even while the screen is being

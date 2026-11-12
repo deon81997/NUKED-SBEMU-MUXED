@@ -1399,3 +1399,56 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
   SEEK_END, opendir (32 entries), stat / fstat / findfirst sizes right, open for write -1.
 - Not tested: MS-DOS 6.22, real PCs, games (DOS/4GW) running from such a drive while music plays, NTFS volumes
   > 2 GB free space display (scaled), FAT32 on DOS < 7.10 (would need a FAT reader in fsread: not done).
+
+## beta.96 (2026-11-12): MIDPLAY - 3D screen modes, real shuffle, no lost notes, Windows DOS box (RELEASED, tag v1.0.0-beta.96-usb)
+User asked (MIDPLAY only): 3D resolutions/refresh rates, a dropped-notes test + fixes, real shuffle, next/previous bugs,
+MIDPLAY in a windowed Win98 DOS box and the black 3D view there. Files: tools/midplay.c, midplay3d.h, m3core.h;
+sbemu/vmpu_sc55.c (1 line, NOT in the zip yet - see below); testrig/midplay/notetest.sh + notetest.py.
+- 3D MODES: m3core.h `#define M3_DYNAMIC_RES` (only MIDPLAY sets it; MENU/SETTINGS/CDGUI/GAMETEST keep the fixed
+  640x480 and compile to the same picture: M3_FBASE 640, m3_fyk 1.0). m3_modes[]: mode 13h first, then every VBE mode
+  with 8 bpp packed (dithered to a 6x7x6 palette, 4x4 Bayer, palette via 4F09h then the DAC ports) or 15/16/24/32
+  direct colour, 320x200..1600x1200. m3_open_mode(mode, hz): hz > 0 and VBE 3.0 -> GTF CRTC block (4F0Bh rounds the
+  pixel clock), BIOS refusal -> same mode at its own rate. mp3_enter fallback: wanted -> last confirmed -> auto (old
+  best 640x480; Windows: 13h) -> 13h -> text + message. Options items 10/11 ("3D screen mode", "3D refresh rate"),
+  MIDPLAY.CFG MODE3D=w h bits / HZ3D (DOS) and MODE3DW / HZ3DW (Windows DOS box). A changed mode asks "Keep this
+  mode? Y" (10 s, any other key reverts: mp3_answer). Pacing: <= 1 frame per refresh (set, or measured on 3DAh),
+  vsync wait before present when the frame took < 75% of a refresh (DOS only), 4 fps and frozen animation while
+  paused / done. The 3D clock now = MIDPLAY's TSC clock (m3_time_init's 3-tick calibration is wrong in Windows).
+  QEMU std-vga tested: 320x200x8, 640x480x8/32, 800x600x8/16, 1024x768x8/16/32, unknown mode -> 640x480, the Options
+  -> Y-prompt -> timeout revert flow. NOT tested: refresh rates (QEMU's VBE is 2.0), real cards, 86Box.
+- DROPPED NOTES: (1) parse_track dropped the REST OF A TRACK when running status continued after a meta event
+  (lyrics in .KAR, markers): 20 of 21 notes lost in the test file. Running status now survives meta/SysEx, a stray
+  data byte is skipped. (2) mp_pump waited up to 1 s PER BYTE when the synth's queue was full (DRR): on a slow PC the
+  whole player froze (no screen, no keys). Now it checks DRR before each event and sends the rest later (song lags,
+  nothing dropped); /T log counts it ("synth busy n"). User's 199 MIDI files (upload midi.zip): the host build sends
+  exactly the note-ons mido counts in every file (/tmp/refcount.py vs mphost; 0 differences).
+- notetest.sh "SBEMU OPTS" files...: QEMU FreeDOS + JEMMEX/QPIEMU + HDPMI32I + SBEMU; per file SBDIAG START, MIDPLAY
+  /S /T (bytes + note-ons sent), SBDIAG (bytes received / dropped); notetest.py summarises. QSECS, CPU, ICOUNT (slow
+  PC), PACK=folder with the EXEs (+GM.SF2 / ROMS). Results (TimGM6mb.sf2 from the pretty_midi wheel, /VSFVOICES:24):
+  0 bytes dropped in every song; QEMU TCG is too slow for dense songs with the SoundFont (busy ~300k times), MIDPLAY
+  no longer freezes there. Not run: SC-55 ROM sets, MT-32, /VSCAHEAD/VSCVOICES, 86Box Pentium/Celeron (no ROMs or
+  86Box in this session: the devkit tar / personal zip were not reachable).
+- SBEMU BUG (fixed in source, needs the next SBEMU build): with /VSF, vmpu_sc55.c VMPU_Init returned before setting
+  VMPU_base, so the whole side channel was dead with a SoundFont: SBDIAG ("cannot measure itself"), MIDPLAY's LCD/load
+  panel, GAMETEST's key player. One line. Not in the beta.96 zip because SBEMU's source also holds the USB session's
+  unreleased work - ship it with their next SBEMU.
+- SHUFFLE / NEXT / PREVIOUS: play order g_ord (Fisher-Yates, xorshift RNG; was 15-bit rand()); N/P walk it, new round
+  never starts with the song just played; songs added are fitted in ahead, removed ones leave it, moves keep it,
+  sorting restarts it from the current song; H cycles off / all / this folder (SHUFFLE=0..2); MIDPLAY.SHF keeps the
+  order + position; a fresh shuffled start picks a random song. Fixes: P in shuffle went back in LIST order; P after
+  removing the playing song went to the last song; a song that fails to load skipped linearly even in shuffle;
+  N pressed as a song ended skipped two (keys are now handled before the "song finished" check); Ctrl+P / opened
+  playlists start through the shuffle order; /S with nothing playable now exits instead of hanging.
+  Host test: `gcc -O2 -DHOSTTEST -o /tmp/mphost tools/midplay.c -lm && /tmp/mphost --queue` (50 random lists, P/N,
+  removal/adding mid-round, folder scope, in-order wrap, .SHF round trip; mutations of the code make it fail).
+  QEMU: /H /D: with 8 songs, N x9, P x2: 8 different songs, then a new round, P back through the order.
+- WINDOWS DOS BOX (NOT TESTED - no Win98 VM image in this session): g_win from INT 2Fh 1600h. Text: TWK/VESA/graphics
+  text modes from THEME.CFG are replaced by VGA80x25 for that run (THEME.CFG untouched). 3D: default mode 13h (a
+  window can show it; the VESA modes stayed black - most likely a windowed DOS box cannot show SVGA modes); a VESA mode
+  in Windows asks Y once per run. No retrace waits/measuring in Windows. __dpmi_yield() while nothing is due within
+  20 ms (text views), so SC55W gets the CPU. TO TEST: windowed + full-screen DOS box, text, panel and 3D views.
+- QEMU artefact: SeaBIOS delivers a grey arrow key twice through INT 16h AH=10h (KT test: AL=00 AH=48 x2), N/F2 once.
+  Not a MIDPLAY bug - remember it when driving MIDPLAY by sendkey.
+Zip = beta.95 zip + FILES\SC55\MIDPLAY.EXE + README.TXT (section 8: 3D modes, shuffle, Windows DOS box).
+To test on real PCs: Options > 3D screen mode / refresh on the D810 and P5PE; shuffle across restarts; N at song end;
+Win98 DOS box (windowed: text, panel, 3D in 320x200; Alt+Enter: a VESA mode).

@@ -2200,7 +2200,7 @@ int main(int argc, char** argv)
     if (g_ui) { m3_vbe_probe(); mp3_prepare(); if (m3_vbest >= 0) mp3_make_panel("", 0, 0); screen_sync(); ui_frame(); }   /* the slow BIOS work (3D mode, first frame) before the music */
     if (g_npl)
     {
-        if (start_index(g_cur >= 0 ? g_cur : 0) && seek_resume && g_last_pos > 2)
+        if (start_index(g_cur >= 0 ? g_cur : g_shuf ? next_index(0) : 0) && seek_resume && g_last_pos > 2)   /* shuffle: a random first song */
         {
             mp_seek((uint64_t)g_last_pos * 1000000ULL);
             msg("Back where you left: %s at %ld:%02ld (HOME starts the song from the beginning)", pl_name(g_cur), g_last_pos / 60, g_last_pos % 60);
