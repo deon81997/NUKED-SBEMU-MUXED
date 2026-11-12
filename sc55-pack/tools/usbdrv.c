@@ -16,7 +16,9 @@
 
 #define UD_INFO   (0x80 + 8 * (0x40 + 0x40))
 #define UD_INFOSZ 48
-#define UD_RINFO  (UD_INFO + 8 * UD_INFOSZ)   /* exFAT / NTFS drives (read-only, SBEMU's redirector) */
+#define UD_RINFO  (UD_INFO + 8 * UD_INFOSZ)
+#define UD_LOG    (UD_RINFO + 8 * UD_INFOSZ)
+#define UD_LOGN   64   /* exFAT / NTFS drives (read-only, SBEMU's redirector) */
 
 typedef struct { int letter, unit, state, fat, ok, redir; unsigned seg; char name[44]; double size, freeb; } Drv;
 static Drv D[26];
@@ -172,8 +174,31 @@ int main(int argc, char** argv)
 {
     __dpmi_regs r;
     int i;
+    if (argc > 1 && !strcasecmp(argv[1], "/L"))
+    {   /* SBEMU's last 64 USB drive requests from DOS (for bug reports) */
+        static const char* cn[] = { "init", "media check", "build bpb", "ioctl in", "read", "nd read", "in status", "in flush",
+            "write", "write+verify", "out status", "out flush", "ioctl out", "open", "close", "removable", "out busy", "?",
+            "?", "generic ioctl", "?", "?", "?", "get logical", "set logical", "ioctl query" };
+        unsigned nx, k;
+        unsigned long lg;
+        scan(0);
+        if (!ND) { printf("No USB drive letters.\n"); return 0; }
+        lg = lin(D[0].seg, UD_LOG);
+        nx = _farpeekw(_dos_ds, lg);
+        printf("USBDRV /L: last requests (oldest first), %u in all. Drives:", nx);
+        for (k = 0; k < (unsigned)ND; ++k) if (!D[k].redir) printf(" %c:=unit %d", 'A' + D[k].letter, D[k].unit);
+        printf("\n");
+        for (k = nx > UD_LOGN ? nx - UD_LOGN : 0; k < nx; ++k)
+        {
+            unsigned long e = lg + 4 + (k % UD_LOGN) * 8;
+            unsigned c = _farpeekb(_dos_ds, e), st = _farpeekw(_dos_ds, e + 2);
+            printf("%5u  unit %u  %-13s cmd %02Xh  status %04Xh%s  %s %lu\n", k, _farpeekb(_dos_ds, e + 1), c < 26 ? cn[c] : "?", c, st,
+                   st & 0x8000 ? " ERROR" : "      ", (c == 4 || c == 8 || c == 9) ? "sector" : "len", _farpeekl(_dos_ds, e + 4));
+        }
+        return 0;
+    }
     if (argc > 1 && !strcasecmp(argv[1], "/T")) g_text = 1;
-    else if (argc > 1) { printf("USBDRV [/T]\n"); return 1; }
+    else if (argc > 1) { printf("USBDRV [/T | /L]\n"); return 1; }
     scan(1);
     if (g_text)
     {

@@ -27,7 +27,9 @@
 #define UD_CDS   0x58
 #define UD_INFO  (UD_STUB + UD_UNITS * (UD_BPB + UD_DPB))   /* per unit 48 bytes for USBDRV: state, FAT bits, name */
 #define UD_INFOSZ 48
-#define UD_RINFO (UD_INFO + UD_UNITS * UD_INFOSZ)   /* 8 x 48 bytes: exFAT / NTFS drives of usbredir.c, for USBDRV */
+#define UD_RINFO (UD_INFO + UD_UNITS * UD_INFOSZ)
+#define UD_LOG   (UD_RINFO + 8 * UD_INFOSZ)        /* request log for USBDRV /L: word next, then 64 x 8 bytes */
+#define UD_LOGN  64   /* 8 x 48 bytes: exFAT / NTFS drives of usbredir.c, for USBDRV */
 
 typedef struct
 {
@@ -398,7 +400,7 @@ static void USBDISK_Req(void)
     int u = DPMI_LoadB(rq + 1), cmd = DPMI_LoadB(rq + 2);
     uint16_t st = 0;
     __asm__ __volatile__("sti");                                /* the sound keeps playing during a long read */
-    if (u >= NU) { rq_status(rq, ST_DONE | ST_ERR | 0x01); __asm__ __volatile__("cli"); return; }
+    if (u >= NU) { rq_status(rq, ST_DONE | ST_ERR | 0x01); __asm__ __volatile__("cli"); return; }   /* (not logged) */
     switch (cmd)
     {
     case 0x01:  /* MEDIA CHECK: 1 not changed, 0 don't know, -1 changed (+0Fh volume id) */
@@ -432,6 +434,15 @@ static void USBDISK_Req(void)
     default: st = ST_ERR | 0x03;                                /* unknown command */
     }
     rq_status(rq, ST_DONE | st);
+    {   /* request log: cmd, unit, status, start sector (read / write) or request length */
+        uint32_t lg = base_lin() + UD_LOG, e;
+        uint16_t nx = DPMI_LoadW(lg);
+        uint32_t sec = (cmd == 4 || cmd == 8 || cmd == 9) ? (DPMI_LoadW(rq + 0x14) == 0xFFFF && DPMI_LoadB(rq) >= 0x1E ?
+                       DPMI_LoadD(rq + 0x1A) : DPMI_LoadW(rq + 0x14)) : DPMI_LoadB(rq);
+        e = lg + 4 + (nx % UD_LOGN) * 8;
+        DPMI_StoreB(e, (uint8_t)cmd); DPMI_StoreB(e + 1, (uint8_t)u); DPMI_StoreW(e + 2, (uint16_t)(ST_DONE | st)); DPMI_StoreD(e + 4, sec);
+        DPMI_StoreW(lg, (uint16_t)(nx + 1));
+    }
     __asm__ __volatile__("cli");
 }
 
@@ -487,7 +498,7 @@ int USBDISK_Install(void)
     for (i = 0; i < NU; ++i)                                    /* letters must be free and next to each other */
         if (DPMI_LoadW(CdsBase + (drive + i) * UD_CDS + 0x43) & 0xC000) { NU = i; break; }
 
-    Seg = (uint16_t)DPMI_HighMalloc((UD_RINFO + 8 * UD_INFOSZ + 15) / 16, TRUE);
+    Seg = (uint16_t)DPMI_HighMalloc((UD_LOG + 4 + UD_LOGN * 8 + 15) / 16, TRUE);
     Cb = DPMI_AllocateRMCB_RETF(&USBDISK_Req, &Reg);
     if (!Seg || !Cb) { NU = 0; strcpy(Msg, "no memory for the drive stub"); return 0; }
     typedef char stub_fits[sizeof USBDISK_Stub <= UD_STUB ? 1 : -1]; (void)sizeof(stub_fits);
@@ -496,7 +507,7 @@ int USBDISK_Install(void)
     stub[0x0A] = (uint8_t)NU;
     memcpy(stub + 0x16, &Cb, 4);
     memcpy(stub + 0x0B, "USBDSK", 6);                           /* name field (unused in block devices): USBDRV finds us */
-    DPMI_LMemset(base_lin(), 0, UD_RINFO + 8 * UD_INFOSZ);
+    DPMI_LMemset(base_lin(), 0, UD_LOG + 4 + UD_LOGN * 8);
     DPMI_LMemcpy(base_lin(), DPMI_PTR2L(stub), sizeof stub);
 
     for (i = 0; i < NU; ++i)
