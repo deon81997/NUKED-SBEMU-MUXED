@@ -69,3 +69,12 @@ Review for 2,000-10,000 files, deep folders, long names. No fixed-size song arra
 - SBEMU, USBTEST, SBSET, SC55LOG rebuilt from main (usbdisk.c: drives follow their stick when usbpad renumbers disks,
   a card swapped in a card reader is seen after 2 s idle). Everything else in the zip is beta.94's.
 - fsread (exFAT/NTFS reader) is still a separate library, not built into SBEMU yet.
+
+## Shareware test games: General MIDI set (2026-11-11)
+
+- `testgames/` now holds ten untouched shareware archives. Added: `3dduke13.zip` (MD5 04e4ca70b8a2d59ed56c451c5c1d5d39, dosgames.com = archive.org 3dduke13SW), `htic_v12.zip` (MD5 420b23b3d8f2cbd164c121369eaa2b09, idgames mirror), `1rott13.zip`, `1rap12.zip` (user uploads), `desc14sw.exe` (dosgames.com original; a ZIP SFX holding ARJ .SOW parts).
+- Licences read from inside each archive: Duke LICENSE.TXT (free WWW/FTP sites OK), ROTT/Raptor VENDOR.DOC (free copying encouraged, unmodified), Heretic LICENSE.DOC (electronic distribution, compressed only), Descent README.TXT section 10 (freely distributable unmodified, no fees; read from the user's DOSBox copy since the ARJ parts were not unpacked here).
+- Doom 1.9 (`doom19s.zip`) has no licence file inside, so it stays a link only.
+- Tip: Doom/Heretic `*.1` + `*.2` joined with `cat` are a plain ZIP; Apogee `.SHR` files are ZIP SFX (`unzip` works).
+- README: new "★ Free Shareware Games!! ★" section after Download Zone with direct download links; Download Zone points to it.
+- Not done yet: playing each game's MIDI music through the SC-55 in 86Box.

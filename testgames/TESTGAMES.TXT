@@ -1,10 +1,12 @@
 NUKED SB-EMU - FREE TEST GAMES
 ==============================
 
-Five shareware games to try the pack with. Each ZIP is the authors' own,
-untouched shareware archive (taken from the 1994 "Super Shareware Collection"
-CD; only the CD's "_" was dropped from three file names). They are shareware:
-if you like one, the full game is sold today by its rights holder.
+Ten shareware games to try the pack with. Each file is the publisher's own,
+untouched shareware archive. The first five come from the 1994 "Super
+Shareware Collection" CD (only the CD's "_" was dropped from three file
+names); the five General MIDI games keep their original download names.
+They are shareware: if you like one, the full game is sold today by its
+rights holder.
 
 They are offered here as separate free downloads, exactly as their own
 licence files allow for online services and BBSes. They are NOT part of the
@@ -22,6 +24,18 @@ and pass them on only as the complete, unmodified ZIP files.
   BATS20.ZIP    Invasion of the Mutant Space Bats      Sound Blaster, joystick
                 of Doom (Pop Software)
 
+General MIDI games - for the SC-55 (MIDI port 330h):
+  3dduke13.zip  Duke Nukem 3D 1.3D shareware (3D Realms) GM music + SB effects
+                Bobby Prince's MIDI score, fast timer (TIMETEST / SBDIAG)
+  1rott13.zip   Rise of the Triad: The HUNT Begins 1.3  GM music + SB effects
+                (Apogee) - same sound library as Duke 3D, older version
+  1rap12.zip    Raptor: Call of the Shadows 1.2         GM music + SB effects
+                (Cygnus Studios / Apogee) - easy shooter, good long test
+  htic_v12.zip  Heretic 1.2 shareware (Raven / id)      GM music + SB effects
+                same sound code as Doom (DMX)
+  desc14sw.exe  Descent 1.4 shareware (Parallax /       GM music (HMI driver)
+                Interplay) - a ZIP that unzips itself; 3D with heavy CPU use
+
 What their licences say (from the files inside each ZIP):
   Epic MegaGames (LICENSE.DOC): bulletin boards and online services may
     distribute the game "as long as no files are altered or removed".
@@ -30,27 +44,42 @@ What their licences say (from the files inside each ZIP):
     (so these stay separate downloads, never inside the pack zip).
   Pop Software (READ.ME / VENDOR.DOC): "Please share BATS.ZIP by giving it
     to your friends and uploading it to your favorite BBS."
+  3D Realms (Duke 3D LICENSE.TXT): free WWW and FTP sites may make the game
+    available for downloading, with all files unmodified.
+  Apogee (ROTT and Raptor VENDOR.DOC): everyone is encouraged to copy, upload
+    and pass the program around without charging for it, all files
+    unmodified; CD-ROM or bundles need Apogee's permission.
+  id Software (Heretic LICENSE.DOC): electronic distribution is permitted,
+    royalty free, in compressed form only.
+  Parallax / Interplay (Descent README.TXT section 10): freely distributable
+    to anyone so long as it is unmodified and no fees are charged.
 
-Two more great test games - get them from their original places:
-  Doom 1.9 shareware (doom19s.zip): OPL, Sound Blaster and General MIDI
-    music -> the SC-55. idgames mirrors, e.g.
-    https://mirrors.lug.mtu.edu/idgames/idstuff/doom/
-  Duke Nukem 3D 1.3D shareware (3dduke13.zip): General MIDI music through
-    the SC-55, fast timer (TIMETEST / SBDIAG). Its LICENSE.TXT allows free
-    sharing; e.g. https://archive.org/details/3dduke13SW
+One more great test game - get it from its original place (its archive
+has no licence file, so we link to it instead of copying it):
+  Doom 1.9 shareware (doom19s.zip, MD5 244d181457c9be5f28b91b488e67e042):
+    OPL, Sound Blaster and General MIDI music -> the SC-55. idgames
+    mirrors, e.g. https://mirrors.lug.mtu.edu/idgames/idstuff/doom/
 
 How to use:
   1. Copy the ZIP to the PC (or a USB stick with /USBDISK:1, or a CD image).
   2. Unzip it into a folder, e.g. C:\GAMES\PINBALL (PKUNZIP or 7-Zip).
+     The Apogee / 3D Realms / id / Descent archives hold an installer:
+     unzip into a temporary folder and run INSTALL (Heretic: INSTALL.BAT).
   3. Start the SC-55 (SC55, or SC55JEM for real-mode games), run the game's
      setup and pick Sound Blaster at 220h, the IRQ / DMA SBEMU shows
      (SBSET or the BLASTER line), and AdLib / OPL music where offered.
   4. Or add it to MENU > Games so the menu starts it with the right
-     settings.
+     settings. For MIDI music pick "General MIDI" (or "Sound Canvas") at
+     port 330h.
 
-SHA-256 of the ZIPs as published here:
+SHA-256 of the files as published here:
+  7d6b062dcdc76d9ea02d8d71af14e5043223581d792f6ead4eb1316fd0351552  1rap12.zip
+  eea67a85845d52fa0ee7272e3ae24b79769ed1e8bdff7b1360904078bc51ad1e  1rott13.zip
+  c67efd179022bc6d9bde54f404c707cbcbdc15423c20be72e277bc2bdddf3d0e  3dduke13.zip
   c4e668089f4764e77a47db6197146c76490339b21044dbc2f30ce81137b3d8cf  BATS20.ZIP
   dd09095e2e8aa78bca06edb24b5f7896826b4ba803fc7b22b194945922660772  ELECTRO.ZIP
   08404dc700253b808d9e0e2e29ec27c8692ba9e9f14f12e41e73ae95ce2175b5  GOT100.ZIP
   5f14283e591990661708f1b337f540194d87fc51a19ae687bbdb0acee4f2d62e  HEART.ZIP
   a39831826bd4df1e7753694c1961ffe9b4596698cf3094144944aa61dccc4746  PINBALL.ZIP
+  3dadb7fbc01efce2904d0908c55d9a9cf1f402e83bf771970552efaca15efcb0  desc14sw.exe
+  5ffbb47e4a5750fef144c312973ee5782266b4a63474b77478103b6c1aaed39d  htic_v12.zip

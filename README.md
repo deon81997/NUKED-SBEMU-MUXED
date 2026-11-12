@@ -907,12 +907,60 @@ the same GPL.
 | **GSCDROM.SYS** (LG) | LG drives XCDROM doesn't like (optional) | [DOS Days](https://www.dosdays.co.uk/topics/Software/optical_downloads.php) | `FILES\GSCDROM` |
 | **QEMM 8 / 9** | `SC55QMM.BAT` only (optional) | Out of print; JEMMEX + QPIEMU (included) does the same job | `FILES\QEMM` |
 
-**Free test games!!** <img src="docs/90s/ic-pad.gif" alt=""> Five shareware games whose own licences let them be shared online, as
-untouched original ZIPs in [`testgames/`](testgames) (separate from the pack, not under its GPL):
-**Epic Pinball**, **Electro Man**, **Heartlight** (Epic MegaGames), **God of Thunder** (Software Creations) and
-**Invasion of the Mutant Space Bats of Doom** (Pop Software). [TESTGAMES.TXT](testgames/TESTGAMES.TXT) says what each one
-tests (Sound Blaster, OPL music, real-mode sound, joystick), how to set it up, and where to get the Doom and Duke Nukem 3D
-shareware from their own sources.
+**Free test games!!** <img src="docs/90s/ic-pad.gif" alt=""> Ten shareware games to try the pack with are waiting in
+[Free Shareware Games!!](#-free-shareware-games-) just below.
+
+<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+
+<div align="center"><img src="docs/90s/fd-marine-walk.gif" alt=""> <img src="docs/90s/ic-pad.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-pad.gif" alt=""> <img src="docs/90s/fd-potion.gif" alt=""></div>
+
+## ★ Free Shareware Games!! ★
+
+<div align="center"><img src="docs/90s/ic-sparkle.gif" alt=""> <b><font color="#00ff00">No games to test with? Grab these - FREE and LEGAL!!</font></b> <img src="docs/90s/ic-sparkle.gif" alt=""></div>
+
+Ten classic shareware games, each one the publisher's own **untouched original archive**, shared here exactly as its
+own licence file allows for free online sites. They live in [`testgames/`](testgames), separate from the pack: they
+are **not** in the release zip and **not** under our GPL. Don't sell them, and only pass them on as the complete,
+unmodified files. Liked one? The full game is still sold today by its rights holder.
+
+<details open>
+<summary><b>&gt;&gt; Sound Blaster + AdLib games &lt;&lt;</b></summary>
+
+| Download | Game | By | Sound | Tests |
+|---|---|---|---|---|
+| [`PINBALL.ZIP`](https://github.com/deon81997/NUKED-SBEMU-MUXED/raw/main/testgames/PINBALL.ZIP) | **Epic Pinball** | Epic MegaGames | Sound Blaster music + effects | SBEMU's Sound Blaster, DMA and mixing |
+| [`ELECTRO.ZIP`](https://github.com/deon81997/NUKED-SBEMU-MUXED/raw/main/testgames/ELECTRO.ZIP) | **Electro Man** | Epic MegaGames / XLAND | SB + AdLib music | OPL3 (FM) music next to SB effects |
+| [`HEART.ZIP`](https://github.com/deon81997/NUKED-SBEMU-MUXED/raw/main/testgames/HEART.ZIP) | **Heartlight** | Epic MegaGames / XLAND | SB + AdLib music | a light game for slow PCs, joystick |
+| [`GOT100.ZIP`](https://github.com/deon81997/NUKED-SBEMU-MUXED/raw/main/testgames/GOT100.ZIP) | **God of Thunder** | Software Creations | SB effects + AdLib music | real-mode sound (SC55JEM) |
+| [`BATS20.ZIP`](https://github.com/deon81997/NUKED-SBEMU-MUXED/raw/main/testgames/BATS20.ZIP) | **Invasion of the Mutant Space Bats of Doom** | Pop Software | Sound Blaster | sound + joystick |
+</details>
+
+<details open>
+<summary><b>&gt;&gt; General MIDI games - for the SC-55!! &lt;&lt;</b></summary>
+
+| Download | Game | By | Sound | Tests |
+|---|---|---|---|---|
+| [`3dduke13.zip`](https://github.com/deon81997/NUKED-SBEMU-MUXED/raw/main/testgames/3dduke13.zip) | **Duke Nukem 3D 1.3D** | 3D Realms | General MIDI + SB effects | Bobby Prince's MIDI score, fast timer |
+| [`1rott13.zip`](https://github.com/deon81997/NUKED-SBEMU-MUXED/raw/main/testgames/1rott13.zip) | **Rise of the Triad: The HUNT Begins 1.3** | Apogee | General MIDI + SB effects | same sound library as Duke, older |
+| [`1rap12.zip`](https://github.com/deon81997/NUKED-SBEMU-MUXED/raw/main/testgames/1rap12.zip) | **Raptor: Call of the Shadows 1.2** | Cygnus Studios / Apogee | General MIDI + SB effects | a good long music test |
+| [`htic_v12.zip`](https://github.com/deon81997/NUKED-SBEMU-MUXED/raw/main/testgames/htic_v12.zip) | **Heretic 1.2** | Raven / id Software | General MIDI + SB effects | the same sound code as Doom |
+| [`desc14sw.exe`](https://github.com/deon81997/NUKED-SBEMU-MUXED/raw/main/testgames/desc14sw.exe) | **Descent 1.4** | Parallax / Interplay | General MIDI (HMI driver) | 3D with heavy CPU use + MIDI |
+</details>
+
+**How to play:** unzip into a folder (the Apogee, 3D Realms, id and Descent archives hold an installer: unzip to a
+temporary folder and run `INSTALL`, Heretic `INSTALL.BAT`). Start the SC-55, then in the game's setup pick
+**Sound Blaster** at 220h with the IRQ / DMA SBEMU shows, and for music **General MIDI** (or Sound Canvas) at port
+**330h**, or AdLib for the FM games. Or add the game to **MENU &gt; Games**.
+
+**What their licences say:** Epic MegaGames and Software Creations allow online services and BBSes to share them
+with no files changed; Pop Software asks you to share Space Bats with friends; 3D Realms lets free web and FTP sites
+offer Duke 3D; Apogee encourages everyone to copy and pass ROTT and Raptor around free of charge; id Software
+permits electronic distribution of Heretic in compressed form; Descent is freely distributable unmodified with no
+fees. The full quotes, setup tips and SHA-256 checksums are in [TESTGAMES.TXT](testgames/TESTGAMES.TXT).
+
+**Doom?** The Doom 1.9 shareware archive has no licence file in it, so we link instead of copying: get
+`doom19s.zip` from the [idgames mirror](https://mirrors.lug.mtu.edu/idgames/idstuff/doom/) (MD5
+`244d181457c9be5f28b91b488e67e042`).
 
 <div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
