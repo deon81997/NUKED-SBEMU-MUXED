@@ -18,7 +18,9 @@
 #define UD_INFOSZ 48
 #define UD_RINFO  (UD_INFO + 8 * UD_INFOSZ)
 #define UD_LOG    (UD_RINFO + 8 * UD_INFOSZ)
-#define UD_LOGN   64   /* exFAT / NTFS drives (read-only, SBEMU's redirector) */
+#define UD_LOGN   64
+#define UD_DIAG   (UD_LOG + 4 + UD_LOGN * 8)
+#define UD_DIAGSZ 160   /* exFAT / NTFS drives (read-only, SBEMU's redirector) */
 
 typedef struct { int letter, unit, state, fat, ok, redir; unsigned seg; char name[44]; double size, freeb; } Drv;
 static Drv D[26];
@@ -140,6 +142,8 @@ static void row(int i, char* o, int n)
     if (d->state == 1 && d->ok)
         snprintf(o, n, "%c:  %-28.28s %-6s %9s %9s%s", 'A' + d->letter, d->name[0] ? d->name : "(USB disk)", fs, mb(d->size, a), mb(d->freeb, b),
                  d->redir ? "  read-only" : "");
+    else if (d->state == 1)
+        snprintf(o, n, "%c:  %-28.28s %-6s  DOS gives an error for it (send USBDRV /L)", 'A' + d->letter, d->name[0] ? d->name : "(USB disk)", fs);
     else if (d->redir)
         snprintf(o, n, "%c:  %-28.28s %-6s  not ready (stick out?)", 'A' + d->letter, d->name[0] ? d->name : "(USB disk)", fs);
     else if (d->state == 2)
@@ -194,6 +198,19 @@ int main(int argc, char** argv)
             unsigned c = _farpeekb(_dos_ds, e), st = _farpeekw(_dos_ds, e + 2);
             printf("%5u  unit %u  %-13s cmd %02Xh  status %04Xh%s  %s %lu\n", k, _farpeekb(_dos_ds, e + 1), c < 26 ? cn[c] : "?", c, st,
                    st & 0x8000 ? " ERROR" : "      ", (c == 4 || c == 8 || c == 9) ? "sector" : "len", _farpeekl(_dos_ds, e + 4));
+        }
+        for (k = 0; k < (unsigned)ND; ++k)
+        {
+            unsigned long g = lin(D[0].seg, UD_DIAG + D[k].unit * UD_DIAGSZ);
+            int j;
+            if (D[k].redir) continue;
+            printf("%c: unit %d  start %lu size %lu  FAT%d fat32ok %d  53h flags %04X ax %04X\n   BPB:", 'A' + D[k].letter, D[k].unit,
+                   _farpeekl(_dos_ds, g), _farpeekl(_dos_ds, g + 4), _farpeekb(_dos_ds, g + 12), _farpeekb(_dos_ds, g + 13),
+                   _farpeekw(_dos_ds, g + 8), _farpeekw(_dos_ds, g + 10));
+            for (j = 0; j < 64; ++j) printf("%s%02X", j && j % 32 == 0 ? "\n       " : " ", _farpeekb(_dos_ds, g + 16 + j));
+            printf("\n   MBR 1BEh:");
+            for (j = 0; j < 66; ++j) printf("%s%02X", j && j % 16 == 0 ? "\n            " : " ", _farpeekb(_dos_ds, g + 80 + j));
+            printf("\n");
         }
         return 0;
     }

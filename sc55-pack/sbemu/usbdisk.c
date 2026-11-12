@@ -29,7 +29,9 @@
 #define UD_INFOSZ 48
 #define UD_RINFO (UD_INFO + UD_UNITS * UD_INFOSZ)
 #define UD_LOG   (UD_RINFO + 8 * UD_INFOSZ)        /* request log for USBDRV /L: word next, then 64 x 8 bytes */
-#define UD_LOGN  64   /* 8 x 48 bytes: exFAT / NTFS drives of usbredir.c, for USBDRV */
+#define UD_LOGN  64
+#define UD_DIAG  (UD_LOG + 4 + UD_LOGN * 8)       /* per unit 160 bytes for USBDRV /L: start, size, AH=53h result, BPB, MBR 1BEh.. */
+#define UD_DIAGSZ 160   /* 8 x 48 bytes: exFAT / NTFS drives of usbredir.c, for USBDRV */
 
 typedef struct
 {
@@ -498,7 +500,7 @@ int USBDISK_Install(void)
     for (i = 0; i < NU; ++i)                                    /* letters must be free and next to each other */
         if (DPMI_LoadW(CdsBase + (drive + i) * UD_CDS + 0x43) & 0xC000) { NU = i; break; }
 
-    Seg = (uint16_t)DPMI_HighMalloc((UD_LOG + 4 + UD_LOGN * 8 + 15) / 16, TRUE);
+    Seg = (uint16_t)DPMI_HighMalloc((UD_DIAG + UD_UNITS * UD_DIAGSZ + 15) / 16, TRUE);
     Cb = DPMI_AllocateRMCB_RETF(&USBDISK_Req, &Reg);
     if (!Seg || !Cb) { NU = 0; strcpy(Msg, "no memory for the drive stub"); return 0; }
     typedef char stub_fits[sizeof USBDISK_Stub <= UD_STUB ? 1 : -1]; (void)sizeof(stub_fits);
@@ -507,7 +509,7 @@ int USBDISK_Install(void)
     stub[0x0A] = (uint8_t)NU;
     memcpy(stub + 0x16, &Cb, 4);
     memcpy(stub + 0x0B, "USBDSK", 6);                           /* name field (unused in block devices): USBDRV finds us */
-    DPMI_LMemset(base_lin(), 0, UD_LOG + 4 + UD_LOGN * 8);
+    DPMI_LMemset(base_lin(), 0, UD_DIAG + UD_UNITS * UD_DIAGSZ);
     DPMI_LMemcpy(base_lin(), DPMI_PTR2L(stub), sizeof stub);
 
     for (i = 0; i < NU; ++i)
@@ -520,6 +522,14 @@ int USBDISK_Install(void)
         r.w.es = Seg; r.w.bp = (uint16_t)(dp - base_lin());
         if (Fat32Ok) { r.w.cx = 0x4558; r.w.dx = 0x4152; }
         dos_call(&r);
+        {   /* diagnostics for USBDRV /L: partition, AH=53h flags/AX, the BPB given, the disk's partition table */
+            uint32_t dg = base_lin() + UD_DIAG + i * UD_DIAGSZ;
+            DPMI_StoreD(dg, U[i].start); DPMI_StoreD(dg + 4, U[i].size);
+            DPMI_StoreW(dg + 8, r.w.flags); DPMI_StoreW(dg + 10, r.w.ax); DPMI_StoreB(dg + 12, (uint8_t)U[i].fat);
+            DPMI_StoreB(dg + 13, (uint8_t)Fat32Ok);
+            DPMI_LMemcpy(dg + 16, bpb_lin(i), 64);
+            if (U[i].disk >= 0 && !dread(U[i].disk, 0, 1, Sec)) DPMI_LMemcpy(dg + 80, DPMI_PTR2L(Sec + 446), 66);
+        }
         DPMI_StoreB(dp + 0, (uint8_t)U[i].drive); DPMI_StoreB(dp + 1, (uint8_t)i);
         DPMI_StoreW(dp + 0x13, 0); DPMI_StoreW(dp + 0x15, Seg);
         DPMI_StoreB(dp + 0x18, 0xFF);                           /* not accessed yet: DOS asks BUILD BPB */
