@@ -1368,3 +1368,5 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
   disks (MAX_MSD 4). Tested: QEMU EHCI USBTEST + SBEMU /USBDISK:1 COPY 2.7 MB exact, 86Box OHCI hot-plug USBTEST.
 - Still open for the drive-letter side (usbdisk.c, session 4 owner): spare units so a stick plugged in after SBEMU
   starts gets a letter.
+- Stick pulled out during a COPY (QEMU EHCI, SBEMU /USBDISK:1): DOS says "drive not ready" (Abort/Retry/Fail), no
+  hang (a transport failure now checks the root port's connect bit: the port monitor cannot run during a request).

@@ -2048,6 +2048,14 @@ const USBPAD_Disk* USBPAD_DiskInfo(int n)
     return &s->lun[l];
 }
 
+/* is device di still plugged in? (root port connect status; the port monitor cannot run during a disk request) */
+static int dev_present(int di)
+{
+    while (di >= 0 && D[di].parent >= 0) di = D[di].parent;   /* behind a hub: its root port at least */
+    if (di < 0) return 0;
+    return (pstat(D[di].hc, D[di].rootport) & PS_CCS) != 0;
+}
+
 static int disk_rw(int n, uint32_t lba, int count, uint8_t* p, int wr)
 {
     msd_init_pending();
@@ -2079,6 +2087,7 @@ static int disk_rw(int n, uint32_t lba, int count, uint8_t* p, int wr)
                 if ((sn >> 16) == 2) { u->ready = 0; r = USBPAD_E_NOTREADY; break; }
                 if ((sn >> 16) == 7) { u->wp = 1; r = USBPAD_E_WP; break; }
             }
+            if (t < 0 && !dev_present(s->dev)) { u->ready = 0; r = USBPAD_E_NOTREADY; break; }   /* unplugged mid-request */
             if (k == 1) r = USBPAD_E_IO;
         }
         lba += (uint32_t)c; count -= c; p += (uint32_t)c * u->bsize;
