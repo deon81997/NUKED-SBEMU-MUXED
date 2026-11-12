@@ -3,7 +3,7 @@
 ; (tools/mkusbdisk.sh). A DOS block device header + strategy / interrupt routines; the interrupt routine
 ; far-calls SBEMU's protected-mode handler (DPMI real-mode callback, RETF style) with ES:BX = request header.
 ; cbvec 0 (SBEMU gone or not set up yet): every request -> "drive not ready".
-; Layout used by usbdisk.c: 00h header, 12h request pointer, 16h callback, 1Ah volume id, 30h code.
+; Layout used by usbdisk.c: 00h header, 12h request pointer, 16h callback, 1Ah volume id, 28h/2Ch call counters, 30h code.
 bits 16
 org 0
 next:   dd -1               ; 00 next device (DOS fills it when linked)
@@ -26,12 +26,14 @@ intr:   pushf
         push gs
         pushad
         cld
+        inc dword [cs:0x28]         ; calls from DOS (USBDRV /L shows it)
         les bx, [cs:reqp]
         cmp dword [cs:cbvec], 0
         je .nr
         call far [cs:cbvec]
         jmp .out
-.nr:    mov word [es:bx+3], 0x8102  ; error, done, not ready
+.nr:    inc dword [cs:0x2C]         ; ... that found no SBEMU callback
+        mov word [es:bx+3], 0x8102  ; error, done, not ready
 .out:   popad
         pop gs
         pop fs

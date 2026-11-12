@@ -189,6 +189,7 @@ int main(int argc, char** argv)
         if (!ND) { printf("No USB drive letters.\n"); return 0; }
         lg = lin(D[0].seg, UD_LOG);
         nx = _farpeekw(_dos_ds, lg);
+        printf("Driver stub: %lu calls from DOS, %lu without SBEMU's callback\n", _farpeekl(_dos_ds, lin(D[0].seg, 0x28)), _farpeekl(_dos_ds, lin(D[0].seg, 0x2C)));
         printf("USBDRV /L: last requests (oldest first), %u in all. Drives:", nx);
         for (k = 0; k < (unsigned)ND; ++k) if (!D[k].redir) printf(" %c:=unit %d", 'A' + D[k].letter, D[k].unit);
         printf("\n");
