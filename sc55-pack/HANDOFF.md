@@ -1340,7 +1340,11 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
   96 MB fixed VHDs, NTFS with 8dot3 on + exFAT, fills them: long/unicode names, 600-file folder, hidden/system/
   read-only, fragmented, 64 MB sparse, compressed, ADS, 150 hard links -> $ATTRIBUTE_LIST; writes FSRNTFS.TXT /
   FSREXFAT.TXT with Windows' own 8.3 names, sizes, attributes, MD5). Check: `python3 test/win/checkwin.py
-  FSTEST FSRNTFS.VHD FSRNTFS.TXT`. Script not yet run on Windows (no Windows here); waiting for the user.
+  FSTEST FSRNTFS.VHD FSRNTFS.TXT`.
+- First Windows-made volume (user's PC, FSRNTFS.VHD, MBR partition at LBA 128): all 652 entries identical to ntfs-3g
+  (names, sizes, content incl. fragmented, 64 MB sparse, empty), all 652 Windows 8.3 names identical (incl. Windows'
+  hashed FIB28D~1.DAT style), attributes right. The script stopped after the sparse step (no compressed/ADS/hard
+  links, no .TXT): mkvhd.ps1 now skips a failing step and always writes the listing. exFAT VHD not received yet.
 - Still not tested: volumes made by Windows itself (real 8dot3 names, Windows $MFT/index layout; needs a
   small VHD/stick image from a Windows XP+ PC; Win98 cannot make NTFS/exFAT), speed on the real PCs.
 - USB session (2026-11-11): USBPAD_DiskWrite (WRITE 10, same path as reads), USBPAD_E_WP + USBPAD_Disk.wp (MODE SENSE

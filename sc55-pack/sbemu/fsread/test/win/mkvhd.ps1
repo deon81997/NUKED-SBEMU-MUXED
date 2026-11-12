@@ -20,6 +20,7 @@ function Bytes($n, $seed) { $b = New-Object byte[] $n; (New-Object Random $seed)
 function Put($p, $n, $seed) { [IO.File]::WriteAllBytes($p, (Bytes $n $seed)) }
 function Txt($p, $s) { [IO.File]::WriteAllText($p, $s) }
 
+function Try-Step($what, $code) { try { & $code } catch { Write-Host "  ($what skipped: $_)" } }
 function Fill($r, $ntfs) {
     $u = [string][char]0xFC + 'n' + [char]0xEF + 'code ' + [char]0x2713 + '.txt'   # unicode name
     Txt "$r\small.txt" "hello`n"; Txt "$r\readme.txt" "readme`r`n"; Txt "$r\UPPER.TXT" "upper`n"
@@ -39,16 +40,15 @@ function Fill($r, $ntfs) {
     New-Item -ItemType Directory "$r\many" | Out-Null
     0..599 | ForEach-Object { Txt "$r\many\file with long name $_.dat" "$_" }
     if ($ntfs) {
-        $f = "$r\sparse.bin"; [IO.File]::WriteAllBytes($f, (New-Object byte[] 0))
-        & fsutil sparse setflag $f | Out-Null
+        Try-Step 'sparse' { $f = "$r\sparse.bin"; [IO.File]::WriteAllBytes($f, (New-Object byte[] 0))
+        & cmd /c "fsutil sparse setflag `"$f`" >nul 2>&1"
         $s = [IO.File]::OpenWrite($f); $s.SetLength(64MB)
         foreach ($o in 0, 5MB, 33MB, 64MB - 4096) { $s.Position = $o; $b = Bytes 4096 $o; $s.Write($b, 0, 4096) }
-        $s.Close()
-        Txt "$r\compressed.txt" ('compress me ' * 20000); & compact /c "$r\compressed.txt" | Out-Null
-        Txt "$r\ads.txt" 'main stream'; & cmd /c "echo secret> `"$r\ads.txt:hidden`"" | Out-Null
-        New-Item -ItemType Directory "$r\links" | Out-Null
-        Txt "$r\links\target.txt" 'linked'
-        1..150 | ForEach-Object { & fsutil hardlink create "$r\links\hard link number $_.txt" "$r\links\target.txt" | Out-Null }
+        $s.Close() }
+        Try-Step 'compressed' { Txt "$r\compressed.txt" ('compress me ' * 20000); & cmd /c "compact /c `"$r\compressed.txt`" >nul 2>&1" }
+        Try-Step 'stream' { Txt "$r\ads.txt" 'main stream'; & cmd /c "echo secret> `"$r\ads.txt:hidden`" 2>nul" }
+        Try-Step 'hard links' { New-Item -ItemType Directory "$r\links" | Out-Null; Txt "$r\links\target.txt" 'linked'
+            1..150 | ForEach-Object { & cmd /c "fsutil hardlink create `"$r\links\hard link number $_.txt`" `"$r\links\target.txt`" >nul 2>&1" } }
     }
 }
 
@@ -81,7 +81,10 @@ function Make($fs, $letter, $name) {
     DP "create vdisk file=`"$vhd`" maximum=96 type=fixed`r`nselect vdisk file=`"$vhd`"`r`nattach vdisk`r`ncreate partition primary`r`nformat fs=$fs quick label=$name`r`nassign letter=$letter`r`n"
     for ($i = 0; $i -lt 30 -and -not (Test-Path "${letter}:\"); $i++) { Start-Sleep 1 }
     if ($fs -eq 'NTFS') { & fsutil 8dot3name set "${letter}:" 0 | Out-Null }   # make 8.3 names like a system drive
-    try { Fill "${letter}:" ($fs -eq 'NTFS'); List "${letter}:" (Join-Path $out "$name.TXT") $fs }
+    try {
+        try { Fill "${letter}:" ($fs -eq 'NTFS') } catch { Write-Host "  (filling stopped: $_)" }
+        List "${letter}:" (Join-Path $out "$name.TXT") $fs
+    }
     finally { DP "select vdisk file=`"$vhd`"`r`ndetach vdisk`r`n" }
 }
 
