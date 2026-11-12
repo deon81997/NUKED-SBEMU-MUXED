@@ -27,7 +27,8 @@
 
 typedef struct
 {
-    int disk;                  /* USBPAD disk number */
+    int disk;                  /* USBPAD disk number (shifts when an earlier disk goes: see unit_disk) */
+    int lun;                   /* card reader slot; with gen: which stick the drive belongs to */
     int part;                  /* which FAT partition on that disk (0..) */
     int fat;                   /* 12 / 16 / 32 */
     uint32_t start, size;      /* partition on the disk */
@@ -225,10 +226,36 @@ static int load_bpb(int u)
     return 0;
 }
 
+/* usbpad numbers disks in table order, so unplugging the first stick renumbers the second: follow each drive's stick
+ * by its plug-in gen (a global counter in usbpad, so two sticks of the same model differ) + LUN. A new stick in the
+ * drive's number that no other drive owns counts as a new medium for the drive (and for its partner partitions). */
+static const USBPAD_Disk* unit_disk(int u)
+{
+    uint32_t old = U[u].gen;
+    int lun = U[u].lun, from = U[u].disk, n, k, nd = USBPAD_Disks();
+    const USBPAD_Disk* d;
+    for (n = 0; n < nd; ++n)
+        if ((d = USBPAD_DiskInfo(n)) && d->gen == old && d->lun == lun)
+        {
+            if (n != from)
+            {
+                cache_drop(from); cache_drop(n);
+                for (k = 0; k < NU; ++k) if (U[k].gen == old && U[k].lun == lun) U[k].disk = n;
+            }
+            return d;
+        }
+    if (!(d = USBPAD_DiskInfo(from))) return NULL;
+    for (k = 0; k < NU; ++k) if (U[k].gen == d->gen && U[k].lun == d->lun) return NULL;   /* another drive's stick */
+    cache_drop(from);
+    for (k = 0; k < NU; ++k)
+        if (U[k].gen == old && U[k].lun == lun) { U[k].gen = d->gen; U[k].lun = d->lun; U[k].ok = 0; U[k].changed = 1; }
+    return d;
+}
+
 /* medium check of unit u: same disk gen -> 1; new medium -> re-find the partition (0 if gone) */
 static int unit_check(int u)
 {
-    const USBPAD_Disk* d = USBPAD_DiskInfo(U[u].disk);
+    const USBPAD_Disk* d = unit_disk(u);
     Part p[UD_UNITS];
     int n;
     if (!d || !d->ready) { if (U[u].ok) { U[u].ok = 0; U[u].changed = 1; cache_drop(U[u].disk); } return 0; }
@@ -368,6 +395,7 @@ int USBDISK_Install(void)
             memset(x, 0, sizeof *x);
             x->disk = d; x->part = i; x->fat = pt[i].fat; x->start = pt[i].start; x->size = pt[i].size;
             x->gen = di ? di->gen : 0; x->ok = 1;
+            if (di) x->lun = di->lun;
         }
     }
     if (!NU) { NU = 0; strcpy(Msg, "no FAT partition on the USB disk(s)"); return 0; }

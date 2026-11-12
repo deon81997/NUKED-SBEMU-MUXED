@@ -1274,6 +1274,17 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
 - 86Box (user's sc55-devkit tar, P2B-LS + ES1371 + usb_msd, testrig/86box/drvtest.sh; start Xvfb :9 with setsid first,
   else it dies with the background shell): FreeDOS on UHCI and on OPTi OHCI (disk plugged at 25 s), MS-DOS 7.1 on UHCI:
   FAT16 + logical FAT32 DIR / TYPE / 300 KB copies exact. (Its @screen grab at the end often misses the socket.)
+- Review fix (same day): usbpad numbers disks in table order, so unplugging the first stick renumbered the second and
+  its drive letter moved (D: showed stick 2, E:/F: "not ready"; with writes it would have written to the wrong stick).
+  Drives now follow their stick by plug-in gen (global MsGen) + LUN (unit_disk); a new stick in a gone stick's number
+  is that drive's new medium. QEMU: 2 sticks, first unplugged -> its letters "not ready", the other's still right;
+  swap in the same port -> new contents. Rig: qemu-usbdrive.sh EV="28:device_del+us1 ..." (monitor commands in time).
+- Wanted from the USB session too: a per-LUN media-change counter in USBPAD_Disk (card reader: card swapped without a
+  not-ready read in between -> gen stays, unit attention is absorbed inside DiskRead, usbdisk.c cannot tell and DOS keeps
+  the old card's buffers / our cache). Today only a read that hits "not ready" or a re-plug is noticed.
+- Speed (COPY /B to NUL, DOS TIME): QEMU EHCI 4 MB 1.0 s FAT16 (2 KB clusters), 1.4 s FAT32 (512 B clusters) - about
+  half the raw 7.7 MB/s, and C: (IDE) is only 5.4 MB/s in the same test, so DOS's copy is a large part; 86Box UHCI 4 MB
+  in 3.9 s = 1.05 MB/s = USBTEST's raw speed (0.85 MB/s with 16 KB reads): no measurable overhead from the drive layer.
 - NOT tested: SBEMU unload, games running (RMCB from a DPMI
   game), real PCs (D810 ICH6, P5PE-VM NEC EHCI).
 ## fsread: read-only exFAT + NTFS reader library (2026-11-11, not built into anything yet)

@@ -7,7 +7,7 @@
 # Sticks are hot-plugged at P s (default 6) while DELAY runs: plugged at boot, SeaBIOS maps them as INT 13h disks and
 # FreeDOS gives them letters itself (writable, not ours). D="id:port ..." (default "s1:1 s2:4"), images vm/sa.img
 # (MBR FAT16 + logical FAT32), sg.img (GPT FAT16), sf.img (superfloppy FAT12); B=uh.0 QX="-device piix3-usb-uhci,id=uh,addr=5"
-# for UHCI. Each DOS cmd's output goes to C:\UT.TXT -> NAME-UT.TXT; screen at the end -> NAME.ppm.
+# for UHCI. EV="28:device_del+us1 ..." runs monitor commands at given seconds (+ = space). Each DOS cmd's output goes to C:\UT.TXT -> NAME-UT.TXT; screen at the end -> NAME.ppm.
 N=$1; shift; cd /home/claude/vm; R=/home/claude/nuked-sbemu-muxed/sc55-pack
 M() { echo "$1" | socat - UNIX-CONNECT:/home/claude/vm/qmon.sock >/dev/null; }
 { printf '@ECHO OFF\r\nHDPMI32I -r -x\r\nDELAY\r\nSBEMU /JOY:1 /USBDISK:1 > C:\\SB.TXT\r\nVER > C:\\UT.TXT\r\n'
@@ -20,6 +20,7 @@ timeout ${T:-60} qemu-system-i386 -m 64 -display none -no-reboot -audiodev none,
   -device ich9-usb-uhci3,masterbus=ehci.0,firstport=4,addr=1d.2,multifunction=on \
   -drive if=none,id=s1,file=sa.img,format=raw -drive if=none,id=s2,file=sg.img,format=raw -drive if=none,id=s3,file=sf.img,format=raw \
   -monitor unix:/home/claude/vm/qmon.sock,server,nowait $QX > qemu.log 2>&1 &
+for e in $EV; do (sleep ${e%%:*}; M "$(echo ${e#*:} | tr + " ")") & done   # EV="28:device_del+us1": monitor command (+ = space) at 28 s
 sleep ${P:-6}; for d in ${D:-s1:1 s2:4}; do M "device_add usb-storage,bus=${B:-ehci.0},port=${d#*:},drive=${d%:*},id=u${d%:*}"; done
 sleep $(( ${T:-60} - ${P:-6} - 4 )); M "screendump /home/claude/vm/$N.ppm"; wait
 python3 $R/testrig/mkdisk.py get q.img UT.TXT $N-UT.TXT >/dev/null && tr -d '\r' < $N-UT.TXT | grep -v '^$'
