@@ -36,6 +36,7 @@ typedef struct
     int changed;               /* a new medium seen: next MEDIA CHECK says "changed" */
     int ok;                    /* partition there now */
     uint32_t last;             /* BIOS tick of the last access */
+    uint32_t sig;              /* CRC of LBA 0 + the partition's boot sector: tells a swapped card (same gen) */
     int drive;                 /* 0 = A: */
 } Unit;
 
@@ -252,6 +253,16 @@ static const USBPAD_Disk* unit_disk(int u)
     return d;
 }
 
+/* CRC of the disk's LBA 0 and the unit's boot sector, read past the cache; 0 = read failed */
+static uint32_t unit_sig(int u)
+{
+    uint32_t c;
+    if (dread(U[u].disk, 0, 1, Sec)) return 0;
+    c = crc32(Sec, 512);
+    if (dread(U[u].disk, U[u].start, 1, Sec)) return 0;
+    return (c ^ crc32(Sec, 512)) | 1;
+}
+
 /* medium check of unit u: same disk gen -> 1; new medium -> re-find the partition (0 if gone) */
 static int unit_check(int u)
 {
@@ -266,6 +277,7 @@ static int unit_check(int u)
     if (U[u].part >= n) return 0;
     U[u].start = p[U[u].part].start; U[u].size = p[U[u].part].size; U[u].fat = p[U[u].part].fat;
     if (load_bpb(u)) return 0;
+    U[u].sig = unit_sig(u);
     U[u].ok = 1;
     return 1;
 }
@@ -344,7 +356,16 @@ static void USBDISK_Req(void)
     {
         int8_t m;
         if (!unit_check(u) || U[u].changed) m = -1;
-        else m = (DPMI_LoadD(0x46C) - U[u].last < 37) ? 1 : 0;
+        else if (DPMI_LoadD(0x46C) - U[u].last < 37) m = 1;
+        else
+        {   /* idle 2 s: a card reader's card may have been swapped without a re-plug (usbpad keeps the gen and
+             * absorbs the unit attention) - compare LBA 0 + boot sector, and start the cache afresh anyway */
+            uint32_t sg = unit_sig(u);
+            cache_drop(U[u].disk);
+            m = 0;
+            if (sg != U[u].sig) { U[u].ok = 0; unit_check(u); m = -1; }   /* -1 also when the new card has no FAT */
+            U[u].last = DPMI_LoadD(0x46C);
+        }
         if (m == -1) U[u].changed = 0;
         DPMI_StoreB(rq + 0x0E, (uint8_t)m);
         DPMI_StoreW(rq + 0x0F, 0x1A); DPMI_StoreW(rq + 0x11, Seg);
@@ -396,6 +417,7 @@ int USBDISK_Install(void)
             x->disk = d; x->part = i; x->fat = pt[i].fat; x->start = pt[i].start; x->size = pt[i].size;
             x->gen = di ? di->gen : 0; x->ok = 1;
             if (di) x->lun = di->lun;
+            x->sig = unit_sig(NU - 1);
         }
     }
     if (!NU) { NU = 0; strcpy(Msg, "no FAT partition on the USB disk(s)"); return 0; }

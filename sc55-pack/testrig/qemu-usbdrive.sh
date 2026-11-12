@@ -9,7 +9,7 @@
 # (MBR FAT16 + logical FAT32), sg.img (GPT FAT16), sf.img (superfloppy FAT12); B=uh.0 QX="-device piix3-usb-uhci,id=uh,addr=5"
 # for UHCI. EV="28:device_del+us1 ..." runs monitor commands at given seconds (+ = space). Each DOS cmd's output goes to C:\UT.TXT -> NAME-UT.TXT; screen at the end -> NAME.ppm.
 N=$1; shift; cd /home/claude/vm; R=/home/claude/nuked-sbemu-muxed/sc55-pack
-M() { echo "$1" | socat - UNIX-CONNECT:/home/claude/vm/qmon.sock >/dev/null; }
+M() { echo "$1" | socat - UNIX-CONNECT:/home/claude/vm/qmon.sock | tr -d "\033" | tail -c 300 >> /home/claude/vm/$N-mon.log; }
 { printf '@ECHO OFF\r\nHDPMI32I -r -x\r\nDELAY\r\nSBEMU /JOY:1 /USBDISK:1 > C:\\SB.TXT\r\nVER > C:\\UT.TXT\r\n'
   for c in "$@"; do printf '%s >> C:\\UT.TXT\r\n' "$c"; done; printf 'ECHO DONE >> C:\\UT.TXT\r\n'; } > ${C:-c}/AUTOEXEC.BAT
 python3 $R/testrig/mkdisk.py build ${C:-c} q.img 100 >/dev/null
