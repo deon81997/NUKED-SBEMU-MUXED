@@ -215,6 +215,26 @@ def win98():
     return m
 
 
+def claude():
+    """Claude as a little voxel buddy (original figure, not a logo): coral body, typing on a beige keyboard"""
+    m = {}
+    C, D = (217, 119, 87), (180, 90, 62)
+    box(m, 2, 2, 0, 10, 8, 7, C)                                    # body
+    box(m, 1, 1, 7, 11, 9, 15, C)                                   # head
+    box(m, 3, 0, 10, 5, 1, 13, (255, 255, 255)); m[(4, -1, 11)] = (30, 20, 20)   # eyes
+    box(m, 8, 0, 10, 10, 1, 13, (255, 255, 255)); m[(8, -1, 11)] = (30, 20, 20)
+    for x in range(5, 8): m[(x, 0, 8)] = (90, 40, 30)               # smile, corners up
+    m[(4, 0, 9)] = m[(8, 0, 9)] = (90, 40, 30)
+    m[(2, 0, 9)] = m[(10, 0, 9)] = (250, 160, 150)                  # cheeks
+    box(m, 5, 4, 15, 7, 6, 17, D); box(m, 4, 3, 17, 8, 7, 19, (255, 200, 90))   # antenna with a light
+    box(m, 0, 0, 3, 2, 3, 5, C); box(m, 10, 0, 3, 12, 3, 5, C)      # arms reaching forward
+    box(m, -1, -5, 0, 13, -1, 2, (215, 205, 180))                   # keyboard
+    for x in range(0, 12, 2):
+        for y in (-4, -2): m[(x, y, 2)] = (240, 235, 220)
+    box(m, 3, 2, -3, 5, 5, 0, D); box(m, 7, 2, -3, 9, 5, 0, D)      # legs
+    return m
+
+
 if __name__ == '__main__':
     render(sc55(), (240, 150), scale=8, tilt=0.75, name='vox-sc55.gif')
     render(pc(), (200, 200), scale=7, tilt=0.4, name='vox-pc.gif')
@@ -226,5 +246,6 @@ if __name__ == '__main__':
                            (gamepad, 5, 0.9, 'USB GAMEPADS|as a DOS joystick'), (keymouse, 5, 0.8, 'USB KEYB + MOUSE|in plain DOS'),
                            (joystick, 6, 0.45, 'GAMEPORT|CH, TM, GrIP'), (win98, 5, 0.35, 'WINDOWS 98|DOS boxes + MIDI')):
         render(fn(), (180, 110), scale=sc, tilt=t, name='vox-part-%s.gif' % fn.__name__, cap=cap)
+    render(claude(), (200, 200), scale=7, tilt=0.45, name='vox-claude.gif', cap='CLAUDE|wrote this pack!!')
     for f in sorted(os.listdir(OUT)):
         if f.startswith('vox-'): print(f, os.path.getsize(os.path.join(OUT, f)))

@@ -2,7 +2,14 @@
 
 <table>
 <tr>
-<td align="center" valign="top"><picture><img src="docs/90s/fd-marine-shoot.gif" alt="Freedoom marine"></picture><br><br><picture><img src="docs/90s/tux-waddle.gif" width="120" alt="Tux"></picture><br><br><picture><img src="docs/90s/fd-soulsphere.gif" alt="soul sphere"></picture><br><br><picture><img src="docs/90s/port220-small.gif" width="96" alt="Port 220"></picture></td>
+<td align="center" width="140"><picture><img src="docs/90s/vox-claude.gif" width="130" alt="Claude as a voxel buddy, typing"></picture></td>
+<td><b>A note from the webmaster!!</b> The new code, the docs and all the art on this page were made by <b>Claude</b>, an AI by <a href="https://www.anthropic.com/">Anthropic</a>, working with me: I pick what to build and test every build on my real PCs, Claude writes it and checks it in emulators first. It all stands on <a href="https://github.com/crazii/SBEMU">SBEMU</a>, <a href="https://github.com/nukeykt/Nuked-SC55">Nuked-SC55</a> and other open-source projects (see <a href="#-thanks-to-my-friends-">Thanks</a>).</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td align="center" valign="top"><picture><img src="docs/90s/fd-marine-shoot.gif" alt="Freedoom marine"></picture><br><br><picture><img src="docs/90s/tux-waddle.gif" width="120" alt="Tux"></picture><br><br><picture><img src="docs/90s/fd-soulsphere.gif" alt="soul sphere"></picture><br><br><picture><img src="docs/90s/port220-small.gif" width="96" alt="Port 220"></picture><br><br><picture><img src="docs/90s/vox-port220.gif" width="110" alt="Port 220 in voxels"></picture><br><br><picture><img src="docs/90s/fd-hatchling.gif" alt="Freedoom hatchling"></picture><br><br><picture><img src="docs/90s/ic-speaker.gif" alt="speaker"></picture><br><br><picture><img src="docs/90s/vox-flopsy.gif" width="100" alt="Flopsy in voxels"></picture><br><br><picture><img src="docs/90s/fd-zombie.gif" alt="Freedoom zombie"></picture></td>
 <td align="center" valign="top">
 
 <picture><img src="docs/90s/title.gif" width="560" alt="NUKED SB-EMU"></picture>
@@ -39,7 +46,7 @@
 <br><br>
 
 </td>
-<td align="center" valign="top"><picture><img src="docs/90s/fd-serpentipede-attack.gif" alt="Freedoom serpentipede"></picture><br><br><picture><img src="docs/90s/mascot-canvaskid.gif" width="120" alt="Canvas Kid"></picture><br><br><picture><img src="docs/90s/fd-keycard.gif" alt="keycard"></picture></td>
+<td align="center" valign="top"><picture><img src="docs/90s/fd-serpentipede-attack.gif" alt="Freedoom serpentipede"></picture><br><br><picture><img src="docs/90s/mascot-canvaskid.gif" width="120" alt="Canvas Kid"></picture><br><br><picture><img src="docs/90s/fd-keycard.gif" alt="keycard"></picture><br><br><picture><img src="docs/90s/vox-pc.gif" width="110" alt="A voxel DOS PC"></picture><br><br><picture><img src="docs/90s/fd-potion.gif" alt="potion"></picture><br><br><picture><img src="docs/90s/ic-cd.gif" alt="CD"></picture><br><br><picture><img src="docs/90s/vox-sc55.gif" width="120" alt="A voxel sound module"></picture><br><br><picture><img src="docs/90s/fd-trilobite.gif" alt="Freedoom trilobite"></picture></td>
 </tr>
 </table>
 
