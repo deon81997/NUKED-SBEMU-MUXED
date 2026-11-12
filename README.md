@@ -76,6 +76,8 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/11/2026: beta.94.** **USB sticks get a DOS drive letter!!** Start SBEMU with /USBDISK:1 (and LASTDRIVE=Z in CONFIG.SYS) and the USB sticks and card readers plugged in get the next free drive letters: FAT12/16 everywhere, FAT32 on MS-DOS 7.1 and FreeDOS, read AND write, USB 2.0 speed on USB 2.0 ports. Copy your CD images or game files onto a stick and use them straight from DOS. Tested in QEMU and 86Box: reading on FreeDOS, MS-DOS 7.1 and 6.22, writing on FreeDOS (2.7 MB copies byte-exact, write-protect switch honoured). Experimental and off by default: please try it on your PCs. exFAT / NTFS sticks come next.
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/11/2026: beta.93.** **USB sticks, first step!!** USBTEST now finds USB sticks and card readers: name, size, the start of the disk and a 1 MB read test. On USB 2.0 ports they run at full USB 2.0 speed (the NEC card tested: about 680 KB/s with small reads, more now), and pads, keyboards and mice on the same ports still go to the USB 1.1 side as before. Test only for now: the drive letter in DOS comes next. SBEMU itself works as in beta.92.
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/11/2026: beta.92.** **An empty CD drive no longer freezes the PC!!** If a game or tool looked at the virtual CD drive M: while no disc was in it, the DOS extender under all the 32-bit programs (HDPMI32I) crashed with an error it could not show, and the PC just seemed to hang: a likely cause of the "read error / init error" freezes with CD games. Found with a register dump in 86Box and fixed in HDPMI; the program now simply gets "not ready". The same HDPMI also fixes the Borland extender (SSF2 Turbo's MAKESWP). **CD images from ANY drive:** the CD images screen and MENU's game CD picker open any folder on any drive (D or Tab = next drive), remember the last folder, and F2 / G set and open your home folder. Also in this build: MIDPLAY handles thousands of MIDI files, and the SC-55 sound chip code is about 4% faster (same sound bit for bit).
@@ -88,15 +90,15 @@ second mount), so the game said "no CD", or failed with read or init errors. MEN
 and if a disc still cannot be mounted it says so and does not start the game. Tested in 86Box: disc swap works, and
 Doom runs straight from the virtual drive with SBEMU and the SC-55 loaded (its WAD read back bit-identical).
 
+<details>
+<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.90-w98.6.** **Windows 98 catches up with DOS!!** MIDPLAY in a Windows
 DOS box now shows the SC-55's (or MT-32's) REAL display, live, just like in DOS: the Windows driver answers its
 front-panel query now. The Windows side also runs on the same CPUs as DOS: SC55W.EXE picks the fast SSE2 build on a
 Pentium 4 / M and newer, and a Pentium II build on a Pentium II / III or Athlon XP (before, those could not run it at
 all). And a MIDPLAY fix: in a Windows DOS box its clock could think the CPU ran at a few MHz (Windows delivers the
 BIOS timer late and in bursts) and raced to the end of a song; it now calibrates over a full second there.
-
-<details>
-<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.89-w98.5.** **Blood sounds right in Windows 98!!** Blood's effects
 (Sound Blaster 16, 44 kHz) came out in short bursts with gaps in a Windows DOS box. Recorded in our Windows 98 test PC:

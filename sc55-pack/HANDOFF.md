@@ -1320,3 +1320,11 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
   cache lines, WP -> status 00h). Tested: QEMU EHCI HS + piix UHCI, 86Box OPTi OHCI: COPY of a 2.7 MB file to the stick
   byte-exact (read back on the host), ECHO > D:\NEW.TXT; QEMU readonly stick -> "write-protection violation".
   NOTE: /USBDISK:1 also switches EHCIs with companions to high-speed mode in SBEMU (pads handed over per port).
+
+## beta.94 (2026-11-11): /USBDISK drive letters, read and write (RELEASED, tag v1.0.0-beta.94-usb)
+- Zip = beta.93 zip with SBEMU.EXE, USBTEST.EXE, SC55MENU.EXE and README.TXT (/USBDISK section) swapped in.
+- Without /USBDISK SBEMU's USB is as before (86Box P2B-LS: both pads, usb_msd connected but unused).
+- Not tested yet: real PCs (D810 ICH6 UHCI+EHCI, P5PE-VM NEC EHCI) with /USBDISK:1, games running while a stick is
+  read (RMCB from a DPMI game), writes on MS-DOS 7.1 / 6.22.
+- Next: session 5 redirector (exFAT / NTFS through sbemu/fsread, FAT32 on DOS 6.22), disks plugged after SBEMU starts
+  (spare units), stable disk ids, BIOS INT 13h takeover for sticks the BIOS had mapped (keeps their boot letters).
