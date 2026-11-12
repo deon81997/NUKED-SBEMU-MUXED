@@ -127,6 +127,7 @@ SBEMU_SRC := sbemu/dbopl.cpp \
 		 sbemu/dpmi/djgpp/gopint.c \
 	     main.c \
 	     sbemu/cdlink.c \
+	     sbemu/usbdisk.c \
 	     qemm.c \
 	     utility.c \
 	     hdpmipt.c \
@@ -234,6 +235,13 @@ output/padconv.exe: tools/padmap/padconv.c
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
 	$(SILENTCMD)$(CC) -O2 -march=i386 -o $@ $< -s
+
+# USB disk block device stub (bytes in a header; the header is committed, nasm only needed after an .asm change)
+sbemu/usbdiskbin.h: sbemu/usbdisk.asm
+	$(SILENTMSG) "NASM\t$@\n"
+	$(SILENTCMD)nasm -f bin -o output/usbdisk.bin $< && (echo "/* generated from usbdisk.asm (makefile) */"; \
+	  echo "static const unsigned char USBDISK_Stub[] = {"; od -An -v -tx1 output/usbdisk.bin | sed 's/ \([0-9a-f][0-9a-f]\)/0x\1,/g'; echo "};") > $@
+output/sbemu/usbdisk.o: sbemu/usbdiskbin.h
 
 output/sbemu16.com: tools/sbemu16.asm
 	@mkdir -p $(dir $@)

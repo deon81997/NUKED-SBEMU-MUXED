@@ -181,6 +181,11 @@ media: detect by a valid BPB / exFAT / NTFS signature at LBA 0.
    (HS and split for FS sticks behind the rate-matching hub). Speed test in USBTEST.
 4. **DOS block device (FAT12/16/32).** Real-mode stub + RMCB, DEVLOAD-style DPB/CDS linking, MBR/GPT/
    superfloppy, sector cache + read-ahead, media check, unload. Test on 6.22, 7.1, FreeDOS.
+   DONE (read-only, 2026-11-11): `sbemu/usbdisk.c/.h` + stub `sbemu/usbdisk.asm` (bytes in `usbdiskbin.h`), SBEMU
+   option `/USBDISK:1` (off by default). Only the public usbpad.h API. Writes answer "write protected" (TODO:
+   needs `USBPAD_DiskWrite`). QEMU + FreeDOS (rufus kernel) (testrig/qemu-usbdrive.sh): MBR FAT16, logical FAT32, GPT
+   FAT16, superfloppy FAT12 on EHCI HS and on UHCI; 300 KB copies byte-exact; stick swap -> new medium seen; unplug ->
+   "drive not ready". Not tried: MS-DOS 7.1 / 6.22 (needs the user's system files), 86Box (devkit tar), real PCs.
 5. **Redirector skeleton + exFAT read-only.** INT 2Fh stub, CDS setup, the 11xxh calls, 8.3 aliases,
    exFAT reader. FAT32-on-6.22 through the same path (a small FAT reader).
 6. **NTFS read-only.** MFT, runlists, index B+ trees, attribute lists, sparse; refuse compressed/encrypted.

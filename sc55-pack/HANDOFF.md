@@ -1242,3 +1242,31 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
   old 4 KB reads (retest with beta.93's 16 KB). Idle cost: none (no periodic disk work, async schedule off).
 - Next: session 4 (DOS drive letter), session 2 rest (writes, unplug during a request). Parallel prompts for the
   user: docs/USB-STORAGE.md section 8.
+
+## USB disks, session 4: DOS drive letters (2026-11-11, DOS session, not released)
+- New: sbemu/usbdisk.c/.h, stub sbemu/usbdisk.asm -> sbemu/usbdiskbin.h (makefile rule, nasm + od; header committed).
+  main.c: option /USBDISK (0 default; adds USBPAD_F_DISK to /JOY's USBPAD_Init flags), USBDISK_Install() after
+  "1 s of polling went fine", USBDISK_Uninstall() before USBPAD_Shutdown. usbpad.c untouched.
+- How: DEVLOAD style. Stub (attr 0802h: removable + 32-bit sectors, no generic IOCTL) in DPMI_HighMalloc(UMB) memory
+  with per-unit BPB + DPB slots; its interrupt routine far-calls a RETF RMCB (USBDISK_Req, STI inside). Device linked
+  after NUL; DPBs from INT 21h AH=53h (CX/DX 'XE','AR' extended form on DOS 7.10+ / FreeDOS; FAT12/16 BPBs get
+  synthesised FAT32 fields), access flag FFh, appended to the DPB chain; CDS entries copied from C:'s, path X:\,
+  cluster 0, flags 4000h; letters = first free after the block devices, up to LASTDRIVE (LoL+20h bumped when
+  contiguous). One unit per FAT partition (max 8): MBR primaries + logicals, GPT basic data (header CRC), superfloppy.
+  Media check: gen changed -> "changed" (partitions re-found), < 2 s since the last access -> "not changed", else
+  "don't know". Cache: 16 x 4 KB lines for 1-sector reads; longer reads via a 32 KB bounce buffer. E_BUSY retried.
+- Limits / TODO: writes return "write protected" (needs USBPAD_DiskWrite from the USB session; then write-through
+  into the cache lines); disks with blocks != 512 skipped; units fixed at install (a disk plugged after SBEMU loads gets
+  no letter; swapping the medium in a known disk works); usbpad finds at most 2 disks (MAX_MSD); FAT32 on DOS < 7.10
+  is skipped (redirector, session 5); exFAT/NTFS: session 5/6.
+- Wanted from the USB session (usbpad.h): USBPAD_DiskWrite(n, lba, count, buf) with write-protect reported
+  (e.g. USBPAD_E_WP, from MODE SENSE or sense 07/27h) - usbdisk.c rq_rw() has the TODO; a disk id stable across
+  other disks' unplugs would help (disk numbers shift today).
+- Tested: QEMU 8.2.2 + FreeDOS KERNEL.SYS from rufus res/freedos + JEMMEX + HDPMI32I + AC97 playing, testrig/qemu-usbdrive.sh
+  (sticks hot-plugged after boot, else SeaBIOS maps them to INT 13h and FreeDOS letters them itself). EHCI HS and
+  piix UHCI: DIR / TYPE / COPY of 300 KB from MBR FAT16 + logical FAT32 + GPT FAT16 + superfloppy FAT12 byte-exact;
+  medium swap seen; unplug -> "drive not ready"; write -> "write-protection violation".
+- NOT tested: MS-DOS 7.1 (needs the user's IO.SYS/MSDOS.SYS/COMMAND.COM; check its CDS 49h..4Ch and the extended DPB),
+  MS-DOS 6.22, 86Box/msdtest.sh (devkit tar not attached this session), SBEMU unload, games running (RMCB from a DPMI
+  game), real PCs (D810 ICH6, P5PE-VM NEC EHCI).
+

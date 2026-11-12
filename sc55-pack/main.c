@@ -227,6 +227,7 @@ static BOOL MAIN_HookInt15(int joy)
  * running programs; the layout used is the newest program found by its own id, else the newest found by a file in
  * its folder (data files identify games too), else Default - as SC55W does it in Windows 98. */
 #include "sbemu/int21bin.h"
+#include "sbemu/usbdisk.h"
 #define MAIN_PADSTK 8
 static DPMI_REG MAIN_I21REG;
 static uint32_t MAIN_I21Lin;           /* the stub (its data bytes), 0 = not hooked */
@@ -777,6 +778,7 @@ struct MAIN_OPT
     "/JOYMODE", "Gameport stick type: 0=standard, 1=CH Flightstick Pro (D-pad = hat), 2=Thrustmaster FCS (D-pad = hat on axis 4), 3=Gravis GamePad Pro digital (GrIP, all buttons, 2 pads), 4=none (real gameport stays usable)", 0, MAIN_SETCMD_BASE10,
     "/USBKB", "USB keyboard typed through the PC's keyboard controller (1=on, 0=off; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
     "/USBMS", "USB mouse for a DOS mouse driver loaded after SBEMU (1=auto, 2=always, 0=off; needs /JOY:1). Without JEMM/QEMM it goes through the BIOS, next to the touchpad", 1, MAIN_SETCMD_BASE10,
+    "/USBDISK", "USB sticks / card readers as DOS drive letters, FAT12/16/32, read-only for now (1=on, 0=off; needs /JOY:1 and LASTDRIVE high enough). Experimental", 0, MAIN_SETCMD_BASE10,
     "/JOYBIOS", "BIOS joystick calls (INT 15h AH=84h) answered from the USB pad too (1=on, 0=off; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
     "/PADKEYS", "Pad buttons -> keyboard keys with a layout per game, from PADMAP.TXT / PADUSER.TXT in SBEMU's folder (1=on, 0=off: only /JOYKEY; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
     "/PADLOG", "Show which pad layout the loaded SBEMU picked for the last programs started (SBEMU /PADLOG)", 0, MAIN_SETCMD_BASE10,
@@ -847,6 +849,7 @@ enum EOption
     OPT_JOYMODE,
     OPT_USBKB,
     OPT_USBMS,
+    OPT_USBDISK,
     OPT_JOYBIOS,
     OPT_PADKEYS,
     OPT_PADLOG,
@@ -1295,6 +1298,7 @@ static void MAIN_Cleanup()
     if(MAIN_KBC_RM) { QEMM_Uninstall_IOPortTrap(&MAIN_KBC_IOPT); MAIN_KBC_RM = FALSE; }
     if(MAIN_KBC_PM60) { HDPMIPT_Uninstall_IOPortTrap(&MAIN_KBC_IOPT_PM60); MAIN_KBC_PM60 = FALSE; }
     if(MAIN_KBC_PM64) { HDPMIPT_Uninstall_IOPortTrap(&MAIN_KBC_IOPT_PM64); MAIN_KBC_PM64 = FALSE; }
+    USBDISK_Uninstall();
     if(MAIN_JOY_On) { MAIN_JOY_On = FALSE; USBPAD_Shutdown(); }
     if(OldRoutedHandle.valid)
         HDPMIPT_InstallIRQRoutedHandlerH(aui.card_irq, &OldRoutedHandle);
@@ -2176,7 +2180,8 @@ int main(int argc, char* argv[])
             MAIN_CPrintf(YELLOW, "Joystick: \"%s\" not understood in /JOYAX, /JOYBT or /JOYKEY, USB off.\n", bad ? bad : "?");
         else
         {
-            int flags = (MAIN_Options[OPT_USBKB].value ? USBPAD_F_KBD : 0) | (MAIN_Options[OPT_USBMS].value ? USBPAD_F_MOUSE : 0);
+            int flags = (MAIN_Options[OPT_USBKB].value ? USBPAD_F_KBD : 0) | (MAIN_Options[OPT_USBMS].value ? USBPAD_F_MOUSE : 0)
+                | (MAIN_Options[OPT_USBDISK].value ? USBPAD_F_DISK : 0);
             VKBC_Init(MAIN_TCps, 0);
             USBPAD_SetHid(&VKBC_UsbKeys, &VKBC_UsbMouse);
             int usb_ok;
@@ -2264,6 +2269,13 @@ int main(int argc, char* argv[])
                     while(DIAG_Tsc() - t0 < MAIN_TCps) {}
                 }
                 MAIN_Step("USB: 1 s of polling went fine");
+                if(MAIN_Options[OPT_USBDISK].value)
+                {
+                    MAIN_Step("USB: disk drive letters (/USBDISK)");
+                    if(USBDISK_Install()) MAIN_CPrintf(LIGHTGREEN, "USB disk: %s\n", USBDISK_Msg());
+                    else MAIN_CPrintf(YELLOW, "USB disk: %s.\n", USBDISK_Msg());
+                    MAIN_D("USB disk: %s\n", USBDISK_Msg());
+                }
             }
         }
         MAIN_D("Joystick mode %d\n", MAIN_Options[OPT_JOYMODE].value);
