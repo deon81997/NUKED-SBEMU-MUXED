@@ -15,3 +15,22 @@ H4 = ?SKIP_CLISTI=0; H5 = H1 + pushad/popad around the real-mode IRQ call. SBEMU
 - i1-i10: the game's INSTALL.EXE menus (attempt to select No Sound; the setting did not save).
 
 MAKESWP itself exited normally in every run on this machine (no exit hang).
+
+## USB exFAT / NTFS drive letters (USB disks session 5, 2026-11-12)
+
+QEMU 8.2, EHCI, two USB sticks hot-plugged after boot (stick 1: MBR NTFS + exFAT = D: E:, stick 2: GPT exFAT = F:),
+`SBEMU /JOY:1 /USBDISK:1` built with sbemu/usbredir.c hooked in (scratch build). Each is the screen at the end of a
+run: SBEMU's start-up lines ("USB disk: 3 drive(s) D: E: F:, first NTFS 29 MB, read-only") and whatever DOS printed
+to the screen (error messages); the commands' normal output went to a log file, summarised in HANDOFF.md
+("USB disks, session 5").
+
+| File | Run |
+|---|---|
+| usbredir-freedos-0-replug-qemu-refused.png | FreeDOS, unplug/replug, first try (QEMU refused the re-plug: "drive already in use"; test rig, not our code) |
+| usbredir-freedos-1-dir-type-copy.png | FreeDOS: DIR, TYPE, COPY from D: E: F:, missing file, write refused ("Unable to open file 'D:\X.SYS'") |
+| usbredir-freedos-2-cd-and-writes-refused.png | FreeDOS: CD into a USB folder, relative TYPE, COPY to / MD / DEL / REN refused |
+| usbredir-freedos-3-unplug-replug.png | FreeDOS: stick 1 unplugged (D: E: not ready, F: still works) and plugged back (D: E: back) |
+| usbredir-msdos71-1-dir-type-copy.png | MS-DOS 7.1: same as freedos-1 ("Access denied - D:\X.SYS") |
+| usbredir-msdos71-2-djgpp-program.png | MS-DOS 7.1: DJGPP program reading through the redirector (copy, seek from end, opendir, stat) |
+| usbredir-msdos71-3-stat-sizes.png | MS-DOS 7.1: findfirst / stat / fstat sizes |
+| usbredir-msdos71-4-unplug-replug-new-usbpad.png | MS-DOS 7.1: unplug / replug again with the DOS session's newer usbpad.c |
