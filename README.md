@@ -22,7 +22,7 @@
 
 <picture><img src="docs/90s/port220-hello.gif" width="400" alt="Port 220, the NUKED SB-EMU mascot, says hi"></picture> <picture><img src="docs/90s/vox-claude.gif" width="130" alt="Claude as a voxel buddy, typing"></picture>
 
-<h3>~ What's inside my PC?? ~</h3><sub>(everything NUKED SB-EMU does for your DOS games: click a part!!)</sub><br>
+<h3>~ What's inside my PC?? ~</h3><picture><img src="docs/90s/doodle-parts.gif" width="150" alt="click the parts!"></picture><sub>(everything NUKED SB-EMU does for your DOS games: click a part!!)</sub><br>
 <a href="#-supported-sound-chips-"><img src="docs/90s/vox-part-soundcard.gif" width="130" alt="Sound Blaster 16 on any PCI sound card"></a>
 <a href="#-what-is-this-"><img src="docs/90s/vox-part-sc55.gif" width="130" alt="Roland SC-55, General MIDI"></a>
 <a href="#-cool-features-"><img src="docs/90s/vox-part-cdrom.gif" width="130" alt="CD audio and CD images"></a>
@@ -38,7 +38,7 @@
 
 <br><br>
 
-<a href="https://github.com/deon81997/NUKED-SBEMU-MUXED/releases/latest"><img src="docs/90s/btn-download.gif" alt="Download"></a>
+<picture><img src="docs/90s/doodle-click.gif" width="150" alt="click me!!"></picture><a href="https://github.com/deon81997/NUKED-SBEMU-MUXED/releases/latest"><img src="docs/90s/btn-download.gif" alt="Download"></a>
 <picture><img src="docs/90s/btn-sc55.gif" alt="SC-55 inside"></picture>
 <picture><img src="docs/90s/btn-sb16.gif" alt="Sound by SB16"></picture>
 <picture><img src="docs/90s/btn-dos.gif" alt="Powered by DOS 7.1"></picture>
@@ -94,6 +94,8 @@
 <div align="center"><picture><img src="docs/90s/fd-marine-walk.gif" alt=""></picture> <picture><img src="docs/90s/ic-news.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-news.gif" alt=""></picture> <picture><img src="docs/90s/fd-serpentipede.gif" alt=""></picture></div>
 
 ## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> What's NEW!! <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
+
+<picture><img src="docs/90s/vox-sec-tv.gif" width="140" align="right" alt=""></picture>
 
 <picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/12/2026: beta.98.** **USB sticks after "Restart in MS-DOS mode"!!** Windows 98 keeps the letters it gave your USB stick and DOS then refuses them ("Invalid function"). SBEMU now checks every USB letter and moves any refused one to the next free letter, so both partitions of a stick read again (MENU > CD-ROM > USB drives shows where they went). Tested in QEMU with Win98 SE: stick used in Windows, then MS-DOS mode.
 
@@ -304,6 +306,8 @@ never takes more than about 60% of the CPU, so your game always gets the rest.
 
 </details>
 
+<div align="center"><picture><img src="docs/90s/note-news.gif" width="240" alt="a sticky note"></picture></div>
+
 <div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
 <div align="center"><picture><img src="docs/90s/fd-zombie.gif" alt=""></picture> <picture><img src="docs/90s/ic-sparkle.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-sparkle.gif" alt=""></picture> <picture><img src="docs/90s/mascot-flopsy.gif" alt=""></picture></div>
@@ -357,65 +361,65 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 <details>
 <summary><b>&gt;&gt; Sound Blaster, FM and PC speaker &lt;&lt;</b></summary>
 
-- Sound Blaster 1.x, 2.0, Pro, Pro 2 and 16: 8- and 16-bit DMA, mono, stereo, high-speed modes, Creative ADPCM
-- Any port (220 / 240), IRQ (5 / 7 / 9) and DMA; `BLASTER` is set for games automatically
-- If your sound chip already sits on the IRQ you picked, SBEMU grabs a free one instead of giving up
-- OPL3 FM: [Nuked-OPL3-fast](https://github.com/tgies/Nuked-OPL3-fast) (cycle-accurate) or DOSBox's fast core; hardware FM pass-through on cards that have it
-- PC speaker sound mixed into the output
-- Protected-mode games out of the box (HDPMI32i); real-mode games with JEMMEX + QPIEMU (included) or QEMM
-- 16-bit protected-mode games (Borland Pascal / C++ DPMI, like Jazz Jackrabbit) with SBEMU16 + HDPMI16I (`SC55J16.BAT`)
+- <picture><img src="docs/90s/ball-red.gif" width="14" alt="o"></picture> Sound Blaster 1.x, 2.0, Pro, Pro 2 and 16: 8- and 16-bit DMA, mono, stereo, high-speed modes, Creative ADPCM
+- <picture><img src="docs/90s/ball-blue.gif" width="14" alt="o"></picture> Any port (220 / 240), IRQ (5 / 7 / 9) and DMA; `BLASTER` is set for games automatically
+- <picture><img src="docs/90s/ball-green.gif" width="14" alt="o"></picture> If your sound chip already sits on the IRQ you picked, SBEMU grabs a free one instead of giving up
+- <picture><img src="docs/90s/ball-gold.gif" width="14" alt="o"></picture> OPL3 FM: [Nuked-OPL3-fast](https://github.com/tgies/Nuked-OPL3-fast) (cycle-accurate) or DOSBox's fast core; hardware FM pass-through on cards that have it
+- <picture><img src="docs/90s/ball-red.gif" width="14" alt="o"></picture> PC speaker sound mixed into the output
+- <picture><img src="docs/90s/ball-blue.gif" width="14" alt="o"></picture> Protected-mode games out of the box (HDPMI32i); real-mode games with JEMMEX + QPIEMU (included) or QEMM
+- <picture><img src="docs/90s/ball-green.gif" width="14" alt="o"></picture> 16-bit protected-mode games (Borland Pascal / C++ DPMI, like Jazz Jackrabbit) with SBEMU16 + HDPMI16I (`SC55J16.BAT`)
 </details>
 
 <details>
 <summary><b>&gt;&gt; MIDI: SC-55, MT-32, CM-32L, SoundFont &lt;&lt;</b></summary>
 
-- **SC-55** (mk1 v1.00 – v2.00) and **SC-55mkII** (v1.01), ROM sets found by content, the best one picked for you
-- **MT-32** and **CM-32L / LAPC-I** with Munt 2.8.5
-- **SoundFont** (`.SF2`) with reverb and chorus, for slower PCs
-- MPU-401 on any port (330, 300, 310, 320, 332, 334)
-- Render-ahead buffer and automatic speed control keep the music smooth while games run
-- **Automatic setup** measures each ROM set on your CPU and picks the best one it can handle
-- **Front panel in games**: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>F12</kbd> shows the SC-55 / MT-32 display over the game
-- `MIDPLAY`: MIDI player with five pages (player, playlist, files, options, help): titles and lengths read in the background, type-to-find, sorting, .M3U lists, speed 25-400%, mute/solo per channel, resume where you quit, a live SC-55 front panel and a sharp 640×480 3D view, in every text and VESA mode
-- `SC55WAV` / `SC55LOG`: render an SC-55 demo to WAV and see how fast your PC runs each ROM set
+- <picture><img src="docs/90s/ball-gold.gif" width="14" alt="o"></picture> **SC-55** (mk1 v1.00 – v2.00) and **SC-55mkII** (v1.01), ROM sets found by content, the best one picked for you
+- <picture><img src="docs/90s/ball-red.gif" width="14" alt="o"></picture> **MT-32** and **CM-32L / LAPC-I** with Munt 2.8.5
+- <picture><img src="docs/90s/ball-blue.gif" width="14" alt="o"></picture> **SoundFont** (`.SF2`) with reverb and chorus, for slower PCs
+- <picture><img src="docs/90s/ball-green.gif" width="14" alt="o"></picture> MPU-401 on any port (330, 300, 310, 320, 332, 334)
+- <picture><img src="docs/90s/ball-gold.gif" width="14" alt="o"></picture> Render-ahead buffer and automatic speed control keep the music smooth while games run
+- <picture><img src="docs/90s/ball-red.gif" width="14" alt="o"></picture> **Automatic setup** measures each ROM set on your CPU and picks the best one it can handle
+- <picture><img src="docs/90s/ball-blue.gif" width="14" alt="o"></picture> **Front panel in games**: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>F12</kbd> shows the SC-55 / MT-32 display over the game
+- <picture><img src="docs/90s/ball-green.gif" width="14" alt="o"></picture> `MIDPLAY`: MIDI player with five pages (player, playlist, files, options, help): titles and lengths read in the background, type-to-find, sorting, .M3U lists, speed 25-400%, mute/solo per channel, resume where you quit, a live SC-55 front panel and a sharp 640×480 3D view, in every text and VESA mode
+- <picture><img src="docs/90s/ball-gold.gif" width="14" alt="o"></picture> `SC55WAV` / `SC55LOG`: render an SC-55 demo to WAV and see how fast your PC runs each ROM set
 </details>
 
 <details>
 <summary><b>&gt;&gt; Virtual CD drive and CD music &lt;&lt;</b></summary>
 
-- Mounts `.ISO`, `.CUE/.BIN` (raw or 2048-byte) and multi-disc games on drive **M:** (uCDD 0.9.5-a3 + SHSUCDX 3.09, both built from source)
-- **M: is the first CD drive**, even when a real CD-ROM drive is there too, so games find the disc instead of your empty drive
-- **The drive plays CD music by itself** like a real one: play, pause, resume, track time, "busy" until the track ends, PREGAP in CUE sheets
-- **CD music played through your sound card**, mixed with the game (`HYBRID.BAT`)
-- Swap discs while SBEMU runs; the music stops when a disc comes out
-- CD images screen: disc label and date, track list with lengths, file list without mounting, run a disc's installer, fix broken CUE files
-- Drivers for a **real CD-ROM drive** in DOS: XCDROM (included), VIDE-CDD, LG GSCDROM, MSCDEX
+- <picture><img src="docs/90s/ball-red.gif" width="14" alt="o"></picture> Mounts `.ISO`, `.CUE/.BIN` (raw or 2048-byte) and multi-disc games on drive **M:** (uCDD 0.9.5-a3 + SHSUCDX 3.09, both built from source)
+- <picture><img src="docs/90s/ball-blue.gif" width="14" alt="o"></picture> **M: is the first CD drive**, even when a real CD-ROM drive is there too, so games find the disc instead of your empty drive
+- <picture><img src="docs/90s/ball-green.gif" width="14" alt="o"></picture> **The drive plays CD music by itself** like a real one: play, pause, resume, track time, "busy" until the track ends, PREGAP in CUE sheets
+- <picture><img src="docs/90s/ball-gold.gif" width="14" alt="o"></picture> **CD music played through your sound card**, mixed with the game (`HYBRID.BAT`)
+- <picture><img src="docs/90s/ball-red.gif" width="14" alt="o"></picture> Swap discs while SBEMU runs; the music stops when a disc comes out
+- <picture><img src="docs/90s/ball-blue.gif" width="14" alt="o"></picture> CD images screen: disc label and date, track list with lengths, file list without mounting, run a disc's installer, fix broken CUE files
+- <picture><img src="docs/90s/ball-green.gif" width="14" alt="o"></picture> Drivers for a **real CD-ROM drive** in DOS: XCDROM (included), VIDE-CDD, LG GSCDROM, MSCDEX
 </details>
 
 <details>
 <summary><b>&gt;&gt; Menus and tools &lt;&lt;</b></summary>
 
-- **MENU**: sound, settings, tests, games, CD-ROM and files in one place; shows whether SBEMU is loaded and the port, IRQ, DMA and MIDI port it really uses
-- **Games**: per-game profiles (SBEMU options, CD image, arguments)
-- **SETTINGS**: every option on one screen; changes apply to a running SBEMU straight away
-- <kbd>F3</kbd> in any program switches the colour style for all of them
-- **3D screens** for MENU, SETTINGS, CD images, GAMETEST and MIDPLAY in three looks (Panels, Carousel, Module), with the mouse; <kbd>F8</kbd> flips them all between 3D and text
-- **GAMETEST**: runs games by itself (Doom demos, Duke 3D), measures music timing and finds each game's best settings
-- Styles: Groovy, Classic, Sunset, Ocean, Neon, Candy, Midnight; a 3D menu (640×480, no 3D card needed); Terminus or VGA fonts; 80×25 up to 80×60 and your card's VESA text modes
-- `SBDIAG`, `MPUTEST`, `TIMETEST`, `JOYTEST`, `USBTEST`, `KMTEST`, `CPUMHZ`, `PADCONV`
-- `SETUP`, `CDINST`, `CLEANUP`, `UNINSTAL`: install and remove without touching `CONFIG.SYS` or `AUTOEXEC.BAT`
+- <picture><img src="docs/90s/ball-gold.gif" width="14" alt="o"></picture> **MENU**: sound, settings, tests, games, CD-ROM and files in one place; shows whether SBEMU is loaded and the port, IRQ, DMA and MIDI port it really uses
+- <picture><img src="docs/90s/ball-red.gif" width="14" alt="o"></picture> **Games**: per-game profiles (SBEMU options, CD image, arguments)
+- <picture><img src="docs/90s/ball-blue.gif" width="14" alt="o"></picture> **SETTINGS**: every option on one screen; changes apply to a running SBEMU straight away
+- <picture><img src="docs/90s/ball-green.gif" width="14" alt="o"></picture> <kbd>F3</kbd> in any program switches the colour style for all of them
+- <picture><img src="docs/90s/ball-gold.gif" width="14" alt="o"></picture> **3D screens** for MENU, SETTINGS, CD images, GAMETEST and MIDPLAY in three looks (Panels, Carousel, Module), with the mouse; <kbd>F8</kbd> flips them all between 3D and text
+- <picture><img src="docs/90s/ball-red.gif" width="14" alt="o"></picture> **GAMETEST**: runs games by itself (Doom demos, Duke 3D), measures music timing and finds each game's best settings
+- <picture><img src="docs/90s/ball-blue.gif" width="14" alt="o"></picture> Styles: Groovy, Classic, Sunset, Ocean, Neon, Candy, Midnight; a 3D menu (640×480, no 3D card needed); Terminus or VGA fonts; 80×25 up to 80×60 and your card's VESA text modes
+- <picture><img src="docs/90s/ball-green.gif" width="14" alt="o"></picture> `SBDIAG`, `MPUTEST`, `TIMETEST`, `JOYTEST`, `USBTEST`, `KMTEST`, `CPUMHZ`, `PADCONV`
+- <picture><img src="docs/90s/ball-gold.gif" width="14" alt="o"></picture> `SETUP`, `CDINST`, `CLEANUP`, `UNINSTAL`: install and remove without touching `CONFIG.SYS` or `AUTOEXEC.BAT`
 </details>
 
 <details>
 <summary><b>&gt;&gt; Windows 98 &lt;&lt;</b></summary>
 
-- Virtual Sound Blaster (1.5 – 16), OPL3 and MPU-401 for DOS boxes (`SC55W.VXD`)
-- **"NUKED SB-EMU" MIDI device** for Windows programs, played by the same synths
-- Tray program with a settings window (tabs: Sound and MIDI, Joystick, Pad keys); settings shared with DOS
-- **Joysticks**: any pad Windows knows plays DOS games in DOS boxes; *Set up...* adds a NUKED SB-EMU Game Port and Joystick so Windows games get it too, even without a game port on your sound card
-- **Pad keys** per game in DOS boxes, and an Xbox 360 pad driver for Windows 98 (unofficial, with English install steps)
-- Rests when nothing plays: about **0.25% CPU** while idle on a Pentium II
-- See [`README98.TXT`](sc55-pack/pack/README98.TXT)
+- <picture><img src="docs/90s/ball-red.gif" width="14" alt="o"></picture> Virtual Sound Blaster (1.5 – 16), OPL3 and MPU-401 for DOS boxes (`SC55W.VXD`)
+- <picture><img src="docs/90s/ball-blue.gif" width="14" alt="o"></picture> **"NUKED SB-EMU" MIDI device** for Windows programs, played by the same synths
+- <picture><img src="docs/90s/ball-green.gif" width="14" alt="o"></picture> Tray program with a settings window (tabs: Sound and MIDI, Joystick, Pad keys); settings shared with DOS
+- <picture><img src="docs/90s/ball-gold.gif" width="14" alt="o"></picture> **Joysticks**: any pad Windows knows plays DOS games in DOS boxes; *Set up...* adds a NUKED SB-EMU Game Port and Joystick so Windows games get it too, even without a game port on your sound card
+- <picture><img src="docs/90s/ball-red.gif" width="14" alt="o"></picture> **Pad keys** per game in DOS boxes, and an Xbox 360 pad driver for Windows 98 (unofficial, with English install steps)
+- <picture><img src="docs/90s/ball-blue.gif" width="14" alt="o"></picture> Rests when nothing plays: about **0.25% CPU** while idle on a Pentium II
+- <picture><img src="docs/90s/ball-green.gif" width="14" alt="o"></picture> See [`README98.TXT`](sc55-pack/pack/README98.TXT)
 </details>
 
 <div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
@@ -457,11 +461,15 @@ emulated CPU, and that always runs at full speed.)
 | **DOS** | MS-DOS 6.22 / 7.x or FreeDOS, plain DOS | Windows 98 "Restart in MS-DOS mode" |
 | **Disk** | about 25 MB, more for disc images | |
 
+<div align="center"><picture><img src="docs/90s/note-run.gif" width="240" alt="a sticky note"></picture></div>
+
 <div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
 <div align="center"><picture><img src="docs/90s/fd-potion.gif" alt=""></picture> <picture><img src="docs/90s/ic-rocket.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-rocket.gif" alt=""></picture> <picture><img src="docs/90s/mascot-flopsy.gif" alt=""></picture></div>
 
 ## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> My Test Lab!! <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
+
+<picture><img src="docs/90s/vox-sec-tower.gif" width="140" align="right" alt=""></picture>
 
 Every release gets tried on real iron here, plus a whole fleet of emulated PCs:
 
@@ -471,22 +479,22 @@ Every release gets tried on real iron here, plus a whole fleet of emulated PCs:
 
 <picture><img src="docs/90s/icon-laptop.gif" width="56" alt="laptop"></picture> <b>Dell Latitude D810</b> (the home machine!!)
 
-- Intel Pentium M
-- ATI Mobility Radeon X300
-- Intel ICH6 chipset, AC'97 sound, built-in touchpad
-- Windows 98 SE / MS-DOS 7.1
+- <picture><img src="docs/90s/ball-gold.gif" width="14" alt="o"></picture> Intel Pentium M
+- <picture><img src="docs/90s/ball-red.gif" width="14" alt="o"></picture> ATI Mobility Radeon X300
+- <picture><img src="docs/90s/ball-blue.gif" width="14" alt="o"></picture> Intel ICH6 chipset, AC'97 sound, built-in touchpad
+- <picture><img src="docs/90s/ball-green.gif" width="14" alt="o"></picture> Windows 98 SE / MS-DOS 7.1
 
 </td>
 <td valign="top" width="50%">
 
 <picture><img src="docs/90s/icon-tower.gif" width="56" alt="tower PC"></picture> <b>Custom Windows 98 / DOS tower</b>
 
-- ASUS P5PE-VM motherboard
-- Leadtek WinFast A400 (GeForce 6800)
-- Creative Sound Blaster Audigy
-- 2 GB RAM
-- 3X DVD-ROM
-- NEC uPD720101 USB 2.0 card + official wired Xbox 360 pad
+- <picture><img src="docs/90s/ball-gold.gif" width="14" alt="o"></picture> ASUS P5PE-VM motherboard
+- <picture><img src="docs/90s/ball-red.gif" width="14" alt="o"></picture> Leadtek WinFast A400 (GeForce 6800)
+- <picture><img src="docs/90s/ball-blue.gif" width="14" alt="o"></picture> Creative Sound Blaster Audigy
+- <picture><img src="docs/90s/ball-green.gif" width="14" alt="o"></picture> 2 GB RAM
+- <picture><img src="docs/90s/ball-gold.gif" width="14" alt="o"></picture> 3X DVD-ROM
+- <picture><img src="docs/90s/ball-red.gif" width="14" alt="o"></picture> NEC uPD720101 USB 2.0 card + official wired Xbox 360 pad
 
 </td>
 </tr>
@@ -500,6 +508,8 @@ add-ons: a fake USB Xbox 360 pad, a joystick driven from a file and scripted key
 <div align="center"><picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture> <picture><img src="docs/90s/ic-computer.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-computer.gif" alt=""></picture> <picture><img src="docs/90s/fd-potion.gif" alt=""></picture></div>
 
 ## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Getting Started <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
+
+<picture><img src="docs/90s/vox-sec-crate.gif" width="140" align="right" alt=""></picture>
 
 ```text
   1. Download the zip, unzip it, put your ROM dumps in NUKEDSB\FILES\ROMS
@@ -518,13 +528,15 @@ Duke-style games by itself.
 <details>
 <summary><b>&gt;&gt; More: real-mode games, CD music, settings &lt;&lt;</b></summary>
 
-- **Protected-mode games** (DOS/4GW and friends): `C:\SC55\SC55.BAT`, then the game
-- **Real-mode games**: `SC55JEM.BAT` (JEMM + QPIEMU) or `SC55QMM.BAT` (QEMM, bring your own)
-- **CD music**: put the image in `C:\CDIMAGES`, mount it in the CD images screen, start with `HYBRID.BAT`
-- **Settings** live in `C:\SC55\SBOPTS.TXT`, shared by every launcher and Windows 98
+- <picture><img src="docs/90s/ball-blue.gif" width="14" alt="o"></picture> **Protected-mode games** (DOS/4GW and friends): `C:\SC55\SC55.BAT`, then the game
+- <picture><img src="docs/90s/ball-green.gif" width="14" alt="o"></picture> **Real-mode games**: `SC55JEM.BAT` (JEMM + QPIEMU) or `SC55QMM.BAT` (QEMM, bring your own)
+- <picture><img src="docs/90s/ball-gold.gif" width="14" alt="o"></picture> **CD music**: put the image in `C:\CDIMAGES`, mount it in the CD images screen, start with `HYBRID.BAT`
+- <picture><img src="docs/90s/ball-red.gif" width="14" alt="o"></picture> **Settings** live in `C:\SC55\SBOPTS.TXT`, shared by every launcher and Windows 98
 
 The `README.TXT` in the pack is the full manual.
 </details>
+
+<div align="center"><picture><img src="docs/90s/note-start.gif" width="240" alt="a sticky note"></picture></div>
 
 <div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
@@ -556,15 +568,17 @@ your own layouts go in PADUSER.TXT. Games without a layout get arrow keys on the
 D-pad, Enter on Start and Esc on Back. Every game above was played with nothing
 but the pad: [see all the screenshots](docs/padkeys-tests/README.md)!
 
-- **Stick types** (`/JOYMODE`): standard, CH Flightstick Pro, Thrustmaster FCS, Gravis GamePad Pro (GrIP), or native (a real gameport)
-- **USB keyboard** typed through the PC's keyboard controller, so DOS sees a PS/2 keyboard
-- **USB mouse** through a DOS mouse driver (CuteMouse is included and loaded for you)
-- **Pads:** the wired Microsoft Xbox 360 pad and wired lookalikes (Hori, Mad Catz, Logitech, Saitek...); also wired Xbox One / Series pads and ordinary USB gamepads (PC pads, PS4 pad on the cable, retro pads), tested in emulators so far. Not PS3 pads or Bluetooth, sorry!
-- **Controllers:** UHCI, OHCI, EHCI and xHCI, through hubs (up to four deep), hot-plugging. Not CardBus cards
-- **How:** a tiny polled USB host inside SBEMU (`sbemu/usbpad.c`). It uses no USB interrupt, so it never fights the sound chip for an IRQ
+- <picture><img src="docs/90s/ball-blue.gif" width="14" alt="o"></picture> **Stick types** (`/JOYMODE`): standard, CH Flightstick Pro, Thrustmaster FCS, Gravis GamePad Pro (GrIP), or native (a real gameport)
+- <picture><img src="docs/90s/ball-green.gif" width="14" alt="o"></picture> **USB keyboard** typed through the PC's keyboard controller, so DOS sees a PS/2 keyboard
+- <picture><img src="docs/90s/ball-gold.gif" width="14" alt="o"></picture> **USB mouse** through a DOS mouse driver (CuteMouse is included and loaded for you)
+- <picture><img src="docs/90s/ball-red.gif" width="14" alt="o"></picture> **Pads:** the wired Microsoft Xbox 360 pad and wired lookalikes (Hori, Mad Catz, Logitech, Saitek...); also wired Xbox One / Series pads and ordinary USB gamepads (PC pads, PS4 pad on the cable, retro pads), tested in emulators so far. Not PS3 pads or Bluetooth, sorry!
+- <picture><img src="docs/90s/ball-blue.gif" width="14" alt="o"></picture> **Controllers:** UHCI, OHCI, EHCI and xHCI, through hubs (up to four deep), hot-plugging. Not CardBus cards
+- <picture><img src="docs/90s/ball-green.gif" width="14" alt="o"></picture> **How:** a tiny polled USB host inside SBEMU (`sbemu/usbpad.c`). It uses no USB interrupt, so it never fights the sound chip for an IRQ
 
 Works on my D810. Hubs are tested in QEMU on every controller type; a pad
 behind a USB 2.0 hub on a USB 2.0 port still needs a real-hardware test.
+
+<div align="center"><picture><img src="docs/90s/note-pads.gif" width="240" alt="a sticky note"></picture></div>
 
 <div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
@@ -624,6 +638,8 @@ works for some people.
 <div align="center"><picture><img src="docs/90s/fd-hatchling.gif" alt=""></picture> <picture><img src="docs/90s/ic-camera.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-camera.gif" alt=""></picture> <picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture></div>
 
 ## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Screenshots!! <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
+
+<picture><img src="docs/90s/vox-sec-camera.gif" width="140" align="right" alt=""></picture>
 
 <div align="center">
 
@@ -731,11 +747,15 @@ works for some people.
 
 </div>
 
+<div align="center"><picture><img src="docs/90s/note-shots.gif" width="240" alt="a sticky note"></picture></div>
+
 <div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
 <div align="center"><picture><img src="docs/90s/fd-potion.gif" alt=""></picture> <picture><img src="docs/90s/ic-cd.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-cd.gif" alt=""></picture> <picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture></div>
 
 ## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Hall of Fame!! <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
+
+<picture><img src="docs/90s/vox-sec-trophy.gif" width="140" align="right" alt=""></picture>
 
 <div align="center"><picture><img src="docs/90s/port220-hello.gif" width="330" alt="Port 220"></picture></div>
 
@@ -759,6 +779,8 @@ Stuff this little pack pulled off that I'm REALLY proud of:
 <div align="center"><picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture> <picture><img src="docs/90s/ic-chip.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-chip.gif" alt=""></picture> <picture><img src="docs/90s/fd-keycard.gif" alt=""></picture></div>
 
 ## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Built With Claude!! <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
+
+<picture><img src="docs/90s/vox-claude.gif" width="140" align="right" alt=""></picture>
 
 <div align="center"><picture><img src="docs/90s/port220-hop.gif" width="100%" alt=""></picture></div>
 
@@ -792,6 +814,8 @@ before they ever reached my real hardware.
 <div align="center"><picture><img src="docs/90s/fd-hatchling.gif" alt=""></picture> <picture><img src="docs/90s/ic-heart.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-heart.gif" alt=""></picture> <picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture></div>
 
 ## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Made For This Pack!! <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
+
+<picture><img src="docs/90s/vox-sec-gift.gif" width="140" align="right" alt=""></picture>
 
 Everything listed here was written for this pack by **Claude**. Some of it is brand new (the menus and screens,
 the test tools, the pad-keys system, the test rigs); some of it builds on other people's projects, and those rows say
@@ -865,6 +889,8 @@ Want to use our drivers in your own project? See [Take Our Drivers!!](#-take-our
 
 ## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Take Our Drivers!! <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
 
+<picture><img src="docs/90s/vox-sec-toolbox.gif" width="140" align="right" alt=""></picture>
+
 <div align="center"><picture><img src="docs/90s/ic-sparkle.gif" alt=""></picture> <b><font color="#00ff00">Building your own DOS or Windows 98 project? Borrow our drivers!!</font></b> <picture><img src="docs/90s/ic-sparkle.gif" alt=""></picture></div>
 
 Every driver and library on this list is free software under the **GNU GPL, version 2 or later** (see
@@ -921,6 +947,8 @@ the same GPL.
 | 86Box + QEMU test rigs | drive an emulated PC by script: keys, screenshots, CPU registers, fake USB pads and sticks |
 </details>
 
+<div align="center"><picture><img src="docs/90s/note-drivers.gif" width="240" alt="a sticky note"></picture></div>
+
 <div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
 <div align="center"><picture><img src="docs/90s/fd-trilobite.gif" alt=""></picture> <picture><img src="docs/90s/ic-heart.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-heart.gif" alt=""></picture> <picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture></div>
@@ -952,11 +980,15 @@ the same GPL.
 **Free test games!!** <picture><img src="docs/90s/ic-pad.gif" alt=""></picture> Ten shareware games to try the pack with are waiting in
 [Free Shareware Games!!](#-free-shareware-games-) just below.
 
+<div align="center"><picture><img src="docs/90s/note-download.gif" width="240" alt="a sticky note"></picture></div>
+
 <div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
 <div align="center"><picture><img src="docs/90s/fd-marine-walk.gif" alt=""></picture> <picture><img src="docs/90s/ic-pad.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-pad.gif" alt=""></picture> <picture><img src="docs/90s/fd-potion.gif" alt=""></picture></div>
 
 ## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Free Shareware Games!! <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
+
+<picture><img src="docs/90s/vox-sec-arcade.gif" width="140" align="right" alt=""></picture>
 
 <div align="center"><picture><img src="docs/90s/ic-sparkle.gif" alt=""></picture> <b><font color="#00ff00">No games to test with? Grab these - FREE and LEGAL!!</font></b> <picture><img src="docs/90s/ic-sparkle.gif" alt=""></picture></div>
 
@@ -1010,6 +1042,8 @@ fees. The full quotes, setup tips and SHA-256 checksums are in [TESTGAMES.TXT](t
 
 ## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Sign My Guestbook! <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
 
+<picture><img src="docs/90s/vox-sec-book.gif" width="140" align="right" alt=""></picture>
+
 <table>
 <tr>
 <td><picture><img src="docs/90s/mail.gif" alt="mailbox"></picture></td>
@@ -1023,11 +1057,15 @@ settings, SBEMU's messages and test results. Attach it and tell me what you
 were doing. If SBEMU hung, the last `[step]` line in `SBDETAIL.TXT` shows
 exactly where.
 
+<div align="center"><picture><img src="docs/90s/note-guest.gif" width="240" alt="a sticky note"></picture></div>
+
 <div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
 <div align="center"><picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture> <picture><img src="docs/90s/ic-computer.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-computer.gif" alt=""></picture> <picture><img src="docs/90s/fd-marine-shoot.gif" alt=""></picture></div>
 
 ## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> For the Nerds: Source Code <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
+
+<picture><img src="docs/90s/vox-sec-scroll.gif" width="140" align="right" alt=""></picture>
 
 ```text
 sc55-pack/
@@ -1064,6 +1102,8 @@ drawn by [`docs/90s/make90s.py`](docs/90s/make90s.py).
 <div align="center"><picture><img src="docs/90s/tux-waddle.gif" width="96" alt=""></picture> <picture><img src="docs/90s/ic-heart.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-heart.gif" alt=""></picture> <picture><img src="docs/90s/mascot-canvaskid.gif" width="96" alt=""></picture></div>
 
 ## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Thanks To My Friends <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
+
+<picture><img src="docs/90s/vox-sec-heart.gif" width="140" align="right" alt=""></picture>
 
 None of this would exist without these awesome people. THANK YOU!!
 The whole thing is **GPL-2.0-or-later** ([`COPYING`](sc55-pack/COPYING)).

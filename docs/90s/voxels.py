@@ -35,7 +35,7 @@ def render(m, size, frames=12, scale=7, tilt=0.5, bg=(0, 0, 32), bob=True, ms=90
     xs, ys, zs = zip(*m)
     cx, cy, cz = (max(xs) + min(xs) + 1) / 2, (max(ys) + min(ys) + 1) / 2, (max(zs) + min(zs) + 1) / 2
     W, H = size
-    out = []
+    raw = []
     for k in range(frames):
         a = 2 * math.pi * k / frames if spin else 0.35 * math.sin(2 * math.pi * k / frames)   # spin, or a little dance
         ca, sa, ct, st = math.cos(a), math.sin(a), math.cos(tilt), math.sin(tilt)
@@ -55,7 +55,14 @@ def render(m, size, frames=12, scale=7, tilt=0.5, bg=(0, 0, 32), bob=True, ms=90
                 depth = sum(p[1] for p in pts) / 4
                 l = 0.55 + 0.45 * max(0, -rn[0] * LIGHT[0] * -1 + -rn[1] * 0.4 + rn[2] * LIGHT[2])
                 dy = abs(math.sin(2 * math.pi * k / frames * 2)) * 3 if bob else 0
-                polys.append((depth, [(W / 2 + p[0] * scale, H / 2 - (p[2] + dy / scale) * scale) for p in pts], shade(c, l)))
+                polys.append((depth, [(p[0], -(p[2] + dy / 3.5)) for p in pts], shade(c, l)))
+        raw.append(polys)
+    xs = [x for polys in raw for _, pts, _ in polys for x, _ in pts]; ys = [y for polys in raw for _, pts, _ in polys for _, y in pts]
+    scale = min(scale, 0.94 * W / (max(xs) - min(xs)), 0.94 * H / (max(ys) - min(ys)))   # fits the frame, nothing clipped
+    ox, oy = W / 2 - (max(xs) + min(xs)) / 2 * scale, H / 2 - (max(ys) + min(ys)) / 2 * scale
+    out = []
+    for polys in raw:
+        polys = [(dp, [(ox + x * scale, oy + y * scale) for x, y in pts], col) for dp, pts, col in polys]
         im = Image.new('RGB', (W, H), KEY)
         d = ImageDraw.Draw(im)
         for depth, pts, col in sorted(polys, key=lambda t: -t[0]):
@@ -398,6 +405,65 @@ def pixel_icons():
     px('ok.gif', ok); px('lab.gif', lab)
 
 
+def tv():
+    m = {}
+    box(m, 0, 0, 0, 16, 12, 12, (90, 60, 40))                       # wooden TV
+    box(m, 2, -1, 2, 12, 0, 10, (20, 20, 25)); box(m, 3, -2, 3, 11, -1, 9, (40, 160, 230))
+    for x, c in ((4, (255, 255, 0)), (5, (255, 255, 0)), (7, (255, 80, 80)), (8, (255, 80, 80)), (9, (255, 80, 80))): m[(x, -3, 6)] = c   # NEW!
+    m[(13, -1, 8)] = m[(13, -1, 5)] = (200, 200, 200)
+    box(m, 5, 4, 12, 6, 5, 16, (60, 60, 60)); box(m, 10, 4, 12, 11, 5, 16, (60, 60, 60))   # rabbit ears
+    return m
+
+
+def camera():
+    m = {}
+    box(m, 0, 0, 0, 16, 8, 10, (40, 40, 45)); box(m, 2, 0, 10, 6, 8, 12, (40, 40, 45))
+    for x in range(-3, 4):
+        for z in range(-3, 4):
+            if x * x + z * z <= 10: m[(8 + x, -1, 5 + z)] = (90, 90, 100) if x * x + z * z > 4 else (60, 140, 230)
+    m[(13, 0, 10)] = (230, 40, 40); box(m, 12, -1, 7, 15, 0, 9, (220, 220, 230))
+    return m
+
+
+def gift():
+    m = {}
+    box(m, 0, 0, 0, 12, 12, 10, (220, 40, 60))
+    box(m, 5, -1, 0, 7, 13, 11, (255, 210, 40)); box(m, -1, 5, 0, 13, 7, 11, (255, 210, 40))
+    box(m, 3, 5, 11, 5, 7, 13, (255, 210, 40)); box(m, 7, 5, 11, 9, 7, 13, (255, 210, 40))
+    return m
+
+
+def toolbox():
+    m = {}
+    box(m, 0, 0, 0, 18, 8, 7, (210, 40, 40)); box(m, 0, 0, 7, 18, 8, 8, (170, 30, 30))
+    box(m, 6, 3, 8, 7, 5, 11, (80, 80, 80)); box(m, 11, 3, 8, 12, 5, 11, (80, 80, 80)); box(m, 6, 3, 11, 12, 5, 12, (80, 80, 80))
+    box(m, 8, -1, 4, 10, 0, 6, (200, 200, 200))
+    box(m, 2, 2, 8, 3, 3, 14, (160, 160, 170)); box(m, 1, 1, 13, 4, 4, 15, (160, 160, 170))   # wrench sticking out
+    return m
+
+
+def arcade():
+    m = {}
+    box(m, 0, 0, 0, 12, 10, 24, (40, 40, 150))
+    box(m, 1, -1, 13, 11, 0, 20, (20, 20, 20)); box(m, 2, -2, 14, 10, -1, 19, (0, 180, 60))
+    for x, z in ((4, 17), (7, 16), (5, 15)): m[(x, -3, z)] = (255, 255, 0)
+    box(m, 0, -4, 9, 12, 0, 11, (60, 60, 170))                      # control panel
+    box(m, 3, -3, 11, 4, -2, 14, (30, 30, 30)); m[(3, -3, 14)] = (230, 30, 30)
+    m[(7, -3, 11)] = (230, 30, 30); m[(9, -3, 11)] = (40, 160, 230)
+    box(m, 1, -1, 21, 11, 0, 24, (255, 180, 0))                     # marquee
+    return m
+
+
+def heart():
+    m = {}
+    for x in range(-7, 8):
+        for z in range(-7, 7):
+            X, Z = x / 6.0, z / 6.0 + 0.15
+            if (X * X + Z * Z - 1) ** 3 - X * X * Z ** 3 < 0:
+                for y in range(0, 3): m[(x, y, z)] = (230, 30, 70) if (x + z) % 4 else (255, 110, 140)
+    return m
+
+
 if __name__ == '__main__':
     render(sc55(), (240, 150), scale=8, tilt=0.75, name='vox-sc55.gif')
     render(pc(), (200, 200), scale=7, tilt=0.4, name='vox-pc.gif')
@@ -411,12 +477,15 @@ if __name__ == '__main__':
         render(fn(), (180, 110), scale=sc, tilt=t, name='vox-part-%s.gif' % fn.__name__, cap=cap)
     render(claude(), (200, 200), scale=7, tilt=0.45, name='vox-claude.gif', cap='CLAUDE|wrote this pack!!')
     for fn, sc, t in ((i_speaker, 6, 0.3), (sc55, 3.6, 0.75), (i_mt32, 3.4, 0.75), (lambda: disc(), 6, 1.0), (gamepad, 3.8, 0.9),
-                      (joystick, 5, 0.45), (win98, 4.4, 0.35), (i_menu, 4.4, 0.35), (i_note, 5, 0.3), (i_bug, 5.5, 0.9),
-                      (i_laptop, 4.2, 0.6), (i_tower, 3.8, 0.35), (i_trophy, 5.5, 0.4), (i_crate, 5.5, 0.6), (i_scroll, 4.2, 0.3),
+                      (joystick, 5, 0.45), (win98, 4.4, 0.35), (i_menu, 4.4, 0.35), (i_note, 4.2, 0.3), (i_bug, 5.5, 0.9),
+                      (i_laptop, 4.2, 0.6), (i_tower, 3.8, 0.35), (i_trophy, 3.8, 0.4), (i_crate, 5.5, 0.6), (i_scroll, 4.2, 0.3),
                       (i_book, 4, 0.9), (i_palette, 4.4, 1.0), (claude, 4, 0.45), (usbstick, 5, 0.75)):
         n = fn.__name__.replace('i_', '') if fn.__name__ != '<lambda>' else 'disc'
         render(fn(), (72, 72), scale=sc, tilt=t, name='icon-%s.gif' % n)
     render(i_star(), (48, 48), frames=16, scale=3.2, tilt=0.15, bob=False, ms=70, name='star.gif', spin=True)
     pixel_icons()
+    for fn, sc, t in ((tv, 6, 0.35), (camera, 6, 0.4), (gift, 6.5, 0.55), (toolbox, 5.5, 0.55), (arcade, 4.5, 0.3), (heart, 6.5, 0.2),
+                      (i_tower, 5, 0.35), (i_trophy, 7, 0.4), (i_crate, 6.5, 0.6), (i_book, 5, 0.9), (i_scroll, 5.5, 0.3)):
+        render(fn(), (150, 150), scale=sc, tilt=t, name='vox-sec-%s.gif' % fn.__name__.replace('i_', ''))
     for f in sorted(os.listdir(OUT)):
         if f.startswith('vox-'): print(f, os.path.getsize(os.path.join(OUT, f)))
