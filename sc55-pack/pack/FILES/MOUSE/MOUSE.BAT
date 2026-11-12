@@ -1,4 +1,5 @@
 @ECHO OFF
+REM SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 REM Loads a DOS mouse driver after SBEMU, so a USB mouse works in DOS: SBEMU
 REM hands its movement to the driver as a PS/2 mouse. SC55RUN.BAT calls this.
 REM The touchpad or a PS/2 mouse works with it too.

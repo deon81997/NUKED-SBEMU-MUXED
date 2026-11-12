@@ -1,4 +1,5 @@
 @ECHO OFF
+REM SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 REM GUI.BAT - the CD images screen: mount .CUE/.BIN, .ISO or .MDM disc images from C:\CDIMAGES on drive M:
 REM   GUI [sc55 folder]      (the SC-55 menu passes its folder so the screen uses your style)
 REM CDGUI.EXE only picks; the uCDD command it chooses is run here from plain DOS (CDRUN.BAT),

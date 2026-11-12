@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* crit24.h - drive checks for the folder browsers (empty CD drive, card reader without a card, unplugged
  * USB drive must just fail, never stop with "Abort, Retry, Fail?").
  * GPL-2.0-or-later. */

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED */
 /* safewr.h - crash-safe file saving for the pack's tools.
  * sw_open() opens <name>.$$$ next to the file; sw_close() pushes it to the disk (fflush + DOS commit),
  * then swaps it in. If the PC hangs or loses power while saving, the old file is still there whole

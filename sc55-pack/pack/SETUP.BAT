@@ -1,4 +1,5 @@
 @ECHO OFF
+REM SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 REM ======================================================================
 REM  SETUP.BAT - installs SBEMU + SC-55 emulation and HDPMI32i
 REM  Run from this folder (the one containing the FILES folder).

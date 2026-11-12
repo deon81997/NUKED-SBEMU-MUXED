@@ -1,4 +1,5 @@
 @ECHO OFF
+REM SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 REM ======================================================================
 REM  CDINST.BAT - installs the virtual CD drive (uCDD, mount-only build) and the disc menu.
 REM  Run it from this folder (the one containing FILES).   CDINST [drive]   default C

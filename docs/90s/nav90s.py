@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """The README's site-map buttons, the "back to top" button and the scrolling news ticker (original, Pillow).
 
     python3 docs/90s/nav90s.py       -> nav-*.gif, btn-top.gif, ticker-hd.gif (and the counter) next to this script

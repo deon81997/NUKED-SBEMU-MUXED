@@ -1,4 +1,5 @@
 @ECHO OFF
+REM SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 REM CDON.BAT - turns on the virtual CD drive for this DOS session (nothing is started at boot).
 REM   1. loads uCDD (mount-only build: no sound code, no memory manager needed)
 REM   2. gives the virtual drive the letter M: with SHSUCDX (never A:/B: - those are the floppy)

@@ -1,4 +1,5 @@
 @ECHO OFF
+REM SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 REM ======================================================================
 REM  JEMMCFG.BAT - OPTIONAL. Adds a 2-line start menu to CONFIG.SYS:
 REM     1. Windows 98            (your old CONFIG.SYS / AUTOEXEC.BAT, unchanged; the default)

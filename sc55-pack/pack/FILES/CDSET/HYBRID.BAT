@@ -1,4 +1,5 @@
 @ECHO OFF
+REM SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 REM HYBRID.BAT - virtual CD drive + SC-55, with CD-Audio from CUE/BIN images played through SBEMU
 REM (AC'97 etc.). Use it instead of SC55.BAT for games with CD music. Extra SBEMU options can follow.
 IF NOT EXIST C:\SC55\SBEMU.EXE GOTO NOSC

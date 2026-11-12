@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: OFL-1.1 - Terminus font by Dimitar Zhekov, converted for NUKED SB-EMU */
 /* Text and graphics fonts for the SC-55 pack screens: Terminus (Dimitar Zhekov, SIL Open Font Licence 1.1),
  * converted from its BDF files. Lines and blocks (B0-DF) are not included: they stay the VGA ones so frames
  * join up. Generated - do not edit. */

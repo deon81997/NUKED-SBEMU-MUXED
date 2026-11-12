@@ -1,4 +1,5 @@
 @ECHO OFF
+REM SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 REM CDDIAG.BAT - runs the virtual CD steps one at a time so you can see which one fails.
 REM Use it right after a restart. Press a key between steps; write down the step where the error appears.
 SET CDVM=

@@ -1,4 +1,5 @@
 @ECHO OFF
+REM SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 REM Runs SBEMU with your saved settings and shows its messages. Called by SC55.BAT / SC55JEM.BAT /
 REM SC55QMM.BAT - not meant to be run by hand. The settings are passed as a response file
 REM (@SBOPTS.TXT), not through the small DOS environment, so they can be as long as needed.

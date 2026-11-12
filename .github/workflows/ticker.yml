@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # Rebuilds the README's scrolling news ticker whenever README.md changes, from the newest "What's NEW!!"
 # entries (docs/90s/ticker_news.py), and uploads it to the "news-ticker" pre-release (the repository rules
 # do not let the Actions bot push to any branch). The README shows

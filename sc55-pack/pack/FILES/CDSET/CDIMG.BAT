@@ -1,4 +1,5 @@
 @ECHO OFF
+REM SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 REM ======================================================================
 REM  CDIMG.BAT - pick a disc image (.ISO / .CUE / .MDM in C:\CDIMAGES) and mount it with uCDD
 REM

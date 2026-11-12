@@ -1,4 +1,5 @@
 @ECHO OFF
+REM SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 REM ======================================================================
 REM  UNINSTAL.BAT - removes everything the SC-55 pack installed and puts the PC back the way it was.
 REM

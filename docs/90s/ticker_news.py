@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """Builds the README's news ticker from the newest "What's NEW!!" entries in README.md.
 
     python3 docs/90s/ticker_news.py OUTDIR [count]     (default: the 3 newest entries)

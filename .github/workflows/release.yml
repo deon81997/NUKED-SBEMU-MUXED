@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 # Publishes a GitHub release whenever a push to main changes the zip in release/.
 #
 # The version comes from the zip's file name:

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """Port 220 - the NUKED SB-EMU mascot (original character): a little ISA sound card standing on its gold
 edge connector, bobbing to the music, with notes coming out of its jacks. Named after the Sound Blaster's
 usual I/O address.

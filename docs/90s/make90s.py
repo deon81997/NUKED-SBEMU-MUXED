@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """Draws the 90s home-page graphics used by README.md (all original, made with Pillow).
 
     python3 docs/90s/make90s.py      -> writes the GIFs next to this script

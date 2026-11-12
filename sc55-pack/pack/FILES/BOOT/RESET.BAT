@@ -1,4 +1,5 @@
 @ECHO OFF
+REM SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 REM ======================================================================
 REM  RESET.BAT - puts CONFIG.SYS and AUTOEXEC.BAT back the way they were before BOOTCFG.BAT / JEMMCFG.BAT.
 REM  Lives in C:\ . Safe to run more than once.

@@ -1,4 +1,5 @@
 @ECHO OFF
+REM SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 REM ======================================================================
 REM  BOOTCFG.BAT - OPTIONAL. No menu. Adds the CD-ROM driver to CONFIG.SYS and MSCDEX to
 REM  AUTOEXEC.BAT so the real CD-ROM drive (D:) works in DOS. Windows 98 still starts as usual.

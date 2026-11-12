@@ -828,7 +828,8 @@ Want to use our drivers in your own project? See [Take Our Drivers!!](#-take-our
 <div align="center"><img src="docs/90s/ic-sparkle.gif" alt=""> <b><font color="#00ff00">Building your own DOS or Windows 98 project? Borrow our drivers!!</font></b> <img src="docs/90s/ic-sparkle.gif" alt=""></div>
 
 Every driver and library on this list is free software under the **GNU GPL, version 2 or later** (see
-[COPYING](COPYING); each of our source files starts with `SPDX-License-Identifier: GPL-2.0-or-later`). Use it, change
+[COPYING](COPYING); each of our source files, batch files and scripts starts with `SPDX-License-Identifier: GPL-2.0-or-later`;
+the Terminus font in `fontdata.h` stays under its own SIL Open Font Licence). Use it, change
 it and ship it, as long as your project is GPL-compatible and you share your source too. It can't go into closed-source
 programs. The parts **based on** other people's work (see the table above) keep their authors' credit and come under
 the same GPL.
@@ -849,6 +850,11 @@ the same GPL.
 | CD music link ([`cdlink.c`](sc55-pack/sbemu/cdlink.c)) | the virtual CD drive's music mixed into the sound card output | ★ SBEMU only |
 | `SBEMU16` ([`sbemu16.asm`](sc55-pack/tools/sbemu16.asm)) | sound and joystick ports for 16-bit protected-mode games (Jazz Jackrabbit, Borland 16-bit), with HDPMI16I | ★★★ small and stand-alone |
 | HDPMI32I fixes ([`hdpmi32fix/`](sc55-pack/third_party/hdpmi32fix)) | an empty CD drive no longer freezes the PC, and Borland's 32RTM extender (Super Street Fighter II Turbo) starts | ★★★ helps every program that runs on HDPMI32I |
+| DOS 3D engine ([`m3core.h`](sc55-pack/tools/m3core.h) + `menu3d.h`, `form3d.h`, `midplay3d.h`) | a software 3D renderer for VGA / VESA: Z-buffer, textured floors, glowing smooth text, colour themes, fast on a Pentium II | ★★★ header-only C, needs DJGPP; good for DOS demos, menus and games |
+| Text-mode UI kit ([`tui.h`](sc55-pack/tools/tui.h), `toolui.h`, `theme.h`, `fontdata.h`) | windows, menus, input boxes, colour styles and big fonts for DOS programs, with crash-safe saving ([`safewr.h`](sc55-pack/tools/safewr.h)) | ★★★ header-only C |
+| MIDI file player ([`midplay.c`](sc55-pack/tools/midplay.c)) | reads Standard MIDI Files (format 0 and 1, .RMI, karaoke) and plays them to any MPU-401 on time, from inside the drawing code | ★★ lift the loader and the clock out of MIDPLAY |
+| Per-game pad keys ([`padmap.c`](sc55-pack/sbemu/padmap.c), [`int21.asm`](sc55-pack/sbemu/int21.asm)) | notices which game DOS is starting (an INT 21h hook) and switches to that game's pad layout from PADMAP | ★★ needs a resident program |
+| DOS drive from a resident program ([`usbdisk.asm`](sc55-pack/sbemu/usbdisk.asm)) | adds a block device (a drive letter) after DOS has booted, like DEVLOAD, and serves it from protected mode | ★★ a pattern for any DOS disk driver written in C |
 </details>
 
 <details>
@@ -859,6 +865,7 @@ the same GPL.
 | `SC55W.VXD` ([`win98/vxd`](sc55-pack/win98/vxd)) | virtual Sound Blaster, OPL3 and MPU-401 for DOS boxes, handing the sound to a Windows program | ★★ a working example of a DOS-box sound VxD (JWasm + Open Watcom) |
 | `NUKEDJOY.VXD` ([`win98/joy`](sc55-pack/win98/joy)) | joystick minidriver: our USB pad shows up in Game Controllers like a real joystick | ★★★ a small template for any custom Windows 98 joystick |
 | `SC55MIDI.DRV` ([`win98/mididrv`](sc55-pack/win98/mididrv)) | 16-bit MIDI output driver: the SC-55 is a MIDI device for every Windows program | ★★★ a template for any software MIDI synth on Windows 9x |
+| `SC55W.EXE` engine ([`win98/helper`](sc55-pack/win98/helper)) | takes the VxD's sound and MIDI events and plays them through WinMM, with the buffer that grows by itself when a full-screen DOS game hogs the CPU | ★★ a starting point for any Windows 98 software synth |
 </details>
 
 <details>

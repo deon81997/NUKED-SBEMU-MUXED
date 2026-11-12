@@ -1,4 +1,5 @@
 @ECHO OFF
+REM SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 REM ======================================================================
 REM  CLEANUP.BAT - removes leftovers of OLD installs of this pack. Run it from the pack folder or from C:\SC55.
 REM  It shows what it found, asks once, then deletes only these (all from earlier versions of the pack):

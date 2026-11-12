@@ -1,4 +1,5 @@
 @ECHO OFF
+REM SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 REM Collects everything needed to find a problem into one file: BUGREP.TXT in the SC55 folder.
 REM Usage: BUGREP [folder]   (the menu item Files, Make a bug report, does this for you)
 REM Nothing is changed or sent anywhere. ROM files are listed by name only.
