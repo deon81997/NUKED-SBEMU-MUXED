@@ -628,7 +628,7 @@ works for some people.
 <div align="center">
 
 <b>The menu in all seven styles</b> (Groovy, Classic, Sunset, Ocean, Neon, Candy, Midnight)<br>
-<picture><img src="docs/shots/menu-styles.gif" width="750" alt="The text menu cycling through its seven styles"></picture>
+<picture><img src="docs/shots/menu-styles.gif" width="750" alt="The text menu cycling through its seven styles, on the CD-ROM page with USB drives"></picture>
 
 <br><br>
 
@@ -652,7 +652,7 @@ works for some people.
 </tr>
 </table>
 
-<b>MIDPLAY</b>, the MIDI player, live off the SC-55 (beta.83: five pages, sharp full-resolution 3D):
+<b>MIDPLAY</b>, the MIDI player, live off the SC-55 (five pages, 3D up to 1024x768 in 256 colours to 32-bit):
 
 <picture><img src="docs/shots/midplay-3d.png" width="640" alt="MIDPLAY's 3D view: a sound module, a lit keyboard and channel columns"></picture>
 
@@ -687,6 +687,10 @@ works for some people.
 <td align="center"><picture><img src="docs/main-menu.png" width="420"></picture><br><sub>the main menu, <i>Sunset</i> style</sub></td>
 </tr>
 </table>
+
+<b>USB drives</b> (MENU &gt; CD-ROM): every stick, its letter, format, size and free space:
+
+<picture><img src="docs/shots/usbdrv.png" width="560" alt="USBDRV listing two FAT32 partitions of a USB stick and two spare letters"></picture>
 
 <b>Games played with nothing but the pad</b> (beta.79/80, the layout picked by itself; [all 160 screenshots](docs/padkeys-tests/README.md)):
 
