@@ -38,7 +38,7 @@ MIDPLAY := output/midplay.exe
 CDGUI := output/cdgui.exe
 SBSET := output/sbset.exe
 ifeq ($(VSC55),1)
-all: $(TARGET) $(SC55WAV) $(SC55LOG) $(MPUTEST) $(MIDPLAY) $(CDGUI) $(SBSET) output/sc55menu.exe output/gametest.exe output/sbdiag.exe output/timetest.exe output/joytest.exe output/usbtest.exe output/kmtest.exe output/sbemu16.com output/padconv.exe
+all: $(TARGET) $(SC55WAV) $(SC55LOG) $(MPUTEST) $(MIDPLAY) $(CDGUI) $(SBSET) output/sc55menu.exe output/gametest.exe output/sbdiag.exe output/timetest.exe output/joytest.exe output/usbtest.exe output/kmtest.exe output/usbdrv.exe output/sbemu16.com output/padconv.exe
 else
 all: $(TARGET)
 endif
@@ -247,6 +247,11 @@ output/sbemu16.com: tools/sbemu16.asm
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "NASM\t$@\n"
 	$(SILENTCMD)nasm -f bin -o $@ $<
+
+output/usbdrv.exe: tools/usbdrv.c $(wildcard tools/*.h)
+	@mkdir -p $(dir $@)
+	$(SILENTMSG) "CC\t$@\n"
+	$(SILENTCMD)$(CC) -O2 -Wall -march=i386 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
 
 output/kmtest.exe: tools/kmtest.c $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)

@@ -20,10 +20,13 @@
 #include "usbdiskbin.h"
 
 #define UD_UNITS 8
+#define UD_SPARE 2              /* drives kept for sticks plugged in after SBEMU starts */
 #define UD_STUB  0x80          /* stub code size rounded up (usbdisk.asm) */
 #define UD_BPB   0x40          /* per unit: BPB copy for BUILD BPB (boot sector 0Bh..4Ah) */
 #define UD_DPB   0x40          /* per unit: DPB (DOS 7 extended DPB is 3Dh bytes) */
 #define UD_CDS   0x58
+#define UD_INFO  (UD_STUB + UD_UNITS * (UD_BPB + UD_DPB))   /* per unit 48 bytes for USBDRV: state, FAT bits, name */
+#define UD_INFOSZ 48
 
 typedef struct
 {
@@ -211,6 +214,20 @@ static uint32_t bpb_lin(int u) { return base_lin() + UD_STUB + u * UD_BPB; }
 static uint32_t dpb_lin(int u) { return base_lin() + UD_STUB + UD_UNITS * UD_BPB + u * UD_DPB; }
 
 /* boot sector of unit u -> its BPB slot in the stub segment; 0 ok */
+/* a FAT16 BPB for a drive with no stick yet (DOS needs one to build the DPB; the real one comes with BUILD BPB) */
+static void spare_bpb(int u)
+{
+    memset(Sec, 0, 512);
+    Sec[11] = 0x00; Sec[12] = 0x02;                             /* 512 bytes per sector */
+    Sec[13] = 4; Sec[14] = 1; Sec[16] = 2;                      /* 4 per cluster, 1 reserved, 2 FATs */
+    Sec[17] = 0x00; Sec[18] = 0x02;                             /* 512 root entries */
+    Sec[21] = 0xF8; Sec[22] = 0x40;                             /* media, 64 sectors per FAT */
+    Sec[32] = 0x00; Sec[33] = 0x00; Sec[34] = 0x01;            /* 65536 sectors (32 MB) */
+    Sec[36] = 0x40;                                             /* extended BPB: FAT size again (see load_bpb) */
+    Sec[48] = Sec[49] = Sec[50] = Sec[51] = 0xFF;
+    DPMI_LMemcpy(bpb_lin(u), DPMI_PTR2L(Sec + 11), UD_BPB);
+}
+
 static int load_bpb(int u)
 {
     if (dread(U[u].disk, U[u].start, 1, Sec)) return -1;
@@ -230,6 +247,12 @@ static int load_bpb(int u)
 /* usbpad numbers disks in table order, so unplugging the first stick renumbers the second: follow each drive's stick
  * by its plug-in gen (a global counter in usbpad, so two sticks of the same model differ) + LUN. A new stick in the
  * drive's number that no other drive owns counts as a new medium for the drive (and for its partner partitions). */
+static int owned(const USBPAD_Disk* d)              /* some drive has this stick */
+{
+    int k;
+    for (k = 0; k < NU; ++k) if (U[k].gen == d->gen && U[k].lun == d->lun) return 1;
+    return 0;
+}
 static const USBPAD_Disk* unit_disk(int u)
 {
     uint32_t old = U[u].gen;
@@ -245,11 +268,16 @@ static const USBPAD_Disk* unit_disk(int u)
             }
             return d;
         }
-    if (!(d = USBPAD_DiskInfo(from))) return NULL;
-    for (k = 0; k < NU; ++k) if (U[k].gen == d->gen && U[k].lun == d->lun) return NULL;   /* another drive's stick */
-    cache_drop(from);
+    /* our stick is gone: a disk no drive owns becomes this drive's new medium - its old number first, then any (a
+     * spare drive, made for sticks plugged in after SBEMU started, has none: disk -1) */
+    n = -1;
+    if (from >= 0 && (d = USBPAD_DiskInfo(from)) && !owned(d)) n = from;
+    for (k = 0; n < 0 && k < nd; ++k) if ((d = USBPAD_DiskInfo(k)) && !owned(d)) n = k;
+    if (n < 0 || !(d = USBPAD_DiskInfo(n))) return NULL;
+    if (from >= 0) cache_drop(from);
+    cache_drop(n);
     for (k = 0; k < NU; ++k)
-        if (U[k].gen == old && U[k].lun == lun) { U[k].gen = d->gen; U[k].lun = d->lun; U[k].ok = 0; U[k].changed = 1; }
+        if (U[k].gen == old && U[k].lun == lun) { U[k].disk = n; U[k].gen = d->gen; U[k].lun = d->lun; U[k].ok = 0; U[k].changed = 1; }
     return d;
 }
 
@@ -263,8 +291,28 @@ static uint32_t unit_sig(int u)
     return (c ^ crc32(Sec, 512)) | 1;
 }
 
+/* what USBDRV.EXE shows (stub segment + UD_INFO): [0] 0 no stick / 1 FAT drive / 2 stick without a usable FAT
+ * partition, [1] 12/16/32, [2..3] 0, [4..] "vendor product" */
+static void info_set(int u, int state)
+{
+    char b[UD_INFOSZ];
+    const USBPAD_Disk* d = state && U[u].disk >= 0 ? USBPAD_DiskInfo(U[u].disk) : NULL;
+    if (!Seg) return;
+    memset(b, 0, sizeof b);
+    b[0] = (char)state; b[1] = (char)(state == 1 ? U[u].fat : 0);
+    if (d) snprintf(b + 4, sizeof b - 4, "%s %s", d->vendor, d->product);
+    DPMI_LMemcpy(DPMI_SEGOFF2L(Seg, UD_INFO + u * UD_INFOSZ), DPMI_PTR2L(b), sizeof b);
+}
+
 /* medium check of unit u: same disk gen -> 1; new medium -> re-find the partition (0 if gone) */
+static int unit_check_(int u);
 static int unit_check(int u)
+{
+    int r = unit_check_(u);
+    info_set(u, r ? 1 : U[u].disk >= 0 && USBPAD_DiskInfo(U[u].disk) && USBPAD_DiskInfo(U[u].disk)->ready ? 2 : 0);
+    return r;
+}
+static int unit_check_(int u)
 {
     const USBPAD_Disk* d = unit_disk(u);
     Part p[UD_UNITS];
@@ -394,10 +442,10 @@ int USBDISK_Install(void)
     DPMI_REG r;
     uint32_t lol, p, last, nul;
     uint8_t stub[UD_STUB];
-    int disks = USBPAD_Disks(), d, i, lastdrive, nblk, drive;
+    int disks = USBPAD_Disks(), d, i, lastdrive, nblk, drive, nfound;
     Letters[0] = 0;
     if (NU) return NU;
-    if (!disks) { strcpy(Msg, "no USB disk"); return 0; }
+
     memset(&r, 0, sizeof r); r.w.ax = 0x3306; dos_call(&r);
     {
         int maj = r.h.bl, min = r.h.bh;
@@ -405,11 +453,11 @@ int USBDISK_Install(void)
         if (r.h.al > maj || (r.h.al == maj && r.h.ah > min)) { maj = r.h.al; min = r.h.ah; }
         Fat32Ok = maj > 7 || (maj == 7 && min >= 10) || r.h.bh == 0xFD;   /* BH FDh: FreeDOS */
     }
-    for (d = 0; d < disks && NU < UD_UNITS; ++d)
+    for (d = 0; d < disks && NU < UD_UNITS - UD_SPARE; ++d)
     {
         Part pt[UD_UNITS];
         const USBPAD_Disk* di = USBPAD_DiskInfo(d);
-        int n = find_parts(d, pt, UD_UNITS - NU);
+        int n = find_parts(d, pt, UD_UNITS - UD_SPARE - NU);
         for (i = 0; i < n; ++i)
         {
             Unit* x = &U[NU++];
@@ -420,7 +468,13 @@ int USBDISK_Install(void)
             x->sig = unit_sig(NU - 1);
         }
     }
-    if (!NU) { NU = 0; strcpy(Msg, "no FAT partition on the USB disk(s)"); return 0; }
+    nfound = NU;
+    for (i = 0; i < UD_SPARE && NU < UD_UNITS; ++i)            /* spare drives: sticks plugged in later */
+    {
+        Unit* x = &U[NU++];
+        memset(x, 0, sizeof *x);
+        x->disk = -1; x->gen = 0xFFFFFF00UL + (uint32_t)i; x->lun = -1; x->fat = 16;
+    }
 
     memset(&r, 0, sizeof r); r.h.ah = 0x52; dos_call(&r);
     lol = DPMI_SEGOFF2L(r.w.es, r.w.bx);
@@ -432,7 +486,7 @@ int USBDISK_Install(void)
     for (i = 0; i < NU; ++i)                                    /* letters must be free and next to each other */
         if (DPMI_LoadW(CdsBase + (drive + i) * UD_CDS + 0x43) & 0xC000) { NU = i; break; }
 
-    Seg = (uint16_t)DPMI_HighMalloc((UD_STUB + UD_UNITS * (UD_BPB + UD_DPB) + 15) / 16, TRUE);
+    Seg = (uint16_t)DPMI_HighMalloc((UD_INFO + UD_UNITS * UD_INFOSZ + 15) / 16, TRUE);
     Cb = DPMI_AllocateRMCB_RETF(&USBDISK_Req, &Reg);
     if (!Seg || !Cb) { NU = 0; strcpy(Msg, "no memory for the drive stub"); return 0; }
     typedef char stub_fits[sizeof USBDISK_Stub <= UD_STUB ? 1 : -1]; (void)sizeof(stub_fits);
@@ -440,14 +494,15 @@ int USBDISK_Install(void)
     memcpy(stub, USBDISK_Stub, sizeof USBDISK_Stub);
     stub[0x0A] = (uint8_t)NU;
     memcpy(stub + 0x16, &Cb, 4);
-    DPMI_LMemset(base_lin(), 0, UD_STUB + UD_UNITS * (UD_BPB + UD_DPB));
+    memcpy(stub + 0x0B, "USBDSK", 6);                           /* name field (unused in block devices): USBDRV finds us */
+    DPMI_LMemset(base_lin(), 0, UD_INFO + UD_UNITS * UD_INFOSZ);
     DPMI_LMemcpy(base_lin(), DPMI_PTR2L(stub), sizeof stub);
 
     for (i = 0; i < NU; ++i)
     {
         uint32_t dp = dpb_lin(i);
         U[i].drive = drive + i;
-        if (load_bpb(i)) { NU = i; break; }
+        if (U[i].disk < 0 || load_bpb(i)) spare_bpb(i);         /* spare / unreadable: a placeholder until a stick comes */
         memset(&r, 0, sizeof r);
         r.h.ah = 0x53; r.w.ds = Seg; r.w.si = (uint16_t)(UD_STUB + i * UD_BPB);
         r.w.es = Seg; r.w.bp = (uint16_t)(dp - base_lin());
@@ -458,7 +513,7 @@ int USBDISK_Install(void)
         DPMI_StoreB(dp + 0x18, 0xFF);                           /* not accessed yet: DOS asks BUILD BPB */
         DPMI_StoreW(dp + 0x19, 0xFFFF); DPMI_StoreW(dp + 0x1B, 0xFFFF);
     }
-    if (!NU) { strcpy(Msg, "boot sector read failed"); return 0; }
+
     DPMI_StoreB(base_lin() + 0x0A, (uint8_t)NU);
 
     __asm__ __volatile__("cli");
@@ -487,11 +542,14 @@ int USBDISK_Install(void)
     __asm__ __volatile__("sti");
 
     for (i = 0; i < NU; ++i) sprintf(Letters + strlen(Letters), "%s%c:", i ? " " : "", 'A' + U[i].drive);
+    for (i = 0; i < NU; ++i) info_set(i, U[i].disk >= 0 && U[i].ok ? 1 : 0);
+    if (nfound)
     {
         const USBPAD_Disk* di = USBPAD_DiskInfo(U[0].disk);
         sprintf(Msg, "%d drive(s) %s, first FAT%d %lu MB (%s %s)", NU, Letters, U[0].fat,
             (unsigned long)(U[0].size / 2048), di ? di->vendor : "", di ? di->product : "");
     }
+    else sprintf(Msg, "drive(s) %s ready for USB sticks plugged in now", Letters);
     return NU;
 }
 

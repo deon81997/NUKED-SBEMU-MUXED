@@ -912,11 +912,14 @@ CONTENTS
   sticks and card readers plugged in when SBEMU starts get DOS drive
   letters (the next free ones, up to LASTDRIVE - put LASTDRIVE=Z in
   CONFIG.SYS), FAT12/16 everywhere, FAT32 on MS-DOS 7.1 / FreeDOS. Read
-  and write. A USB 2.0 port runs them at USB 2.0 speed (your pads,
-  keyboards and mice there are handed to the USB 1.1 side). Sticks with
-  a write-protect switch say "write protected". A stick plugged in later
-  gets no letter (restart); a different stick in a card reader that has a
-  letter is seen. exFAT / NTFS: later. NEC uPD720101 cards: USB 2.0
+  and write. Two more letters wait for sticks plugged in later: the
+  first time DOS uses that letter (or USBDRV's R) the new stick is
+  there. Turn it on in MENU > Settings > Joystick > USB sticks (restart
+  after). MENU > CD-ROM > USB drives (USBDRV.EXE) lists each letter with
+  the stick, FAT12/16/32, size and free space; R refreshes. A USB 2.0
+  port runs them at USB 2.0 speed (your pads, keyboards and mice there
+  are handed to the USB 1.1 side). Sticks with a write-protect switch say
+  "write protected". exFAT / NTFS: later. NEC uPD720101 cards: USB 2.0
   sticks only.
 
   Test without a game:  MENU > Tests > Joystick test (JOYTEST), or run

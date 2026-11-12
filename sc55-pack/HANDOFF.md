@@ -1452,3 +1452,11 @@ sbemu/vmpu_sc55.c (1 line, NOT in the zip yet - see below); testrig/midplay/note
 Zip = beta.95 zip + FILES\SC55\MIDPLAY.EXE + README.TXT (section 8: 3D modes, shuffle, Windows DOS box).
 To test on real PCs: Options > 3D screen mode / refresh on the D810 and P5PE; shuffle across restarts; N at song end;
 Win98 DOS box (windowed: text, panel, 3D in 320x200; Alt+Enter: a VESA mode).
+- USB session (2026-11-12): spare drive letters + USBDRV. usbdisk.c: UD_SPARE (2) extra units with no stick (placeholder
+  FAT16 BPB for the DPB, disk -1, own pseudo-gen); unit_disk gives a drive whose stick is gone (or a spare) any disk
+  no drive owns, so a stick plugged in after SBEMU starts gets a letter on first access (FAT32 too: DOS rebuilds the
+  DPB from BUILD BPB). Install also works with no stick at all (letters wait). Stub name field 0Bh = "USBDSK", info
+  area at UD_INFO (48 bytes per unit: state, FAT bits, "vendor product") for tools/usbdrv.c (USBDRV.EXE, MENU >
+  CD-ROM > USB drives, /T = text): letter, stick, FAT12/16/32, size, free (INT 21h 7303h, else 36h; real-mode
+  INT 24h "fail" stub so empty drives do not prompt), R refreshes. SBSET: "USB sticks" (/USBDISK) under Joystick.
+  QEMU FreeDOS EHCI: D: at start + FAT32 300 MB stick plugged after SBEMU -> E: (DIR, TYPE, COPY), USBDRV lists them.

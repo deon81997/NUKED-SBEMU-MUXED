@@ -401,6 +401,9 @@ static void build_menu(void)
       add(C_CD, "CD images", "Mount .CUE/.BIN, .ISO or .MDM disc images from any folder on any drive (D: next drive, F2 home folder) as drive M:. Shows each image's"
           " tracks and size, fixes CUE files that name a long BIN file name DOS cannot open (F), and tells you if the"
           " mount worked. CD-audio tracks play through SBEMU - start games with HYBRID.BAT for that.", IT_BAT, c, 0, 0, NULL); }
+    add(C_CD, "USB drives", "USB sticks and card readers with a DOS drive letter (Settings > Joystick > USB sticks"
+        " = On, then restart): letter, stick, file system, size and free space. R refreshes (a stick just plugged in"
+        " gets one of the spare letters).", IT_BAT, "USBDRV.EXE", 1, 0, NULL);
     /* Files */
     add(C_FILES, "SBEMU messages (SBLOG)", "What SBEMU printed when it was last started: sound card, sample rate, SC-55 ROM"
         " set, errors.", IT_VIEW, "SBLOG.TXT", 0, 0, NULL);
