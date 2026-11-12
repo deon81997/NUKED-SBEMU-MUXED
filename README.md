@@ -1,68 +1,31 @@
 <div align="center">
 
-<table>
-<tr>
-<td align="center" valign="top"><img src="docs/90s/fd-marine-shoot.gif" alt="Freedoom marine"><br><br><img src="docs/90s/tux-waddle.gif" width="120" alt="Tux"><br><br><img src="docs/90s/fd-soulsphere.gif" alt="soul sphere"><br><br><img src="docs/90s/port220-small.gif" width="96" alt="Port 220"></td>
-<td align="center">
+<a href="#-whats-new-"><img src="docs/flash/intro.gif" width="720" alt="NUKED SB-EMU: loading..., the logo flies in, ENTER"></a>
 
-<img src="docs/90s/title.gif" width="560" alt="NUKED SB-EMU">
-
-<h2>~*~ Welcome to my DOS Sound Page!!! ~*~</h2>
-
-<i>A Roland Sound Canvas for your DOS games. No MIDI hardware needed!!</i>
-
-<br><br>
-
-<img src="docs/90s/port220-hello.gif" width="440" alt="Port 220, the NUKED SB-EMU mascot, says hi">
-
-<br><br>
-
-<img src="docs/90s/construction.gif" width="300" alt="Under construction">
+<a href="#-whats-new-"><img src="docs/flash/b-skip.gif" width="150" alt="Skip intro"></a>
 
 <br>
 
-<sub>this page is ALWAYS under construction... please come back soon!! :-)</sub>
+<a href="https://github.com/deon81997/NUKED-SBEMU-MUXED/releases/latest"><img src="docs/flash/b-download.gif" width="200" alt="Download"></a>
 
 <br><br>
 
-<a href="https://github.com/deon81997/NUKED-SBEMU-MUXED/releases/latest"><img src="docs/90s/btn-download.gif" alt="Download"></a>
-<img src="docs/90s/btn-sc55.gif" alt="SC-55 inside">
-<img src="docs/90s/btn-sb16.gif" alt="Sound by SB16">
-<img src="docs/90s/btn-dos.gif" alt="Powered by DOS 7.1">
-
-<br><br>
-
-</td>
-<td align="center" valign="top"><img src="docs/90s/fd-serpentipede-attack.gif" alt="Freedoom serpentipede"><br><br><img src="docs/90s/mascot-canvaskid.gif" width="120" alt="Canvas Kid"><br><br><img src="docs/90s/fd-keycard.gif" alt="keycard"></td>
-</tr>
+<table>
+<tr><td><a href="#-whats-new-"><img src="docs/flash/b-news.gif" width="150" alt="What's new"></a></td><td><a href="#-what-is-this-"><img src="docs/flash/b-what.gif" width="150" alt="What is this?"></a></td><td><a href="#-cool-features-"><img src="docs/flash/b-features.gif" width="150" alt="Features"></a></td><td><a href="#-will-it-run-on-my-pc-"><img src="docs/flash/b-run.gif" width="150" alt="Will it run?"></a></td></tr>
+<tr><td><a href="#-my-test-lab-"><img src="docs/flash/b-lab.gif" width="150" alt="My test lab"></a></td><td><a href="#-getting-started-"><img src="docs/flash/b-start.gif" width="150" alt="Getting started"></a></td><td><a href="#-usb-gamepads-in-dos-"><img src="docs/flash/b-pads.gif" width="150" alt="USB gamepads"></a></td><td><a href="#-supported-sound-chips-"><img src="docs/flash/b-chips.gif" width="150" alt="Sound chips"></a></td></tr>
+<tr><td><a href="#-screenshots-"><img src="docs/flash/b-shots.gif" width="150" alt="Screenshots"></a></td><td><a href="#-hall-of-fame-"><img src="docs/flash/b-fame.gif" width="150" alt="Hall of fame"></a></td><td><a href="#-built-with-claude-"><img src="docs/flash/b-claude.gif" width="150" alt="Built with Claude"></a></td><td><a href="#-made-for-this-pack-"><img src="docs/flash/b-home.gif" width="150" alt="Made for this pack"></a></td></tr>
+<tr><td><a href="#-download-zone-"><img src="docs/flash/b-download.gif" width="150" alt="Downloads"></a></td><td><a href="#-sign-my-guestbook-"><img src="docs/flash/b-guest.gif" width="150" alt="Guestbook"></a></td><td><a href="#-for-the-nerds-source-code-"><img src="docs/flash/b-source.gif" width="150" alt="Source code"></a></td><td><a href="#-thanks-to-my-friends-"><img src="docs/flash/b-thanks.gif" width="150" alt="Thanks"></a></td></tr>
 </table>
 
-<b>Release counter:</b><br>
-<img src="docs/90s/counter.gif" alt="000082"><br>
-<sub>betas and counting!</sub>
-
-<br><br>
+<br>
 
 <a href="#-whats-new-"><img src="https://github.com/deon81997/NUKED-SBEMU-MUXED/releases/download/news-ticker/ticker-hd.gif" width="600" alt="The newest news, scrolling"></a>
 
 <br><br>
 
-<img src="docs/90s/bar.gif" width="600" alt="">
+<img src="docs/flash/badge-plugin.gif" width="88" alt="Best viewed with a fast plug-in"> <img src="docs/90s/btn-sc55.gif" alt="SC-55 inside"> <img src="docs/90s/btn-sb16.gif" alt="Sound by SB16"> <img src="docs/90s/btn-dos.gif" alt="Powered by DOS 7.1">
 
-<br>
-
-<b>~ SITE MAP ~</b> <sub>(click a button!!)</sub>
-
-<table>
-<tr><td><a href="#-whats-new-"><img src="docs/90s/nav-news.gif" width="88" alt="What's new"></a></td><td><a href="#-what-is-this-"><img src="docs/90s/nav-what.gif" width="88" alt="What is this?"></a></td><td><a href="#-cool-features-"><img src="docs/90s/nav-features.gif" width="88" alt="Features"></a></td><td><a href="#-will-it-run-on-my-pc-"><img src="docs/90s/nav-run.gif" width="88" alt="Will it run?"></a></td></tr>
-<tr><td><a href="#-my-test-lab-"><img src="docs/90s/nav-lab.gif" width="88" alt="My test lab"></a></td><td><a href="#-getting-started-"><img src="docs/90s/nav-start.gif" width="88" alt="Getting started"></a></td><td><a href="#-usb-gamepads-in-dos-"><img src="docs/90s/nav-pads.gif" width="88" alt="USB gamepads"></a></td><td><a href="#-supported-sound-chips-"><img src="docs/90s/nav-chips.gif" width="88" alt="Sound chips"></a></td></tr>
-<tr><td><a href="#-screenshots-"><img src="docs/90s/nav-shots.gif" width="88" alt="Screenshots"></a></td><td><a href="#-hall-of-fame-"><img src="docs/90s/nav-fame.gif" width="88" alt="Hall of fame"></a></td><td><a href="#-built-with-claude-"><img src="docs/90s/nav-claude.gif" width="88" alt="Built with Claude"></a></td><td><a href="#-made-for-this-pack-"><img src="docs/90s/nav-home.gif" width="88" alt="Made for this pack"></a></td></tr>
-<tr><td><a href="#-download-zone-"><img src="docs/90s/nav-download.gif" width="88" alt="Downloads"></a></td><td><a href="#-sign-my-guestbook-"><img src="docs/90s/nav-guest.gif" width="88" alt="Guestbook"></a></td><td><a href="#-for-the-nerds-source-code-"><img src="docs/90s/nav-source.gif" width="88" alt="Source code"></a></td><td><a href="#-thanks-to-my-friends-"><img src="docs/90s/nav-thanks.gif" width="88" alt="Thanks"></a></td></tr>
-</table>
-
-<img src="docs/90s/parade.gif" width="100%" alt="A parade of Freedoom monsters, the marine and Flopsy">
-
-<img src="docs/90s/bar.gif" width="600" alt="">
+<img src="docs/flash/divider.gif" width="720" alt="">
 
 </div>
 
@@ -72,7 +35,7 @@
 
 <div align="center"><sub><i>^^^ the main menu, running in plain DOS ^^^</i></sub></div>
 
-<div align="center"><img src="docs/90s/fd-marine-walk.gif" alt=""> <img src="docs/90s/ic-news.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-news.gif" alt=""> <img src="docs/90s/fd-serpentipede.gif" alt=""></div>
+<div align="center"><img src="docs/90s/fd-marine-walk.gif" alt=""> <img src="docs/90s/ic-news.gif" alt=""> <img src="docs/flash/divider.gif" width="380" alt=""> <img src="docs/90s/ic-news.gif" alt=""> <img src="docs/90s/fd-serpentipede.gif" alt=""></div>
 
 ## ★ What's NEW!! ★
 
@@ -285,9 +248,9 @@ never takes more than about 60% of the CPU, so your game always gets the rest.
 
 </details>
 
-<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+<div align="right"><a href="#top"><img src="docs/flash/b-top.gif" width="100" alt="back to top"></a></div>
 
-<div align="center"><img src="docs/90s/fd-zombie.gif" alt=""> <img src="docs/90s/ic-sparkle.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-sparkle.gif" alt=""> <img src="docs/90s/mascot-flopsy.gif" alt=""></div>
+<div align="center"><img src="docs/90s/fd-zombie.gif" alt=""> <img src="docs/90s/ic-sparkle.gif" alt=""> <img src="docs/flash/divider.gif" width="380" alt=""> <img src="docs/90s/ic-sparkle.gif" alt=""> <img src="docs/90s/mascot-flopsy.gif" alt=""></div>
 
 ## ★ What is this?? ★
 
@@ -311,9 +274,9 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 > **ROMs are NOT included!!** Bring your own SC-55 (and MT-32 / CM-32L) dumps.
 > They're recognised by what's inside them, so the file names don't matter.
 
-<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+<div align="right"><a href="#top"><img src="docs/flash/b-top.gif" width="100" alt="back to top"></a></div>
 
-<div align="center"><img src="docs/90s/fd-hatchling.gif" alt=""> <img src="docs/90s/ic-speaker.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-speaker.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
+<div align="center"><img src="docs/90s/fd-hatchling.gif" alt=""> <img src="docs/90s/ic-speaker.gif" alt=""> <img src="docs/flash/divider.gif" width="380" alt=""> <img src="docs/90s/ic-speaker.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
 ## ★ Cool Features ★
 
@@ -394,9 +357,9 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 - See [`README98.TXT`](sc55-pack/pack/README98.TXT)
 </details>
 
-<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+<div align="right"><a href="#top"><img src="docs/flash/b-top.gif" width="100" alt="back to top"></a></div>
 
-<div align="center"><img src="docs/90s/fd-worm.gif" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
+<div align="center"><img src="docs/90s/fd-worm.gif" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/flash/divider.gif" width="380" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
 ## ★ Will it run on my PC?? ★
 
@@ -431,9 +394,9 @@ emulated CPU, and that always runs at full speed.)
 | **DOS** | MS-DOS 6.22 / 7.x or FreeDOS, plain DOS | Windows 98 "Restart in MS-DOS mode" |
 | **Disk** | about 25 MB, more for disc images | |
 
-<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+<div align="right"><a href="#top"><img src="docs/flash/b-top.gif" width="100" alt="back to top"></a></div>
 
-<div align="center"><img src="docs/90s/fd-potion.gif" alt=""> <img src="docs/90s/ic-rocket.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-rocket.gif" alt=""> <img src="docs/90s/mascot-flopsy.gif" alt=""></div>
+<div align="center"><img src="docs/90s/fd-potion.gif" alt=""> <img src="docs/90s/ic-rocket.gif" alt=""> <img src="docs/flash/divider.gif" width="380" alt=""> <img src="docs/90s/ic-rocket.gif" alt=""> <img src="docs/90s/mascot-flopsy.gif" alt=""></div>
 
 ## ★ My Test Lab!! ★
 
@@ -469,9 +432,9 @@ Every release gets tried on real iron here, plus a whole fleet of emulated PCs:
 **Emulated:** 86Box (Celeron 366 for "how slow can it go?", Pentium II with Windows 98 SE) and QEMU, with custom
 add-ons: a fake USB Xbox 360 pad, a joystick driven from a file and scripted keys and screenshots.
 
-<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+<div align="right"><a href="#top"><img src="docs/flash/b-top.gif" width="100" alt="back to top"></a></div>
 
-<div align="center"><img src="docs/90s/port220-small.gif" width="96" alt=""> <img src="docs/90s/ic-computer.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-computer.gif" alt=""> <img src="docs/90s/fd-potion.gif" alt=""></div>
+<div align="center"><img src="docs/90s/port220-small.gif" width="96" alt=""> <img src="docs/90s/ic-computer.gif" alt=""> <img src="docs/flash/divider.gif" width="380" alt=""> <img src="docs/90s/ic-computer.gif" alt=""> <img src="docs/90s/fd-potion.gif" alt=""></div>
 
 ## ★ Getting Started ★
 
@@ -500,9 +463,9 @@ Duke-style games by itself.
 The `README.TXT` in the pack is the full manual.
 </details>
 
-<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+<div align="right"><a href="#top"><img src="docs/flash/b-top.gif" width="100" alt="back to top"></a></div>
 
-<div align="center"><img src="docs/90s/fd-marine-walk.gif" alt=""> <img src="docs/90s/ic-pad.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-pad.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
+<div align="center"><img src="docs/90s/fd-marine-walk.gif" alt=""> <img src="docs/90s/ic-pad.gif" alt=""> <img src="docs/flash/divider.gif" width="380" alt=""> <img src="docs/90s/ic-pad.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
 ## ★ USB Gamepads in DOS?!? ★
 
@@ -538,9 +501,9 @@ but the pad: [see all the screenshots](docs/padkeys-tests/README.md)!
 Works on my D810. Hubs are tested in QEMU on every controller type; a pad
 behind a USB 2.0 hub on a USB 2.0 port still needs a real-hardware test.
 
-<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+<div align="right"><a href="#top"><img src="docs/flash/b-top.gif" width="100" alt="back to top"></a></div>
 
-<div align="center"><img src="docs/90s/mascot-canvaskid.gif" width="96" alt=""> <img src="docs/90s/ic-speaker.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-speaker.gif" alt=""> <img src="docs/90s/fd-serpentipede.gif" alt=""></div>
+<div align="center"><img src="docs/90s/mascot-canvaskid.gif" width="96" alt=""> <img src="docs/90s/ic-speaker.gif" alt=""> <img src="docs/flash/divider.gif" width="380" alt=""> <img src="docs/90s/ic-speaker.gif" alt=""> <img src="docs/90s/fd-serpentipede.gif" alt=""></div>
 
 ## ★ Supported Sound Chips ★
 
@@ -589,9 +552,9 @@ works for some people.
 > [!TIP]
 > Not sure what's in your PC? Boot DOS and run `SBEMU` once. It tells you the chip it found.
 
-<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+<div align="right"><a href="#top"><img src="docs/flash/b-top.gif" width="100" alt="back to top"></a></div>
 
-<div align="center"><img src="docs/90s/fd-hatchling.gif" alt=""> <img src="docs/90s/ic-camera.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-camera.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
+<div align="center"><img src="docs/90s/fd-hatchling.gif" alt=""> <img src="docs/90s/ic-camera.gif" alt=""> <img src="docs/flash/divider.gif" width="380" alt=""> <img src="docs/90s/ic-camera.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
 ## ★ Screenshots!! ★
 
@@ -697,9 +660,9 @@ works for some people.
 
 </div>
 
-<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+<div align="right"><a href="#top"><img src="docs/flash/b-top.gif" width="100" alt="back to top"></a></div>
 
-<div align="center"><img src="docs/90s/fd-potion.gif" alt=""> <img src="docs/90s/ic-cd.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-cd.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
+<div align="center"><img src="docs/90s/fd-potion.gif" alt=""> <img src="docs/90s/ic-cd.gif" alt=""> <img src="docs/flash/divider.gif" width="380" alt=""> <img src="docs/90s/ic-cd.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
 ## ★ Hall of Fame!! ★
 
@@ -720,9 +683,9 @@ Stuff this little pack pulled off that I'm REALLY proud of:
 - 🏆 **Found and fixed an FPU bug as old as SBEMU itself**: its sound interrupt and port handlers used the math unit without saving the game's values, which could garble 3D games; tracked down from a few black lines in MIDPLAY's 3D view
 - 🏆 **Tested like crazy** on emulated PCs: custom 86Box builds with a fake USB pad, a file-driven joystick and a strict keyboard controller, QEMU with a fake Xbox 360 pad, and real games driven by scripts
 
-<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+<div align="right"><a href="#top"><img src="docs/flash/b-top.gif" width="100" alt="back to top"></a></div>
 
-<div align="center"><img src="docs/90s/port220-small.gif" width="96" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/fd-keycard.gif" alt=""></div>
+<div align="center"><img src="docs/90s/port220-small.gif" width="96" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/flash/divider.gif" width="380" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/fd-keycard.gif" alt=""></div>
 
 ## ★ Built With Claude!! ★
 
@@ -753,9 +716,9 @@ Highlights of what that means: a USB host for DOS inside SBEMU, a 20% faster SC-
 the same, Windows 98 drivers, 3D menus, the pad-keys-per-game system, and dozens of bugs found in emulators
 before they ever reached my real hardware.
 
-<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+<div align="right"><a href="#top"><img src="docs/flash/b-top.gif" width="100" alt="back to top"></a></div>
 
-<div align="center"><img src="docs/90s/fd-hatchling.gif" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
+<div align="center"><img src="docs/90s/fd-hatchling.gif" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/flash/divider.gif" width="380" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
 ## ★ Made For This Pack!! ★
 
@@ -825,9 +788,9 @@ Want to use our drivers in your own project? See [Take Our Drivers!!](#-take-our
 | `make90s.py`, `port220.py` | every animated GIF on this page, Port 220 included |
 </details>
 
-<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+<div align="right"><a href="#top"><img src="docs/flash/b-top.gif" width="100" alt="back to top"></a></div>
 
-<div align="center"><img src="docs/90s/fd-soulsphere.gif" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
+<div align="center"><img src="docs/90s/fd-soulsphere.gif" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/flash/divider.gif" width="380" alt=""> <img src="docs/90s/ic-chip.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
 ## ★ Take Our Drivers!! ★
 
@@ -887,9 +850,9 @@ the same GPL.
 | 86Box + QEMU test rigs | drive an emulated PC by script: keys, screenshots, CPU registers, fake USB pads and sticks |
 </details>
 
-<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+<div align="right"><a href="#top"><img src="docs/flash/b-top.gif" width="100" alt="back to top"></a></div>
 
-<div align="center"><img src="docs/90s/fd-trilobite.gif" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
+<div align="center"><img src="docs/90s/fd-trilobite.gif" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/flash/divider.gif" width="380" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/port220-small.gif" width="96" alt=""></div>
 
 ## ★ Download Zone ★
 
@@ -916,9 +879,9 @@ the same GPL.
 **Free test games!!** <img src="docs/90s/ic-pad.gif" alt=""> Ten shareware games to try the pack with are waiting in
 [Free Shareware Games!!](#-free-shareware-games-) just below.
 
-<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+<div align="right"><a href="#top"><img src="docs/flash/b-top.gif" width="100" alt="back to top"></a></div>
 
-<div align="center"><img src="docs/90s/fd-marine-walk.gif" alt=""> <img src="docs/90s/ic-pad.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-pad.gif" alt=""> <img src="docs/90s/fd-potion.gif" alt=""></div>
+<div align="center"><img src="docs/90s/fd-marine-walk.gif" alt=""> <img src="docs/90s/ic-pad.gif" alt=""> <img src="docs/flash/divider.gif" width="380" alt=""> <img src="docs/90s/ic-pad.gif" alt=""> <img src="docs/90s/fd-potion.gif" alt=""></div>
 
 ## ★ Free Shareware Games!! ★
 
@@ -968,9 +931,9 @@ fees. The full quotes, setup tips and SHA-256 checksums are in [TESTGAMES.TXT](t
 `doom19s.zip` from the [idgames mirror](https://mirrors.lug.mtu.edu/idgames/idstuff/doom/) (MD5
 `244d181457c9be5f28b91b488e67e042`).
 
-<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+<div align="right"><a href="#top"><img src="docs/flash/b-top.gif" width="100" alt="back to top"></a></div>
 
-<div align="center"><img src="docs/90s/mascot-flopsy.gif" alt=""> <img src="docs/90s/ic-news.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-news.gif" alt=""> <img src="docs/90s/fd-worm.gif" alt=""></div>
+<div align="center"><img src="docs/90s/mascot-flopsy.gif" alt=""> <img src="docs/90s/ic-news.gif" alt=""> <img src="docs/flash/divider.gif" width="380" alt=""> <img src="docs/90s/ic-news.gif" alt=""> <img src="docs/90s/fd-worm.gif" alt=""></div>
 
 ## ★ Sign My Guestbook! ★
 
@@ -987,9 +950,9 @@ settings, SBEMU's messages and test results. Attach it and tell me what you
 were doing. If SBEMU hung, the last `[step]` line in `SBDETAIL.TXT` shows
 exactly where.
 
-<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+<div align="right"><a href="#top"><img src="docs/flash/b-top.gif" width="100" alt="back to top"></a></div>
 
-<div align="center"><img src="docs/90s/port220-small.gif" width="96" alt=""> <img src="docs/90s/ic-computer.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-computer.gif" alt=""> <img src="docs/90s/fd-marine-shoot.gif" alt=""></div>
+<div align="center"><img src="docs/90s/port220-small.gif" width="96" alt=""> <img src="docs/90s/ic-computer.gif" alt=""> <img src="docs/flash/divider.gif" width="380" alt=""> <img src="docs/90s/ic-computer.gif" alt=""> <img src="docs/90s/fd-marine-shoot.gif" alt=""></div>
 
 ## ★ For the Nerds: Source Code ★
 
@@ -1023,9 +986,9 @@ needs MinGW-w64 i686, Open Watcom 2 and JWasm; see
 tested, what still needs real hardware. The 90s graphics on this page are
 drawn by [`docs/90s/make90s.py`](docs/90s/make90s.py).
 
-<div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
+<div align="right"><a href="#top"><img src="docs/flash/b-top.gif" width="100" alt="back to top"></a></div>
 
-<div align="center"><img src="docs/90s/tux-waddle.gif" width="96" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/bar.gif" width="380" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/mascot-canvaskid.gif" width="96" alt=""></div>
+<div align="center"><img src="docs/90s/tux-waddle.gif" width="96" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/flash/divider.gif" width="380" alt=""> <img src="docs/90s/ic-heart.gif" alt=""> <img src="docs/90s/mascot-canvaskid.gif" width="96" alt=""></div>
 
 ## ★ Thanks To My Friends ★
 
@@ -1086,7 +1049,7 @@ VIDE-CDD (Acer / BenQ), GSCDROM (LG), QEMM (Quarterdeck). Built with
 
 <img src="docs/90s/port220-hop.gif" width="100%" alt="Port 220 hopping across the page">
 
-<img src="docs/90s/bar.gif" width="600" alt="">
+<img src="docs/flash/divider.gif" width="600" alt="">
 
 <h3>~ DOS Sound WebRing ~</h3>
 
