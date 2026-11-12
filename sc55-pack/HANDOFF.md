@@ -1266,8 +1266,10 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
   (sticks hot-plugged after boot, else SeaBIOS maps them to INT 13h and FreeDOS letters them itself). EHCI HS and
   piix UHCI: DIR / TYPE / COPY of 300 KB from MBR FAT16 + logical FAT32 + GPT FAT16 + superfloppy FAT12 byte-exact;
   medium swap seen; unplug -> "drive not ready"; write -> "write-protection violation".
-- NOT tested: MS-DOS 7.1 (needs the user's IO.SYS/MSDOS.SYS/COMMAND.COM; check its CDS 49h..4Ch and the extended DPB),
-  MS-DOS 6.22, 86Box/msdtest.sh (devkit tar not attached this session), SBEMU unload, games running (RMCB from a DPMI
+- MS-DOS 7.1 [7.10.1999] (IO.SYS/MSDOS.SYS/COMMAND.COM from the user's DOS 7.1 CD, BOOT/DOS71INS.IMG; rig with
+  C=c71 MKDISK_BOOT=msdos): same results - FAT16, logical FAT32 (CD E:\ + DIR E:), GPT, superfloppy FAT12, EHCI and UHCI,
+  300 KB copies exact, swap seen, unplug -> "Not ready reading drive D", write -> "Write protect error writing drive D".
+- NOT tested: MS-DOS 6.22, 86Box/msdtest.sh (devkit tar not attached this session), SBEMU unload, games running (RMCB from a DPMI
   game), real PCs (D810 ICH6, P5PE-VM NEC EHCI).
 ## fsread: read-only exFAT + NTFS reader library (2026-11-11, not built into anything yet)
 - New files only: sc55-pack/sbemu/fsread/{fsread.h, exfat.c, ntfs.c} (+ test/). Not in the makefile; usbpad.c /

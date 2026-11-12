@@ -3,6 +3,7 @@
 # works too). /home/claude/vm/c = boot folder: FreeDOS KERNEL.SYS + COMMAND.COM (testrig/rufus/res/freedos),
 # JEMMEX.EXE + HDPMI32I.EXE (release zip), SBEMU.EXE, DELAY.COM (10 s wait, INT 1Ah), CONFIG.SYS
 # "DEVICE=C:\JEMMEX.EXE NOEMS / DOS=HIGH,UMB / LASTDRIVE=Z" (SBEMU needs XMS).
+# C=c71 MKDISK_BOOT=msdos: MS-DOS 7.1 folder instead (IO.SYS, MSDOS.SYS, COMMAND.COM from the user's CD, BOOT/DOS71INS.IMG).
 # Sticks are hot-plugged at P s (default 6) while DELAY runs: plugged at boot, SeaBIOS maps them as INT 13h disks and
 # FreeDOS gives them letters itself (writable, not ours). D="id:port ..." (default "s1:1 s2:4"), images vm/sa.img
 # (MBR FAT16 + logical FAT32), sg.img (GPT FAT16), sf.img (superfloppy FAT12); B=uh.0 QX="-device piix3-usb-uhci,id=uh,addr=5"
@@ -10,8 +11,8 @@
 N=$1; shift; cd /home/claude/vm; R=/home/claude/nuked-sbemu-muxed/sc55-pack
 M() { echo "$1" | socat - UNIX-CONNECT:/home/claude/vm/qmon.sock >/dev/null; }
 { printf '@ECHO OFF\r\nHDPMI32I -r -x\r\nDELAY\r\nSBEMU /JOY:1 /USBDISK:1 > C:\\SB.TXT\r\nVER > C:\\UT.TXT\r\n'
-  for c in "$@"; do printf '%s >> C:\\UT.TXT\r\n' "$c"; done; printf 'ECHO DONE >> C:\\UT.TXT\r\n'; } > c/AUTOEXEC.BAT
-python3 $R/testrig/mkdisk.py build c q.img 100 >/dev/null
+  for c in "$@"; do printf '%s >> C:\\UT.TXT\r\n' "$c"; done; printf 'ECHO DONE >> C:\\UT.TXT\r\n'; } > ${C:-c}/AUTOEXEC.BAT
+python3 $R/testrig/mkdisk.py build ${C:-c} q.img 100 >/dev/null
 timeout ${T:-60} qemu-system-i386 -m 64 -display none -no-reboot -audiodev none,id=a -device AC97,audiodev=a \
   -drive file=q.img,format=raw,if=ide,index=0 -device ich9-usb-ehci1,id=ehci,addr=1d.7,multifunction=on \
   -device ich9-usb-uhci1,masterbus=ehci.0,firstport=0,addr=1d.0,multifunction=on \
