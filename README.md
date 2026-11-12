@@ -22,7 +22,7 @@
 
 <picture><img src="docs/90s/port220-hello.gif" width="400" alt="Port 220, the NUKED SB-EMU mascot, says hi"></picture> <picture><img src="docs/90s/vox-claude.gif" width="130" alt="Claude as a voxel buddy, typing"></picture>
 
-<h3>~ What's inside my PC?? ~</h3><picture><img src="docs/90s/doodle-parts.gif" width="150" alt="click the parts!"></picture><sub>(everything NUKED SB-EMU does for your DOS games: click a part!!)</sub><br>
+<h3>~ What's inside my PC?? ~</h3><sub>(everything NUKED SB-EMU does for your DOS games: click a part!!)</sub> <picture><img src="docs/90s/doodle-parts.gif" width="150" alt="click the parts!"></picture><br>
 <a href="#-supported-sound-chips-"><img src="docs/90s/vox-part-soundcard.gif" width="130" alt="Sound Blaster 16 on any PCI sound card"></a>
 <a href="#-what-is-this-"><img src="docs/90s/vox-part-sc55.gif" width="130" alt="Roland SC-55, General MIDI"></a>
 <a href="#-cool-features-"><img src="docs/90s/vox-part-cdrom.gif" width="130" alt="CD audio and CD images"></a>
