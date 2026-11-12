@@ -17,6 +17,8 @@
   every other entry); release/ keeps one zip; README.md news (5 newest); HANDOFF section; commit `w98: ...`;
   push -> the workflow publishes the tag from the zip name. Personal pack = public zip + the 52 entries of the
   user's personal zip that the public one lacks (ROMs, MSCDEX, VIDE-CDD, GSCDROM, MOUSE.COM); send it to the user.
+  Since beta.95 the personal pack also gets FILES/PADMAP/keyb2joypad.cpp (DOSBox Pure 0.9.9, the pad layouts we may
+  not ship; DOWNLOADS.TXT has the URL): curl it from raw.githubusercontent.com/schellingb/dosbox-pure/0.9.9/.
 - Standing user rules: after every major milestone push a backup + HANDOFF note; plain-language updates; say
   what still needs testing on the real PCs (Dell D810; ASUS P5PE-VM + NEC USB card + wired Xbox 360 pad).
 - Last task (done in beta.81-w98.4): CPU-usage optimisation in DOS and Windows. Waiting for the user's next request.
