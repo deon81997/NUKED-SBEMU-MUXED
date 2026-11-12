@@ -214,6 +214,62 @@ int main(int argc, char** argv)
                 for (j = 0x43; j < 0x58; ++j) printf(" %02X", _farpeekb(_dos_ds, cds + dr * 0x58 + j));
                 printf("\n");
             }
+            {   /* DPB chain, vectors with owner, DOS answers for the first drive of ours */
+                unsigned long p = lin(_farpeekw(_dos_ds, lol + 2), _farpeekw(_dos_ds, lol)), dv;
+                static const unsigned char iv[] = { 0x13, 0x21, 0x25, 0x2F };
+                int n = 0, dl = ND ? D[0].letter : 3;
+                printf("DPB chain:");
+                while (n++ < 30)
+                {
+                    unsigned no;
+                    printf(" %c=%05lX", 'A' + _farpeekb(_dos_ds, p), p);
+                    no = _farpeekw(_dos_ds, p + 0x19);
+                    if (no == 0xFFFF) break;
+                    p = lin(_farpeekw(_dos_ds, p + 0x1B), no);
+                }
+                printf("\n");
+                for (dr = 2; dr < 2 + 1 + ND && dr < 26; ++dr)
+                {
+                    unsigned long b = lin(_farpeekw(_dos_ds, cds + dr * 0x58 + 0x47), _farpeekw(_dos_ds, cds + dr * 0x58 + 0x45));
+                    printf("DPB %c:", 'A' + dr);
+                    for (j = 0; j < 0x3D; ++j) printf("%s%02X", j && !(j % 32) ? "\n       " : " ", _farpeekb(_dos_ds, b + j));
+                    dv = lin(_farpeekw(_dos_ds, b + 0x15), _farpeekw(_dos_ds, b + 0x13));
+                    printf("\n  dev %04lX:%04lX:", dv >> 4, dv & 15);
+                    for (j = 0; j < 18; ++j) printf(" %02X", _farpeekb(_dos_ds, dv + j));
+                    printf("\n");
+                }
+                for (j = 0; j < 4; ++j)
+                {
+                    unsigned v = _farpeekw(_dos_ds, iv[j] * 4 + 2), o = _farpeekw(_dos_ds, iv[j] * 4), m;
+                    char nm[9] = { 0 };
+                    unsigned long mc = lin(_farpeekw(_dos_ds, lol - 2), 0);  /* MCB walk for the owner */
+                    for (m = 0; m < 2000 && (_farpeekb(_dos_ds, mc) == 'M' || _farpeekb(_dos_ds, mc) == 'Z'); ++m)
+                    {
+                        unsigned long s = mc + 16, e = s + (unsigned long)_farpeekw(_dos_ds, mc + 3) * 16, t = lin(v, o);
+                        if (t >= s && t < e)
+                        {
+                            unsigned own = _farpeekw(_dos_ds, mc + 1), q2;
+                            for (q2 = 0; q2 < 8; ++q2) { char ch = _farpeekb(_dos_ds, lin(own ? own - 1 : 0, 8 + q2)); nm[q2] = ch >= 32 && ch < 127 ? ch : 0; if (!ch) break; }
+                            break;
+                        }
+                        if (_farpeekb(_dos_ds, mc) == 'Z') break;
+                        mc += 16 + (unsigned long)_farpeekw(_dos_ds, mc + 3) * 16;
+                    }
+                    printf("INT %02Xh %04X:%04X %s\n", iv[j], v, o, nm[0] ? nm : (v >= 0xF000 ? "BIOS" : v < 0x100 ? "DOS low" : v >= 0xFFFF ? "HMA" : "?"));
+                }
+                memset(&q, 0, sizeof q); q.h.ah = 0x36; q.h.dl = dl + 1; __dpmi_int(0x21, &q);
+                printf("%c: 36h ax %04X", 'A' + dl, q.x.ax);
+                memset(&q, 0, sizeof q); q.h.ah = 0x59; __dpmi_int(0x21, &q);
+                printf("  ext err %04X class %02X locus %02X", q.x.ax, q.h.bh, q.h.ch);
+                memset(&q, 0, sizeof q); q.h.ah = 0x32; q.h.dl = dl + 1; __dpmi_int(0x21, &q);
+                printf("  32h al %02X %04X:%04X", q.h.al, q.x.ds, q.x.bx);
+                memset(&q, 0, sizeof q); q.x.ax = 0x7302; q.h.dl = dl + 1; q.x.es = __tb >> 4; q.x.di = __tb & 15; q.x.cx = 0x3F;
+                _farpokew(_dos_ds, __tb, 0x3D); __dpmi_int(0x21, &q);
+                printf("  7302h cf %d ax %04X\n", q.x.flags & 1, q.x.ax);
+                memset(&q, 0, sizeof q); q.x.ax = 0x4409; q.h.bl = dl + 1; __dpmi_int(0x21, &q);
+                printf("%c: 4409h cf %d ax %04X dx %04X  stub calls now %lu\n", 'A' + dl, q.x.flags & 1, q.x.ax, q.x.dx,
+                       ND ? _farpeekl(_dos_ds, lin(D[0].seg, 0x28)) : 0UL);
+            }
         }
         for (k = 0; k < (unsigned)ND; ++k)
         {

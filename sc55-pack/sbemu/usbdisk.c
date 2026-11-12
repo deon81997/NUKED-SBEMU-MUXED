@@ -32,6 +32,7 @@
 #define UD_LOGN  256
 #define UD_DIAG  (UD_LOG + 4 + UD_LOGN * 8)       /* per unit 160 bytes for USBDRV /L: start, size, AH=53h result, BPB, MBR 1BEh.. */
 #define UD_DIAGSZ 160   /* 8 x 48 bytes: exFAT / NTFS drives of usbredir.c, for USBDRV */
+#define UD_PROBE (UD_DIAG + UD_UNITS * UD_DIAGSZ)  /* INT 24h "fail" stub + INT 21h 7302h buffer while letters are checked */
 
 typedef struct
 {
@@ -451,6 +452,59 @@ static void USBDISK_Req(void)
 /* ---- linking into DOS ---- */
 static int dos_call(DPMI_REG* r) { return DPMI_CallRealModeINT(0x21, r) == 0; }
 
+static void cds_set(int i, int nblk)                            /* CDS entry, from C:'s as the template (kernel-specific fields) */
+{
+    uint32_t c = CdsBase + U[i].drive * UD_CDS;
+    if (nblk > 2) DPMI_LMemcpy(c, CdsBase + 2 * UD_CDS, UD_CDS); else DPMI_LMemset(c, 0, UD_CDS);
+    DPMI_LMemset(c, 0, 0x43);
+    DPMI_StoreB(c + 0, (uint8_t)('A' + U[i].drive)); DPMI_StoreB(c + 1, ':'); DPMI_StoreB(c + 2, '\\');
+    DPMI_StoreW(c + 0x45, (uint16_t)(dpb_lin(i) - base_lin())); DPMI_StoreW(c + 0x47, Seg);
+    DPMI_StoreD(c + 0x49, 0);                                   /* current directory: root */
+    DPMI_StoreW(c + 0x4D, 0xFFFF);                              /* the rest as a cleanly booted DOS has it */
+    DPMI_StoreW(c + 0x4F, 2);
+    DPMI_LMemset(c + 0x51, 0, UD_CDS - 0x51);
+    DPMI_StoreW(c + 0x43, 0x4000);
+}
+
+/* Windows 98 "Restart in MS-DOS mode": DOS refuses the letters Windows gave USB drives ("Invalid function"),
+ * without ever calling a driver. Ask DOS for each drive's DPB (our stub counts the calls); a letter that never
+ * reaches us is left for the next free one. A temporary INT 24h stub answers "fail" for empty units. */
+static void skip_blocked(int nblk, int lastdrive, uint32_t lol)
+{
+    uint32_t pr = base_lin() + UD_PROBE, old24 = DPMI_LoadD(0x24 * 4);
+    int i, next = U[NU - 1].drive + 1, top = 0, moved = 0;
+    DPMI_StoreB(pr, 0xB0); DPMI_StoreB(pr + 1, 3); DPMI_StoreB(pr + 2, 0xCF);   /* mov al,3 / iret */
+    DPMI_StoreD(0x24 * 4, (uint32_t)Seg << 16 | UD_PROBE);
+    for (i = 0; i < NU; ++i)
+    {
+        int tries = 0;
+        for (;;)
+        {
+            DPMI_REG r;
+            uint32_t n0 = DPMI_LoadD(base_lin() + 0x28);
+            memset(&r, 0, sizeof r);
+            if (Fat32Ok) { r.w.ax = 0x7302; r.h.dl = (uint8_t)(U[i].drive + 1); r.w.es = Seg; r.w.di = UD_PROBE + 0x10; r.w.cx = 0x3F; DPMI_StoreW(pr + 0x10, 0x3D); }
+            else { r.h.ah = 0x32; r.h.dl = (uint8_t)(U[i].drive + 1); }
+            dos_call(&r);
+            if (DPMI_LoadD(base_lin() + 0x28) != n0 || tries++ >= 6) break;
+            while (next < lastdrive && DPMI_LoadW(CdsBase + next * UD_CDS + 0x43) & 0xC000) ++next;
+            if (next >= lastdrive) break;
+            __asm__ __volatile__("cli");
+            DPMI_StoreW(CdsBase + U[i].drive * UD_CDS + 0x43, 0);
+            U[i].drive = next++; DPMI_StoreB(dpb_lin(i), (uint8_t)U[i].drive);
+            DPMI_StoreB(dpb_lin(i) + 0x18, 0xFF);
+            cds_set(i, nblk);
+            if (U[i].drive + 1 > DPMI_LoadB(lol + 0x20)) DPMI_StoreB(lol + 0x20, (uint8_t)(U[i].drive + 1));
+            __asm__ __volatile__("sti");
+            moved = 1;
+        }
+        if (U[i].drive > top) top = U[i].drive;
+    }
+    DPMI_StoreD(0x24 * 4, old24);
+    (void)top; (void)moved;
+}
+
+
 int USBDISK_Install(void)
 {
     DPMI_REG r;
@@ -500,7 +554,7 @@ int USBDISK_Install(void)
     for (i = 0; i < NU; ++i)                                    /* letters must be free and next to each other */
         if (DPMI_LoadW(CdsBase + (drive + i) * UD_CDS + 0x43) & 0xC000) { NU = i; break; }
 
-    Seg = (uint16_t)DPMI_HighMalloc((UD_DIAG + UD_UNITS * UD_DIAGSZ + 15) / 16, TRUE);
+    Seg = (uint16_t)DPMI_HighMalloc((UD_PROBE + 0x50 + 15) / 16, TRUE);
     Cb = DPMI_AllocateRMCB_RETF(&USBDISK_Req, &Reg);
     if (!Seg || !Cb) { NU = 0; strcpy(Msg, "no memory for the drive stub"); return 0; }
     typedef char stub_fits[sizeof USBDISK_Stub <= UD_STUB ? 1 : -1]; (void)sizeof(stub_fits);
@@ -548,22 +602,10 @@ int USBDISK_Install(void)
     nul = lol + 0x22;
     DPMI_StoreD(base_lin() + 0, DPMI_LoadD(nul));
     DPMI_StoreW(nul + 0, 0); DPMI_StoreW(nul + 2, Seg);
-    /* CDS entries, from C:'s as the template (kernel-specific fields) */
-    for (i = 0; i < NU; ++i)
-    {
-        uint32_t c = CdsBase + U[i].drive * UD_CDS;
-        if (nblk > 2) DPMI_LMemcpy(c, CdsBase + 2 * UD_CDS, UD_CDS); else DPMI_LMemset(c, 0, UD_CDS);
-        DPMI_LMemset(c, 0, 0x43);
-        DPMI_StoreB(c + 0, (uint8_t)('A' + U[i].drive)); DPMI_StoreB(c + 1, ':'); DPMI_StoreB(c + 2, '\\');
-        DPMI_StoreW(c + 0x45, (uint16_t)(dpb_lin(i) - base_lin())); DPMI_StoreW(c + 0x47, Seg);
-        DPMI_StoreD(c + 0x49, 0);                               /* current directory: root */
-        DPMI_StoreW(c + 0x4D, 0xFFFF);                          /* the rest as a cleanly booted DOS has it: after */
-        DPMI_StoreW(c + 0x4F, 2);                               /* Windows 98 -> "Restart in MS-DOS mode" C:'s entry */
-        DPMI_LMemset(c + 0x51, 0, UD_CDS - 0x51);               /* keeps IFS fields that sent D: E: elsewhere: DOS */
-        DPMI_StoreW(c + 0x43, 0x4000);                          /* never called us (P5PE-VM, 0 calls) */
-    }
+    for (i = 0; i < NU; ++i) cds_set(i, nblk);
     if (drive == nblk) DPMI_StoreB(lol + 0x20, (uint8_t)(nblk + NU));
     __asm__ __volatile__("sti");
+    if (drive == nblk) skip_blocked(nblk, lastdrive, lol);
 
     for (i = 0; i < NU; ++i) sprintf(Letters + strlen(Letters), "%s%c:", i ? " " : "", 'A' + U[i].drive);
     for (i = 0; i < NU; ++i) info_set(i, U[i].disk >= 0 && U[i].ok ? 1 : 0);

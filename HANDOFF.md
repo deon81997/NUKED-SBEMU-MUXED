@@ -48,6 +48,16 @@ Review for 2,000-10,000 files, deep folders, long names. No fixed-size song arra
 - Note: our HDPMI is built from crazii HEAD, not the exact old v0.1-beta4fix2 binary (38646 bytes). Watch for regressions.
 - Still open: SSF2T MAKESWP hangs on exit with SBEMU resident (see the SSF2T section).
 
+## beta.98 (2026-11-12): USB letters refused after Win98 "Restart in MS-DOS mode"
+- Symptom (user's P5PE-VM, NEC EHCI): D: E: "Invalid function", stub 0 calls, INT 21h 7302h CF ax 000Fh, 36h FFFF.
+  F8 clean boot fine. Reproduced in QEMU (/home/claude/w98, stock.iso as CD): only when the stick was mounted in
+  Windows first (device_add on the desktop), then Restart in MS-DOS mode: the letters Windows gave the stick are
+  refused by the DOS kernel (WIN.COM's INT 21h hook is a plain jmp to DOS; cause inside IO.SYS, not found).
+- Fix (usbdisk.c skip_blocked): after install, INT 21h 7302h (32h on DOS < 7) per unit with a temporary INT 24h
+  "fail" stub; a letter whose call never reaches the stub (counter at 28h) moves to the next free letter (LoL+20h
+  raised). QEMU: E: H: I: J:, both partitions read. CDS tail now written clean (cds_set), not copied from C:.
+- USBDRV /L also prints the DPB chain, our DPBs + device header, INT 13/21/25/2F owners, DOS answers for drive 1.
+
 ## Win98 -> MS-DOS mode with SweetLow's USB 2.0 stack (QuickInstall 1.1.0), tested in QEMU (2026-11-11)
 - The user's QuickInstall v1.1.0 stock ISO (= our Win98 test image) carries SweetLow's USB 2.0 + USB storage stack
   in OSROOTS/1/DRIVER.866 (USB2.INF, usbehci/usbport/usbhub20/USBSTOR.SYS). Windows installs it for a real EHCI.
