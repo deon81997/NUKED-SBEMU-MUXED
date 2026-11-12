@@ -64,3 +64,8 @@ Review for 2,000-10,000 files, deep folders, long names. No fixed-size song arra
     state Windows left and resets again); the USB stick reads (CRC OK) and the hot-plugged keyboard works (keys seen).
     Same with ICH9 UHCI companions. So the Windows-left controller state is handled; not the cause of the
     "lost a TD" on the user's NEC card (that log was a cold DOS boot anyway: "DOS version 7.10, no Windows").
+
+## beta.95 (2026-11-11): USB disk fixes since beta.94 built in
+- SBEMU, USBTEST, SBSET, SC55LOG rebuilt from main (usbdisk.c: drives follow their stick when usbpad renumbers disks,
+  a card swapped in a card reader is seen after 2 s idle). Everything else in the zip is beta.94's.
+- fsread (exFAT/NTFS reader) is still a separate library, not built into SBEMU yet.

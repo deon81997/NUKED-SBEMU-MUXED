@@ -76,6 +76,8 @@
 
 ## ★ What's NEW!! ★
 
+<img src="docs/90s/new.gif" alt="NEW!"> **11/11/2026: beta.95.** **USB drives stay put!!** With two USB sticks in, unplugging the first one no longer moves the second stick's files to the wrong drive letter: each drive follows its own stick. Swap the card in a card reader and DOS sees the new card after 2 seconds. Also checked: going from Windows 98 (with SweetLow's USB 2.0 drivers from QuickInstall) to MS-DOS mode, our USB driver takes the controllers back and the stick and keyboard work again, but a USB-only keyboard stays dead until the SC-55 starts, so start it from DOSSTART.BAT.
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/11/2026: beta.94.** **USB sticks get a DOS drive letter!!** Start SBEMU with /USBDISK:1 (and LASTDRIVE=Z in CONFIG.SYS) and the USB sticks and card readers plugged in get the next free drive letters: FAT12/16 everywhere, FAT32 on MS-DOS 7.1 and FreeDOS, read AND write, USB 2.0 speed on USB 2.0 ports. Copy your CD images or game files onto a stick and use them straight from DOS. Tested in QEMU and 86Box: reading on FreeDOS, MS-DOS 7.1 and 6.22, writing on FreeDOS (2.7 MB copies byte-exact, write-protect switch honoured). Experimental and off by default: please try it on your PCs. exFAT / NTFS sticks come next.
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/11/2026: beta.93.** **USB sticks, first step!!** USBTEST now finds USB sticks and card readers: name, size, the start of the disk and a 1 MB read test. On USB 2.0 ports they run at full USB 2.0 speed (the NEC card tested: about 680 KB/s with small reads, more now), and pads, keyboards and mice on the same ports still go to the USB 1.1 side as before. Test only for now: the drive letter in DOS comes next. SBEMU itself works as in beta.92.
@@ -84,14 +86,14 @@
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.91-w98.7.** **Windows 98 to DOS, cleaned up!!** If you started SC55 (SBEMU) inside a Windows 98 DOS box it used to fail with a confusing "both modes disabled" message, and on some setups it could even grab the sound card from under Windows. Now it says plainly that Windows is running and that the Windows part (SC55W) already gives DOS boxes their sound, and stops. After "Restart in MS-DOS mode" it loads as always. README98 also shows the one line to put in DOSSTART.BAT so the SC-55 starts by itself in MS-DOS mode.
 
+<details>
+<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
+
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.91.** **CD games from MENU find the right disc!!** Starting a second
 CD game from MENU in the same session kept the FIRST game's disc in drive M: (uCDD has one drive and refused the
 second mount), so the game said "no CD", or failed with read or init errors. MENU now takes the old disc out first,
 and if a disc still cannot be mounted it says so and does not start the game. Tested in 86Box: disc swap works, and
 Doom runs straight from the virtual drive with SBEMU and the SC-55 loaded (its WAD read back bit-identical).
-
-<details>
-<summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
 
 <img src="docs/90s/new.gif" alt="NEW!"> **11/10/2026: beta.90-w98.6.** **Windows 98 catches up with DOS!!** MIDPLAY in a Windows
 DOS box now shows the SC-55's (or MT-32's) REAL display, live, just like in DOS: the Windows driver answers its
@@ -727,14 +729,14 @@ MPXPlay drivers, **Japheth**'s HX and Jemm, **vorvek**'s uCDD and everyone in [T
 
 Everything new on top of them was written by **Claude**, Anthropic's AI: the code, the bug hunting, the emulated
 test PCs, the docs and Port 220. My part was the ideas, the direction and the testing on my own PCs. The numbers (from this repo's
-history, November 4 - 11, 2026, at beta.92):
+history, November 4 - 11, 2026, at beta.95):
 
 <div align="center">
 
 | | |
 |---|---|
-| 🧑‍💻 **commits co-written by Claude** | **158 of 164** |
-| 📦 **releases** | **60** |
+| 🧑‍💻 **commits co-written by Claude** | **198 of 204** |
+| 📦 **releases** | **62** |
 | 📜 **new code** | **about 32,000 lines**: DOS programs, SBEMU additions, Windows 98 drivers, test rigs |
 | 📖 **docs** | a 1,420-line manual (README.TXT) and a 1,260-line dev diary (HANDOFF.md) |
 | 🎨 **art** | Port 220 and every animated GIF on this page |
