@@ -557,8 +557,10 @@ int USBDISK_Install(void)
         DPMI_StoreB(c + 0, (uint8_t)('A' + U[i].drive)); DPMI_StoreB(c + 1, ':'); DPMI_StoreB(c + 2, '\\');
         DPMI_StoreW(c + 0x45, (uint16_t)(dpb_lin(i) - base_lin())); DPMI_StoreW(c + 0x47, Seg);
         DPMI_StoreD(c + 0x49, 0);                               /* current directory: root */
-        DPMI_StoreW(c + 0x4F, 2);                               /* backslash offset */
-        DPMI_StoreW(c + 0x43, 0x4000);                          /* physical drive: valid from now */
+        DPMI_StoreW(c + 0x4D, 0xFFFF);                          /* the rest as a cleanly booted DOS has it: after */
+        DPMI_StoreW(c + 0x4F, 2);                               /* Windows 98 -> "Restart in MS-DOS mode" C:'s entry */
+        DPMI_LMemset(c + 0x51, 0, UD_CDS - 0x51);               /* keeps IFS fields that sent D: E: elsewhere: DOS */
+        DPMI_StoreW(c + 0x43, 0x4000);                          /* never called us (P5PE-VM, 0 calls) */
     }
     if (drive == nblk) DPMI_StoreB(lol + 0x20, (uint8_t)(nblk + NU));
     __asm__ __volatile__("sti");

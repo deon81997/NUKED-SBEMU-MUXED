@@ -200,6 +200,21 @@ int main(int argc, char** argv)
             printf("%5u  unit %u  %-13s cmd %02Xh  status %04Xh%s  %s %ld\n", k, _farpeekb(_dos_ds, e + 1), c < 26 ? cn[c] : "?", c, st,
                    st & 0x8000 ? " ERROR" : "      ", (c == 4 || c == 8 || c == 9) ? "sector" : c == 1 ? "answer" : "len", (long)_farpeekl(_dos_ds, e + 4));
         }
+        {   /* DOS's drive table (CDS) bytes 43h..57h: C: and ours */
+            __dpmi_regs q;
+            unsigned long lol, cds;
+            int dr, j;
+            memset(&q, 0, sizeof q); q.h.ah = 0x52; __dpmi_int(0x21, &q);
+            lol = lin(q.x.es, q.x.bx);
+            cds = lin(_farpeekw(_dos_ds, lol + 0x18), _farpeekw(_dos_ds, lol + 0x16));
+            printf("LoL: block devices %u, lastdrive %u\n", _farpeekb(_dos_ds, lol + 0x20), _farpeekb(_dos_ds, lol + 0x21));
+            for (dr = 2; dr < 2 + 1 + ND && dr < 26; ++dr)
+            {
+                printf("CDS %c: 43h:", 'A' + dr);
+                for (j = 0x43; j < 0x58; ++j) printf(" %02X", _farpeekb(_dos_ds, cds + dr * 0x58 + j));
+                printf("\n");
+            }
+        }
         for (k = 0; k < (unsigned)ND; ++k)
         {
             unsigned long g = lin(D[0].seg, UD_DIAG + D[k].unit * UD_DIAGSZ);
