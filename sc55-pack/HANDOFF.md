@@ -1362,3 +1362,9 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
   read (RMCB from a DPMI game), writes on MS-DOS 7.1 / 6.22.
 - Next: session 5 redirector (exFAT / NTFS through sbemu/fsread, FAT32 on DOS 6.22), disks plugged after SBEMU starts
   (spare units), stable disk ids, BIOS INT 13h takeover for sticks the BIOS had mapped (keeps their boot letters).
+- USB session (2026-11-12): a new disk's INQUIRY / TEST UNIT READY / READ CAPACITY / MODE SENSE no longer run inside
+  enumeration (which runs in the sound interrupt for hot-plugs: a slow stick could stall the sound for seconds); only
+  GET_MAX_LUN there, the rest on the first USBPAD_Disks / DiskInfo / DiskRead / DiskWrite (msd_init_pending). Up to 4
+  disks (MAX_MSD 4). Tested: QEMU EHCI USBTEST + SBEMU /USBDISK:1 COPY 2.7 MB exact, 86Box OHCI hot-plug USBTEST.
+- Still open for the drive-letter side (usbdisk.c, session 4 owner): spare units so a stick plugged in after SBEMU
+  starts gets a letter.

@@ -286,12 +286,12 @@ typedef struct { int ids; HidF ax[6], hat, btn; int nbtn; } HidMap;  /* ax: X Y 
 static HidMap    Hm[MAX_PIPE];
 
 /* USB disks (mass storage, bulk-only transport + SCSI; docs/USB-STORAGE.md): one per interface, its LUNs are drives */
-#define MAX_MSD   2
+#define MAX_MSD   4
 #define MAX_LUN   4
 typedef struct
 {
-    int used, dev, hc, ifc, in, out, mps, tin, tout, nlun;
-    uint32_t tag;
+    int used, dev, hc, ifc, in, out, mps, tin, tout, nlun, pending;   /* pending: INQUIRY etc. not done yet */
+    uint32_t tag, gen;
     int lok[MAX_LUN];                   /* LUN is a disk (INQUIRY type 0 / 0Eh) */
     USBPAD_Disk lun[MAX_LUN];
 } Msd;
@@ -1954,11 +1954,12 @@ static int msd_check(Msd* s, int l)
     return 1;
 }
 
+/* a new disk: only GET_MAX_LUN here (this can run from the sound interrupt, in a game); INQUIRY, TEST UNIT READY,
+ * READ CAPACITY, MODE SENSE (seconds on a slow stick) wait for the first USBPAD_Disks / DiskInfo / DiskRead call */
 static void msd_add(int di, int ifc, int in, int out, int mps)
 {
     int m, l;
     Msd* s;
-    uint8_t* r = DBuf + 0x80;
     for (m = 0; m < MAX_MSD && Ms[m].used; ++m) {}
     if (m == MAX_MSD) { trace("msd: no room "); return; }
     s = &Ms[m];
@@ -1969,23 +1970,41 @@ static void msd_add(int di, int ifc, int in, int out, int mps)
     if (control(di, 0xA1, 0xFE, 0, (uint16_t)ifc, 1) == 0) s->nlun = (CBuf[16] & 15) + 1;   /* GET_MAX_LUN (STALL: one) */
     if (s->nlun > MAX_LUN) s->nlun = MAX_LUN;
     trace("msd if%d in%d out%d mps%d luns %d ", ifc, in, out, mps, s->nlun);
-    ++MsGen;
+    s->gen = ++MsGen;
+    for (l = 0; l < s->nlun; ++l) s->lok[l] = 1;          /* until INQUIRY says otherwise */
+    s->pending = 1;
+    s->used = 1;
+}
+
+static void msd_init(Msd* s)                           /* caller's context, Busy held */
+{
+    int m, l;
+    uint8_t* r = DBuf + 0x80;
+    s->pending = 0;
     for (l = 0; l < s->nlun; ++l)
     {
         USBPAD_Disk* u = &s->lun[l];
+        s->lok[l] = 0;
         memset(r, 0, 36);
         if (msd_simple(s, l, 0x12, 36, r) != 0 && msd_simple(s, l, 0x12, 36, r) != 0) { trace("inq! "); continue; }   /* once more after the reset */
         if ((r[0] & 0x1F) != 0 && (r[0] & 0x1F) != 0x0E) { trace("lun%d type %02x ", l, r[0] & 0x1F); continue; }
         trace("inq %02x %02x %02x %02x %.8s ", r[0], r[1], r[2], r[3], (const char*)r + 8);
         s->lok[l] = 1;
-        u->vid = D[di].vid; u->pid = D[di].pid; u->gen = MsGen; u->lun = l;
+        u->vid = D[s->dev].vid; u->pid = D[s->dev].pid; u->gen = s->gen; u->lun = l;
         memcpy(u->vendor, r + 8, 8); memcpy(u->product, r + 16, 16);
         for (m = 7; m >= 0 && u->vendor[m] == ' '; --m) u->vendor[m] = 0;
         for (m = 15; m >= 0 && u->product[m] == ' '; --m) u->product[m] = 0;
         msd_check(s, l);
     }
-    s->used = 1;
     if (HC[s->hc].type == T_EHCI) ehci_sched(s->hc, EC_ASE, 0);
+}
+
+static void msd_init_pending(void)                     /* new disks, from a caller (not the interrupt) */
+{
+    int m;
+    if (!Inited || Busy) return;
+    for (m = 0; m < MAX_MSD; ++m)
+        if (Ms[m].used && Ms[m].pending) { Busy = 1; MsdBusy = 1; msd_init(&Ms[m]); MsdBusy = 0; Busy = 0; }
 }
 
 static void msd_gone(int di)
@@ -2007,6 +2026,7 @@ static Msd* msd_find(int n, int* lun)                 /* drive n -> disk + LUN *
 int USBPAD_Disks(void)
 {
     int n = 0, l;
+    msd_init_pending();
     while (msd_find(n, &l)) ++n;
     return n;
 }
@@ -2014,7 +2034,9 @@ int USBPAD_Disks(void)
 const USBPAD_Disk* USBPAD_DiskInfo(int n)
 {
     int l;
-    Msd* s = msd_find(n, &l);
+    Msd* s;
+    msd_init_pending();
+    s = msd_find(n, &l);
     if (!s) return NULL;
     if (!s->lun[l].ready && Inited && !Busy)
     {
@@ -2028,6 +2050,7 @@ const USBPAD_Disk* USBPAD_DiskInfo(int n)
 
 static int disk_rw(int n, uint32_t lba, int count, uint8_t* p, int wr)
 {
+    msd_init_pending();
     int l, r = 0, k;
     Msd* s = msd_find(n, &l);
     if (!s) return USBPAD_E_NODISK;
