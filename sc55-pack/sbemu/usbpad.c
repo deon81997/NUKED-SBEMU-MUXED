@@ -1943,8 +1943,13 @@ static int msd_check(Msd* s, int l)
     u->bsize  = ((uint32_t)r[4] << 24 | (uint32_t)r[5] << 16 | (uint32_t)r[6] << 8 | r[7]);
     if (u->blocks != 0xFFFFFFFFUL) ++u->blocks;                /* last LBA -> count (> 2 TB: later, READ CAPACITY 16) */
     if (u->bsize < 512 || u->bsize > 4096 || (u->bsize & (u->bsize - 1))) { trace("bsize %lu! ", (unsigned long)u->bsize); return 0; }
+    {   /* MODE SENSE(6), all pages, header only: byte 2 bit 7 = write protected (no answer: not protected) */
+        uint8_t ms[6] = { 0x1A, 0, 0x3F, 0, 4, 0 };
+        memset(r, 0, 8);
+        u->wp = msd_cmd(s, l, ms, 6, 1, r, 4, NULL) == 0 && (r[2] & 0x80);
+    }
     u->ready = 1;
-    trace("lun%d %lu x %lu ", l, (unsigned long)u->blocks, (unsigned long)u->bsize);
+    trace("lun%d %lu x %lu%s ", l, (unsigned long)u->blocks, (unsigned long)u->bsize, u->wp ? " wp" : "");
     return 1;
 }
 
@@ -2020,15 +2025,15 @@ const USBPAD_Disk* USBPAD_DiskInfo(int n)
     return &s->lun[l];
 }
 
-int USBPAD_DiskRead(int n, uint32_t lba, int count, void* buf)
+static int disk_rw(int n, uint32_t lba, int count, uint8_t* p, int wr)
 {
     int l, r = 0, k;
-    uint8_t* p = (uint8_t*)buf;
     Msd* s = msd_find(n, &l);
     if (!s) return USBPAD_E_NODISK;
     if (!Inited || Busy) return USBPAD_E_BUSY;
     Busy = 1; MsdBusy = 1;
     if (!s->lun[l].ready && !msd_check(s, l)) { MsdBusy = 0; Busy = 0; return USBPAD_E_NOTREADY; }
+    if (wr && s->lun[l].wp) { MsdBusy = 0; Busy = 0; return USBPAD_E_WP; }
     while (count > 0 && !r)
     {
         USBPAD_Disk* u = &s->lun[l];
@@ -2037,10 +2042,10 @@ int USBPAD_DiskRead(int n, uint32_t lba, int count, void* buf)
         uint32_t moved;
         if (c > max) c = max;
         if (lba >= u->blocks || (uint32_t)c > u->blocks - lba) { r = USBPAD_E_IO; break; }
-        cdb[0] = 0x28; put32be(cdb + 2, lba); cdb[7] = (uint8_t)(c >> 8); cdb[8] = (uint8_t)c;
+        cdb[0] = wr ? 0x2A : 0x28; put32be(cdb + 2, lba); cdb[7] = (uint8_t)(c >> 8); cdb[8] = (uint8_t)c;
         for (k = 0; k < 2; ++k)
         {
-            int t = msd_cmd(s, l, cdb, 10, 1, p, (uint32_t)c * u->bsize, &moved);
+            int t = msd_cmd(s, l, cdb, 10, !wr, p, (uint32_t)c * u->bsize, &moved);
             if (t == 0 && moved == (uint32_t)c * u->bsize) break;
             if (t > 0)
             {
@@ -2048,6 +2053,7 @@ int USBPAD_DiskRead(int n, uint32_t lba, int count, void* buf)
                 trace("read %lu: sense %06lx ", (unsigned long)lba, (unsigned long)sn);
                 if ((sn >> 16) == 6 && !msd_check(s, l)) { r = USBPAD_E_NOTREADY; break; }   /* medium changed */
                 if ((sn >> 16) == 2) { u->ready = 0; r = USBPAD_E_NOTREADY; break; }
+                if ((sn >> 16) == 7) { u->wp = 1; r = USBPAD_E_WP; break; }
             }
             if (k == 1) r = USBPAD_E_IO;
         }
@@ -2057,6 +2063,9 @@ int USBPAD_DiskRead(int n, uint32_t lba, int count, void* buf)
     MsdBusy = 0; Busy = 0;
     return r;
 }
+
+int USBPAD_DiskRead(int n, uint32_t lba, int count, void* buf) { return disk_rw(n, lba, count, (uint8_t*)buf, 0); }
+int USBPAD_DiskWrite(int n, uint32_t lba, int count, const void* buf) { return disk_rw(n, lba, count, (uint8_t*)buf, 1); }
 
 /* the IN endpoint of pipe k: two TDs used in turn on OHCI / EHCI (the empty tail is filled, a new
  * empty one appended - the only change allowed while the controller runs the queue) */
@@ -3330,8 +3339,15 @@ int USBPAD_Init(uint64_t cps, int wait_ms, int flags, const char** msg)
 
 void USBPAD_Shutdown(void)
 {
-    int i;
+    int i, l;
     if (!Inited) return;
+    for (i = 0; i < MAX_MSD; ++i)                         /* disks: SYNCHRONIZE CACHE(10) (failures ignored) */
+        for (l = 0; Ms[i].used && l < Ms[i].nlun; ++l)
+            if (Ms[i].lok[l] && Ms[i].lun[l].ready && !Ms[i].lun[l].wp)
+            {
+                uint8_t cdb[10] = { 0x35 };
+                Busy = 1; msd_cmd(&Ms[i], l, cdb, 10, 0, NULL, 0, NULL); Busy = 0;
+            }
     Inited = 0;
     for (i = 0; i < HCn; ++i)
     {

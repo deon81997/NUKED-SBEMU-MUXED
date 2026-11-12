@@ -887,6 +887,16 @@ CONTENTS
      is plugged in as SBEMU starts (the touchpad is then not used);
      2 = always.
   0 = off. Test with MENU > Tests > Keyboard / mouse test (KMTEST).
+  USB disks (/USBDISK:1, off by default, experimental, needs /JOY:1): USB
+  sticks and card readers plugged in when SBEMU starts get DOS drive
+  letters (the next free ones, up to LASTDRIVE - put LASTDRIVE=Z in
+  CONFIG.SYS), FAT12/16 everywhere, FAT32 on MS-DOS 7.1 / FreeDOS. Read
+  and write. A USB 2.0 port runs them at USB 2.0 speed (your pads,
+  keyboards and mice there are handed to the USB 1.1 side). Sticks with
+  a write-protect switch say "write protected". A stick plugged in later
+  gets no letter (restart); a different stick in a card reader that has a
+  letter is seen. exFAT / NTFS: later. NEC uPD720101 cards: USB 2.0
+  sticks only.
 
   Test without a game:  MENU > Tests > Joystick test (JOYTEST), or run
   JOYTEST.EXE. Move the sticks: about 24 = left/up, 575 = centre and 1124

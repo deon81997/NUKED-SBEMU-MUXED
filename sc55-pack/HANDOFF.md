@@ -1315,3 +1315,8 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
   ~1700 cmds). Reading the image as a file through FreeDOS instead is ~5 ms per seek: too slow, use INT 13h.
 - Still not tested: volumes made by Windows itself (real 8dot3 names, Windows $MFT/index layout; needs a
   small VHD/stick image from a Windows XP+ PC; Win98 cannot make NTFS/exFAT), speed on the real PCs.
+- USB session (2026-11-11): USBPAD_DiskWrite (WRITE 10, same path as reads), USBPAD_E_WP + USBPAD_Disk.wp (MODE SENSE
+  byte 2 bit 7, also sense key 7), SYNCHRONIZE CACHE on USBPAD_Shutdown; usbdisk.c rq_rw writes (write-through into the
+  cache lines, WP -> status 00h). Tested: QEMU EHCI HS + piix UHCI, 86Box OPTi OHCI: COPY of a 2.7 MB file to the stick
+  byte-exact (read back on the host), ECHO > D:\NEW.TXT; QEMU readonly stick -> "write-protection violation".
+  NOTE: /USBDISK:1 also switches EHCIs with companions to high-speed mode in SBEMU (pads handed over per port).

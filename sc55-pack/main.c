@@ -778,7 +778,7 @@ struct MAIN_OPT
     "/JOYMODE", "Gameport stick type: 0=standard, 1=CH Flightstick Pro (D-pad = hat), 2=Thrustmaster FCS (D-pad = hat on axis 4), 3=Gravis GamePad Pro digital (GrIP, all buttons, 2 pads), 4=none (real gameport stays usable)", 0, MAIN_SETCMD_BASE10,
     "/USBKB", "USB keyboard typed through the PC's keyboard controller (1=on, 0=off; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
     "/USBMS", "USB mouse for a DOS mouse driver loaded after SBEMU (1=auto, 2=always, 0=off; needs /JOY:1). Without JEMM/QEMM it goes through the BIOS, next to the touchpad", 1, MAIN_SETCMD_BASE10,
-    "/USBDISK", "USB sticks / card readers as DOS drive letters, FAT12/16/32, read-only for now (1=on, 0=off; needs /JOY:1 and LASTDRIVE high enough). Experimental", 0, MAIN_SETCMD_BASE10,
+    "/USBDISK", "USB sticks / card readers as DOS drive letters, FAT12/16/32, read and write (1=on, 0=off; needs /JOY:1 and LASTDRIVE high enough). Experimental", 0, MAIN_SETCMD_BASE10,
     "/JOYBIOS", "BIOS joystick calls (INT 15h AH=84h) answered from the USB pad too (1=on, 0=off; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
     "/PADKEYS", "Pad buttons -> keyboard keys with a layout per game, from PADMAP.TXT / PADUSER.TXT in SBEMU's folder (1=on, 0=off: only /JOYKEY; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
     "/PADLOG", "Show which pad layout the loaded SBEMU picked for the last programs started (SBEMU /PADLOG)", 0, MAIN_SETCMD_BASE10,

@@ -53,14 +53,17 @@ typedef struct
     int      lun;
     uint32_t gen;                  /* differs after an unplug / re-plug */
     char     vendor[9], product[17];
+    int      wp;                   /* write protected (MODE SENSE) */
 } USBPAD_Disk;
 #define USBPAD_E_NODISK   -1
 #define USBPAD_E_NOTREADY -2       /* no medium */
 #define USBPAD_E_IO       -3
 #define USBPAD_E_BUSY     -4       /* called from inside USBPAD_Poll (an interrupt): try again later */
+#define USBPAD_E_WP       -5       /* write protected */
 int  USBPAD_Disks(void);                                     /* drives now */
 const USBPAD_Disk* USBPAD_DiskInfo(int n);                   /* NULL = no drive n; checks the medium again if not ready */
 int  USBPAD_DiskRead(int n, uint32_t lba, int count, void* buf);   /* count blocks; 0 or USBPAD_E_* */
+int  USBPAD_DiskWrite(int n, uint32_t lba, int count, const void* buf);   /* the same, write */
 
 /* called from inside USBPAD_Poll / PollLight for every new report:
  * keyboard: the 8-byte boot report (modifiers, 0, six key usages); all zero = every key released

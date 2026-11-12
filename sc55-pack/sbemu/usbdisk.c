@@ -7,8 +7,8 @@
  * end of the DPB chain, and a CDS entry per drive (first free letter after the block devices, up to LASTDRIVE).
  * DOS does the FAT itself: FAT12/16 everywhere, FAT32 on DOS 7.10+ / FreeDOS.
  * Partitions: MBR primaries + logicals in extended chains, GPT basic data (header CRC checked), superfloppy.
- * DOS sectors are 512 bytes: disks with other block sizes are skipped (TODO). Writes: TODO (USBPAD_DiskWrite
- * comes from the USB session), answered "write protected".
+ * DOS sectors are 512 bytes: disks with other block sizes are skipped (TODO). Writes: USBPAD_DiskWrite, then the
+ * same sectors in the cache are updated (write-through); a write-protected disk answers "write protected".
  * Cache: 16 lines x 4 KB (8 sectors, aligned) for the one-sector reads DOS does for FAT / directories;
  * multi-sector reads go straight through a 32 KB bounce buffer. Dropped on a medium change. GPL-2.0-or-later. */
 #include <stdio.h>
@@ -69,6 +69,18 @@ static int dread(int disk, uint32_t lba, int n, void* buf)
     for (t = 0; t < 200; ++t)
     {
         r = USBPAD_DiskRead(disk, lba, n, buf);
+        if (r != USBPAD_E_BUSY) return r;
+        { uint32_t t0 = DPMI_LoadD(0x46C); while (DPMI_LoadD(0x46C) == t0) {} }   /* ~55 ms */
+    }
+    return r;
+}
+
+static int dwrite(int disk, uint32_t lba, int n, const void* buf)
+{
+    int r, t;
+    for (t = 0; t < 200; ++t)
+    {
+        r = USBPAD_DiskWrite(disk, lba, n, buf);
         if (r != USBPAD_E_BUSY) return r;
         { uint32_t t0 = DPMI_LoadD(0x46C); while (DPMI_LoadD(0x46C) == t0) {} }   /* ~55 ms */
     }
@@ -245,7 +257,33 @@ static uint16_t rq_rw(uint32_t rq, int u, int write)
     DPMI_StoreW(rq + 0x12, 0);
     if (!unit_check(u)) return ST_ERR | 0x02;                  /* not ready */
     if (U[u].changed && !write) { /* DOS reads without a MEDIA CHECK after a change: fine, the BPB is the same kind */ }
-    if (write) return ST_ERR | 0x00;                            /* TODO writes: USBPAD_DiskWrite (USB session) */
+    if (write)
+    {   /* write-through: the device first, then any cache line holding those sectors */
+        const USBPAD_Disk* d = USBPAD_DiskInfo(U[u].disk);
+        if (sec >= U[u].size || cnt > U[u].size - sec) return ST_ERR | 0x08;
+        if (!d || d->wp) return ST_ERR | 0x00;                  /* write protected */
+        U[u].last = DPMI_LoadD(0x46C);
+        while (done < cnt && !r)
+        {
+            uint32_t n = cnt - done, lba = U[u].start + sec + done, k;
+            int i;
+            if (n > sizeof(Bounce) / 512) n = sizeof(Bounce) / 512;
+            DPMI_LMemcpy(DPMI_PTR2L(Bounce), xfer + done * 512, n * 512);
+            r = dwrite(U[u].disk, lba, (int)n, Bounce);
+            if (r) break;
+            for (i = 0; i < CL_N; ++i)
+                if (CL[i].valid && CL[i].disk == U[u].disk)
+                    for (k = 0; k < n; ++k)
+                        if (lba + k >= CL[i].lba && lba + k < CL[i].lba + CL_S)
+                            memcpy(CLData[i] + (lba + k - CL[i].lba) * 512, Bounce + k * 512, 512);
+            done += n;
+        }
+        DPMI_StoreW(rq + 0x12, (uint16_t)done);
+        if (r == USBPAD_E_WP) return ST_ERR | 0x00;
+        if (r == USBPAD_E_NOTREADY || r == USBPAD_E_NODISK) { U[u].ok = 0; U[u].changed = 1; return ST_ERR | 0x02; }
+        if (r) return ST_ERR | 0x0A;                             /* write fault */
+        return 0;
+    }
     if (sec >= U[u].size || cnt > U[u].size - sec) return ST_ERR | 0x08;
     U[u].last = DPMI_LoadD(0x46C);
     if (cnt == 1)
