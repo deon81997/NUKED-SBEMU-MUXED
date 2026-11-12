@@ -18,7 +18,7 @@
 #define UD_INFOSZ 48
 #define UD_RINFO  (UD_INFO + 8 * UD_INFOSZ)
 #define UD_LOG    (UD_RINFO + 8 * UD_INFOSZ)
-#define UD_LOGN   64
+#define UD_LOGN   256
 #define UD_DIAG   (UD_LOG + 4 + UD_LOGN * 8)
 #define UD_DIAGSZ 160   /* exFAT / NTFS drives (read-only, SBEMU's redirector) */
 
@@ -196,8 +196,8 @@ int main(int argc, char** argv)
         {
             unsigned long e = lg + 4 + (k % UD_LOGN) * 8;
             unsigned c = _farpeekb(_dos_ds, e), st = _farpeekw(_dos_ds, e + 2);
-            printf("%5u  unit %u  %-13s cmd %02Xh  status %04Xh%s  %s %lu\n", k, _farpeekb(_dos_ds, e + 1), c < 26 ? cn[c] : "?", c, st,
-                   st & 0x8000 ? " ERROR" : "      ", (c == 4 || c == 8 || c == 9) ? "sector" : "len", _farpeekl(_dos_ds, e + 4));
+            printf("%5u  unit %u  %-13s cmd %02Xh  status %04Xh%s  %s %ld\n", k, _farpeekb(_dos_ds, e + 1), c < 26 ? cn[c] : "?", c, st,
+                   st & 0x8000 ? " ERROR" : "      ", (c == 4 || c == 8 || c == 9) ? "sector" : c == 1 ? "answer" : "len", (long)_farpeekl(_dos_ds, e + 4));
         }
         for (k = 0; k < (unsigned)ND; ++k)
         {

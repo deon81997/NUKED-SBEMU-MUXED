@@ -29,7 +29,7 @@
 #define UD_INFOSZ 48
 #define UD_RINFO (UD_INFO + UD_UNITS * UD_INFOSZ)
 #define UD_LOG   (UD_RINFO + 8 * UD_INFOSZ)        /* request log for USBDRV /L: word next, then 64 x 8 bytes */
-#define UD_LOGN  64
+#define UD_LOGN  256
 #define UD_DIAG  (UD_LOG + 4 + UD_LOGN * 8)       /* per unit 160 bytes for USBDRV /L: start, size, AH=53h result, BPB, MBR 1BEh.. */
 #define UD_DIAGSZ 160   /* 8 x 48 bytes: exFAT / NTFS drives of usbredir.c, for USBDRV */
 
@@ -440,7 +440,7 @@ static void USBDISK_Req(void)
         uint32_t lg = base_lin() + UD_LOG, e;
         uint16_t nx = DPMI_LoadW(lg);
         uint32_t sec = (cmd == 4 || cmd == 8 || cmd == 9) ? (DPMI_LoadW(rq + 0x14) == 0xFFFF && DPMI_LoadB(rq) >= 0x1E ?
-                       DPMI_LoadD(rq + 0x1A) : DPMI_LoadW(rq + 0x14)) : DPMI_LoadB(rq);
+                       DPMI_LoadD(rq + 0x1A) : DPMI_LoadW(rq + 0x14)) : cmd == 1 ? (uint32_t)(int8_t)DPMI_LoadB(rq + 0x0E) : DPMI_LoadB(rq);
         e = lg + 4 + (nx % UD_LOGN) * 8;
         DPMI_StoreB(e, (uint8_t)cmd); DPMI_StoreB(e + 1, (uint8_t)u); DPMI_StoreW(e + 2, (uint16_t)(ST_DONE | st)); DPMI_StoreD(e + 4, sec);
         DPMI_StoreW(lg, (uint16_t)(nx + 1));
