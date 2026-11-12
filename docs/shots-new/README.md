@@ -1,21 +1,17 @@
-# Screenshots from the beta.96 MIDPLAY session (QEMU 8.2, std-vga, FreeDOS)
+# SSF2T / 32RTM investigation screenshots (86Box P2B-LS, ES1371 on IRQ 12, 2026-11-11)
 
-| File | What it shows |
-|---|---|
-| midplay3d-1024x768-32bit.png | 3D view in 1024x768, 32-bit colour |
-| midplay3d-1024x768-16bit-release-build.png | the released beta.96 MIDPLAY.EXE in 1024x768, 16-bit |
-| midplay3d-800x600-16bit.png | 800x600, 16-bit |
-| midplay3d-800x600-8bit-dithered.png | 800x600, 256 colours (6x7x6 palette, ordered dither) |
-| midplay3d-640x480-8bit-dithered.png | 640x480, 256 colours |
-| midplay3d-320x200-vga-old-bar.png | VGA mode 13h 320x200 (the Windows DOS box default), before the slimmer bottom bar |
-| midplay3d-320x200-vga-slim-bar.png | 320x200 with the slim bar |
-| midplay3d-800x600-and-320x200-side-by-side.png | both of the above side by side |
-| midplay3d-fallback-unknown-mode-to-640x480.png | MODE3D=999 777 32 (not offered) falls back to 640x480 |
-| midplay-options-3d-screen-mode.png / -crop.png | Options page with "3D screen mode" set to 1024x768 256 colours |
-| midplay3d-keep-this-mode-prompt-1024x768-8bit.png | the "Keep this mode? Y = yes" prompt after changing the mode |
-| midplay3d-after-timeout-back-to-640x480.png | no answer: back to the last good mode (640x480) |
-| qemu-arrow-key-doubled-options-rows.png | QEMU/SeaBIOS artefact: one grey arrow key moved the Options cursor two rows |
-| qemu-midplay-plain-busy-synth-0m13s.png / -crop.png | MIDPLAY /S stuck at 0:13 on the slow (TCG) VM while the SoundFont synth was busy (bug fixed in beta.96) |
+HDPMI builds: H1 = crazii HX 43182b4 + mov-cr0.diff; H2 = H1 with ?IRQ_ROUTE_IVT=0; H3 = ?TRAP_CLISTI=0;
+H4 = ?SKIP_CLISTI=0; H5 = H1 + pushad/popad around the real-mode IRQ call. SBEMU = beta.91.
 
-Screenshots taken earlier in the session (SBEMU start-up messages, the SBDIAG "cannot measure itself" box) were
-overwritten by later ones of the same name and are not here.
+- s1: H1 + SBEMU, SF2TURBO: 32RTM exception 0D in the decompressor (`rep movsb`, bad ESI/ECX).
+- s2: H1 without SBEMU: game stops at "Unable to Initialise Sound Driver" (text screen, image is mostly blank).
+- s3: H1 + SBEMU /JOY0 /USBMS0 /USBKB0 /VTIMER0: exception 0D in the clear-screen `rep stosd`, ECX=001DEB46 (should be <=3E80h).
+- s4: H2, same crash (IRQ_ROUTE_IVT not the cause).
+- s5: SBEMU /PM0: sound init fails before the crash point.
+- s6: H3: hangs while SBEMU loads (TF trick for POPF is needed).
+- s7: H4, same crash, ECX=001DEB60.
+- s8: H5, same crash (real-mode IRQ handlers not the cause).
+- s9: H1 + SBEMU with 86Box dynarec off: crash again in the decompressor, ECX=001CF8F8 (not an emulator bug).
+- i1-i10: the game's INSTALL.EXE menus (attempt to select No Sound; the setting did not save).
+
+MAKESWP itself exited normally in every run on this machine (no exit hang).
