@@ -96,6 +96,45 @@ def _add(a, b):
     return ImageChops.add(a, b)
 
 
+PIX = lambda n: F('DejaVuSansMono.ttf', n)
+
+
+def hud(im, i, sticker=True):
+    """the bits a 2002 site-builder piled on: tiny pixel text, an equalizer, a tilted version sticker, scanlines"""
+    W, H = im.size
+    d = ImageDraw.Draw(im)
+    d.fontmode = '1'
+    for k in range(14):                                         # equalizer (it is a sound site after all)
+        v = abs(math.sin(i * 0.7 + k * 1.3) * math.cos(i * 0.31 + k * 0.5))
+        hgt = 4 + int(v * 30)
+        for y in range(0, hgt, 3):
+            d.rectangle([24 + k * 7, H - 26 - y, 28 + k * 7, H - 25 - y], fill=lerp((0, 120, 160), ORANGE, y / 34))
+    d.text((24, 16), 'NSB_v3.0 // build 2002.11 // sfx: ON', font=PIX(10), fill=(70, 150, 190))
+    d.text((W - 24, 16), '[ best @ 1024x768 ]', font=PIX(10), fill=(70, 90, 120), anchor='ra')
+    d.text((130, H - 34), 'sound canvas: online_', font=PIX(10), fill=(110, 130, 150))
+    if sticker:
+        st = Image.new('RGBA', (120, 30), (0, 0, 0, 0))
+        sd = ImageDraw.Draw(st)
+        sd.rectangle([0, 0, 119, 29], fill=ORANGE + (255,))
+        sd.text((60, 15), 'v3.0 BETA!!', font=F(BOLD, 15), fill=(20, 20, 20), anchor='mm')
+        st = st.rotate(14, expand=True, resample=Image.BICUBIC)
+        im.paste(st, (W - 150, 40), st)
+    sl = Image.new('L', im.size, 0)
+    sd = ImageDraw.Draw(sl)
+    for y in range(0, H, 2): sd.line([(0, y), (W, y)], fill=40)
+    return Image.composite(Image.new('RGB', im.size, (0, 0, 0)), im, sl)
+
+
+def glitch(im, seed):
+    """a frame of shifted slices, as when the .swf was still streaming in"""
+    r = random.Random(seed)
+    out = im.copy()
+    for _ in range(7):
+        y = r.randrange(0, im.height - 12); h = r.randrange(3, 12); dx = r.randrange(-30, 30)
+        out.paste(im.crop((0, y, im.width, y + h)), (dx, y))
+    return out
+
+
 def intro():
     """preloader 0..100%, the logo flies in with motion blur, a flare sweeps, ENTER pulses (loops)"""
     W, H = 720, 300
@@ -110,8 +149,8 @@ def intro():
         d.rectangle([210, 140, 510, 156], outline=(90, 110, 140))
         d.rectangle([213, 143, 213 + int(294 * p / 100), 153], fill=CYAN)
         d.text((W // 2, 176), '%3d%%' % p, font=mono, fill=(120, 140, 170), anchor='mm')
-        d.text((W // 2, 262), 'NUKED SB-EMU // SOUND CANVAS FOR DOS', font=F(MONO, 11), fill=(60, 70, 90), anchor='mm')
-        fr.append(im); durs.append(70)
+        d.text((W // 2, 214), 'please wait... loading the sound canvas', font=F(MONO, 11), fill=(60, 70, 90), anchor='mm')
+        fr.append(hud(im, i, False)); durs.append(70)
     logo = chrome_text('NUKED SB-EMU', F(BOLD, 64))
     sub = chrome_text('ROLAND SC-55 SOUND FOR DOS GAMES', F(COND, 20), glow=ORANGE)
     # 2. fly-in: from huge + blurred to resting size
@@ -124,6 +163,8 @@ def intro():
         a = lg.split()[3].point(lambda v: int(v * min(1, 0.15 + t)))
         lg.putalpha(a)
         im.paste(lg, (W // 2 - lg.width // 2, 110 - lg.height // 2), lg)
+        im = hud(im, 14 + i, False)
+        if i in (9, 11): im = glitch(im, i)
         fr.append(im); durs.append(50)
     # 3. tagline slides in, flare sweeps across the logo
     for i in range(16):
@@ -133,7 +174,7 @@ def intro():
         sx = int(-sub.width + (W // 2 - sub.width // 2 + sub.width) * t)
         im.paste(sub, (sx, 168), sub)
         im = flare(im, int(150 + 420 * i / 15), 104, 0.8 + 0.3 * math.sin(i / 3))
-        fr.append(im); durs.append(60)
+        fr.append(hud(im, 26 + i)); durs.append(60)
     # 4. ENTER / SKIP INTRO pulse
     for i in range(10):
         im = backdrop(W, H, 0.05 + i / 30)
@@ -144,7 +185,7 @@ def intro():
         d.rounded_rectangle([300, 226, 420, 254], 13, outline=lerp((40, 80, 110), CYAN, g), width=2)
         d.text((W // 2, 240), '[ ENTER ]', font=F(COND, 16), fill=lerp((120, 140, 160), (255, 255, 255), g), anchor='mm')
         d.text((W - 20, H - 16), 'skip intro >>', font=F(COND, 11), fill=(90, 110, 140), anchor='rm')
-        fr.append(im); durs.append(90)
+        fr.append(hud(im, 42 + i)); durs.append(90)
     durs[-1] = 1800
     pal = [f.convert('P', palette=Image.ADAPTIVE, colors=128) for f in fr]
     pal[0].save(os.path.join(OUT, 'intro.gif'), save_all=True, append_images=pal[1:], duration=durs, loop=0, optimize=True)
@@ -173,7 +214,8 @@ def button(label, name, w=150, h=34, accent=CYAN):
         d = ImageDraw.Draw(im)
         d.rounded_rectangle([1, 1, w - 2, h - 2], h // 2 - 1, outline=accent, width=1)
         d.ellipse([12, h // 2 - 3, 18, h // 2 + 3], fill=accent)
-        d.text((w // 2 + 6, h // 2), label, font=font, fill=(235, 240, 250), anchor='mm')
+        d.text((w // 2 + 6, h // 2), label.lower() if len(label) < 13 else label, font=font, fill=(235, 240, 250), anchor='mm')
+        d.text((w - 16, h // 2), '>>', font=F(COND, 10), fill=accent, anchor='mm')
         fr.append(im)
     save(fr, name, ms=70, colors=64, last=2200)
 
