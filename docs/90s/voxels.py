@@ -27,13 +27,17 @@ FACES = [((1, 0, 0), [(1, 0, 0), (1, 1, 0), (1, 1, 1), (1, 0, 1)]), ((-1, 0, 0),
 LIGHT = (0.45, -0.55, 0.7)
 
 
-def render(m, size, frames=16, scale=7, tilt=0.5, bg=(0, 0, 32), bob=False, ms=90, name='vox.gif'):
+KEY = (255, 0, 255)
+
+
+def render(m, size, frames=12, scale=7, tilt=0.5, bg=(0, 0, 32), bob=True, ms=90, name='vox.gif', cap=None):
+    size = (size[0] // 2, size[1] // 2); scale = scale / 2         # drawn at half size, stored 2x: chunky pixels like the sprites
     xs, ys, zs = zip(*m)
     cx, cy, cz = (max(xs) + min(xs) + 1) / 2, (max(ys) + min(ys) + 1) / 2, (max(zs) + min(zs) + 1) / 2
     W, H = size
     out = []
     for k in range(frames):
-        a = 0.8 * math.sin(2 * math.pi * k / frames)                # swing left-right, face stays in view
+        a = 0.35 * math.sin(2 * math.pi * k / frames)               # a little dance, face stays in view
         ca, sa, ct, st = math.cos(a), math.sin(a), math.cos(tilt), math.sin(tilt)
 
         def rot(p):
@@ -50,15 +54,30 @@ def render(m, size, frames=16, scale=7, tilt=0.5, bg=(0, 0, 32), bob=False, ms=9
                 pts = [rot((x + u, y + v, z + w)) for u, v, w in corners]
                 depth = sum(p[1] for p in pts) / 4
                 l = 0.55 + 0.45 * max(0, -rn[0] * LIGHT[0] * -1 + -rn[1] * 0.4 + rn[2] * LIGHT[2])
-                dy = abs(math.sin(2 * math.pi * k / frames * 2)) * 4 if bob else 0
+                dy = abs(math.sin(2 * math.pi * k / frames * 2)) * 3 if bob else 0
                 polys.append((depth, [(W / 2 + p[0] * scale, H / 2 - (p[2] + dy / scale) * scale) for p in pts], shade(c, l)))
-        im = Image.new('RGB', (W, H), bg)
+        im = Image.new('RGB', (W, H), KEY)
         d = ImageDraw.Draw(im)
-        d.ellipse([W / 2 - W * 0.3, H - 22, W / 2 + W * 0.3, H - 8], fill=shade(bg, 0.5) if bg != (0, 0, 0) else (20, 20, 20))
         for depth, pts, col in sorted(polys, key=lambda t: -t[0]):
-            d.polygon(pts, fill=col, outline=shade(col, 0.8))
-        out.append(im.convert('P', palette=Image.ADAPTIVE, colors=64))
-    out[0].save(os.path.join(OUT, name), save_all=True, append_images=out[1:], duration=ms, loop=0, optimize=True, disposal=2)
+            d.polygon(pts, fill=col, outline=shade(col, 0.75))
+        if cap:                                                     # pixel caption under the figure, like the nav buttons
+            from PIL import ImageFont
+            ft = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf', 8)
+            c2 = Image.new('RGB', (W, H + 24), KEY); c2.paste(im, (0, 0)); im = c2
+            d = ImageDraw.Draw(im); d.fontmode = '1'
+            for j, (line, col) in enumerate(zip(cap.split('|'), ((255, 255, 0), (255, 255, 255)))):
+                d.text((W // 2 + 1, H + 5 + j * 11), line, font=ft, fill=(0, 0, 0), anchor='mm')
+                d.text((W // 2, H + 4 + j * 11), line, font=ft, fill=col, anchor='mm')
+        im = im.resize((im.width * 2, im.height * 2), Image.NEAREST)
+        out.append(im)
+    sheet = Image.new('RGB', (out[0].width * len(out), out[0].height))
+    for i, f in enumerate(out): sheet.paste(f, (i * f.width, 0))
+    palimg = sheet.quantize(colors=63, method=Image.MEDIANCUT, dither=Image.NONE)
+    pal = palimg.getpalette()
+    ki = min(range(len(pal) // 3), key=lambda i: sum(abs(pal[i * 3 + j] - KEY[j]) for j in range(3)))
+    frames = [f.quantize(palette=palimg, dither=Image.NONE) for f in out]   # one palette, magenta -> transparent
+    frames[0].save(os.path.join(OUT, name), save_all=True, append_images=frames[1:], duration=ms, loop=0, disposal=2,
+                   transparency=ki, optimize=False)
 
 
 def sc55():
@@ -123,11 +142,89 @@ def flopsy():
     return m
 
 
+def soundcard():
+    m = {}
+    box(m, 0, 0, 0, 18, 1, 9, (25, 120, 60))                        # PCB
+    box(m, -2, -1, 0, 0, 2, 11, (170, 170, 180))                    # bracket
+    for z, c in ((2, (230, 150, 40)), (4, (60, 160, 230)), (6, (230, 90, 160)), (8, (90, 220, 90))): m[(-3, 0, z)] = c   # jacks
+    for x in range(3, 16, 2): box(m, x, 0, -2, x + 1, 1, 0, (230, 180, 40))   # gold fingers
+    box(m, 3, -2, 3, 8, 0, 7, (25, 25, 30))                         # DSP chip
+    box(m, 10, -2, 4, 13, 0, 7, (25, 25, 30))                       # OPL3
+    box(m, 14, -1, 2, 17, 0, 4, (220, 210, 90))                     # crystal
+    box(m, 3, -1, 8, 16, 0, 9, (200, 200, 210))                     # game/MIDI port
+    return m
+
+
+def cdrom():
+    m = {}
+    box(m, 0, 0, 0, 18, 16, 5, (215, 205, 175))                     # 5.25" bay drive
+    box(m, 1, -1, 1, 17, 0, 4, (45, 45, 50))                        # front bezel
+    box(m, 3, -2, 2, 15, -1, 3, (25, 25, 28))                       # tray slot
+    m[(15, -2, 1)] = (0, 230, 0); m[(13, -2, 1)] = (200, 200, 200)  # LED, eject
+    for x in range(4, 14):                                          # the disc, half out
+        for y in range(-9, -2):
+            if (x - 8.5) ** 2 + (y + 5.5) ** 2 < 22: m[(x, y, 2)] = (200, 210, 230) if (x + y) % 3 else (230, 180, 230)
+    m[(8, -6, 2)] = m[(9, -6, 2)] = (90, 90, 100)
+    return m
+
+
+def usbstick():
+    m = {}
+    box(m, 0, 0, 0, 5, 14, 3, (210, 40, 40))                        # body
+    box(m, 1, -5, 0, 4, 0, 3, (200, 200, 210))                      # connector
+    box(m, 1, -5, 1, 4, -1, 2, (40, 40, 40))
+    m[(2, 12, 3)] = (255, 230, 60)                                  # LED
+    box(m, 1, 4, 3, 4, 10, 4, (240, 240, 240))                      # label
+    return m
+
+
+def keymouse():
+    m = {}
+    box(m, 0, 0, 0, 22, 8, 2, (205, 200, 185))                      # keyboard
+    for x in range(1, 21, 2):
+        for y in range(1, 7, 2): m[(x, y, 2)] = (235, 232, 220)
+    box(m, 6, 1, 2, 15, 2, 3, (235, 232, 220))                      # space bar
+    box(m, 25, 2, 0, 30, 9, 3, (205, 200, 185))                     # mouse
+    box(m, 25, 7, 3, 30, 9, 4, (180, 175, 160)); m[(27, 9, 3)] = (60, 60, 60)
+    box(m, 27, 9, 1, 28, 14, 2, (120, 120, 120))                    # cable
+    return m
+
+
+def joystick():
+    m = {}
+    box(m, 0, 0, 0, 10, 10, 3, (40, 40, 45))                        # base
+    box(m, 4, 4, 3, 6, 6, 12, (60, 60, 65))                         # stick
+    box(m, 3, 3, 12, 7, 7, 15, (200, 30, 30))                       # grip top
+    m[(4, 3, 14)] = (255, 220, 0)                                   # hat
+    box(m, 1, 1, 3, 3, 3, 4, (220, 40, 40)); box(m, 7, 1, 3, 9, 3, 4, (40, 120, 230))   # base buttons
+    box(m, 9, 4, 1, 14, 5, 2, (90, 90, 90))                         # cable to the gameport
+    return m
+
+
+def win98():
+    m = {}
+    box(m, 0, 0, 0, 18, 12, 14, (220, 212, 185))                    # CRT
+    box(m, 1, -1, 1, 17, 0, 13, (50, 50, 55))
+    box(m, 2, -2, 2, 16, -1, 12, (0, 128, 128))                     # teal desktop
+    box(m, 4, -3, 5, 14, -2, 11, (192, 192, 192))                   # a window
+    box(m, 4, -3, 10, 14, -2, 11, (0, 0, 128))                      # title bar
+    m[(13, -4, 10)] = (192, 192, 192)
+    box(m, 2, -3, 2, 16, -2, 3, (192, 192, 192))                    # taskbar
+    m[(3, -4, 2)] = (0, 160, 0)                                     # Start
+    box(m, 4, 4, -2, 14, 10, 0, (205, 197, 170))                    # stand
+    return m
+
+
 if __name__ == '__main__':
     render(sc55(), (240, 150), scale=8, tilt=0.75, name='vox-sc55.gif')
     render(pc(), (200, 200), scale=7, tilt=0.4, name='vox-pc.gif')
     render(port220(), (200, 200), scale=10, bob=True, name='vox-port220.gif')
     render(gamepad(), (220, 150), scale=8, tilt=0.9, name='vox-pad.gif')
     render(flopsy(), (180, 200), scale=10, bob=True, name='vox-flopsy.gif')
+    for fn, sc, t, cap in ((soundcard, 6, 0.55, 'SOUND BLASTER 16|any PCI sound card'), (sc55, 5, 0.75, 'ROLAND SC-55|General MIDI'),
+                           (cdrom, 5, 0.7, 'CD AUDIO + IMAGES|ISO / CUE'), (usbstick, 7, 0.75, 'USB STICKS|DOS drive letters'),
+                           (gamepad, 5, 0.9, 'USB GAMEPADS|as a DOS joystick'), (keymouse, 5, 0.8, 'USB KEYB + MOUSE|in plain DOS'),
+                           (joystick, 6, 0.45, 'GAMEPORT|CH, TM, GrIP'), (win98, 5, 0.35, 'WINDOWS 98|DOS boxes + MIDI')):
+        render(fn(), (180, 110), scale=sc, tilt=t, name='vox-part-%s.gif' % fn.__name__, cap=cap)
     for f in sorted(os.listdir(OUT)):
         if f.startswith('vox-'): print(f, os.path.getsize(os.path.join(OUT, f)))

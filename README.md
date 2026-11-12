@@ -3,7 +3,7 @@
 <table>
 <tr>
 <td align="center" valign="top"><picture><img src="docs/90s/fd-marine-shoot.gif" alt="Freedoom marine"></picture><br><br><picture><img src="docs/90s/tux-waddle.gif" width="120" alt="Tux"></picture><br><br><picture><img src="docs/90s/fd-soulsphere.gif" alt="soul sphere"></picture><br><br><picture><img src="docs/90s/port220-small.gif" width="96" alt="Port 220"></picture></td>
-<td align="center">
+<td align="center" valign="top">
 
 <picture><img src="docs/90s/title.gif" width="560" alt="NUKED SB-EMU"></picture>
 
@@ -13,14 +13,20 @@
 
 <br><br>
 
-<picture><img src="docs/90s/port220-hello.gif" width="440" alt="Port 220, the NUKED SB-EMU mascot, says hi"></picture>
+<picture><img src="docs/90s/port220-hello.gif" width="400" alt="Port 220, the NUKED SB-EMU mascot, says hi"></picture>
 
-<br><br>
+<h3>~ What's inside my PC?? ~</h3><sub>(everything NUKED SB-EMU does for your DOS games: click a part!!)</sub><br>
+<a href="#-supported-sound-chips-"><img src="docs/90s/vox-part-soundcard.gif" width="130" alt="Sound Blaster 16 on any PCI sound card"></a>
+<a href="#-what-is-this-"><img src="docs/90s/vox-part-sc55.gif" width="130" alt="Roland SC-55, General MIDI"></a>
+<a href="#-cool-features-"><img src="docs/90s/vox-part-cdrom.gif" width="130" alt="CD audio and CD images"></a>
+<a href="#-whats-new-"><img src="docs/90s/vox-part-usbstick.gif" width="130" alt="USB sticks as DOS drive letters"></a><br>
+<a href="#-usb-gamepads-in-dos-"><img src="docs/90s/vox-part-gamepad.gif" width="130" alt="USB gamepads as a DOS joystick"></a>
+<a href="#-usb-gamepads-in-dos-"><img src="docs/90s/vox-part-keymouse.gif" width="130" alt="USB keyboard and mouse in plain DOS"></a>
+<a href="#-usb-gamepads-in-dos-"><img src="docs/90s/vox-part-joystick.gif" width="130" alt="Gameport modes"></a>
+<a href="#-will-it-run-on-my-pc-"><img src="docs/90s/vox-part-win98.gif" width="130" alt="Windows 98 DOS boxes and MIDI driver"></a>
 
-<picture><img src="docs/90s/construction.gif" width="300" alt="Under construction"></picture>
 
-<br>
-
+<picture><img src="docs/90s/construction.gif" width="260" alt="Under construction"></picture><br>
 <sub>this page is ALWAYS under construction... please come back soon!! :-)</sub>
 
 <br><br>
@@ -64,17 +70,6 @@
 <tr><td><a href="#-download-zone-"><img src="docs/90s/nav-download.gif" width="88" alt="Downloads"></a></td><td><a href="#-sign-my-guestbook-"><img src="docs/90s/nav-guest.gif" width="88" alt="Guestbook"></a></td><td><a href="#-for-the-nerds-source-code-"><img src="docs/90s/nav-source.gif" width="88" alt="Source code"></a></td><td><a href="#-thanks-to-my-friends-"><img src="docs/90s/nav-thanks.gif" width="88" alt="Thanks"></a></td></tr>
 </table>
 
-<b>~ My 3D Voxel Gallery!! ~</b> <sub>(rendered in REAL 3D... well, almost)</sub>
-
-<table>
-<tr>
-<td align="center"><picture><img src="docs/90s/vox-port220.gif" width="130" alt="Port 220 in voxels"></picture><br><sub>Port 220</sub></td>
-<td align="center"><picture><img src="docs/90s/vox-sc55.gif" width="156" alt="A voxel sound module"></picture><br><sub>the Sound Canvas</sub></td>
-<td align="center"><picture><img src="docs/90s/vox-pc.gif" width="130" alt="A voxel beige DOS PC"></picture><br><sub>my 486</sub></td>
-<td align="center"><picture><img src="docs/90s/vox-pad.gif" width="143" alt="A voxel gamepad"></picture><br><sub>USB pad</sub></td>
-<td align="center"><picture><img src="docs/90s/vox-flopsy.gif" width="117" alt="Flopsy the floppy in voxels"></picture><br><sub>Flopsy</sub></td>
-</tr>
-</table>
 
 
 <picture><img src="docs/90s/parade.gif" width="100%" alt="A parade of Freedoom monsters, the marine and Flopsy"></picture>
@@ -308,6 +303,8 @@ never takes more than about 60% of the CPU, so your game always gets the rest.
 
 ## ★ What is this?? ★
 
+<picture><img src="docs/90s/vox-port220.gif" align="right" width="130" alt="Port 220 in voxels"></picture>
+
 Ever fire up Doom on an old laptop and the music starts and it's... FM? It's
 fine, but you *know* how it's supposed to sound. It's supposed to sound like a
 **Roland Sound Canvas**.
@@ -333,6 +330,8 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 <div align="center"><picture><img src="docs/90s/fd-hatchling.gif" alt=""></picture> <picture><img src="docs/90s/ic-speaker.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-speaker.gif" alt=""></picture> <picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture></div>
 
 ## ★ Cool Features ★
+
+<picture><img src="docs/90s/vox-sc55.gif" align="right" width="130" alt="A voxel sound module"></picture>
 
 <table>
 <tr><td>🔊</td><td><b>Sound Blaster 1.x / 2.0 / Pro / 16 + OPL3 FM</b> in pure DOS, on your PCI sound chip</td></tr>
@@ -416,6 +415,8 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 <div align="center"><picture><img src="docs/90s/fd-worm.gif" alt=""></picture> <picture><img src="docs/90s/ic-chip.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-chip.gif" alt=""></picture> <picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture></div>
 
 ## ★ Will it run on my PC?? ★
+
+<picture><img src="docs/90s/vox-pc.gif" align="right" width="130" alt="A voxel beige DOS PC"></picture>
 
 Sound Blaster and FM run on anything with a Pentium. The SC-55 is the hungry
 one, because it emulates Roland's hardware clock by clock. It needs a CPU with
@@ -523,6 +524,8 @@ The `README.TXT` in the pack is the full manual.
 
 ## ★ USB Gamepads in DOS?!? ★
 
+<picture><img src="docs/90s/vox-pad.gif" align="right" width="130" alt="A voxel gamepad"></picture>
+
 <picture><img src="docs/joytest.png" width="560" alt="JOYTEST showing the pad's sticks and buttons"></picture>
 
 Yep!! DOS games read an analog joystick on the gameport (port 201h), and SBEMU
@@ -560,6 +563,8 @@ behind a USB 2.0 hub on a USB 2.0 port still needs a real-hardware test.
 <div align="center"><picture><img src="docs/90s/mascot-canvaskid.gif" width="96" alt=""></picture> <picture><img src="docs/90s/ic-speaker.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-speaker.gif" alt=""></picture> <picture><img src="docs/90s/fd-serpentipede.gif" alt=""></picture></div>
 
 ## ★ Supported Sound Chips ★
+
+<picture><img src="docs/90s/vox-part-soundcard.gif" align="right" width="130" alt="A voxel sound card"></picture>
 
 Sound comes out of the PCI chip in your PC. These are all the chips the SBEMU
 in this pack has a driver for. ✅ = tested and working; 🧪 = ported from Linux,
@@ -909,6 +914,8 @@ the same GPL.
 <div align="center"><picture><img src="docs/90s/fd-trilobite.gif" alt=""></picture> <picture><img src="docs/90s/ic-heart.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-heart.gif" alt=""></picture> <picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture></div>
 
 ## ★ Download Zone ★
+
+<picture><img src="docs/90s/vox-flopsy.gif" align="right" width="110" alt="Flopsy the floppy in voxels"></picture>
 
 <table>
 <tr>
