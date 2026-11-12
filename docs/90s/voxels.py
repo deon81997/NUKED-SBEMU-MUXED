@@ -235,6 +235,128 @@ def claude():
     return m
 
 
+# ---------------------------------------------------------------- small icons (feature list, test lab, hall of fame)
+def disc(x0=0, y0=0, z=0, r=6.5, m=None):
+    m = {} if m is None else m
+    for x in range(-7, 8):
+        for y in range(-7, 8):
+            d = x * x + y * y
+            if d < r * r and d > 2: m[(x0 + x, y0 + y, z)] = (210, 215, 235) if (x + y) % 4 else (235, 190, 235)
+    return m
+
+
+def i_speaker():
+    m = {}
+    box(m, 0, 0, 0, 8, 6, 12, (205, 190, 155))
+    for x, z, r in ((4, 8, 2.2), (4, 3, 1.4)):
+        for dx in range(-3, 4):
+            for dz in range(-3, 4):
+                if dx * dx + dz * dz <= r * r: m[(x + dx, -1, z + dz)] = (40, 40, 40) if dx * dx + dz * dz > 1 else (170, 170, 170)
+    return m
+
+
+def i_mt32():
+    m = {}
+    box(m, 0, 0, 0, 22, 9, 4, (180, 180, 185))
+    box(m, 3, -1, 1, 11, 0, 3, (230, 100, 40))                      # orange display
+    for i in range(5): box(m, 13 + i * 2, -1, 1, 14 + i * 2, 0, 2, (40, 40, 40))
+    box(m, 1, 10, 0, 21, 14, 2, (240, 240, 240))                    # keys behind
+    for x in range(2, 21, 3): box(m, x, 10, 2, x + 1, 13, 3, (20, 20, 20))
+    return m
+
+
+def i_note():
+    m = {}
+    box(m, 0, 0, 0, 4, 2, 3, (255, 210, 60)); box(m, 3, 0, 3, 4, 2, 13, (255, 210, 60))
+    box(m, 8, 0, 2, 12, 2, 5, (255, 210, 60)); box(m, 11, 0, 5, 12, 2, 15, (255, 210, 60))
+    box(m, 3, 0, 12, 12, 2, 15, (255, 210, 60))
+    return m
+
+
+def i_bug():
+    m = {}
+    box(m, 1, 0, 1, 9, 10, 4, (200, 40, 40)); box(m, 5, 0, 4, 5, 10, 4, (0, 0, 0))
+    for y in (2, 5, 8): m[(4, y, 4)] = m[(6, y, 4)] = (20, 20, 20)
+    box(m, 3, -3, 1, 7, 0, 4, (30, 30, 30))                         # head
+    m[(4, -4, 3)] = m[(6, -4, 3)] = (255, 255, 255)
+    for y in (2, 5, 8): m[(0, y, 1)] = m[(-1, y, 0)] = m[(9, y, 1)] = m[(10, y, 0)] = (30, 30, 30)   # legs
+    m[(3, -5, 4)] = m[(7, -5, 4)] = (30, 30, 30)                    # feelers
+    return m
+
+
+def i_laptop():
+    m = {}
+    box(m, 0, 0, 0, 18, 12, 1, (50, 50, 55))                        # base
+    for x in range(1, 17, 2):
+        for y in range(2, 8, 2): m[(x, y, 1)] = (90, 90, 95)
+    box(m, 0, 12, 1, 18, 13, 13, (50, 50, 55)); box(m, 1, 11, 2, 17, 12, 12, (40, 90, 160))   # lid, screen
+    return m
+
+
+def i_tower():
+    m = {}
+    box(m, 0, 0, 0, 8, 14, 20, (215, 205, 175))
+    box(m, 1, -1, 15, 7, 0, 17, (60, 60, 60)); box(m, 1, -1, 11, 7, 0, 13, (60, 60, 60))   # drive bays
+    box(m, 2, -1, 8, 5, 0, 9, (40, 40, 40))                         # floppy
+    m[(6, -1, 4)] = (0, 230, 0); m[(6, -1, 2)] = (230, 120, 0)
+    return m
+
+
+def i_trophy():
+    m = {}
+    G = (240, 190, 40)
+    box(m, 2, 2, 0, 9, 9, 2, (90, 60, 30))
+    box(m, 4, 4, 2, 7, 7, 6, G)
+    for z in range(6, 13):
+        r = 2 + (z - 6) * 0.45
+        for x in range(-4, 5):
+            for y in range(-4, 5):
+                if x * x + y * y <= r * r: m[(5 + x, 5 + y, z)] = G
+    box(m, -1, 5, 8, 0, 6, 12, G); box(m, 11, 5, 8, 12, 6, 12, G)  # handles
+    return m
+
+
+def i_crate():
+    m = {}
+    box(m, 0, 0, 0, 12, 12, 10, (190, 140, 80))
+    for z in (0, 9): box(m, 0, -1, z, 12, 0, z + 1, (130, 90, 50))
+    box(m, 5, -1, 0, 7, 0, 10, (130, 90, 50))
+    return m
+
+
+def i_scroll():
+    m = {}
+    box(m, 0, 0, 0, 14, 1, 16, (240, 225, 180))
+    box(m, -1, -1, 15, 15, 2, 17, (200, 170, 120)); box(m, -1, -1, -1, 15, 2, 1, (200, 170, 120))
+    for z in range(3, 14, 2): box(m, 2, -1, z, 2 + 4 + (z * 7) % 6, 0, z + 1, (60, 120, 200) if z % 4 == 1 else (80, 60, 40))
+    return m
+
+
+def i_book():
+    m = {}
+    box(m, 0, 0, 0, 14, 18, 3, (40, 70, 160)); box(m, 1, 1, 3, 13, 17, 4, (240, 235, 220))
+    box(m, 1, 1, 4, 13, 17, 5, (40, 70, 160)); box(m, 4, 6, 5, 10, 8, 6, (255, 210, 60))
+    return m
+
+
+def i_palette():
+    m = {}
+    for x in range(0, 16):
+        for y in range(0, 12):
+            if ((x - 8) / 8) ** 2 + ((y - 6) / 6) ** 2 < 1 and not ((x - 4) ** 2 + (y - 8) ** 2 < 3): m[(x, y, 0)] = (200, 160, 110)
+    for (x, y), c in (((6, 3), (230, 40, 40)), ((9, 2), (40, 160, 230)), ((12, 4), (60, 200, 60)), ((12, 8), (255, 210, 60)), ((9, 9), (170, 60, 200))):
+        box(m, x, y, 1, x + 2, y + 2, 2, c)
+    return m
+
+
+def i_menu():
+    m = win98()
+    for (x, y, z), c in list(m.items()):
+        if c in ((0, 128, 128), (192, 192, 192), (0, 0, 128)) and y < 0:
+            m[(x, y, z)] = (0, 0, 170) if c == (0, 128, 128) else (230, 100, 40) if z in (9, 10) else (0, 170, 170)
+    return m
+
+
 if __name__ == '__main__':
     render(sc55(), (240, 150), scale=8, tilt=0.75, name='vox-sc55.gif')
     render(pc(), (200, 200), scale=7, tilt=0.4, name='vox-pc.gif')
@@ -247,5 +369,11 @@ if __name__ == '__main__':
                            (joystick, 6, 0.45, 'GAMEPORT|CH, TM, GrIP'), (win98, 5, 0.35, 'WINDOWS 98|DOS boxes + MIDI')):
         render(fn(), (180, 110), scale=sc, tilt=t, name='vox-part-%s.gif' % fn.__name__, cap=cap)
     render(claude(), (200, 200), scale=7, tilt=0.45, name='vox-claude.gif', cap='CLAUDE|wrote this pack!!')
+    for fn, sc, t in ((i_speaker, 6, 0.3), (sc55, 3.6, 0.75), (i_mt32, 3.4, 0.75), (lambda: disc(), 6, 1.0), (gamepad, 3.8, 0.9),
+                      (joystick, 5, 0.45), (win98, 4.4, 0.35), (i_menu, 4.4, 0.35), (i_note, 5, 0.3), (i_bug, 5.5, 0.9),
+                      (i_laptop, 4.2, 0.6), (i_tower, 3.8, 0.35), (i_trophy, 5.5, 0.4), (i_crate, 5.5, 0.6), (i_scroll, 4.2, 0.3),
+                      (i_book, 4, 0.9), (i_palette, 4.4, 1.0), (claude, 4, 0.45)):
+        n = fn.__name__.replace('i_', '') if fn.__name__ != '<lambda>' else 'disc'
+        render(fn(), (72, 72), scale=sc, tilt=t, name='icon-%s.gif' % n)
     for f in sorted(os.listdir(OUT)):
         if f.startswith('vox-'): print(f, os.path.getsize(os.path.join(OUT, f)))

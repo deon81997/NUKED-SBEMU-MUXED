@@ -341,16 +341,16 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 <picture><img src="docs/90s/vox-sc55.gif" align="right" width="130" alt="A voxel sound module"></picture>
 
 <table>
-<tr><td>🔊</td><td><b>Sound Blaster 1.x / 2.0 / Pro / 16 + OPL3 FM</b> in pure DOS, on your PCI sound chip</td></tr>
-<tr><td>🎹</td><td><b>Roland SC-55 and SC-55mkII</b>: the real firmware, from your ROMs</td></tr>
-<tr><td>🎼</td><td><b>Roland MT-32 / CM-32L</b> (Munt), or any <code>.SF2</code> SoundFont</td></tr>
-<tr><td>💿</td><td><b>Virtual CD drive M:</b> that works like a real disc: ISO, CUE/BIN, multi-disc, CD music played by the drive and mixed in. Pick images from any folder on any drive, with a home folder</td></tr>
-<tr><td>🎮</td><td><b>USB game pads</b> as gameport joysticks (up to two), plus USB keyboard and a USB mouse right next to your touchpad</td></tr>
-<tr><td>🕹️</td><td><b>The pad presses each game's own keys</b>: jump, fire, pogo, menu, for over 3500 DOS games, in DOS and Windows 98</td></tr>
-<tr><td>🪟</td><td><b>Windows 98</b>: SB / OPL3 / MPU for DOS boxes, a "NUKED SB-EMU" MIDI device, a joystick + game port for every game, and barely any CPU while idle</td></tr>
-<tr><td>🖥️</td><td><b>Menus for everything</b>: seven colour styles, 3D screens (menu, settings, CD images, GAMETEST, MIDI player), game profiles, tests</td></tr>
-<tr><td>🎵</td><td><b>MIDPLAY</b>: a full-screen MIDI player with playlist, file browser, options, a live SC-55 front panel and a smooth 3D view</td></tr>
-<tr><td>🐞</td><td><b>One-key bug report</b>, start-up logs and a live load meter</td></tr>
+<tr><td><picture><img src="docs/90s/icon-speaker.gif" width="56" alt="speaker"></picture></td><td><b>Sound Blaster 1.x / 2.0 / Pro / 16 + OPL3 FM</b> in pure DOS, on your PCI sound chip</td></tr>
+<tr><td><picture><img src="docs/90s/icon-sc55.gif" width="56" alt="sound module"></picture></td><td><b>Roland SC-55 and SC-55mkII</b>: the real firmware, from your ROMs</td></tr>
+<tr><td><picture><img src="docs/90s/icon-mt32.gif" width="56" alt="synth module"></picture></td><td><b>Roland MT-32 / CM-32L</b> (Munt), or any <code>.SF2</code> SoundFont</td></tr>
+<tr><td><picture><img src="docs/90s/icon-disc.gif" width="56" alt="CD"></picture></td><td><b>Virtual CD drive M:</b> that works like a real disc: ISO, CUE/BIN, multi-disc, CD music played by the drive and mixed in. Pick images from any folder on any drive, with a home folder</td></tr>
+<tr><td><picture><img src="docs/90s/icon-gamepad.gif" width="56" alt="gamepad"></picture></td><td><b>USB game pads</b> as gameport joysticks (up to two), plus USB keyboard and a USB mouse right next to your touchpad</td></tr>
+<tr><td><picture><img src="docs/90s/icon-joystick.gif" width="56" alt="joystick"></picture></td><td><b>The pad presses each game's own keys</b>: jump, fire, pogo, menu, for over 3500 DOS games, in DOS and Windows 98</td></tr>
+<tr><td><picture><img src="docs/90s/icon-win98.gif" width="56" alt="Windows 98 PC"></picture></td><td><b>Windows 98</b>: SB / OPL3 / MPU for DOS boxes, a "NUKED SB-EMU" MIDI device, a joystick + game port for every game, and barely any CPU while idle</td></tr>
+<tr><td><picture><img src="docs/90s/icon-menu.gif" width="56" alt="menu screen"></picture></td><td><b>Menus for everything</b>: seven colour styles, 3D screens (menu, settings, CD images, GAMETEST, MIDI player), game profiles, tests</td></tr>
+<tr><td><picture><img src="docs/90s/icon-note.gif" width="56" alt="music note"></picture></td><td><b>MIDPLAY</b>: a full-screen MIDI player with playlist, file browser, options, a live SC-55 front panel and a smooth 3D view</td></tr>
+<tr><td><picture><img src="docs/90s/icon-bug.gif" width="56" alt="bug"></picture></td><td><b>One-key bug report</b>, start-up logs and a live load meter</td></tr>
 </table>
 
 <details>
@@ -468,7 +468,7 @@ Every release gets tried on real iron here, plus a whole fleet of emulated PCs:
 <tr>
 <td valign="top" width="50%">
 
-<b>💻 Dell Latitude D810</b> (the home machine!!)
+<picture><img src="docs/90s/icon-laptop.gif" width="56" alt="laptop"></picture> <b>Dell Latitude D810</b> (the home machine!!)
 
 - Intel Pentium M
 - ATI Mobility Radeon X300
@@ -478,7 +478,7 @@ Every release gets tried on real iron here, plus a whole fleet of emulated PCs:
 </td>
 <td valign="top" width="50%">
 
-<b>🖥️ Custom Windows 98 / DOS tower</b>
+<picture><img src="docs/90s/icon-tower.gif" width="56" alt="tower PC"></picture> <b>Custom Windows 98 / DOS tower</b>
 
 - ASUS P5PE-VM motherboard
 - Leadtek WinFast A400 (GeForce 6800)
@@ -574,7 +574,7 @@ behind a USB 2.0 hub on a USB 2.0 port still needs a real-hardware test.
 <picture><img src="docs/90s/vox-part-soundcard.gif" align="right" width="130" alt="A voxel sound card"></picture>
 
 Sound comes out of the PCI chip in your PC. These are all the chips the SBEMU
-in this pack has a driver for. ✅ = tested and working; 🧪 = ported from Linux,
+in this pack has a driver for. <picture><img src="docs/90s/ok.gif" width="20" alt="tested"></picture> = tested and working; <picture><img src="docs/90s/lab.gif" width="20" alt="ported, not tested yet"></picture> = ported from Linux,
 works for some people.
 
 <details>
@@ -582,16 +582,16 @@ works for some people.
 
 | Family | Chips | |
 |---|---|:---:|
-| **Intel AC'97** (`sc_ich`) | 82801AA/AB/BA (ICH, ICH0, ICH2), ICH3, ICH4, ICH5, **ICH6** *(my D810)*, ICH7, ESB, ESB2, 440MX | ✅ |
-| **nVidia AC'97** (`sc_ich`) | nForce, nForce2, nForce3, MCP04, CK8, CK8S, CK804 | ✅ |
-| **SiS / AMD AC'97** (`sc_ich`) | SiS 7012, AMD-768, AMD-8111 | ✅ |
-| **VIA AC'97** (`sc_via82`) | VT82C686, VT8233 / 8233A / 8235 / 8237 | ✅ |
-| **Intel HD Audio** (`sc_inthd`) | ICH6 – ICH10, ESB2, 5 Series / 3400, Cougar Point, Patsburg, Panther Point, Lynx Point (+LP), 9 Series, Wildcat Point, Wellsburg, Lewisburg, Sunrise Point, Kaby Lake, Coffee Lake, Cannon Lake, Comet Lake, Ice Lake, Jasper Lake, Tiger Lake, Alder Lake, Elkhart Lake, Broxton, Gemini Lake, Bay Trail, Braswell, Poulsbo, Oaktrail | ✅ |
-| **AMD / ATI HD Audio** (`sc_inthd`) | ATI SB450, SB600, AMD Hudson, X370-class, X570-class, Stoney, Raven | ✅ |
-| **nVidia HD Audio** (`sc_inthd`) | MCP51, MCP55, MCP61, MCP65, MCP67, MCP73, MCP77, MCP79, MCP89 | ✅ |
-| **Other HD Audio** (`sc_inthd`) | VIA 82xx / VT7122 / VT6122, SiS 966, ULi M5461, Zhaoxin, C-Media HDA, Vortex86MX, Teradici | ✅ |
-| **HDMI audio** (`sc_inthd`) | Intel Haswell / Broadwell HDMI, ATI/AMD Radeon HDMI (RS600 – R6xxx and later) | 🧪 |
-| **Geode** (`sc_cs5535`) | National CS5535, AMD CS5536 | 🧪 |
+| **Intel AC'97** (`sc_ich`) | 82801AA/AB/BA (ICH, ICH0, ICH2), ICH3, ICH4, ICH5, **ICH6** *(my D810)*, ICH7, ESB, ESB2, 440MX | <picture><img src="docs/90s/ok.gif" width="20" alt="tested"></picture> |
+| **nVidia AC'97** (`sc_ich`) | nForce, nForce2, nForce3, MCP04, CK8, CK8S, CK804 | <picture><img src="docs/90s/ok.gif" width="20" alt="tested"></picture> |
+| **SiS / AMD AC'97** (`sc_ich`) | SiS 7012, AMD-768, AMD-8111 | <picture><img src="docs/90s/ok.gif" width="20" alt="tested"></picture> |
+| **VIA AC'97** (`sc_via82`) | VT82C686, VT8233 / 8233A / 8235 / 8237 | <picture><img src="docs/90s/ok.gif" width="20" alt="tested"></picture> |
+| **Intel HD Audio** (`sc_inthd`) | ICH6 – ICH10, ESB2, 5 Series / 3400, Cougar Point, Patsburg, Panther Point, Lynx Point (+LP), 9 Series, Wildcat Point, Wellsburg, Lewisburg, Sunrise Point, Kaby Lake, Coffee Lake, Cannon Lake, Comet Lake, Ice Lake, Jasper Lake, Tiger Lake, Alder Lake, Elkhart Lake, Broxton, Gemini Lake, Bay Trail, Braswell, Poulsbo, Oaktrail | <picture><img src="docs/90s/ok.gif" width="20" alt="tested"></picture> |
+| **AMD / ATI HD Audio** (`sc_inthd`) | ATI SB450, SB600, AMD Hudson, X370-class, X570-class, Stoney, Raven | <picture><img src="docs/90s/ok.gif" width="20" alt="tested"></picture> |
+| **nVidia HD Audio** (`sc_inthd`) | MCP51, MCP55, MCP61, MCP65, MCP67, MCP73, MCP77, MCP79, MCP89 | <picture><img src="docs/90s/ok.gif" width="20" alt="tested"></picture> |
+| **Other HD Audio** (`sc_inthd`) | VIA 82xx / VT7122 / VT6122, SiS 966, ULi M5461, Zhaoxin, C-Media HDA, Vortex86MX, Teradici | <picture><img src="docs/90s/ok.gif" width="20" alt="tested"></picture> |
+| **HDMI audio** (`sc_inthd`) | Intel Haswell / Broadwell HDMI, ATI/AMD Radeon HDMI (RS600 – R6xxx and later) | <picture><img src="docs/90s/lab.gif" width="20" alt="ported, not tested yet"></picture> |
+| **Geode** (`sc_cs5535`) | National CS5535, AMD CS5536 | <picture><img src="docs/90s/lab.gif" width="20" alt="ported, not tested yet"></picture> |
 </details>
 
 <details>
@@ -599,20 +599,20 @@ works for some people.
 
 | Family | Cards / chips | |
 |---|---|:---:|
-| **Creative SB Live!** (`sc_sbliv`) | EMU10K1: Live!, Live! Value, Live! 5.1, Live! Platinum, PCI512 (CT4620 – SB0220) | ✅ |
-| **Creative Audigy** (`sc_sbliv`) | EMU10K2: Audigy 1 / ES, Audigy 2 / ZS / EX / Platinum / Value, Audigy 4 / 4 Pro | ✅ |
-| **Creative Audigy LS / Live! 24-bit** (`sc_sbl24`) | CA0106: Audigy LS, Live! 7.1 24-bit, Live24 OEM, X-Fi Xtreme Audio (SB0790) | ✅ |
-| **Creative / Dell SB0200** (`sc_emu10k1x`) | EMU10K1X | 🧪 |
-| **Creative X-Fi** (`sc_ctxfi`) | EMU20K1, EMU20K2 | 🧪 |
-| **Ensoniq / Creative** (`sc_e1371`) | **ES1371**, ES1373, CT5880, Ectiva EV1938 (SB PCI 64/128) | ✅ |
-| **Ensoniq AudioPCI** (`sc_e1370`) | ES1370 | 🧪 |
-| **C-Media** (`sc_cmi`) | CMI8338A, CMI8338B, CMI8738, CMI8738B | ✅ |
-| **C-Media Oxygen** (`sc_oxygen`) | CMI8786/8787/8788: **Asus Xonar DG / DGX**, HT-Omega Claro / Claro halo, AuzenTech X-Meridian / 2G, TempoTec HiFier Fantasia / Serenade, Kuroutoshikou CMI8787, C-Media reference boards | 🧪 |
-| **Yamaha DS-XG** (`sc_ymf`) | YMF724, YMF724F, YMF740, YMF740C, **YMF744**, **YMF754** | 🧪 |
-| **ESS** (`sc_allegro`) | Maestro 2 (ES1968), Maestro 2E (ES1978), Allegro / Allegro-1 (ES1988S/ES1989S), Maestro-3i (ES1983), Canyon3D 2 / LE (ES1990/1992) | 🧪 |
-| **Avance Logic** (`sc_als4000`) | ALS4000 | 🧪 |
-| **Trident / SiS** (`sc_trident`) | 4DWave DX, 4DWave NX, SiS 7018 | 🧪 |
-| **Cirrus Logic** (`sc_cs4281`) | CS4281 | 🧪 |
+| **Creative SB Live!** (`sc_sbliv`) | EMU10K1: Live!, Live! Value, Live! 5.1, Live! Platinum, PCI512 (CT4620 – SB0220) | <picture><img src="docs/90s/ok.gif" width="20" alt="tested"></picture> |
+| **Creative Audigy** (`sc_sbliv`) | EMU10K2: Audigy 1 / ES, Audigy 2 / ZS / EX / Platinum / Value, Audigy 4 / 4 Pro | <picture><img src="docs/90s/ok.gif" width="20" alt="tested"></picture> |
+| **Creative Audigy LS / Live! 24-bit** (`sc_sbl24`) | CA0106: Audigy LS, Live! 7.1 24-bit, Live24 OEM, X-Fi Xtreme Audio (SB0790) | <picture><img src="docs/90s/ok.gif" width="20" alt="tested"></picture> |
+| **Creative / Dell SB0200** (`sc_emu10k1x`) | EMU10K1X | <picture><img src="docs/90s/lab.gif" width="20" alt="ported, not tested yet"></picture> |
+| **Creative X-Fi** (`sc_ctxfi`) | EMU20K1, EMU20K2 | <picture><img src="docs/90s/lab.gif" width="20" alt="ported, not tested yet"></picture> |
+| **Ensoniq / Creative** (`sc_e1371`) | **ES1371**, ES1373, CT5880, Ectiva EV1938 (SB PCI 64/128) | <picture><img src="docs/90s/ok.gif" width="20" alt="tested"></picture> |
+| **Ensoniq AudioPCI** (`sc_e1370`) | ES1370 | <picture><img src="docs/90s/lab.gif" width="20" alt="ported, not tested yet"></picture> |
+| **C-Media** (`sc_cmi`) | CMI8338A, CMI8338B, CMI8738, CMI8738B | <picture><img src="docs/90s/ok.gif" width="20" alt="tested"></picture> |
+| **C-Media Oxygen** (`sc_oxygen`) | CMI8786/8787/8788: **Asus Xonar DG / DGX**, HT-Omega Claro / Claro halo, AuzenTech X-Meridian / 2G, TempoTec HiFier Fantasia / Serenade, Kuroutoshikou CMI8787, C-Media reference boards | <picture><img src="docs/90s/lab.gif" width="20" alt="ported, not tested yet"></picture> |
+| **Yamaha DS-XG** (`sc_ymf`) | YMF724, YMF724F, YMF740, YMF740C, **YMF744**, **YMF754** | <picture><img src="docs/90s/lab.gif" width="20" alt="ported, not tested yet"></picture> |
+| **ESS** (`sc_allegro`) | Maestro 2 (ES1968), Maestro 2E (ES1978), Allegro / Allegro-1 (ES1988S/ES1989S), Maestro-3i (ES1983), Canyon3D 2 / LE (ES1990/1992) | <picture><img src="docs/90s/lab.gif" width="20" alt="ported, not tested yet"></picture> |
+| **Avance Logic** (`sc_als4000`) | ALS4000 | <picture><img src="docs/90s/lab.gif" width="20" alt="ported, not tested yet"></picture> |
+| **Trident / SiS** (`sc_trident`) | 4DWave DX, 4DWave NX, SiS 7018 | <picture><img src="docs/90s/lab.gif" width="20" alt="ported, not tested yet"></picture> |
+| **Cirrus Logic** (`sc_cs4281`) | CS4281 | <picture><img src="docs/90s/lab.gif" width="20" alt="ported, not tested yet"></picture> |
 </details>
 
 > [!TIP]
@@ -736,18 +736,18 @@ works for some people.
 
 Stuff this little pack pulled off that I'm REALLY proud of:
 
-- 🏆 **A real Roland SC-55 inside a DOS sound card emulator**, running Roland's own firmware, and then made **about 20% faster without changing a single sample** of what it plays, and **13.6% faster again** with a profile-guided build recorded in DOS itself (checked bit for bit, down to the last byte of a WAV)
-- 🏆 **Starts twice as fast**: from 15 seconds to under 7 on a 366 MHz Celeron (a ROM check was secretly redone on almost every start)
-- 🏆 **A USB host for plain DOS built into a sound emulator**: UHCI, OHCI, EHCI and xHCI, hubs four deep, hot-plugging, and not a single interrupt, so it never fights your sound chip (it learned from crazii's USBDDOS and Yeo Kheng Meng's xhci98)
-- 🏆 **USB mouse right next to a laptop touchpad**, no memory manager needed, by talking to the BIOS's own mouse services
-- 🏆 **Your pad presses each game's own keys** in over 3500 DOS games: SBEMU watches which program DOS starts and picks that game's layout. 13 shareware games, Doom II and the full Wolf3D were all played with nothing but the pad
-- 🏆 **Our own Windows 98 drivers**: a virtual Sound Blaster / OPL3 / MPU-401 for DOS boxes, a MIDI driver, a joystick driver and a virtual game port, **idling at 0.25% of the CPU**. Game sound grows its own buffer when Windows gets busy (Blood's gaps went from 56% of the time to 1%), and MIDPLAY shows the SC-55's live display in a DOS box, just like in DOS
-- 🏆 **A virtual CD drive that acts like a real one**: rebuilt from source with our own CD-audio part, first in line for games, and CD music from CUE/BIN images mixed into the game's sound
-- 🏆 **3D menus drawn by the CPU** at 640×480, with no 3D card, that still run on a 366 MHz Celeron, with a floor drawn row by row for 3x more frames, styles up to a third faster, and neon glow in your colour style (<kbd>F6</kbd>)
-- 🏆 **A MIDI player that never makes the music late**: MIDPLAY sends the notes from inside its own drawing code, so even the 3D view keeps the music within a few milliseconds (it was a quarter of a second), and it browses and plays folders with thousands of MIDI files
-- 🏆 **Found and fixed a hidden freeze in the DOS extender itself**: an EMPTY virtual CD drive made HDPMI32I (under every 32-bit program in the pack) crash with an error it could not show, so the PC just hung. Tracked down with a register dump in an emulated PC, fixed in HDPMI's own source, plus a second fix so Borland's DOS extender (Super Street Fighter II Turbo) gets past its start-up
-- 🏆 **Found and fixed an FPU bug as old as SBEMU itself**: its sound interrupt and port handlers used the math unit without saving the game's values, which could garble 3D games; tracked down from a few black lines in MIDPLAY's 3D view
-- 🏆 **Tested like crazy** on emulated PCs: custom 86Box builds with a fake USB pad, a file-driven joystick and a strict keyboard controller, QEMU with a fake Xbox 360 pad, and real games driven by scripts
+- <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **A real Roland SC-55 inside a DOS sound card emulator**, running Roland's own firmware, and then made **about 20% faster without changing a single sample** of what it plays, and **13.6% faster again** with a profile-guided build recorded in DOS itself (checked bit for bit, down to the last byte of a WAV)
+- <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **Starts twice as fast**: from 15 seconds to under 7 on a 366 MHz Celeron (a ROM check was secretly redone on almost every start)
+- <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **A USB host for plain DOS built into a sound emulator**: UHCI, OHCI, EHCI and xHCI, hubs four deep, hot-plugging, and not a single interrupt, so it never fights your sound chip (it learned from crazii's USBDDOS and Yeo Kheng Meng's xhci98)
+- <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **USB mouse right next to a laptop touchpad**, no memory manager needed, by talking to the BIOS's own mouse services
+- <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **Your pad presses each game's own keys** in over 3500 DOS games: SBEMU watches which program DOS starts and picks that game's layout. 13 shareware games, Doom II and the full Wolf3D were all played with nothing but the pad
+- <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **Our own Windows 98 drivers**: a virtual Sound Blaster / OPL3 / MPU-401 for DOS boxes, a MIDI driver, a joystick driver and a virtual game port, **idling at 0.25% of the CPU**. Game sound grows its own buffer when Windows gets busy (Blood's gaps went from 56% of the time to 1%), and MIDPLAY shows the SC-55's live display in a DOS box, just like in DOS
+- <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **A virtual CD drive that acts like a real one**: rebuilt from source with our own CD-audio part, first in line for games, and CD music from CUE/BIN images mixed into the game's sound
+- <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **3D menus drawn by the CPU** at 640×480, with no 3D card, that still run on a 366 MHz Celeron, with a floor drawn row by row for 3x more frames, styles up to a third faster, and neon glow in your colour style (<kbd>F6</kbd>)
+- <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **A MIDI player that never makes the music late**: MIDPLAY sends the notes from inside its own drawing code, so even the 3D view keeps the music within a few milliseconds (it was a quarter of a second), and it browses and plays folders with thousands of MIDI files
+- <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **Found and fixed a hidden freeze in the DOS extender itself**: an EMPTY virtual CD drive made HDPMI32I (under every 32-bit program in the pack) crash with an error it could not show, so the PC just hung. Tracked down with a register dump in an emulated PC, fixed in HDPMI's own source, plus a second fix so Borland's DOS extender (Super Street Fighter II Turbo) gets past its start-up
+- <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **Found and fixed an FPU bug as old as SBEMU itself**: its sound interrupt and port handlers used the math unit without saving the game's values, which could garble 3D games; tracked down from a few black lines in MIDPLAY's 3D view
+- <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **Tested like crazy** on emulated PCs: custom 86Box builds with a fake USB pad, a file-driven joystick and a strict keyboard controller, QEMU with a fake Xbox 360 pad, and real games driven by scripts
 
 <div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
@@ -770,11 +770,11 @@ history, November 4 - 11, 2026, at beta.95):
 
 | | |
 |---|---|
-| 🧑‍💻 **commits co-written by Claude** | **198 of 204** |
-| 📦 **releases** | **62** |
-| 📜 **new code** | **about 32,000 lines**: DOS programs, SBEMU additions, Windows 98 drivers, test rigs |
-| 📖 **docs** | a 1,420-line manual (README.TXT) and a 1,260-line dev diary (HANDOFF.md) |
-| 🎨 **art** | Port 220 and every animated GIF on this page |
+| <picture><img src="docs/90s/icon-claude.gif" width="44" alt="Claude"></picture> **commits co-written by Claude** | **198 of 204** |
+| <picture><img src="docs/90s/icon-crate.gif" width="44" alt="crate"></picture> **releases** | **62** |
+| <picture><img src="docs/90s/icon-scroll.gif" width="44" alt="scroll"></picture> **new code** | **about 32,000 lines**: DOS programs, SBEMU additions, Windows 98 drivers, test rigs |
+| <picture><img src="docs/90s/icon-book.gif" width="44" alt="book"></picture> **docs** | a 1,420-line manual (README.TXT) and a 1,260-line dev diary (HANDOFF.md) |
+| <picture><img src="docs/90s/icon-palette.gif" width="44" alt="palette"></picture> **art** | Port 220 and every animated GIF on this page |
 
 </div>
 
