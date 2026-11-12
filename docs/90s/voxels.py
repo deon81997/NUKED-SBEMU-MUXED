@@ -30,14 +30,14 @@ LIGHT = (0.45, -0.55, 0.7)
 KEY = (255, 0, 255)
 
 
-def render(m, size, frames=12, scale=7, tilt=0.5, bg=(0, 0, 32), bob=True, ms=90, name='vox.gif', cap=None):
+def render(m, size, frames=12, scale=7, tilt=0.5, bg=(0, 0, 32), bob=True, ms=90, name='vox.gif', cap=None, spin=False):
     size = (size[0] // 2, size[1] // 2); scale = scale / 2         # drawn at half size, stored 2x: chunky pixels like the sprites
     xs, ys, zs = zip(*m)
     cx, cy, cz = (max(xs) + min(xs) + 1) / 2, (max(ys) + min(ys) + 1) / 2, (max(zs) + min(zs) + 1) / 2
     W, H = size
     out = []
     for k in range(frames):
-        a = 0.35 * math.sin(2 * math.pi * k / frames)               # a little dance, face stays in view
+        a = 2 * math.pi * k / frames if spin else 0.35 * math.sin(2 * math.pi * k / frames)   # spin, or a little dance
         ca, sa, ct, st = math.cos(a), math.sin(a), math.cos(tilt), math.sin(tilt)
 
         def rot(p):
@@ -65,7 +65,10 @@ def render(m, size, frames=12, scale=7, tilt=0.5, bg=(0, 0, 32), bob=True, ms=90
             ft = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf', 8)
             c2 = Image.new('RGB', (W, H + 24), KEY); c2.paste(im, (0, 0)); im = c2
             d = ImageDraw.Draw(im); d.fontmode = '1'
-            for j, (line, col) in enumerate(zip(cap.split('|'), ((255, 255, 0), (255, 255, 255)))):
+            lines = cap.split('|')
+            tw = max(d.textlength(l, font=ft) for l in lines)
+            d.rounded_rectangle([W // 2 - tw / 2 - 3, H - 1, W // 2 + tw / 2 + 3, H + 22], 3, fill=(16, 16, 24))   # plate: readable on white and dark pages
+            for j, (line, col) in enumerate(zip(lines, ((255, 255, 0), (255, 255, 255)))):
                 d.text((W // 2 + 1, H + 5 + j * 11), line, font=ft, fill=(0, 0, 0), anchor='mm')
                 d.text((W // 2, H + 4 + j * 11), line, font=ft, fill=col, anchor='mm')
         im = im.resize((im.width * 2, im.height * 2), Image.NEAREST)
@@ -357,6 +360,44 @@ def i_menu():
     return m
 
 
+def i_star():
+    m = {}
+    pts = [(math.cos(math.pi / 2 + i * math.pi / 5) * (7 if i % 2 == 0 else 3), math.sin(math.pi / 2 + i * math.pi / 5) * (7 if i % 2 == 0 else 3)) for i in range(10)]
+    def inside(x, z):
+        c = False
+        for i in range(10):
+            (x1, z1), (x2, z2) = pts[i], pts[(i + 1) % 10]
+            if (z1 > z) != (z2 > z) and x < (x2 - x1) * (z - z1) / (z2 - z1) + x1: c = not c
+        return c
+    for x in range(-8, 9):
+        for z in range(-8, 9):
+            if inside(x + 0.5, z + 0.5):
+                for y in range(0, 2): m[(x, y, z)] = (255, 215, 40) if (x + z) % 3 else (255, 245, 150)
+    return m
+
+
+def pixel_icons():
+    """the tested / ported marks for the sound chip table (2D, 12x12 stored 2x)"""
+    from PIL import ImageDraw as D2
+    def px(name, draw):
+        fr = []
+        for k in range(6):
+            im = Image.new('RGB', (12, 12), KEY); draw(D2.Draw(im), k); fr.append(im.resize((24, 24), Image.NEAREST))
+        pal = fr[0].quantize(colors=16)
+        q = [f.quantize(palette=pal) for f in fr]
+        pl = q[0].getpalette(); ki = min(range(len(pl) // 3), key=lambda i: sum(abs(pl[i * 3 + j] - KEY[j]) for j in range(3)))
+        q[0].save(os.path.join(OUT, name), save_all=True, append_images=q[1:], duration=150, loop=0, transparency=ki, disposal=2)
+    def ok(d, k):
+        d.rectangle([0, 0, 11, 11], fill=(0, 140, 0), outline=(0, 80, 0))
+        d.line([(2, 6), (4, 9), (9, 2)], fill=(255, 255, 255) if k % 3 else (200, 255, 200), width=2)
+    def lab(d, k):
+        d.rectangle([4, 0, 7, 1], fill=(200, 200, 210)); d.rectangle([4, 2, 7, 5], fill=(220, 230, 240))
+        d.polygon([(4, 5), (7, 5), (11, 11), (0, 11)], fill=(220, 230, 240))
+        d.polygon([(2, 8), (9, 8), (11, 11), (0, 11)], fill=(80, 220, 120))
+        d.point([(5 + (k % 3), 9 - (k % 2)), (3 + k % 4, 7 - k % 3)], fill=(255, 255, 255))
+    px('ok.gif', ok); px('lab.gif', lab)
+
+
 if __name__ == '__main__':
     render(sc55(), (240, 150), scale=8, tilt=0.75, name='vox-sc55.gif')
     render(pc(), (200, 200), scale=7, tilt=0.4, name='vox-pc.gif')
@@ -372,8 +413,10 @@ if __name__ == '__main__':
     for fn, sc, t in ((i_speaker, 6, 0.3), (sc55, 3.6, 0.75), (i_mt32, 3.4, 0.75), (lambda: disc(), 6, 1.0), (gamepad, 3.8, 0.9),
                       (joystick, 5, 0.45), (win98, 4.4, 0.35), (i_menu, 4.4, 0.35), (i_note, 5, 0.3), (i_bug, 5.5, 0.9),
                       (i_laptop, 4.2, 0.6), (i_tower, 3.8, 0.35), (i_trophy, 5.5, 0.4), (i_crate, 5.5, 0.6), (i_scroll, 4.2, 0.3),
-                      (i_book, 4, 0.9), (i_palette, 4.4, 1.0), (claude, 4, 0.45)):
+                      (i_book, 4, 0.9), (i_palette, 4.4, 1.0), (claude, 4, 0.45), (usbstick, 5, 0.75)):
         n = fn.__name__.replace('i_', '') if fn.__name__ != '<lambda>' else 'disc'
         render(fn(), (72, 72), scale=sc, tilt=t, name='icon-%s.gif' % n)
+    render(i_star(), (48, 48), frames=16, scale=3.2, tilt=0.15, bob=False, ms=70, name='star.gif', spin=True)
+    pixel_icons()
     for f in sorted(os.listdir(OUT)):
         if f.startswith('vox-'): print(f, os.path.getsize(os.path.join(OUT, f)))

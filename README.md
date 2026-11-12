@@ -93,7 +93,7 @@
 
 <div align="center"><picture><img src="docs/90s/fd-marine-walk.gif" alt=""></picture> <picture><img src="docs/90s/ic-news.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-news.gif" alt=""></picture> <picture><img src="docs/90s/fd-serpentipede.gif" alt=""></picture></div>
 
-## ★ What's NEW!! ★
+## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> What's NEW!! <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
 
 <picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/12/2026: beta.98.** **USB sticks after "Restart in MS-DOS mode"!!** Windows 98 keeps the letters it gave your USB stick and DOS then refuses them ("Invalid function"). SBEMU now checks every USB letter and moves any refused one to the next free letter, so both partitions of a stick read again (MENU > CD-ROM > USB drives shows where they went). Tested in QEMU with Win98 SE: stick used in Windows, then MS-DOS mode.
 
@@ -308,7 +308,7 @@ never takes more than about 60% of the CPU, so your game always gets the rest.
 
 <div align="center"><picture><img src="docs/90s/fd-zombie.gif" alt=""></picture> <picture><img src="docs/90s/ic-sparkle.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-sparkle.gif" alt=""></picture> <picture><img src="docs/90s/mascot-flopsy.gif" alt=""></picture></div>
 
-## ★ What is this?? ★
+## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> What is this?? <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
 
 <picture><img src="docs/90s/vox-port220.gif" align="right" width="130" alt="Port 220 in voxels"></picture>
 
@@ -336,7 +336,7 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 
 <div align="center"><picture><img src="docs/90s/fd-hatchling.gif" alt=""></picture> <picture><img src="docs/90s/ic-speaker.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-speaker.gif" alt=""></picture> <picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture></div>
 
-## ★ Cool Features ★
+## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Cool Features <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
 
 <picture><img src="docs/90s/vox-sc55.gif" align="right" width="130" alt="A voxel sound module"></picture>
 
@@ -345,6 +345,7 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 <tr><td><picture><img src="docs/90s/icon-sc55.gif" width="56" alt="sound module"></picture></td><td><b>Roland SC-55 and SC-55mkII</b>: the real firmware, from your ROMs</td></tr>
 <tr><td><picture><img src="docs/90s/icon-mt32.gif" width="56" alt="synth module"></picture></td><td><b>Roland MT-32 / CM-32L</b> (Munt), or any <code>.SF2</code> SoundFont</td></tr>
 <tr><td><picture><img src="docs/90s/icon-disc.gif" width="56" alt="CD"></picture></td><td><b>Virtual CD drive M:</b> that works like a real disc: ISO, CUE/BIN, multi-disc, CD music played by the drive and mixed in. Pick images from any folder on any drive, with a home folder</td></tr>
+<tr><td><picture><img src="docs/90s/icon-usbstick.gif" width="56" alt="USB stick"></picture></td><td><b>USB sticks as DOS drive letters</b>: FAT12/16/32 read and write, exFAT and NTFS read-only, plugged in any time; MENU &gt; CD-ROM &gt; USB drives lists them</td></tr>
 <tr><td><picture><img src="docs/90s/icon-gamepad.gif" width="56" alt="gamepad"></picture></td><td><b>USB game pads</b> as gameport joysticks (up to two), plus USB keyboard and a USB mouse right next to your touchpad</td></tr>
 <tr><td><picture><img src="docs/90s/icon-joystick.gif" width="56" alt="joystick"></picture></td><td><b>The pad presses each game's own keys</b>: jump, fire, pogo, menu, for over 3500 DOS games, in DOS and Windows 98</td></tr>
 <tr><td><picture><img src="docs/90s/icon-win98.gif" width="56" alt="Windows 98 PC"></picture></td><td><b>Windows 98</b>: SB / OPL3 / MPU for DOS boxes, a "NUKED SB-EMU" MIDI device, a joystick + game port for every game, and barely any CPU while idle</td></tr>
@@ -421,7 +422,7 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 
 <div align="center"><picture><img src="docs/90s/fd-worm.gif" alt=""></picture> <picture><img src="docs/90s/ic-chip.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-chip.gif" alt=""></picture> <picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture></div>
 
-## ★ Will it run on my PC?? ★
+## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Will it run on my PC?? <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
 
 <picture><img src="docs/90s/vox-pc.gif" align="right" width="130" alt="A voxel beige DOS PC"></picture>
 
@@ -460,7 +461,7 @@ emulated CPU, and that always runs at full speed.)
 
 <div align="center"><picture><img src="docs/90s/fd-potion.gif" alt=""></picture> <picture><img src="docs/90s/ic-rocket.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-rocket.gif" alt=""></picture> <picture><img src="docs/90s/mascot-flopsy.gif" alt=""></picture></div>
 
-## ★ My Test Lab!! ★
+## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> My Test Lab!! <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
 
 Every release gets tried on real iron here, plus a whole fleet of emulated PCs:
 
@@ -498,7 +499,7 @@ add-ons: a fake USB Xbox 360 pad, a joystick driven from a file and scripted key
 
 <div align="center"><picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture> <picture><img src="docs/90s/ic-computer.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-computer.gif" alt=""></picture> <picture><img src="docs/90s/fd-potion.gif" alt=""></picture></div>
 
-## ★ Getting Started ★
+## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Getting Started <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
 
 ```text
   1. Download the zip, unzip it, put your ROM dumps in NUKEDSB\FILES\ROMS
@@ -529,7 +530,7 @@ The `README.TXT` in the pack is the full manual.
 
 <div align="center"><picture><img src="docs/90s/fd-marine-walk.gif" alt=""></picture> <picture><img src="docs/90s/ic-pad.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-pad.gif" alt=""></picture> <picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture></div>
 
-## ★ USB Gamepads in DOS?!? ★
+## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> USB Gamepads in DOS?!? <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
 
 <picture><img src="docs/90s/vox-pad.gif" align="right" width="130" alt="A voxel gamepad"></picture>
 
@@ -569,7 +570,7 @@ behind a USB 2.0 hub on a USB 2.0 port still needs a real-hardware test.
 
 <div align="center"><picture><img src="docs/90s/mascot-canvaskid.gif" width="96" alt=""></picture> <picture><img src="docs/90s/ic-speaker.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-speaker.gif" alt=""></picture> <picture><img src="docs/90s/fd-serpentipede.gif" alt=""></picture></div>
 
-## ★ Supported Sound Chips ★
+## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Supported Sound Chips <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
 
 <picture><img src="docs/90s/vox-part-soundcard.gif" align="right" width="130" alt="A voxel sound card"></picture>
 
@@ -622,7 +623,7 @@ works for some people.
 
 <div align="center"><picture><img src="docs/90s/fd-hatchling.gif" alt=""></picture> <picture><img src="docs/90s/ic-camera.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-camera.gif" alt=""></picture> <picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture></div>
 
-## ★ Screenshots!! ★
+## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Screenshots!! <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
 
 <div align="center">
 
@@ -730,7 +731,7 @@ works for some people.
 
 <div align="center"><picture><img src="docs/90s/fd-potion.gif" alt=""></picture> <picture><img src="docs/90s/ic-cd.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-cd.gif" alt=""></picture> <picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture></div>
 
-## ★ Hall of Fame!! ★
+## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Hall of Fame!! <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
 
 <div align="center"><picture><img src="docs/90s/port220-hello.gif" width="330" alt="Port 220"></picture></div>
 
@@ -753,7 +754,7 @@ Stuff this little pack pulled off that I'm REALLY proud of:
 
 <div align="center"><picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture> <picture><img src="docs/90s/ic-chip.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-chip.gif" alt=""></picture> <picture><img src="docs/90s/fd-keycard.gif" alt=""></picture></div>
 
-## ★ Built With Claude!! ★
+## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Built With Claude!! <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
 
 <div align="center"><picture><img src="docs/90s/port220-hop.gif" width="100%" alt=""></picture></div>
 
@@ -764,14 +765,14 @@ MPXPlay drivers, **Japheth**'s HX and Jemm, **vorvek**'s uCDD and everyone in [T
 
 Everything new on top of them was written by **Claude**, Anthropic's AI: the code, the bug hunting, the emulated
 test PCs, the docs and Port 220. My part was the ideas, the direction and the testing on my own PCs. The numbers (from this repo's
-history, November 4 - 11, 2026, at beta.95):
+history, November 4 - 12, 2026, at beta.98):
 
 <div align="center">
 
 | | |
 |---|---|
-| <picture><img src="docs/90s/icon-claude.gif" width="44" alt="Claude"></picture> **commits co-written by Claude** | **198 of 204** |
-| <picture><img src="docs/90s/icon-crate.gif" width="44" alt="crate"></picture> **releases** | **62** |
+| <picture><img src="docs/90s/icon-claude.gif" width="44" alt="Claude"></picture> **commits co-written by Claude** | **224 of 230** |
+| <picture><img src="docs/90s/icon-crate.gif" width="44" alt="crate"></picture> **releases** | **66** |
 | <picture><img src="docs/90s/icon-scroll.gif" width="44" alt="scroll"></picture> **new code** | **about 32,000 lines**: DOS programs, SBEMU additions, Windows 98 drivers, test rigs |
 | <picture><img src="docs/90s/icon-book.gif" width="44" alt="book"></picture> **docs** | a 1,420-line manual (README.TXT) and a 1,260-line dev diary (HANDOFF.md) |
 | <picture><img src="docs/90s/icon-palette.gif" width="44" alt="palette"></picture> **art** | Port 220 and every animated GIF on this page |
@@ -786,7 +787,7 @@ before they ever reached my real hardware.
 
 <div align="center"><picture><img src="docs/90s/fd-hatchling.gif" alt=""></picture> <picture><img src="docs/90s/ic-heart.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-heart.gif" alt=""></picture> <picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture></div>
 
-## ★ Made For This Pack!! ★
+## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Made For This Pack!! <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
 
 Everything listed here was written for this pack by **Claude**. Some of it is brand new (the menus and screens,
 the test tools, the pad-keys system, the test rigs); some of it builds on other people's projects, and those rows say
@@ -858,7 +859,7 @@ Want to use our drivers in your own project? See [Take Our Drivers!!](#-take-our
 
 <div align="center"><picture><img src="docs/90s/fd-soulsphere.gif" alt=""></picture> <picture><img src="docs/90s/ic-chip.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-chip.gif" alt=""></picture> <picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture></div>
 
-## ★ Take Our Drivers!! ★
+## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Take Our Drivers!! <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
 
 <div align="center"><picture><img src="docs/90s/ic-sparkle.gif" alt=""></picture> <b><font color="#00ff00">Building your own DOS or Windows 98 project? Borrow our drivers!!</font></b> <picture><img src="docs/90s/ic-sparkle.gif" alt=""></picture></div>
 
@@ -920,7 +921,7 @@ the same GPL.
 
 <div align="center"><picture><img src="docs/90s/fd-trilobite.gif" alt=""></picture> <picture><img src="docs/90s/ic-heart.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-heart.gif" alt=""></picture> <picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture></div>
 
-## ★ Download Zone ★
+## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Download Zone <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
 
 <picture><img src="docs/90s/vox-flopsy.gif" align="right" width="110" alt="Flopsy the floppy in voxels"></picture>
 
@@ -951,7 +952,7 @@ the same GPL.
 
 <div align="center"><picture><img src="docs/90s/fd-marine-walk.gif" alt=""></picture> <picture><img src="docs/90s/ic-pad.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-pad.gif" alt=""></picture> <picture><img src="docs/90s/fd-potion.gif" alt=""></picture></div>
 
-## ★ Free Shareware Games!! ★
+## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Free Shareware Games!! <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
 
 <div align="center"><picture><img src="docs/90s/ic-sparkle.gif" alt=""></picture> <b><font color="#00ff00">No games to test with? Grab these - FREE and LEGAL!!</font></b> <picture><img src="docs/90s/ic-sparkle.gif" alt=""></picture></div>
 
@@ -1003,7 +1004,7 @@ fees. The full quotes, setup tips and SHA-256 checksums are in [TESTGAMES.TXT](t
 
 <div align="center"><picture><img src="docs/90s/mascot-flopsy.gif" alt=""></picture> <picture><img src="docs/90s/ic-news.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-news.gif" alt=""></picture> <picture><img src="docs/90s/fd-worm.gif" alt=""></picture></div>
 
-## ★ Sign My Guestbook! ★
+## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Sign My Guestbook! <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
 
 <table>
 <tr>
@@ -1022,7 +1023,7 @@ exactly where.
 
 <div align="center"><picture><img src="docs/90s/port220-small.gif" width="96" alt=""></picture> <picture><img src="docs/90s/ic-computer.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-computer.gif" alt=""></picture> <picture><img src="docs/90s/fd-marine-shoot.gif" alt=""></picture></div>
 
-## ★ For the Nerds: Source Code ★
+## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> For the Nerds: Source Code <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
 
 ```text
 sc55-pack/
@@ -1058,7 +1059,7 @@ drawn by [`docs/90s/make90s.py`](docs/90s/make90s.py).
 
 <div align="center"><picture><img src="docs/90s/tux-waddle.gif" width="96" alt=""></picture> <picture><img src="docs/90s/ic-heart.gif" alt=""></picture> <picture><img src="docs/90s/bar.gif" width="380" alt=""></picture> <picture><img src="docs/90s/ic-heart.gif" alt=""></picture> <picture><img src="docs/90s/mascot-canvaskid.gif" width="96" alt=""></picture></div>
 
-## ★ Thanks To My Friends ★
+## <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture> Thanks To My Friends <picture><img src="docs/90s/star.gif" width="28" alt="*"></picture>
 
 None of this would exist without these awesome people. THANK YOU!!
 The whole thing is **GPL-2.0-or-later** ([`COPYING`](sc55-pack/COPYING)).
