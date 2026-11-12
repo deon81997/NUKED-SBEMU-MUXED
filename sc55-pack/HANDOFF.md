@@ -1324,6 +1324,11 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
   emulated): list 1500-file folder 0.27 s / 389 cmds, 3 MB read 0.55 s / 98 cmds, open by alias there
   0.16 s / 777 cmds, by long name 0.05 s / 394. NTFS listing costs one MFT record read per entry (1500 files
   ~1700 cmds). Reading the image as a file through FreeDOS instead is ~5 ms per seek: too slow, use INT 13h.
+- Review + fuzz pass: fixed exFAT looping-chain hang (root dir), NTFS index offset kept in 16 bits (64 KB INDX
+  would loop), $MFT run limit 48 -> 128 (well-used Windows drives), exFAT entries bigger than the volume
+  now skipped as corrupt. Speed: exFAT FAT-chain files read adjacent clusters in one command (fragmented
+  2.5 MB file 628 -> 95 commands). test/fuzz.sh: corrupts random bytes in sectors read one at a time
+  (metadata) under ASan/UBSan; exFAT 512/4K + NTFS 512/4K, 220 runs: no crash, no hang.
 - Still not tested: volumes made by Windows itself (real 8dot3 names, Windows $MFT/index layout; needs a
   small VHD/stick image from a Windows XP+ PC; Win98 cannot make NTFS/exFAT), speed on the real PCs.
 - USB session (2026-11-11): USBPAD_DiskWrite (WRITE 10, same path as reads), USBPAD_E_WP + USBPAD_Disk.wp (MODE SENSE

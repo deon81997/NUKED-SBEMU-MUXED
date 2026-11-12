@@ -38,7 +38,7 @@
 #define FSR_NTFS  2
 
 #define FSR_WORK_MIN  (4 * 4096 + 4096)  /* worst case: 4K records, 4K INDX, 4K sectors */
-#define FSR_MFT_RUNS  48
+#define FSR_MFT_RUNS  128
 #define FSR_DEPTH     10                 /* max NTFS index tree depth */
 
 /* Read `count` device sectors at absolute `lba` into buf. Return 0 on success. */
@@ -79,7 +79,7 @@ typedef struct {               /* findfirst / findnext state */
         struct { fsr_xstream d; uint32_t idx; } x;
         struct {
             uint64_t dir; int sp;                     /* sp = frames used */
-            struct { uint64_t vcn; uint16_t off; uint8_t down; } st[FSR_DEPTH];
+            struct { uint64_t vcn; uint32_t off; uint8_t down; } st[FSR_DEPTH];
         } n;
     } u;
 } fsr_find;

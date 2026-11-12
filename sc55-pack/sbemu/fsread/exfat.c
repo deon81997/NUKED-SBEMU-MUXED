@@ -293,6 +293,7 @@ static int x_map(fsr_vol *v, fsr_xstream *s, uint64_t off, uint64_t *lba, uint32
         n = ((tot - ci) << sh) - so;
     } else {
         if (!s->clus || ci < s->cidx) { s->cidx = 0; s->clus = s->first; }
+        if (ci >= v->nclus) return FSR_EBADFS;   /* also stops a looping chain */
         while (s->cidx < ci) {
             uint32_t nx; int r = x_fat(v, s->clus, &nx);
             if (r) return r;
@@ -301,6 +302,10 @@ static int x_map(fsr_vol *v, fsr_xstream *s, uint64_t off, uint64_t *lba, uint32
             s->clus = nx; s->cidx++;
         }
         if (!okclus(v, s->clus)) return FSR_EBADFS;
+        {   /* chain runs on into adjacent clusters: read them in one go (up to 256 sectors) */
+            uint32_t c = s->clus, nx;
+            while (n < 256 && !x_fat(v, c, &nx) && nx == c + 1 && okclus(v, nx)) { n += (uint64_t)1 << sh; c = nx; }
+        }
     }
     *lba = v->heap_lba + ((uint64_t)(s->clus - 2) << sh) + so;
     *ns = n > 0x4000 ? 0x4000 : (uint32_t)n;
@@ -356,6 +361,7 @@ static int x_next(fsr_vol *v, fsr_xstream *dir, uint32_t *idx, xent *e)
         e->s.nofat = (b[1] & 2) != 0; e->s.vdl = LE64(b + 8);
         e->s.first = LE32(b + 20); e->s.size = LE64(b + 24);
         if (e->s.vdl > e->s.size) e->s.vdl = e->s.size;
+        if (e->s.size > v->nclus << v->cs_shift) { *idx = i0 + 1 + sc; continue; }   /* corrupt: bigger than the volume */
         if (!(b[1] & 1)) e->s.first = 0;
         v->nmlen = 0;
         for (k = 2; k <= sc && v->nmlen < nl; k++) {

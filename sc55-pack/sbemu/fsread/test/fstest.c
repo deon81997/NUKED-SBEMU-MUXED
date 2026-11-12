@@ -52,8 +52,10 @@ static int dev(uint64_t lba, int n, void *buf)
 }
 static int rd(void *ctx, uint64_t lba, int n, void *buf)
 {
-    unsigned h = (unsigned)(lba % NCACHE);
+    unsigned h = (unsigned)(lba % NCACHE); static FILE *lg; static int lgi;
     (void)ctx; reads++;
+    if (!lgi) { const char *e = getenv("FSTEST_LOG"); lgi = 1; if (e) lg = fopen(e, "w"); }
+    if (lg && n == 1) { int i; for (i = 0; i < n; i++) fprintf(lg, "%llu\n", (unsigned long long)(lba + i)); }
     if (n != 1) return dev(lba, n, buf);
     if (ctag[h] != lba + 1) { if (dev(lba, 1, cdat[h])) { ctag[h] = 0; return -1; } ctag[h] = lba + 1; }
     memcpy(buf, cdat[h], ss);
@@ -115,12 +117,13 @@ int main(int argc, char **argv)
     if ((r = fsr_mount(&v, rd, 0, lba, work, sizeof work))) { printf("mount failed %d\n", r); return 1; }
     if (argc > 4 && !strcmp(argv[4], "bench")) {   /* timings + device commands per step */
         static const char *step[] = { "list \\MANY (1500 files)", "read \\CONTIG.BIN (3 MB)",
-            "open \\MANY\\FIL~1499.DAT", "open \\many\\file with long name 1499.dat", "list \\MANY again" };
+            "open \\MANY\\FIL~1499.DAT", "open \\many\\file with long name 1499.dat", "list \\MANY again", "read \\FRAG\\FRAGME~1.BIN (2.5 MB)" };
         int k;
-        for (k = 0; k < 5; k++) {
+        for (k = 0; k < 6; k++) {
             clock_t t = clock(); long r0 = reads, d0 = devcmds; fsr_find s; fsr_dirent d; fsr_file f; int n = 0; int32_t g;
             if (k == 0 || k == 4) { for (r = fsr_findfirst(&v, "\\MANY", 0, 0x16, &s, &d); !r; r = fsr_findnext(&v, &s, &d)) n++; }
             if (k == 1) { if (!(r = fsr_open(&v, "\\CONTIG.BIN", &f, 0))) while ((g = fsr_read(&v, &f, buf, 32768)) > 0) n += g; }
+            if (k == 5) { if (!(r = fsr_open(&v, "\\FRAG\\FRAGME~1.BIN", &f, 0))) while ((g = fsr_read(&v, &f, buf, 32768)) > 0) n += g; }
             if (k == 2) r = fsr_open(&v, "\\MANY\\FIL~1499.DAT", &f, &d);
             if (k == 3) r = fsr_open(&v, "\\many\\file with long name 1499.dat", &f, &d);
             printf("%-42s %6.2f s  n=%d rc=%d  lib reads %ld  device cmds %ld\n", step[k],

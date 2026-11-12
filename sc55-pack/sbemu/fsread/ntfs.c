@@ -269,7 +269,7 @@ static int n_step(fsr_vol *v, fsr_find *s, uint8_t **pe)
         uint32_t ho, end, len; uint16_t fl; uint8_t *e; int r, sp = s->u.n.sp;
         if (!sp) return 0;
         if ((r = n_node(v, s->u.n.dir, s->u.n.st[sp - 1].vcn, &ho, &end))) return r;
-        if (!s->u.n.st[sp - 1].off) s->u.n.st[sp - 1].off = (uint16_t)(ho + LE32(v->idx + ho));
+        if (!s->u.n.st[sp - 1].off) s->u.n.st[sp - 1].off = ho + LE32(v->idx + ho);
         if (s->u.n.st[sp - 1].off + 16u > end) return FSR_EBADFS;
         e = v->idx + s->u.n.st[sp - 1].off;
         len = LE16(e + 8); fl = LE16(e + 12);
@@ -283,7 +283,7 @@ static int n_step(fsr_vol *v, fsr_find *s, uint8_t **pe)
         }
         if (fl & 2) { s->u.n.sp--; continue; }
         if (len < 16 + 66 || LE16(e + 10) < 66 || 66 + 2u * e[16 + 64] > LE16(e + 10)) return FSR_EBADFS;
-        s->u.n.st[sp - 1].off = (uint16_t)(s->u.n.st[sp - 1].off + len);
+        s->u.n.st[sp - 1].off += len;
         s->u.n.st[sp - 1].down = 0;
         *pe = e;
         return 1;
