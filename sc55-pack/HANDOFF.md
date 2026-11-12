@@ -1284,8 +1284,8 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
   CRC with the one stored when the partition was found (Unit.sig): different -> partitions re-found, "changed"; the cache
   is dropped on every such idle check anyway. QEMU (usb-storage removable=on, monitor "change s1 FILE raw" =
   EV="24:change+s1+/home/claude/vm/sf2.img+raw") FreeDOS and MS-DOS 7.1: the new card's files show; the build before
-  this fix kept showing the old card. Left: a swap within 2 s of the last access (DOS is told "not changed") - a
-  per-LUN media-change counter in USBPAD_Disk from the USB session would close that (nice to have, not required).
+  this fix kept showing the old card. Left on purpose: a swap within 2 s of the last access (DOS is told "not changed");
+  not physically realistic, so no USBPAD media-change counter is wanted (decided with the user).
   Rig note: MS-DOS 7.1 in QEMU reaches AUTOEXEC's commands ~10 s after start; time EV events with ECHO.|TIME lines.
 - Speed (COPY /B to NUL, DOS TIME): QEMU EHCI 4 MB 1.0 s FAT16 (2 KB clusters), 1.4 s FAT32 (512 B clusters) - about
   half the raw 7.7 MB/s, and C: (IDE) is only 5.4 MB/s in the same test, so DOS's copy is a large part; 86Box UHCI 4 MB
