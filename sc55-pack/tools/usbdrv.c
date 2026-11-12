@@ -16,8 +16,9 @@
 
 #define UD_INFO   (0x80 + 8 * (0x40 + 0x40))
 #define UD_INFOSZ 48
+#define UD_RINFO  (UD_INFO + 8 * UD_INFOSZ)   /* exFAT / NTFS drives (read-only, SBEMU's redirector) */
 
-typedef struct { int letter, unit, state, fat, ok; unsigned seg; char name[44]; double size, freeb; } Drv;
+typedef struct { int letter, unit, state, fat, ok, redir; unsigned seg; char name[44]; double size, freeb; } Drv;
 static Drv D[26];
 static int ND, g_text;
 static char g_msg[80];
@@ -99,6 +100,24 @@ static void scan(int ask)
         d->name[sizeof d->name - 1] = 0;
         if (d->state != 1) d->ok = 0;
     }
+    if (ND)                                                      /* + the exFAT / NTFS drives SBEMU noted there */
+    {
+        unsigned seg = D[0].seg;
+        int k, n = ND;
+        for (k = 0; k < 8 && ND < 26; ++k)
+        {
+            unsigned long b = lin(seg, UD_RINFO + k * UD_INFOSZ);
+            Drv* d;
+            int lt = _farpeekb(_dos_ds, b);
+            if (!lt) continue;
+            d = &D[ND++];
+            memset(d, 0, sizeof *d);
+            d->letter = lt - 1; d->redir = _farpeekb(_dos_ds, b + 1); d->state = 1; d->seg = seg;
+            dosmemget(b + 4, sizeof d->name - 1, d->name);
+            if (ask) { i24_on(); space(d); i24_off(); }
+        }
+        (void)n;
+    }
     if (ask) i24_off();
 }
 
@@ -114,9 +133,13 @@ static void row(int i, char* o, int n)
 {
     const Drv* d = &D[i];
     char a[16], b[16], fs[12];
-    if (d->state == 1) sprintf(fs, "FAT%d", d->fat); else strcpy(fs, "-");
+    if (d->redir) strcpy(fs, d->redir == 2 ? "NTFS" : "exFAT");
+    else if (d->state == 1) sprintf(fs, "FAT%d", d->fat); else strcpy(fs, "-");
     if (d->state == 1 && d->ok)
-        snprintf(o, n, "%c:  %-28.28s %-6s %9s %9s", 'A' + d->letter, d->name[0] ? d->name : "(USB disk)", fs, mb(d->size, a), mb(d->freeb, b));
+        snprintf(o, n, "%c:  %-28.28s %-6s %9s %9s%s", 'A' + d->letter, d->name[0] ? d->name : "(USB disk)", fs, mb(d->size, a), mb(d->freeb, b),
+                 d->redir ? "  read-only" : "");
+    else if (d->redir)
+        snprintf(o, n, "%c:  %-28.28s %-6s  not ready (stick out?)", 'A' + d->letter, d->name[0] ? d->name : "(USB disk)", fs);
     else if (d->state == 2)
         snprintf(o, n, "%c:  %-28.28s %-6s  no FAT partition (exFAT / NTFS: later)", 'A' + d->letter, d->name[0] ? d->name : "(USB disk)", fs);
     else

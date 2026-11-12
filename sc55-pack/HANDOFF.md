@@ -1460,3 +1460,13 @@ Win98 DOS box (windowed: text, panel, 3D in 320x200; Alt+Enter: a VESA mode).
   CD-ROM > USB drives, /T = text): letter, stick, FAT12/16/32, size, free (INT 21h 7303h, else 36h; real-mode
   INT 24h "fail" stub so empty drives do not prompt), R refreshes. SBSET: "USB sticks" (/USBDISK) under Joystick.
   QEMU FreeDOS EHCI: D: at start + FAT32 300 MB stick plugged after SBEMU -> E: (DIR, TYPE, COPY), USBDRV lists them.
+
+## beta.97 (2026-11-12): USB sticks the easy way (RELEASED, tag v1.0.0-beta.97-usb)
+- Zip = beta.96 zip with SBEMU.EXE, USBTEST.EXE, SC55MENU.EXE, SBSET.EXE, README.TXT swapped in and USBDRV.EXE added
+  (FILES/SC55; SETUP copies FILES\SC55\*.*).
+- SBEMU now links usbredir.c + fsread (session 5's hook-up, as its HANDOFF said); usbredir notes its drives in usbdisk's
+  info area (USBDISK_RedirNote, UD_RINFO) so USBDRV lists exFAT / NTFS letters (read-only). Hook-up re-tested here only
+  with FAT sticks (no exFAT/NTFS tools in this sandbox): FAT16 at start + FAT32 plugged later, COPY both ways, USBDRV.
+  The redirector itself was tested by session 5 in a scratch build with the same hook-up.
+- Also in this SBEMU: everything since beta.95 (MIDPLAY session's 1-line vmpu_sc55.c change included).
+- Not tested: real PCs with /USBDISK:1, exFAT / NTFS through this exact build, MS-DOS 6.22 / 7.1 with spares.

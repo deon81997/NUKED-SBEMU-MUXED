@@ -19,6 +19,7 @@
 #include "dpmi/dpmi.h"
 #include "usbpad.h"
 #include "usbredir.h"
+#include "usbdisk.h"
 #include "usbredirbin.h"
 #include "fsread/fsread.h"
 
@@ -582,6 +583,13 @@ int USBREDIR_Install(void)
     __asm__ __volatile__("sti");
 
     for (i = 0; i < NR; ++i) sprintf(Letters + strlen(Letters), "%s%c:", i ? " " : "", 'A' + RU[i]->drive);
+    for (i = 0; i < NR; ++i)
+    {
+        const USBPAD_Disk* di = USBPAD_DiskInfo(RU[i]->disk);
+        char nm[40];
+        snprintf(nm, sizeof nm, "%s %s", di ? di->vendor : "", di ? di->product : "");
+        USBDISK_RedirNote(i, RU[i]->drive, RU[i]->v.type == FSR_NTFS ? 2 : 1, nm);
+    }
     sprintf(Msg, "%d drive(s) %s, first %s %lu MB, read-only", NR, Letters, RU[0]->v.type == FSR_NTFS ? "NTFS" : "exFAT",
         (unsigned long)((RU[0]->v.nclus * RU[0]->v.cs) >> 20));
     return NR;

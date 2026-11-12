@@ -7,7 +7,7 @@ DEBUG ?= 0
 # 0: original SBEMU build with the TinySoundFont SoundFont synth
 VSC55 ?= 1
 
-VERSION ?= 1.0.0-beta.95-usb-sc55
+VERSION ?= 1.0.0-beta.97-usb-sc55
 
 INCLUDES := -I./mpxplay -I./sbemu -I./drivers/include -I./sc55 -I./third_party/nuked-opl3-fast
 DEFINES := -D__DOS__ -DSBEMU -DDEBUG=$(DEBUG) -DSBEMU_VSC55=$(VSC55) -DMAIN_SBEMU_VER=\"$(VERSION)\"
@@ -128,6 +128,7 @@ SBEMU_SRC := sbemu/dbopl.cpp \
 	     main.c \
 	     sbemu/cdlink.c \
 	     sbemu/usbdisk.c \
+	     sbemu/usbredir.c sbemu/fsread/exfat.c sbemu/fsread/ntfs.c \
 	     qemm.c \
 	     utility.c \
 	     hdpmipt.c \
@@ -242,6 +243,7 @@ sbemu/usbdiskbin.h: sbemu/usbdisk.asm
 	$(SILENTCMD)nasm -f bin -o output/usbdisk.bin $< && (echo "/* generated from usbdisk.asm (makefile) */"; \
 	  echo "static const unsigned char USBDISK_Stub[] = {"; od -An -v -tx1 output/usbdisk.bin | sed 's/ \([0-9a-f][0-9a-f]\)/0x\1,/g'; echo "};") > $@
 output/sbemu/usbdisk.o: sbemu/usbdiskbin.h
+output/sbemu/usbredir.o: sbemu/usbredirbin.h
 
 output/sbemu16.com: tools/sbemu16.asm
 	@mkdir -p $(dir $@)

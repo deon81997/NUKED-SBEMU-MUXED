@@ -919,8 +919,9 @@ CONTENTS
   the stick, FAT12/16/32, size and free space; R refreshes. A USB 2.0
   port runs them at USB 2.0 speed (your pads, keyboards and mice there
   are handed to the USB 1.1 side). Sticks with a write-protect switch say
-  "write protected". exFAT / NTFS: later. NEC uPD720101 cards: USB 2.0
-  sticks only.
+  "write protected". exFAT and NTFS sticks plugged in when SBEMU starts
+  get read-only letters too (after the FAT ones). NEC uPD720101 cards:
+  USB 2.0 sticks only.
 
   Test without a game:  MENU > Tests > Joystick test (JOYTEST), or run
   JOYTEST.EXE. Move the sticks: about 24 = left/up, 575 = centre and 1124
@@ -1406,7 +1407,7 @@ CONTENTS
      FILES\SC55       SBEMU.EXE, SBSET.EXE, SC55WAV.EXE, SC55LOG.EXE,
                       MPUTEST.EXE, MIDPLAY.EXE, CPUMHZ.EXE, SC55MENU.EXE,
                       SBDIAG.EXE, GAMETEST.EXE, TIMETEST.EXE, JOYTEST.EXE,
-                      USBTEST.EXE, KMTEST.EXE, SBEMU16.COM, PADCONV.EXE
+                      USBTEST.EXE, KMTEST.EXE, USBDRV.EXE, SBEMU16.COM, PADCONV.EXE
      FILES\PADMAP     for your keyb2joypad.cpp (pad layouts, DOWNLOADS.TXT)
      FILES\ROMS       ROM dumps (yours)
      FILES\HDPMI      HDPMI32I.EXE, HDPMI16I.EXE (16-bit, section 11b)

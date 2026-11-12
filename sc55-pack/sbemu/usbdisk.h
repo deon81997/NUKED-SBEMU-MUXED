@@ -14,4 +14,5 @@ const char* USBDISK_Msg(void);            /* what happened at install (one line)
  * stub stays: DOS cannot unlink a device safely). */
 void USBDISK_Uninstall(void);
 
+void USBDISK_RedirNote(int i, int drive, int type, const char* name);   /* usbredir.c -> USBDRV */
 #endif

@@ -227,6 +227,7 @@ static BOOL MAIN_HookInt15(int joy)
  * running programs; the layout used is the newest program found by its own id, else the newest found by a file in
  * its folder (data files identify games too), else Default - as SC55W does it in Windows 98. */
 #include "sbemu/int21bin.h"
+#include "sbemu/usbredir.h"
 #include "sbemu/usbdisk.h"
 #define MAIN_PADSTK 8
 static DPMI_REG MAIN_I21REG;
@@ -1298,6 +1299,7 @@ static void MAIN_Cleanup()
     if(MAIN_KBC_RM) { QEMM_Uninstall_IOPortTrap(&MAIN_KBC_IOPT); MAIN_KBC_RM = FALSE; }
     if(MAIN_KBC_PM60) { HDPMIPT_Uninstall_IOPortTrap(&MAIN_KBC_IOPT_PM60); MAIN_KBC_PM60 = FALSE; }
     if(MAIN_KBC_PM64) { HDPMIPT_Uninstall_IOPortTrap(&MAIN_KBC_IOPT_PM64); MAIN_KBC_PM64 = FALSE; }
+    USBREDIR_Uninstall();
     USBDISK_Uninstall();
     if(MAIN_JOY_On) { MAIN_JOY_On = FALSE; USBPAD_Shutdown(); }
     if(OldRoutedHandle.valid)
@@ -2275,6 +2277,8 @@ int main(int argc, char* argv[])
                     if(USBDISK_Install()) MAIN_CPrintf(LIGHTGREEN, "USB disk: %s\n", USBDISK_Msg());
                     else MAIN_CPrintf(YELLOW, "USB disk: %s.\n", USBDISK_Msg());
                     MAIN_D("USB disk: %s\n", USBDISK_Msg());
+                    if(USBREDIR_Install()) MAIN_CPrintf(LIGHTGREEN, "USB disk: %s\n", USBREDIR_Msg());
+                    MAIN_D("USB redirector: %s\n", USBREDIR_Msg());
                 }
             }
         }

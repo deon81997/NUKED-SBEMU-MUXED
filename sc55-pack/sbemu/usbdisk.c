@@ -27,6 +27,7 @@
 #define UD_CDS   0x58
 #define UD_INFO  (UD_STUB + UD_UNITS * (UD_BPB + UD_DPB))   /* per unit 48 bytes for USBDRV: state, FAT bits, name */
 #define UD_INFOSZ 48
+#define UD_RINFO (UD_INFO + UD_UNITS * UD_INFOSZ)   /* 8 x 48 bytes: exFAT / NTFS drives of usbredir.c, for USBDRV */
 
 typedef struct
 {
@@ -486,7 +487,7 @@ int USBDISK_Install(void)
     for (i = 0; i < NU; ++i)                                    /* letters must be free and next to each other */
         if (DPMI_LoadW(CdsBase + (drive + i) * UD_CDS + 0x43) & 0xC000) { NU = i; break; }
 
-    Seg = (uint16_t)DPMI_HighMalloc((UD_INFO + UD_UNITS * UD_INFOSZ + 15) / 16, TRUE);
+    Seg = (uint16_t)DPMI_HighMalloc((UD_RINFO + 8 * UD_INFOSZ + 15) / 16, TRUE);
     Cb = DPMI_AllocateRMCB_RETF(&USBDISK_Req, &Reg);
     if (!Seg || !Cb) { NU = 0; strcpy(Msg, "no memory for the drive stub"); return 0; }
     typedef char stub_fits[sizeof USBDISK_Stub <= UD_STUB ? 1 : -1]; (void)sizeof(stub_fits);
@@ -495,7 +496,7 @@ int USBDISK_Install(void)
     stub[0x0A] = (uint8_t)NU;
     memcpy(stub + 0x16, &Cb, 4);
     memcpy(stub + 0x0B, "USBDSK", 6);                           /* name field (unused in block devices): USBDRV finds us */
-    DPMI_LMemset(base_lin(), 0, UD_INFO + UD_UNITS * UD_INFOSZ);
+    DPMI_LMemset(base_lin(), 0, UD_RINFO + 8 * UD_INFOSZ);
     DPMI_LMemcpy(base_lin(), DPMI_PTR2L(stub), sizeof stub);
 
     for (i = 0; i < NU; ++i)
@@ -554,6 +555,17 @@ int USBDISK_Install(void)
 }
 
 const char* USBDISK_Letters(void) { return Letters; }
+
+/* usbredir.c's exFAT / NTFS drives, listed by USBDRV: [0] drive + 1, [1] 1 exFAT / 2 NTFS, [4..] stick name */
+void USBDISK_RedirNote(int i, int drive, int type, const char* name)
+{
+    char b[UD_INFOSZ];
+    if (!Seg || i < 0 || i >= 8) return;
+    memset(b, 0, sizeof b);
+    b[0] = (char)(drive + 1); b[1] = (char)type;
+    if (name) snprintf(b + 4, sizeof b - 4, "%s", name);
+    DPMI_LMemcpy(DPMI_SEGOFF2L(Seg, UD_RINFO + i * UD_INFOSZ), DPMI_PTR2L(b), sizeof b);
+}
 const char* USBDISK_Msg(void) { return Msg; }
 
 void USBDISK_Uninstall(void)
