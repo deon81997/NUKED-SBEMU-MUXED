@@ -25,33 +25,98 @@ static const uint32_t mp3_chcol[16] = {
     0x40A0FF, 0x40E0A0, 0xA0E040, 0xFFD040, 0xFF9040, 0xFF5060, 0xE060C0, 0xA070FF,
     0x60C0FF, 0xFFFFFF, 0x50FFD0, 0xC0FF60, 0xFFB0A0, 0xFF80E0, 0xB0A0FF, 0x80D0D0 };
 
+/* ---- the screen mode. MIDPLAY.CFG keeps the choice (MODE3D=w h bits, HZ3D=refresh; in a Windows DOS box MODE3DW /
+ * HZ3DW, since a window can only show VGA 320x200). Auto: the best 640x480 mode in DOS, VGA 320x200 in Windows.
+ * A mode that cannot be set falls back: the same mode at the BIOS's refresh, the last mode that worked, auto, VGA
+ * 320x200, then the text views with a message. A mode chosen in Options (and the first VESA mode in a Windows DOS box,
+ * where it may stay black) must be confirmed with Y within 10 s, any other key or the time goes back. */
+static int    mp3_want_w, mp3_want_h, mp3_want_b, mp3_hz;      /* the choice (w 0 = auto) */
+static int    mp3_cur = -1, mp3_ok_w, mp3_ok_h, mp3_ok_b, mp3_ok_hz;   /* set now / the last confirmed one */
+static int    mp3_ask, mp3_win_ok;                            /* confirm the next mode set; a VESA mode was kept in Windows */
+static double mp3_ask_until, mp3_anim;
+static int    mp3_force;                                      /* draw the next frame now (a key was pressed) */
+static int    mp3_win;                                        /* MIDPLAY runs in a Windows DOS box */
+static int mp3_find(int w, int h, int b)
+{
+    int i;
+    for (i = 0; i < m3_nmodes; i++) if (m3_modes[i].w == w && m3_modes[i].h == h && (!b || m3_modes[i].bpp == b)) return i;
+    return -1;
+}
+static int mp3_auto(void)
+{
+    int i;
+    if (mp3_win) return 0;                                    /* VGA 320x200: the one mode a window can show */
+    for (i = 0; i < m3_nmodes; i++) if (m3_modes[i].mode == m3_vbest) return i;
+    for (i = m3_nmodes - 1; i >= 0; i--) if (m3_modes[i].w == 640 && m3_modes[i].h == 480 && m3_modes[i].bpp > 8) return i;
+    return 0;
+}
+static const char* mp3_mode_name(int i, char* b, size_t n)
+{
+    if (i < 0 || i >= m3_nmodes) { snprintf(b, n, "?"); return b; }
+    if (m3_modes[i].mode == 0x13) snprintf(b, n, "320x200 VGA, 256 colours");
+    else snprintf(b, n, "%dx%d %s%s", m3_modes[i].w, m3_modes[i].h,
+                  m3_modes[i].bpp == 8 ? "256 colours" : m3_modes[i].bpp == 15 ? "15 bit" : m3_modes[i].bpp == 16 ? "16 bit" : m3_modes[i].bpp == 24 ? "24 bit" : "32 bit",
+                  m3_modes[i].lfb ? "" : " (banked)");
+    return b;
+}
+static int mp3_buffers(void)
+{
+    static int have;
+    int need = M3W * M3H;
+    if (need > have || !m3_fb || !m3_zb)
+    {
+        uint32_t* f = (uint32_t*)realloc(m3_fb, (size_t)need * 4); float* z;
+        if (!f) return 0;
+        m3_fb = f; z = (float*)realloc(m3_zb, (size_t)need * sizeof(float));
+        if (!z) return 0;
+        m3_zb = z; have = need;
+    }
+    m3_scr.w = M3W; m3_scr.h = M3H; m3_scr.p = m3_fb;
+    return 1;
+}
+
 /* buffers and textures, made before the music starts (switching to 3D later then costs only the mode set) */
 static void mp3_prepare(void)
 {
-    if (!m3_fb) m3_fb = (uint32_t*)malloc(M3W * M3H * 4);
-    if (!m3_zb) m3_zb = (float*)malloc(M3W * M3H * sizeof(float));
-    if (!m3_fb || !m3_zb) return;
-    m3_scr.w = M3W; m3_scr.h = M3H; m3_scr.p = m3_fb;
+    m3_W = 640; m3_H = 480;
+    if (!mp3_buffers()) return;
     m3_theme_sync();
     if (!mp3_panel.p) mp3_panel = m3_surf(512, 128);
     if (!mp3_keys.p) mp3_keys = m3_surf(512, 64);
     if (m3_tsc_us == 0) m3_time_init();
 }
 static void mp3_make_panel(const char* title, double frac, int paused);
+static int mp3_try(int i, int hz)
+{
+    if (i < 0 || i >= m3_nmodes) return 0;
+    if (!m3_open_mode(&m3_modes[i], hz)) return 0;
+    if (!mp3_buffers()) { m3_vbe_close(); return 0; }
+    mp3_cur = i;
+    return 1;
+}
 static int mp3_enter(void)
 {
+    int want, ok = 0;
     if (mp3_on) return 1;
-    if (!m3_fb) m3_fb = (uint32_t*)malloc(M3W * M3H * 4);
-    if (!m3_zb) m3_zb = (float*)malloc(M3W * M3H * sizeof(float));
-    if (!m3_fb || !m3_zb) return 0;
-    m3_scr.w = M3W; m3_scr.h = M3H; m3_scr.p = m3_fb;
-    m3_theme_sync();
+    m3_vbe_probe();
     if (!mp3_panel.p) mp3_panel = m3_surf(512, 128);
     if (!mp3_keys.p) mp3_keys = m3_surf(512, 64);
-    if (!m3_vbe_open()) return 0;
+    if (!mp3_panel.p || !mp3_keys.p) return 0;
+    want = mp3_want_w ? mp3_find(mp3_want_w, mp3_want_h, mp3_want_b) : -1;
+    if (want < 0) want = mp3_auto();
+    ok = mp3_try(want, mp3_hz);
+    if (!ok && mp3_ok_w) { ok = mp3_try(mp3_find(mp3_ok_w, mp3_ok_h, mp3_ok_b), mp3_ok_hz); if (ok) mp3_ask = 0; }
+    if (!ok) { ok = mp3_try(mp3_auto(), 0); if (ok) mp3_ask = 0; }
+    if (!ok) { ok = mp3_try(0, 0); if (ok) mp3_ask = 0; }
+    if (!ok) { m3_W = 640; m3_H = 480; return 0; }
+    m3_theme_sync();
     if (m3_tsc_us == 0) m3_time_init();
-    m3_half = 0; m3_rw = M3W; m3_rh = M3H; mp3_slow = 0;
-    mp3_on = 1; mp3_last_frame = 0;
+    mp3_slow = 0; mp3_on = 1; mp3_last_frame = 0; mp3_force = 1;
+    if (!mp3_win && !m3_refresh) m3_refresh_seen = m3_measure_refresh();   /* (a Windows DOS box fakes the retrace) */
+    if (mp3_win && m3_modes[mp3_cur].mode != 0x13 && !mp3_win_ok) mp3_ask = 1;   /* may be black: ask */
+    mp3_ask_until = mp3_ask ? m3_now() + 10 : 0;
+    if (!mp3_ask) { mp3_ok_w = m3_modes[mp3_cur].w; mp3_ok_h = m3_modes[mp3_cur].h; mp3_ok_b = m3_modes[mp3_cur].bpp; mp3_ok_hz = m3_refresh; }
+    mp3_ask = 0;
     return 1;
 }
 static void mp3_leave(void)
@@ -59,6 +124,22 @@ static void mp3_leave(void)
     if (!mp3_on) return;
     m3_vbe_close();
     mp3_on = 0;
+}
+/* the answer to "keep this mode?": 1 = Y (keep), 0 = anything else or the time ran out (back to the last good one) */
+static void mp3_answer(int keep)
+{
+    if (!mp3_ask_until) return;
+    mp3_ask_until = 0;
+    if (keep)
+    {
+        mp3_ok_w = m3_modes[mp3_cur].w; mp3_ok_h = m3_modes[mp3_cur].h; mp3_ok_b = m3_modes[mp3_cur].bpp; mp3_ok_hz = m3_refresh;
+        if (mp3_win) mp3_win_ok = 1;
+        return;
+    }
+    mp3_leave();
+    mp3_want_w = mp3_ok_w; mp3_want_h = mp3_ok_h; mp3_want_b = mp3_ok_b; mp3_hz = mp3_ok_hz;
+    if (mp3_win && !mp3_ok_w) { mp3_want_w = 320; mp3_want_h = 200; mp3_want_b = 8; }
+    mp3_enter();
 }
 
 /* the module's face: brand, LCD with the synth's own display, knob ring, LEDs */
@@ -158,32 +239,54 @@ static void mp3_bar(const char* name, const char* title, uint64_t el_us, uint64_
     m3_text(&m3_scr, 80, 4, 0, b, 0xB0D0FF, 256);
     snprintf(b, sizeof b, "Song %d/%d", g_cur + 1, g_npl);
     m3_text(&m3_scr, M3W - 8 - (int)strlen(b) * 8, 4, 0, b, 0x9090A8, 256);
-    m3_rect(&m3_scr, 0, M3H - 46, M3W, 46, 0x000000, 160);
-    fmt_time(t1, (unsigned long)(total_us / 1000000ULL)); fmt_time(t2, el);
-    m3_text(&m3_scr, 10, M3H - 42, 0, t2, 0xFFFFFF, 256);
-    m3_text(&m3_scr, M3W - 58, M3H - 42, 0, t1, 0xFFFFFF, 256);
-    w = M3W - 140; n = total_us ? (int)((el_us > total_us ? total_us : el_us) * (uint64_t)w / total_us) : 0;
-    m3_rect(&m3_scr, 66, M3H - 38, w, 8, 0x303040, 256);
-    m3_vgrad(&m3_scr, 66, M3H - 38, n, 8, 0x60FFA0, 0x20A060, 256);
-    if (paused) m3_text_sh(&m3_scr, M3W / 2 - 28, M3H - 64, 0, "PAUSED", 0xFFC040);
-    else if (done) m3_text_sh(&m3_scr, M3W / 2 - 20, M3H - 64, 0, "DONE", 0x60FF60);
-    if (mp3_slow) m3_text_sh(&m3_scr, 8, 28, 0, "Few frames on this PC: F4 half resolution (faster), S text views.", 0xFFC040);
-    m3_text(&m3_scr, 10, M3H - 22, 0, "SPACE pause  N/P song  <> seek  TAB lists  S view  F4 resolution  F1 help  ESC quit", 0xA0A0B8, 256);
+    {   /* time bar; small screens (VGA 320x200) get a slimmer band without the key line */
+        int bh = M3H >= 400 ? 46 : 22, ty = M3H - bh + 4;
+        m3_rect(&m3_scr, 0, M3H - bh, M3W, bh, 0x000000, 160);
+        fmt_time(t1, (unsigned long)(total_us / 1000000ULL)); fmt_time(t2, el);
+        m3_text(&m3_scr, 6, ty, 0, t2, 0xFFFFFF, 256);
+        m3_text(&m3_scr, M3W - 8 * (int)strlen(t1) - 6, ty, 0, t1, 0xFFFFFF, 256);
+        w = M3W - 140; n = total_us ? (int)((el_us > total_us ? total_us : el_us) * (uint64_t)w / total_us) : 0;
+        m3_rect(&m3_scr, 66, ty + 4, w, 8, 0x303040, 256);
+        m3_vgrad(&m3_scr, 66, ty + 4, n, 8, 0x60FFA0, 0x20A060, 256);
+    }
+    if (paused) m3_text_sh(&m3_scr, M3W / 2 - 28, M3H - (M3H >= 400 ? 64 : 40), 0, "PAUSED", 0xFFC040);
+    else if (done) m3_text_sh(&m3_scr, M3W / 2 - 20, M3H - (M3H >= 400 ? 64 : 40), 0, "DONE", 0x60FF60);
+    if (mp3_slow) m3_text_sh(&m3_scr, 8, 28, 0, M3W >= 640 ? "Few frames on this PC: F4 half resolution (faster), S text views." : "Slow: F4 half resolution", 0xFFC040);
+    if (M3H >= 400) m3_text(&m3_scr, 10, M3H - 22, 0, M3W >= 720 ? "SPACE pause  N/P song  <> seek  TAB lists  S view  F4 resolution  F2 screen mode  ESC quit"
+                                    : M3W >= 640 ? "SPACE pause  N/P song  <> seek  TAB lists  S view  F4 resolution  F1 help  ESC quit"
+                                    : "SPACE pause  N/P song  S view  TAB lists  ESC quit", 0xA0A0B8, 256);
+    if (mp3_ask_until)
+    {   /* a new screen mode: keep it? (if the screen is black, any key or 10 s brings the last one back) */
+        char q[80]; int left = (int)(mp3_ask_until - m3_now()) + 1, x0 = M3W / 2 - 150; if (left < 0) left = 0; if (x0 < 4) x0 = 4;
+        m3_rect(&m3_scr, x0 - 6, M3H / 2 - 30, 312 > M3W - 8 ? M3W - 8 : 312, 52, 0x000000, 210);
+        snprintf(q, sizeof q, "%dx%d%s%s", M3W, M3H, m3_refresh ? " at " : "", ""); if (m3_refresh) snprintf(q + strlen(q), sizeof q - strlen(q), "%d Hz", m3_refresh);
+        m3_text_sh(&m3_scr, x0, M3H / 2 - 26, 0, q, 0xFFFFFF);
+        snprintf(q, sizeof q, "Keep this mode? Y = yes (%d s)", left);
+        m3_text_sh(&m3_scr, x0, M3H / 2 - 6, 0, q, 0xFFC040);
+    }
 }
 
 static void mp3_draw(const Song* s, const char* name, uint64_t el_us, uint64_t total_us, int paused, int done)
 {
-    double t = m3_now(), t0; float W = 2.6f, H = 0.62f, D = 1.2f, dt; int c;
+    double t = m3_now(), t0, hz, period, ta; float W = 2.6f, H = 0.62f, D = 1.2f, dt; int c, idle = paused || done || !s->nev;
     double frac = total_us ? (double)(el_us > total_us ? total_us : el_us) / (double)total_us : 0;
     if (!mp3_on) return;
-    if (t - mp3_last_frame < 0.016) return;
-    m3_theme_sync();                          /* F3 (style) re-colours the scene too */   /* up to 60 a second (the screen's refresh); frames follow each other (the music is sent from inside) */
+    if (mp3_ask_until && t > mp3_ask_until) { mp3_answer(0); return; }
+    /* pacing: at most one frame per screen refresh (the rate set, else the one measured, else 60 Hz); paused, done or
+       no song: nothing moves, so a frame every 0.25 s (the LCD, the PAUSED blink, the confirm countdown) */
+    hz = m3_refresh ? m3_refresh : (m3_refresh_seen >= 40 && m3_refresh_seen <= 200 ? m3_refresh_seen : 60);
+    period = idle ? 0.25 : 1.0 / hz;
+    if (!mp3_force && t - mp3_last_frame < period - 0.002) return;
+    mp3_force = 0;
+    m3_theme_sync();                          /* F3 (style) re-colours the scene too */
     dt = mp3_last_frame ? (float)(t - mp3_last_frame) : 0.06f; if (dt > 0.2f) dt = 0.2f;
     mp3_last_frame = t; t0 = t;
+    if (!idle) mp3_anim += dt;                /* the scene's own clock stops while nothing plays */
+    ta = mp3_anim;
     lcd_query();
-    m3_bgphase = (float)t;
+    m3_bgphase = (float)ta;
     m3_fog = m3_fogc; m3_fog0 = 8; m3_fog1 = 24;
-    m3_camera(0.6f * sinf((float)t * 0.2f), 0.55f + 0.08f * sinf((float)t * 0.13f), -6.6f, -0.1f * sinf((float)t * 0.2f), -0.16f);
+    m3_camera(0.6f * sinf((float)ta * 0.2f), 0.55f + 0.08f * sinf((float)ta * 0.13f), -6.6f, -0.1f * sinf((float)ta * 0.2f), -0.16f);
     m3_sky();
     M3_HOOK();
     m3_draw_floor(-H - 0.02f, 256);
@@ -214,6 +317,12 @@ static void mp3_draw(const Song* s, const char* name, uint64_t el_us, uint64_t t
     m3_upscale();
     mp3_bar(base_of(name), s->title, el_us, total_us, paused, done);
     M3_HOOK();
+    if (!mp3_win && (m3_now() - t0) < 0.75 / hz)
+    {   /* drawn in well under a refresh: show it at the start of the retrace (no tearing); bounded, music keeps going */
+        double lim = m3_now() + 1.0 / hz;
+        while ((inportb(0x3DA) & 8) && m3_now() < lim) M3_HOOK();
+        while (!(inportb(0x3DA) & 8) && m3_now() < lim) M3_HOOK();
+    }
     m3_present();
     /* frame time: half resolution when slow; a note when even that is too slow */
     mp3_frame_ms = (m3_now() - t0) * 1000;

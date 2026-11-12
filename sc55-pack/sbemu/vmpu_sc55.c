@@ -420,6 +420,7 @@ BOOL VMPU_Init(int baseaddr, int* voices, int freq, const char* romdir)
     }
     if (VMPU_UseSF)
     {
+        VMPU_base = baseaddr;  /* the side channel (SBDIAG, front panel/LCD report, key player) checks VMPU_base: it stayed 0 with /VSF */
         VMPU_SFLoaded = VMPUSF_Init(baseaddr, voices, freq, romdir) ? 1 : 0;
         Gov_Calibrate();
         return VMPU_SFLoaded ? TRUE : FALSE;

@@ -19,8 +19,21 @@
 #include "fontdata.h"
 static unsigned long m3_ticks(void) { return _farpeekl(_dos_ds, 0x46C); }   /* BIOS clock, 18.2 a second */
 
+#ifdef M3_DYNAMIC_RES
+/* MIDPLAY: the screen size is chosen at run time (any VESA mode up to M3WMAX x M3HMAX, or VGA 320x200). The other
+   programs keep the fixed 640x480 below. m3_fyk stretches the picture vertically for modes that are not 4:3. */
+#define M3WMAX 1600
+#define M3HMAX 1200
+static int m3_W = 640, m3_H = 480;
+#define M3W m3_W
+#define M3H m3_H
+#else
 #define M3W 640
 #define M3H 480
+#define M3WMAX 640
+#endif
+#define M3_FBASE 640.0f           /* the focal length m3_f is for a 640 wide picture; wider modes scale it */
+static float m3_fyk = 1.0f;
 typedef struct { int w, h; uint32_t* p; } M3SURF;
 
 static uint32_t* m3_fb;
@@ -36,7 +49,7 @@ static int       m3_bpp, m3_pitch, m3_sel, m3_lfb, m3_winseg, m3_gran, m3_bank =
 static int       m3_rs, m3_rp, m3_gs, m3_gp, m3_bs, m3_bp;
 static unsigned long m3_lin;
 static __dpmi_meminfo m3_map;
-static unsigned char m3_line[M3W * 4];
+static unsigned char m3_line[M3WMAX * 4];
 static double    m3_tsc_us = 0;     /* TSC ticks per microsecond */
 /* called between scan lines while a frame is drawn (MIDPLAY sends its due MIDI events from it); NULL elsewhere */
 static void (*m3_hook)(void);
@@ -58,6 +71,28 @@ static void m3_put(unsigned long off, const void* src, int n)
     }
 }
 
+#ifdef M3_DYNAMIC_RES
+/* every graphics mode the card offers that the 3D view can draw in: 8 bit (packed, dithered to 252 colours) and 15, 16,
+   24, 32 bit direct colour, 320x200 up to M3WMAX x M3HMAX; mode 0x13 (VGA 320x200, works in a Windows DOS box window)
+   is always first. Sorted by size, then colours. */
+typedef struct { int mode, w, h, bpp, lfb, win; } M3MODE;
+static M3MODE m3_modes[64]; static int m3_nmodes, m3_vbever;
+static void m3_list_add(int mode, const unsigned char* mi, int ver)
+{
+    int attr = mi[0] | (mi[1] << 8), w = mi[0x12] | (mi[0x13] << 8), h = mi[0x14] | (mi[0x15] << 8), bpp = mi[0x19], mm = mi[0x1B], i;
+    M3MODE m;
+    if (!(attr & 1) || !(attr & 0x10) || m3_nmodes >= 64) return;          /* supported, graphics */
+    if (!((mm == 4 && bpp == 8) || (mm == 6 && (bpp == 15 || bpp == 16 || bpp == 24 || bpp == 32)))) return;
+    if (w < 320 || h < 200 || w > M3WMAX || h > M3HMAX) return;
+    m.mode = mode; m.w = w; m.h = h; m.bpp = bpp; m.lfb = (attr & 0x80) && ver >= 2; m.win = (mi[2] & 4) != 0;
+    if (!m.lfb && !m.win) return;                                            /* nowhere to write */
+    for (i = 0; i < m3_nmodes; i++) if (m3_modes[i].w == w && m3_modes[i].h == h && m3_modes[i].bpp == bpp) return;   /* same mode twice */
+    i = m3_nmodes++;
+    while (i > 1 && (m3_modes[i - 1].w > w || (m3_modes[i - 1].w == w && (m3_modes[i - 1].h > h || (m3_modes[i - 1].h == h && m3_modes[i - 1].bpp > bpp)))))
+    { m3_modes[i] = m3_modes[i - 1]; i--; }
+    m3_modes[i] = m;
+}
+#endif
 /* the VBE controller info and the best 640x480 mode are looked up once (about a hundred BIOS calls) and kept:
  * MIDPLAY calls m3_vbe_probe() before the music starts, so switching to 3D later costs only the mode set */
 static unsigned char m3_vi[512]; static int m3_vbest = -2;
@@ -67,10 +102,16 @@ static void m3_vbe_probe(void)
     unsigned long lp; unsigned char* vi = m3_vi;
     if (m3_vbest != -2) return;
     m3_vbest = -1;
+#ifdef M3_DYNAMIC_RES
+    m3_nmodes = 1; m3_modes[0].mode = 0x13; m3_modes[0].w = 320; m3_modes[0].h = 200; m3_modes[0].bpp = 8; m3_modes[0].lfb = 0; m3_modes[0].win = 1;
+#endif
     memset(&r, 0, sizeof r); dosmemput("VBE2", 4, __tb);
     r.x.ax = 0x4F00; r.x.es = __tb >> 4; r.x.di = __tb & 15; __dpmi_int(0x10, &r);
     if (r.x.ax != 0x004F) return;
     dosmemget(__tb, 512, vi);
+#ifdef M3_DYNAMIC_RES
+    m3_vbever = vi[5];
+#endif
     lp = ((unsigned long)(vi[0x10] | (vi[0x11] << 8)) << 4) + (vi[0x0E] | (vi[0x0F] << 8));
     while (n < 255) { unsigned short m; dosmemget(lp + n * 2, 2, &m); if (m == 0xFFFF) break; modes[n++] = m; }
     for (i = 0; i < n; i++)
@@ -81,7 +122,10 @@ static void m3_vbe_probe(void)
         dosmemget(__tb, 256, mi);
         attr = mi[0] | (mi[1] << 8); bpp = mi[0x19];
         if (!(attr & 1) || !(attr & 0x10)) continue;
-        if ((mi[0x12] | (mi[0x13] << 8)) != M3W || (mi[0x14] | (mi[0x15] << 8)) != M3H) continue;
+#ifdef M3_DYNAMIC_RES
+        m3_list_add(modes[i], mi, vi[5]);
+#endif
+        if ((mi[0x12] | (mi[0x13] << 8)) != 640 || (mi[0x14] | (mi[0x15] << 8)) != 480) continue;
         if (mi[0x1B] != 6) continue;                                   /* direct colour */
         score = bpp == 32 ? 40 : bpp == 16 ? 30 : bpp == 15 ? 20 : bpp == 24 ? 10 : 0;
         if (!score) continue;
@@ -134,6 +178,137 @@ static void m3_vbe_close(void)
     memset(&r, 0, sizeof r); r.x.ax = 0x0003; __dpmi_int(0x10, &r);
 }
 
+#ifdef M3_DYNAMIC_RES
+static double m3_now(void);
+static unsigned char m3_dr[4][4 * 256], m3_dg[4][4 * 256], m3_db[4][4 * 256];   /* [row][col * 256 + value] -> palette part */
+static void m3_pal252(void)
+{
+    static const int bay[4][4] = { { 0, 8, 2, 10 }, { 12, 4, 14, 6 }, { 3, 11, 1, 9 }, { 15, 7, 13, 5 } };
+    int y, x, v, i;
+    for (y = 0; y < 4; y++) for (x = 0; x < 4; x++) for (v = 0; v < 256; v++)
+    {
+        int t = bay[y][x] * 16 + 8;                                   /* threshold 8..248 */
+        int r = (v * 5 * 256 + t * 255) / (255 * 256), g = (v * 6 * 256 + t * 255) / (255 * 256), b = r;
+        m3_dr[y][x * 256 + v] = (unsigned char)((r > 5 ? 5 : r) * 42);
+        m3_dg[y][x * 256 + v] = (unsigned char)((g > 6 ? 6 : g) * 6);
+        m3_db[y][x * 256 + v] = (unsigned char)(b > 5 ? 5 : b);
+    }
+    outportb(0x3C8, 0);                                                /* the VGA DAC (6 bits per colour) */
+    for (i = 0; i < 256; i++)
+    {
+        int r = i < 252 ? i / 42 * 63 / 5 : 0, g = i < 252 ? i / 6 % 7 * 63 / 6 : 0, b = i < 252 ? i % 6 * 63 / 5 : 0;
+        outportb(0x3C9, r); outportb(0x3C9, g); outportb(0x3C9, b);
+    }
+}
+static int m3_refresh;            /* the refresh rate set (Hz, 0 = the BIOS's own) */
+static double m3_refresh_seen;    /* measured from the retrace, 0 = unknown */
+/* VBE 3.0 CRTC timings for w x h at hz (VESA GTF), pixel clock rounded by the BIOS (4F0Bh); 0 = not possible */
+static int m3_gtf(int mode, int w, int h, int hz, unsigned char* blk)
+{
+    double hp_est, vfe, hp, duty, pclk; int vsbp, vtot, hblank, htot, hsync, hfp, vss; unsigned long clk; __dpmi_regs r;
+    w = w / 8 * 8;
+    hp_est = (1.0 / hz - 550e-6) / (h + 1) * 1e6;                     /* us */
+    vsbp = (int)(550.0 / hp_est + 0.5); vtot = h + vsbp + 1;
+    vfe = 1.0 / hp_est / vtot * 1e6; hp = hp_est / (hz / vfe);
+    duty = 30.0 - 300.0 * hp / 1000.0;
+    hblank = (int)(w * duty / (100.0 - duty) / 16.0 + 0.5) * 16; htot = w + hblank;
+    pclk = htot / hp * 1e6;                                              /* Hz */
+    hsync = (int)(0.08 * htot / 8 + 0.5) * 8; hfp = hblank / 2 - hsync; vss = h + 1;
+    memset(&r, 0, sizeof r); r.x.ax = 0x4F0B; r.h.bl = 0; r.d.ecx = (unsigned long)pclk; r.x.dx = (unsigned short)mode; __dpmi_int(0x10, &r);
+    if (r.x.ax != 0x004F || !r.d.ecx) return 0;
+    clk = r.d.ecx;
+    memset(blk, 0, 64);
+    blk[0] = htot & 255; blk[1] = htot >> 8; blk[2] = (w + hfp) & 255; blk[3] = (w + hfp) >> 8;
+    blk[4] = (w + hfp + hsync) & 255; blk[5] = (w + hfp + hsync) >> 8;
+    blk[6] = vtot & 255; blk[7] = vtot >> 8; blk[8] = vss & 255; blk[9] = vss >> 8; blk[10] = (vss + 3) & 255; blk[11] = (vss + 3) >> 8;
+    blk[12] = 0x04;                                                      /* hsync -, vsync + (GTF) */
+    memcpy(blk + 13, &clk, 4);
+    { unsigned rr = (unsigned)((double)clk * 100.0 / ((double)htot * vtot) + 0.5); blk[17] = rr & 255; blk[18] = rr >> 8; }
+    return 1;
+}
+/* set one of m3_modes (hz > 0: that refresh rate, VBE 3.0); M3W/M3H follow it. 0 = the mode could not be set. */
+static int m3_open_mode(const M3MODE* m, int hz)
+{
+    __dpmi_regs r; unsigned char mi[256];
+    m3_lfb = 0; m3_refresh = 0; m3_refresh_seen = 0;
+    if (m->mode == 0x13)
+    {
+        memset(&r, 0, sizeof r); r.x.ax = 0x0013; __dpmi_int(0x10, &r);
+        if ((_farpeekb(_dos_ds, 0x449) & 0x7F) != 0x13) return 0;
+        m3_mode = 0x13; m3_bpp = 8; m3_pitch = 320; m3_winseg = 0xA000; m3_gran = 64; m3_bank = 0;
+    }
+    else
+    {
+        memset(&r, 0, sizeof r); r.x.ax = 0x4F01; r.x.cx = (unsigned short)m->mode; r.x.es = __tb >> 4; r.x.di = __tb & 15; __dpmi_int(0x10, &r);
+        if (r.x.ax != 0x004F) return 0;
+        dosmemget(__tb, 256, mi);
+        m3_mode = m->mode; m3_bpp = mi[0x19]; m3_pitch = mi[0x10] | (mi[0x11] << 8);
+        m3_rs = mi[0x1F]; m3_rp = mi[0x20]; m3_gs = mi[0x21]; m3_gp = mi[0x22]; m3_bs = mi[0x23]; m3_bp = mi[0x24];
+        m3_winseg = mi[8] | (mi[9] << 8); if (!m3_winseg) m3_winseg = 0xA000; m3_gran = mi[4] | (mi[5] << 8); if (!m3_gran) m3_gran = 64;
+        if (m->lfb)
+        {
+            unsigned long phys = mi[0x28] | (mi[0x29] << 8) | ((unsigned long)mi[0x2A] << 16) | ((unsigned long)mi[0x2B] << 24);
+            if (m3_vbever >= 3 && (mi[0x32] | (mi[0x33] << 8))) m3_pitch = mi[0x32] | (mi[0x33] << 8);
+            m3_map.address = phys; m3_map.size = (unsigned long)m3_pitch * m->h;
+            if (phys && __dpmi_physical_address_mapping(&m3_map) == 0)
+            {
+                m3_lin = m3_map.address; m3_sel = __dpmi_allocate_ldt_descriptors(1);
+                if (m3_sel > 0)
+                {
+                    __dpmi_set_segment_base_address(m3_sel, m3_lin);
+                    __dpmi_set_segment_limit(m3_sel, ((unsigned long)m3_pitch * m->h - 1) | 0xFFF);
+                    m3_lfb = 1;
+                }
+                else { __dpmi_free_physical_address_mapping(&m3_map); m3_sel = 0; }
+            }
+        }
+        if (!m3_lfb && !m->win) return 0;
+        r.x.ax = 0;
+        if (hz > 0 && m3_vbever >= 3 && m->w >= 640 && m->h >= 480)
+        {   /* the refresh rate through a CRTC block; if the BIOS refuses it, the same mode at its own rate */
+            unsigned char blk[64];
+            if (m3_gtf(m->mode, m->w, m->h, hz, blk))
+            {
+                dosmemput(blk, 64, __tb);
+                memset(&r, 0, sizeof r); r.x.ax = 0x4F02; r.x.bx = (unsigned short)(m->mode | (m3_lfb ? 0x4000 : 0) | 0x0800);
+                r.x.es = __tb >> 4; r.x.di = __tb & 15; __dpmi_int(0x10, &r);
+                if (r.x.ax == 0x004F) m3_refresh = hz;
+            }
+        }
+        if (r.x.ax != 0x004F)
+        {
+            memset(&r, 0, sizeof r); r.x.ax = 0x4F02; r.x.bx = (unsigned short)(m->mode | (m3_lfb ? 0x4000 : 0)); __dpmi_int(0x10, &r);
+        }
+        if (r.x.ax != 0x004F)
+        {
+            if (m3_lfb) { __dpmi_free_ldt_descriptor(m3_sel); __dpmi_free_physical_address_mapping(&m3_map); m3_lfb = 0; m3_sel = 0; }
+            return 0;
+        }
+        m3_bank = -1;
+    }
+    m3_W = m->w; m3_H = m->h; m3_rw = m3_W; m3_rh = m3_H; m3_half = 0;
+    m3_fyk = (m3_W * 4 == m3_H * 5) ? 1.0f : (float)(m3_H * 4) / (float)(m3_W * 3);   /* 4:3 screen (1280x1024: square pixels) */
+    if (m3_bpp == 8) m3_pal252();
+    return 1;
+}
+/* the refresh rate seen on the VGA status port (3DAh): two retrace starts; 0 when it does not look like one */
+static double m3_measure_refresh(void)
+{
+    double t0, t1, tend; int i;
+    tend = m3_now() + 0.1;
+    while ((inportb(0x3DA) & 8) && m3_now() < tend) ;
+    while (!(inportb(0x3DA) & 8) && m3_now() < tend) ;
+    t0 = m3_now();
+    for (i = 0; i < 4; i++)
+    {
+        while ((inportb(0x3DA) & 8) && m3_now() < tend + 0.2) M3_HOOK();
+        while (!(inportb(0x3DA) & 8) && m3_now() < tend + 0.2) M3_HOOK();
+    }
+    t1 = m3_now();
+    if (t1 >= tend + 0.2 || t1 - t0 < 4 / 250.0) return 0;
+    return 4 / (t1 - t0);
+}
+#endif
 static void m3_present(void)
 {
     int x, y;
@@ -142,6 +317,15 @@ static void m3_present(void)
         const uint32_t* s = m3_fb + y * M3W;
         if (!(y & 7)) M3_HOOK();
         if (m3_bpp == 32 && m3_rp == 16 && m3_gp == 8 && m3_bp == 0) { m3_put((unsigned long)y * m3_pitch, s, M3W * 4); continue; }
+#ifdef M3_DYNAMIC_RES
+        if (m3_bpp == 8)
+        {   /* 252 colours (6 red x 7 green x 6 blue), ordered 4x4 dither */
+            const unsigned char *tr = m3_dr[y & 3], *tg = m3_dg[y & 3], *tb = m3_db[y & 3];
+            for (x = 0; x < M3W; x++) { uint32_t c = s[x]; int k = (x & 3) << 8; m3_line[x] = (unsigned char)(tr[k + (c >> 16 & 255)] + tg[k + (c >> 8 & 255)] + tb[k + (c & 255)]); }
+            m3_put((unsigned long)y * m3_pitch, m3_line, M3W);
+            continue;
+        }
+#endif
         if (m3_bpp == 32)
             for (x = 0; x < M3W; x++) { uint32_t c = s[x]; ((uint32_t*)m3_line)[x] = ((c >> 16 & 255) << m3_rp) | ((c >> 8 & 255) << m3_gp) | ((c & 255) << m3_bp); }
         else if (m3_bpp == 24)
@@ -405,8 +589,8 @@ static void m3_poly(const M3P* in, int n, const M3SURF* tex, uint32_t col, int a
     for (i = 0; i < m; i++)
     {
         float iz = 1.0f / o[i].z;
-        float f = m3_f * m3_rw / M3W;
-        s[i].sx = m3_rw / 2 + o[i].x * f * iz; s[i].sy = m3_rh / 2 - o[i].y * f * iz;
+        float f = m3_f * m3_rw / M3_FBASE;
+        s[i].sx = m3_rw / 2 + o[i].x * f * iz; s[i].sy = m3_rh / 2 - o[i].y * f * m3_fyk * iz;
         s[i].iz = iz; s[i].uz = o[i].u * iz; s[i].vz = o[i].v * iz; s[i].lz = o[i].l * iz;
     }
     for (i = 1; i + 1 < m; i++) m3_tri_raster(&s[0], &s[i], &s[i + 1], tex, col, alpha, alpha >= 256);
@@ -556,7 +740,7 @@ static void m3_sky(void)
     }
     for (i = 0; i < 90; i++)
     {   /* drifting stars */
-        unsigned h = (unsigned)i * 2654435761u; int x = (int)((h % M3W + (int)(m3_bgphase * (4 + h % 7))) % M3W), yy = (int)(h / M3W % 240);
+        unsigned h = (unsigned)i * 2654435761u; int x = (int)((h % M3W + (int)(m3_bgphase * (4 + h % 7))) % M3W), yy = (int)(h / M3W % (M3H / 2));
         if (m3_half) { x /= 2; yy /= 2; }
         m3_fb[yy * M3W + x] = m3_lerpc(0x404060, 0xFFFFFF, 80 + (int)(h % 170));
     }
@@ -569,13 +753,13 @@ static void m3_sky(void)
 static void m3_floor_rows(float fy, int alpha)          /* alpha < 256: the see-through mirror floor (no z write) */
 {
     const M3SURF* tex = alpha >= 256 ? &m3_floor_solid : &m3_floor;
-    float f = m3_f * m3_rw / M3W, hgt = fy - m3_cam.y, cx = m3_rw / 2.0f, cyy = m3_rh / 2.0f;
+    float f = m3_f * m3_rw / M3_FBASE, hgt = fy - m3_cam.y, cx = m3_rw / 2.0f, cyy = m3_rh / 2.0f;
     float fk = m3_fog1 > m3_fog0 ? 256.0f / (m3_fog1 - m3_fog0) : 0;
     int y;
     if (hgt >= 0) return;                                   /* camera below the floor: nothing to see */
     for (y = 0; y < m3_rh; y++)
     {
-        float dy = (cyy - (float)y) / f, wy = dy * m3_cp_ + m3_sp_, t, z1, ax, bx, az, bz, lo, hi, iz;
+        float dy = (cyy - (float)y) / (f * m3_fyk), wy = dy * m3_cp_ + m3_sp_, t, z1, ax, bx, az, bz, lo, hi, iz;
         int xs, xe, x, U, V, dU, dV, F;
         uint32_t* fp; float* zp;
         if (!(y & 7)) M3_HOOK();
