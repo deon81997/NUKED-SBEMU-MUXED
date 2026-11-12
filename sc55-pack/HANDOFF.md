@@ -1269,4 +1269,34 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
 - NOT tested: MS-DOS 7.1 (needs the user's IO.SYS/MSDOS.SYS/COMMAND.COM; check its CDS 49h..4Ch and the extended DPB),
   MS-DOS 6.22, 86Box/msdtest.sh (devkit tar not attached this session), SBEMU unload, games running (RMCB from a DPMI
   game), real PCs (D810 ICH6, P5PE-VM NEC EHCI).
-
+## fsread: read-only exFAT + NTFS reader library (2026-11-11, not built into anything yet)
+- New files only: sc55-pack/sbemu/fsread/{fsread.h, exfat.c, ntfs.c} (+ test/). Not in the makefile; usbpad.c /
+  main.c untouched. For session 4/5b (network redirector): plain C99, only memcpy/memcmp/memset (+ libgcc 64-bit
+  divide), all disk access through `int read(ctx, lba, count, buf)`, caller-given work buffer (FSR_WORK_MIN = 20 KB
+  worst case; typical NTFS 6.5 KB, exFAT 2 sectors). No whole FAT/MFT/bitmap in memory; only the $MFT runlist
+  (48 runs, else ENOMEM) and a 4-entry alias-numbering cache live in fsr_vol (~2.4 KB).
+- API (fsread.h): fsr_mount (OEM ID picks exFAT/NTFS; part_lba = partition start), fsr_open (path of 8.3 or long
+  names, `\` or `/`), fsr_read (f->pos = seek), fsr_findfirst/findnext (11-char FCB pattern from the SDA + DOS
+  attr mask; no "." / ".."), fsr_freeclusters (bitmap scan, for 110C). Errors = negative DOS codes.
+  fsr_find is ~200 bytes (NTFS B+ tree walk stack); the redirector must keep it in its own table, not the DTA.
+- exFAT: up-case table (first 256 entries cached; above U+00FF compares as-is), NameHash, NoFatChain,
+  ValidDataLength (zeros after), FAT walk cached per open stream, active FAT from VolumeFlags.
+- NTFS: fixups, runlists (sparse = zeros), resident $DATA, $ATTRIBUTE_LIST (base + one extension record buffer),
+  $INDEX_ROOT/$INDEX_ALLOCATION B+ tree (descent for lookup, in-order walk for listing), $UpCase, initialized
+  size (zeros after), compressed/encrypted -> FSR_EACCES at open, $MFT with several runs / attribute list,
+  dirty flag reported (v->dirty) but still mounts. MFT records < 16 and DOS-only index twins hidden.
+- 8.3 names: valid 8.3 -> upper-cased; NTFS DOS-namespace $FILE_NAME if present; else generated
+  `LONGFI~1.TXT` .. `FILEW~10.DAT` .. `FIL~1499.DAT`, numbered by count of earlier entries in directory order
+  with the same 6+3 basis (NTFS: index order). No check for a clash with a real 8.3 name that looks like an alias.
+- Tested (gcc + ASan/UBSan) against real images: mkfs.exfat/exfat-fuse and mkntfs/ntfs-3g, 512 and 4096-byte
+  sectors, MBR-partitioned NTFS at LBA 2048, a VDL-patched exFAT file. Content: long/unicode names, 1500-file
+  directory (multi-cluster / INDX tree), 3 MB contiguous, fragmented FAT chain / runlist, 128 MB sparse file with
+  $ATTRIBUTE_LIST over 10 records, compressed dir, DOS name set via system.ntfs_dos_name. Every file opened by 8.3
+  path and by long path, read in odd chunk sizes, FNV hash == Linux. Rebuild:
+  `sh sbemu/fsread/test/mkimg.sh /tmp/fsimg` (needs sudo, exfatprogs exfat-fuse ntfs-3g attr), then
+  `gcc -std=c99 -D_FILE_OFFSET_BITS=64 -D_POSIX_C_SOURCE=200809L test/fstest.c exfat.c ntfs.c` and
+  `./a.out /tmp/fsimg/ntfs.img 0 512 | grep '^[LD]' | sort | diff - <(sort /tmp/fsimg/ntfs.exp)`.
+- DJGPP gcc 12.2: both files compile with -Wall -Wextra, no warnings, ~23 KB code.
+- Not tested: Windows-made volumes (real 8dot3 names, $MFT in many runs), exFAT TexFAT second FAT, volumes with
+  cluster > 2 MB (NTFS refuses), speed on real hardware (alias numbering re-scans a directory when listing is not
+  sequential).
