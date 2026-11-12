@@ -185,7 +185,8 @@ media: detect by a valid BPB / exFAT / NTFS signature at LBA 0.
    option `/USBDISK:1` (off by default). Only the public usbpad.h API. Writes answer "write protected" (TODO:
    needs `USBPAD_DiskWrite`). QEMU + FreeDOS (rufus kernel) (testrig/qemu-usbdrive.sh): MBR FAT16, logical FAT32, GPT
    FAT16, superfloppy FAT12 on EHCI HS and on UHCI; 300 KB copies byte-exact; stick swap -> new medium seen; unplug ->
-   "drive not ready". Same on MS-DOS 7.1 (2026-11-11). Not tried: MS-DOS 6.22, 86Box (devkit tar), real PCs.
+   "drive not ready". Same on MS-DOS 7.1; MS-DOS 6.22 FAT12/16 only (FAT32 skipped); 86Box UHCI + OHCI
+   (testrig/86box/drvtest.sh) pass too. Not tried: real PCs, SBEMU unload, games running.
 5. **Redirector skeleton + exFAT read-only.** INT 2Fh stub, CDS setup, the 11xxh calls, 8.3 aliases,
    exFAT reader. FAT32-on-6.22 through the same path (a small FAT reader).
 6. **NTFS read-only.** MFT, runlists, index B+ trees, attribute lists, sparse; refuse compressed/encrypted.

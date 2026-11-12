@@ -1269,7 +1269,12 @@ NEXT: test on real PCs; with the user's Win98 image rebuild the 86Box VM and run
 - MS-DOS 7.1 [7.10.1999] (IO.SYS/MSDOS.SYS/COMMAND.COM from the user's DOS 7.1 CD, BOOT/DOS71INS.IMG; rig with
   C=c71 MKDISK_BOOT=msdos): same results - FAT16, logical FAT32 (CD E:\ + DIR E:), GPT, superfloppy FAT12, EHCI and UHCI,
   300 KB copies exact, swap seen, unplug -> "Not ready reading drive D", write -> "Write protect error writing drive D".
-- NOT tested: MS-DOS 6.22, 86Box/msdtest.sh (devkit tar not attached this session), SBEMU unload, games running (RMCB from a DPMI
+- MS-DOS 6.22 (user's Virtual PC VHD, qemu-img convert -f vpc to raw, files put in with mtools, HIMEM only, no UMB):
+  D: FAT16 + E: GPT work, 300 KB copy exact; the FAT32 logical is skipped as designed (redirector, session 5).
+- 86Box (user's sc55-devkit tar, P2B-LS + ES1371 + usb_msd, testrig/86box/drvtest.sh; start Xvfb :9 with setsid first,
+  else it dies with the background shell): FreeDOS on UHCI and on OPTi OHCI (disk plugged at 25 s), MS-DOS 7.1 on UHCI:
+  FAT16 + logical FAT32 DIR / TYPE / 300 KB copies exact. (Its @screen grab at the end often misses the socket.)
+- NOT tested: SBEMU unload, games running (RMCB from a DPMI
   game), real PCs (D810 ICH6, P5PE-VM NEC EHCI).
 ## fsread: read-only exFAT + NTFS reader library (2026-11-11, not built into anything yet)
 - New files only: sc55-pack/sbemu/fsread/{fsread.h, exfat.c, ntfs.c} (+ test/). Not in the makefile; usbpad.c /
