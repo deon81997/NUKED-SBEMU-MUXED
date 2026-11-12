@@ -241,6 +241,7 @@ typedef struct
     uint32_t ignore;                    /* root ports: nothing usable there, skip until unplugged */
     uint8_t  fails[MAX_PORT];
     int      run;                       /* UHCI: running (only while it has a device, as in beta.44) */
+    uint32_t ering;                     /* EHCI: async ring after the control QH (disk QHs), 0 = none */
     int      ctlbulk;                   /* OHCI whose bulk list was not served (P5PE-VM NEC): disk transfers on the
                                          * control ED instead (o_run_tds, as the pads' OUT reports) */
     int      oslow;                     /* OHCI that misses tail-appended TDs (NEC uPD720101): every new IN TD
@@ -1266,7 +1267,7 @@ static int e_run(const Dev* d, int ep, int mps, int n, uint32_t timeout_us)
     volatile uint32_t* qh = HC[h].ctl;
     ehci_sched(h, EC_ASE, 0);
     zero(qh, 24);
-    qh[0] = PHYS(qh) | LP_Q;
+    qh[0] = HC[h].ering ? HC[h].ering : (PHYS(qh) | LP_Q);   /* the disks' QHs stay in the ring */
     qh[1] = e_ch(d, ep, mps, 1, 1);
     qh[2] = e_caps(d, 0, 0);
     qh[4] = PHYS(qtdn(0));
@@ -1523,14 +1524,119 @@ static int send_out(int k, const uint8_t* data, int len)
  * disk's own IN / OUT EDs on the bulk list (put there at reset; only head / tail are written, while skipped:
  * no tail append, see oslow); EHCI: the async QH as for control transfers. xHCI: not yet. */
 #define BCHUNK 2048                     /* bytes per bulk run (UHCI: 32 TDs of 64; EHCI) */
-#define OCHUNK 16384                    /* OHCI: per run, one 16-byte TD per packet (OT) */
-#define OTN    260
+#define OCHUNK 8192                     /* OHCI: per run, one 16-byte TD per packet (OT, 4 KB: 128 + CSW + tail) */
+#define OTN    140
 #define DCMD   16384                    /* most data per SCSI command (the data buffer) */
 #define OT(i)  ((volatile uint32_t*)(DBuf + 0x1000) + (i) * 4)
+static uint32_t OSkip[MAX_HC][MAX_MSD * 2];   /* OHCI: frame number when a disk ED was last skipped */
 static int BulkCsw;                     /* OHCI: the CSW came with the data (13 bytes) */
 static uint32_t le32(const uint8_t* p) { return p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24; }
 static void put32(uint8_t* p, uint32_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24); }
 static void put32be(uint8_t* p, uint32_t v) { p[0] = (uint8_t)(v >> 24); p[1] = (uint8_t)(v >> 16); p[2] = (uint8_t)(v >> 8); p[3] = (uint8_t)v; }
+
+/* ---------------- EHCI disks: an IN and an OUT QH per disk, in the async ring for good (after the control QH),
+ * the controller keeps the toggles (DTC 0). A transfer fills the QH's inactive dummy qTD and adds a new dummy
+ * (Linux's way: the QH is never rewritten while the schedule runs); the async schedule is on only while a disk
+ * request runs (USBPAD_DiskRead), so nothing is fetched while idle */
+#define EQH(h, m, in) (HC[h].ctl + 0x200 + (m) * 64 + ((in) ? 0 : 32))   /* +0x1800, 128 bytes apart */
+#define EQT(i) ((volatile uint32_t*)(DBuf + 0x1000) + ((i) & 63) * 16)  /* 64 qTD slots, used in turn */
+static int EQn, AseHc = -1;
+static uint64_t AseOff;              /* EHCI async schedule (disks) switched off by step() at this time */
+static volatile uint32_t* EDum[MAX_MSD][2];   /* each QH's dummy (inactive) qTD */
+static void ehci_ring(int h)                  /* control QH -> disk QHs -> control QH; schedule off meanwhile */
+{
+    int m;
+    uint32_t next = PHYS(HC[h].ctl) | LP_Q;
+    ehci_sched(h, EC_ASE, 0);
+    for (m = MAX_MSD - 1; m >= 0; --m)
+        if (Ms[m].used && Ms[m].hc == h)
+        {
+            EQH(h, m, 0)[0] = next; next = PHYS(EQH(h, m, 1)) | LP_Q;
+            EQH(h, m, 1)[0] = PHYS(EQH(h, m, 0)) | LP_Q;
+            fl(EQH(h, m, 1), 64); fl(EQH(h, m, 0), 64);
+        }
+    HC[h].ering = next == (PHYS(HC[h].ctl) | LP_Q) ? 0 : next;
+    HC[h].ctl[0] = next;
+    fl(HC[h].ctl, 16);
+}
+static void e_qh_reset(Msd* s, int in)        /* empty overlay, toggle DATA0, no halt (schedule off) */
+{
+    int h = s->hc, m = (int)(s - Ms);
+    volatile uint32_t* q = EQH(h, m, in);
+    volatile uint32_t* dm = EQT(EQn++);
+    ehci_sched(h, EC_ASE, 0);
+    zero(dm, 16); dm[0] = dm[1] = LP_T;
+    q[3] = 0; q[4] = PHYS(dm); q[5] = LP_T; q[6] = 0; q[7] = q[8] = q[9] = q[10] = q[11] = 0;
+    EDum[m][in] = dm;
+    fl(dm, 64); fl(q, 64);
+}
+static void e_disk_init(Msd* s)
+{
+    const Dev* d = &D[s->dev];
+    int h = s->hc, m = (int)(s - Ms), in;
+    for (in = 0; in < 2; ++in)
+    {
+        volatile uint32_t* q = EQH(h, m, in);
+        zero(q, 16);
+        q[1] = e_ch(d, in ? s->in : s->out, s->mps, 0, 0);
+        q[2] = e_caps(d, 0, 0);
+        e_qh_reset(s, in);
+    }
+    ehci_ring(h);
+}
+static void e_fill(volatile uint32_t* q, int in, uint32_t buf, int len, volatile uint32_t* next)   /* token last */
+{
+    int i;
+    q[0] = PHYS(next); q[1] = PHYS(next);                     /* a short packet goes on to next too (the CSW) */
+    for (i = 0; i < 5; ++i) q[3 + i] = !len ? 0 : i ? (buf & ~0xFFFUL) + (uint32_t)i * 0x1000 : buf;
+    fl(q, 64);
+    q[2] = ((uint32_t)len << 16) | (3UL << 10) | ((uint32_t)(in ? 1 : 0) << 8) | QT_ACTIVE;
+    fl(q, 64);
+}
+/* bytes moved, -1 = failed; csw: the 13-byte CSW chained after the data on the IN QH (BulkCsw = 13 if it came) */
+static int e_bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint8_t* csw)
+{
+    int h = s->hc, m = (int)(s - Ms), got = 0, r = -1;
+    volatile uint32_t *q = EDum[m][in], *c = NULL, *nd = EQT(EQn++), *last;
+    uint64_t end;
+    zero(nd, 16); nd[0] = nd[1] = LP_T; fl(nd, 64);
+    fl(buf, len ? len : 1);
+    if (csw && !len) { e_fill(q, 1, PHYS(csw), 13, nd); last = q; }   /* no data: just the CSW */
+    else
+    {
+        if (csw) { c = EQT(EQn++); zero(c, 16); e_fill(c, 1, PHYS(csw), 13, nd); }
+        e_fill(q, in, PHYS(buf), len, c ? c : nd);            /* this one goes live (the QH points at it) */
+        last = c ? c : q;
+    }
+    EDum[m][in] = nd;
+    BulkCsw = 0;
+    if (!(erd(h, E_CMD) & EC_ASE)) ehci_sched(h, EC_ASE, 1);
+    end = tsc() + us2c(timeout_us);
+    for (;;)
+    {
+        fl(q, 64); if (c) fl(c, 64);
+        if ((q[2] & QT_HALT) || (c && (c[2] & QT_HALT))) break;
+        if (!(last[2] & QT_ACTIVE)) { r = 0; break; }
+        if (tsc() > end) break;
+    }
+    if (r)
+    {
+        trace("[eb%08lx %08lx qh%08lx] ", (unsigned long)q[2], c ? (unsigned long)c[2] : 0UL, (unsigned long)EQH(h, m, in)[6]);
+        if (c && !(q[2] & (QT_HALT | QT_ACTIVE))) got = len - (int)((q[2] >> 16) & 0x7FFF);   /* data came, CSW not */
+        e_qh_reset(s, in);
+        if (got > 0 || (c && !(q[2] & (QT_HALT | QT_ACTIVE)))) { fl(buf, len ? len : 1); return got; }
+        return -1;
+    }
+    if (csw && !len) BulkCsw = ((q[2] >> 16) & 0x7FFF) ? 0 : 13;
+    else
+    {
+        got = len - (int)((q[2] >> 16) & 0x7FFF);
+        if (c && !((c[2] >> 16) & 0x7FFF)) BulkCsw = 13;
+    }
+    fl(buf, len ? len : 1);
+    if (csw) fl(csw, 16);
+    return got;
+}
 
 /* one bulk transfer of len (<= BCHUNK, OHCI OCHUNK) bytes at buf (inside DBuf): bytes moved (IN: less = short packet), -1 = failed */
 static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint8_t* csw)
@@ -1656,19 +1762,16 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
         /* as o_run_tds does for a changed control ED (the NEC uPD720101 keeps a copy of an ED it has read: on
          * the P5PE-VM the first bulk IN after the CBW was never even looked at, CC NOT ACCESSED for 5 s): take
          * the bulk list out of use for 2 frames, write the ED, restart the list from its head */
-        {
-            uint32_t c = ord(h, O_CONTROL);
-            owr(h, O_CONTROL, c & ~OC_BLE);
-            f0 = ord(h, 0x3C) & 0xFFFF;
+        {   /* (the NEC never gets here now: its disks are off) an ED is rewritten only 2 frames after it was last
+             * skipped; with CBW on the OUT ED and data + CSW on the IN ED that has nearly always passed already */
+            f0 = OSkip[h][j];
             for (k = 0; k < 40 && ((ord(h, 0x3C) - f0) & 0xFFFF) < 2; ++k) wait_us(250);
-            owr(h, O_BLKCUR, 0);
             ed[0] = ED_SKIP | (uint32_t)d->addr | ((uint32_t)ep << 7) | (d->speed == SP_LS ? ED_LS : 0) | ((uint32_t)mps << 16);
             ed[1] = PHYS(tail);
             ed[2] = PHYS(OT(0)) | (*tog ? 2 : 0);
             fl(OT(0), (n + 1) * 16); fl(ed, 16);
             ed[0] &= ~ED_SKIP;
             fl(ed, 16);
-            owr(h, O_CONTROL, c | OC_BLE);
         }
         owr(h, O_CMDSTS, OS_BLF);
         end = tsc() + us2c(timeout_us);
@@ -1692,6 +1795,7 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
         }
         ed[0] |= ED_SKIP;
         fl(ed, 16);
+        OSkip[h][j] = ord(h, 0x3C) & 0xFFFF;
         for (i = 0; i < n && (OTD_CC(OT(i)[0]) == 0 || (OTD_CC(OT(i)[0]) == 9 && i < nd)); ++i) ++pk;   /* packets that went */
         *tog ^= pk & 1;
         if (r || (ed[2] & ED_HALT))
@@ -1732,13 +1836,7 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
         return got;
     }
     case T_EHCI:
-        qtd(qtdn(0), in ? 1 : 0, *tog, pb, len, NULL);
-        for (i = 2; len && i <= 4; ++i) qtdn(0)[3 + i] = (pb & ~0xFFFUL) + (uint32_t)i * 0x1000;   /* 5 pages: 16 KB runs */
-        r = e_run(d, ep, mps, 1, timeout_us);
-        if (r) return -1;
-        got = len - (int)((qtdn(0)[2] >> 16) & 0x7FFF);
-        pk = got ? (got + mps - 1) / mps : 1;
-        break;
+        return e_bulk(s, in, buf, len, timeout_us, csw);
     default:
         return -1;
     }
@@ -1749,6 +1847,7 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
 
 static void msd_clear(Msd* s, int in)                 /* CLEAR_FEATURE(ENDPOINT_HALT), toggle back to DATA0 */
 {
+    if (HC[s->hc].type == T_EHCI) e_qh_reset(s, in);
     control(s->dev, 0x02, 1, 0, (uint16_t)(in ? s->in | 0x80 : s->out), 0);
     if (in) s->tin = 0; else s->tout = 0;
 }
@@ -1764,7 +1863,7 @@ static void msd_reset(Msd* s)                         /* reset recovery (BOT 5.3
 static int msd_cmd(Msd* s, int lun, const uint8_t* cdb, int cdblen, int in, uint8_t* data, uint32_t len, uint32_t* moved)
 {
     uint8_t *cbw = DBuf, *csw = DBuf + 0x40, *db = DBuf + 0x2000;
-    int comb = HC[s->hc].type == T_OHCI && !HC[s->hc].ctlbulk && (in || !len) && len <= OCHUNK, havecsw = 0;
+    int comb = ((HC[s->hc].type == T_OHCI && !HC[s->hc].ctlbulk) || HC[s->hc].type == T_EHCI) && (in || !len) && len <= OCHUNK, havecsw = 0;
     uint32_t done = 0, tag = ++s->tag;
     int r = 0, k;
     memset(cbw, 0, 31);
@@ -1859,6 +1958,7 @@ static void msd_add(int di, int ifc, int in, int out, int mps)
     s = &Ms[m];
     memset(s, 0, sizeof(*s));
     s->dev = di; s->hc = D[di].hc; s->ifc = ifc; s->in = in; s->out = out; s->mps = mps;
+    if (HC[s->hc].type == T_EHCI) { s->used = 1; e_disk_init(s); s->used = 0; }
     s->nlun = 1;
     if (control(di, 0xA1, 0xFE, 0, (uint16_t)ifc, 1) == 0) s->nlun = (CBuf[16] & 15) + 1;   /* GET_MAX_LUN (STALL: one) */
     if (s->nlun > MAX_LUN) s->nlun = MAX_LUN;
@@ -1879,13 +1979,14 @@ static void msd_add(int di, int ifc, int in, int out, int mps)
         msd_check(s, l);
     }
     s->used = 1;
+    if (HC[s->hc].type == T_EHCI) ehci_sched(s->hc, EC_ASE, 0);
 }
 
 static void msd_gone(int di)
 {
     int m;
     for (m = 0; m < MAX_MSD; ++m)
-        if (Ms[m].used && Ms[m].dev == di) { Ms[m].used = 0; ++MsGen; }
+        if (Ms[m].used && Ms[m].dev == di) { Ms[m].used = 0; ++MsGen; if (HC[Ms[m].hc].type == T_EHCI) ehci_ring(Ms[m].hc); }
 }
 
 static Msd* msd_find(int n, int* lun)                 /* drive n -> disk + LUN */
@@ -1909,7 +2010,13 @@ const USBPAD_Disk* USBPAD_DiskInfo(int n)
     int l;
     Msd* s = msd_find(n, &l);
     if (!s) return NULL;
-    if (!s->lun[l].ready && Inited && !Busy) { Busy = 1; MsdBusy = 1; msd_check(s, l); MsdBusy = 0; Busy = 0; }
+    if (!s->lun[l].ready && Inited && !Busy)
+    {
+        Busy = 1; MsdBusy = 1;
+        msd_check(s, l);
+        if (HC[s->hc].type == T_EHCI) ehci_sched(s->hc, EC_ASE, 0);
+        MsdBusy = 0; Busy = 0;
+    }
     return &s->lun[l];
 }
 
@@ -1925,7 +2032,7 @@ int USBPAD_DiskRead(int n, uint32_t lba, int count, void* buf)
     while (count > 0 && !r)
     {
         USBPAD_Disk* u = &s->lun[l];
-        int c = count, max = DCMD / (int)u->bsize;
+        int c = count, max = (HC[s->hc].type == T_OHCI ? OCHUNK : DCMD) / (int)u->bsize;
         uint8_t cdb[10] = { 0 };
         uint32_t moved;
         if (c > max) c = max;
@@ -1946,6 +2053,7 @@ int USBPAD_DiskRead(int n, uint32_t lba, int count, void* buf)
         }
         lba += (uint32_t)c; count -= c; p += (uint32_t)c * u->bsize;
     }
+    if (HC[s->hc].type == T_EHCI) { AseHc = s->hc; AseOff = tsc() + us2c(100000); }   /* off from step() once idle */
     MsdBusy = 0; Busy = 0;
     return r;
 }
@@ -2965,6 +3073,11 @@ static void step(void)
     for (k = 0; k < MAX_PIPE; ++k) if (P[k].used) pipe_poll(k);
     if (Light) return;
     t = tsc();
+    if (AseHc >= 0 && t >= AseOff)                                      /* disks idle: stop the async schedule */
+    {
+        ewr(AseHc, E_CMD, erd(AseHc, E_CMD) & ~EC_ASE);
+        AseHc = -1;
+    }
     if (LedsWant != LedsHave) set_leds();
     if (t >= NextMon)                                                   /* root ports in use: still there? */
     {
@@ -3184,6 +3297,7 @@ int USBPAD_Init(uint64_t cps, int wait_ms, int flags, const char** msg)
     S = S_SCAN; Cur = -1; NextScan = NextMon = NextHub = 0;
     HubCur = HubPort = HubQuiet = HubBusy = 0;
     LedsHave = -1;
+    AseHc = -1;
     Inited = 1;
     /* set up what is plugged in now: until no root port is left to look at and every hub has had two quiet
      * rounds (or nothing at all is plugged in after 0.3 s), at most wait_ms */
