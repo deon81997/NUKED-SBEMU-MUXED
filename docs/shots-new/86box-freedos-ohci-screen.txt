@@ -1,0 +1,25 @@
+C: HD1, Pri[ 1], CHS=    0-1-1, start=     0 MB, size=    99 MB
+JemmEx v5.86 [01/25/26]
+JemmEx loaded
+Kernel: allocated 46 Diskbuffers = 24472 Bytes in HMA
+
+FreeCom version 0.86 - WATCOMC - XMS_Swap [Dec 30 2024 22:10:51]
+HDPMI32 now resident
+
+SBEMU 1.0.0-beta.93-usb-sc55 (https://github.com/crazii/SBEMU)
+Sound Blaster emulation on PCI sound cards for DOS.
+Based on MPXPlay (drivers) and DOSBox (OPL-3 emulation).
+Sound card: Ensoniq/SBPCI.
+disabled.
+enabled.
+enabled.
+enabled.
+enabled.
+enabled.
+enabled.
+  USB: 1 UHCI + 1 OHCI controller(s), found: pad 1 pad 2.
+enabled.
+  Load the mouse driver (CTMOUSE, MOUSE.COM) after SBEMU. The touchpad works too
+.
+USB disk: 2 drive(s) D: E:, first FAT16 40 MB (86Box 86B_HD01)
+C:\>

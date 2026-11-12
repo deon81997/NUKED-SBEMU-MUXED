@@ -34,3 +34,44 @@ to the screen (error messages); the commands' normal output went to a log file, 
 | usbredir-msdos71-2-djgpp-program.png | MS-DOS 7.1: DJGPP program reading through the redirector (copy, seek from end, opendir, stat) |
 | usbredir-msdos71-3-stat-sizes.png | MS-DOS 7.1: findfirst / stat / fstat sizes |
 | usbredir-msdos71-4-unplug-replug-new-usbpad.png | MS-DOS 7.1: unplug / replug again with the DOS session's newer usbpad.c |
+
+## USB disks session 4 screenshots (2026-11-11)
+
+QEMU screens (`screendump` at the end of each `testrig/qemu-usbdrive.sh` run, full 720x400; `-crop` = the part looked at).
+Test results themselves come from the DOS log files (HANDOFF, "USB disks, session 4"); a screen shows only the end of a run.
+`86box-freedos-ohci-screen.txt`: the only 86Box text-screen grab that worked (the others missed the automation socket).
+"try" / "debug" shots are from runs whose timing or setup was wrong (kept as asked); `-before-fix` / `old-build` show the bugs.
+
+- `86box-freedos-ohci-screen.txt`
+- `qemu-freedos-2sticks-unplug-before-fix-crop.png`
+- `qemu-freedos-2sticks-unplug-before-fix.png`
+- `qemu-freedos-2sticks-unplug-fixed-crop.png`
+- `qemu-freedos-2sticks-unplug-fixed.png`
+- `qemu-freedos-2sticks-unplug-try1.png`
+- `qemu-freedos-2sticks-unplug-try2-crop.png`
+- `qemu-freedos-2sticks-unplug-try2.png`
+- `qemu-freedos-cardswap-debug.png`
+- `qemu-freedos-cardswap-fixed.png`
+- `qemu-freedos-cardswap-old-build.png`
+- `qemu-freedos-ehci-3drives-writeprotect.png`
+- `qemu-freedos-info-usb-check.png`
+- `qemu-freedos-no-xms-sbemu-exits.png`
+- `qemu-freedos-rig-check.png`
+- `qemu-freedos-speed-test.png`
+- `qemu-freedos-stick-swap-same-port.png`
+- `qemu-freedos-superfloppy-first.png`
+- `qemu-freedos-uhci-drives.png`
+- `qemu-msdos622-drives.png`
+- `qemu-msdos71-cardswap-debug-counters.png`
+- `qemu-msdos71-cardswap-debug-ok.png`
+- `qemu-msdos71-cardswap-fixed.png`
+- `qemu-msdos71-cardswap-timed.png`
+- `qemu-msdos71-cardswap-try1.png`
+- `qemu-msdos71-cardswap-try2.png`
+- `qemu-msdos71-cardswap-try3.png`
+- `qemu-msdos71-ehci-drives-crop.png`
+- `qemu-msdos71-ehci-drives.png`
+- `qemu-msdos71-stick-swap-unplug-crop.png`
+- `qemu-msdos71-stick-swap-unplug.png`
+- `qemu-msdos71-uhci-writeprotect-crop.png`
+- `qemu-msdos71-uhci-writeprotect.png`
