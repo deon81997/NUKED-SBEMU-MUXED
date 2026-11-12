@@ -140,7 +140,7 @@ def buttons():
 
 
 # ---------------------------------------------------------------- odometer "counter" (it counts releases)
-def counter(n=72):
+def counter(n=98):
     digits = '%06d' % n
     font = F('DejaVuSansMono-Bold.ttf', 18)
     w, h = 6 * 16 + 4, 26
@@ -197,8 +197,67 @@ def mailbox():
     save(frames, 'mail.gif', 500)
 
 
+# ---------------------------------------------------------------- embedded MIDI player box ("now playing")
+def jukebox():
+    w, h = 300, 64
+    title = '~*~ now playing: PORT220_THEME.MID (SC-55 mix) ~*~ turn your speakers up!! ~*~    '
+    font, small = F('DejaVuSansMono-Bold.ttf', 12), F('DejaVuSans-Bold.ttf', 10)
+    frames = []
+    for k in range(24):
+        im = Image.new('RGB', (w, h), (192, 192, 192))
+        d = crisp(ImageDraw.Draw(im))
+        d.rectangle([0, 0, w - 1, h - 1], outline=(255, 255, 255)); d.line([w - 1, 0, w - 1, h - 1], fill=(64, 64, 64))
+        d.line([0, h - 1, w - 1, h - 1], fill=(64, 64, 64))
+        d.rectangle([3, 3, w - 4, 14], fill=(0, 0, 128))
+        d.text((6, 3), 'MIDI Player - Untitled', font=small, fill=(255, 255, 255))
+        d.rectangle([6, 18, w - 7, 34], fill=(0, 0, 0))
+        off = (k * 7) % (len(title) * 7)
+        d.text((8 - off, 19), title * 2, font=font, fill=(0, 255, 0))
+        d.rectangle([0, 18, 5, 34], fill=(192, 192, 192)); d.rectangle([w - 6, 18, w - 1, 34], fill=(192, 192, 192))
+        for i, sym in enumerate(('|<', '>', '||', '[]', '>|')):         # buttons, PLAY held down
+            x = 8 + i * 30
+            down = i == 1
+            d.rectangle([x, 39, x + 26, 57], fill=(192, 192, 192), outline=(64, 64, 64) if down else (255, 255, 255))
+            d.text((x + 13, 48), sym, font=small, fill=(0, 0, 0), anchor='mm')
+        for b in range(12):                                             # level meter
+            v = abs(math.sin(k * 0.8 + b * 1.1)) * 16
+            d.rectangle([166 + b * 10, 57 - int(v), 172 + b * 10, 57], fill=(0, 200, 0) if v < 11 else (255, 255, 0) if v < 14 else (255, 0, 0))
+        frames.append(im)
+    save(frames, 'jukebox.gif', 110)
+
+
+# ---------------------------------------------------------------- web award + Y2K badge
+def award():
+    w, h = 120, 120
+    frames = []
+    for k in range(8):
+        im = Image.new('RGB', (w, h), (0, 0, 0))
+        d = crisp(ImageDraw.Draw(im))
+        for i in range(16):                                             # rosette
+            a = i * math.pi / 8 + k * 0.1
+            d.polygon([(60, 54), (60 + 52 * math.cos(a), 54 + 52 * math.sin(a)), (60 + 52 * math.cos(a + 0.3), 54 + 52 * math.sin(a + 0.3))],
+                      fill=(255, 215, 0) if i % 2 else (200, 140, 0))
+        d.ellipse([22, 16, 98, 92], fill=(128, 0, 0), outline=(255, 255, 255))
+        d.text((60, 36), 'COOL', font=F('DejaVuSerif-Bold.ttf', 15), fill=(255, 255, 0), anchor='mm')
+        d.text((60, 54), 'DOS SITE', font=F('DejaVuSans-Bold.ttf', 11), fill=(255, 255, 255), anchor='mm')
+        d.text((60, 70), 'of the day', font=F('DejaVuSans.ttf', 10), fill=rainbow(k / 8), anchor='mm')
+        d.polygon([(40, 92), (34, 118), (48, 110), (54, 96)], fill=(0, 0, 160)); d.polygon([(80, 92), (86, 118), (72, 110), (66, 96)], fill=(0, 0, 160))
+        frames.append(im)
+    save(frames, 'award.gif', 140)
+    im = Image.new('RGB', (88, 31), (0, 0, 0))
+    d = crisp(ImageDraw.Draw(im))
+    d.rectangle([0, 0, 87, 30], outline=(0, 255, 0))
+    d.text((44, 9), 'Y2K', font=F('DejaVuSans-Bold.ttf', 13), fill=(0, 255, 0), anchor='mm')
+    d.text((44, 23), 'COMPLIANT!!', font=F('DejaVuSans-Bold.ttf', 9), fill=(255, 255, 255), anchor='mm')
+    save([im], 'btn-y2k.gif')
+
+
 if __name__ == '__main__':
-    title(); construction(); new(); buttons(); counter(); bar(); floppy(); mailbox()
+    import sys
+    if sys.argv[1:]:
+        for fn in sys.argv[1:]: globals()[fn]()
+        sys.exit()
+    title(); construction(); new(); buttons(); counter(); bar(); floppy(); mailbox(); jukebox(); award()
     for f in sorted(os.listdir(OUT)):
         if f.endswith('.gif'):
             print(f, os.path.getsize(os.path.join(OUT, f)))
