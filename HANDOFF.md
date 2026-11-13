@@ -47,6 +47,11 @@ type-to-jump. Files: tools/midplay.c only (+ pack/README.TXT section 8, testrig/
   -m 12 -> fell back to 1280x800; CRASHKEY build wrote C:\CRASH.TXT (page fault, registers, actions). MENU 3D styles OK.
 - Zip: MIDPLAY, SC55MENU, SBEMU (version), GAMETEST, CDSET/CDGUI.EXE, README.TXT swapped. SBSET.EXE NOT swapped (zip's
   copy is 130 KB smaller than a fresh build - built differently; it gets the m3_fi fix next time it is rebuilt).
+- 86Box (built from source @0935207 + testrig diffs, P2B-LS PII-400, S3 ViRGE/DX 4 MB, VBE 1.2 BIOS, FreeDOS +
+  HDPMI32I): auto 640x480, 1600x1200x8 (banked), 1280x1024x16, 1024x768x32, 320x200 with 25-60 random V/C/J/F4/SPACE
+  keys each: no crash; 800x600x24 not offered -> auto. 8 MB RAM + 1600x1200 wanted -> 800x600 "(low memory)";
+  CRASHKEY '!' -> CRASH.TXT (GPF 0Dh, banked mode, actions). Seen: at 8 MB (and QEMU 12 MB) the 140 KB genmid stress
+  song does not load even in the text view - not looked into (not a 3D issue).
 - Real hardware still to test: MIDPLAY 3D on the D810 and the P5PE-VM (big modes, CRASH.TXT if anything happens).
 
 ## SSF2T demo investigation (2026-11-10, unfinished, no release)
