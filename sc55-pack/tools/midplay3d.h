@@ -300,12 +300,12 @@ static void mp3_theme_apply(void)
      * accent. The hardware styles copy the colours of the Roland boxes this pack emulates (no logos, NUKED stays) */
     static const struct { float h0, hs, sat; uint32_t s0, s1, grid, body, face, l0, l1, ink, acc; } T[11] = {
         { 0, 0, 0, 0, 0, 0,                                 0x26262C, 0x28282E, 0xA8E048, 0x7CB830, 0x10200A, 0xFFA030 },
-        { 0, 330, 0.85f, 0x05001A, 0x22003E, 0x9A2A88,       0x18101E, 0x1C1424, 0x60F0FF, 0x30A0E0, 0x081830, 0xFF30D0 },
+        { 200, 140, 0.62f, 0x04020E, 0x140A26, 0x5A3A7A,       0x18101E, 0x1C1424, 0x60F0FF, 0x30A0E0, 0x081830, 0xFF30D0 },
         { 22, 22, 0.85f, 0x0A0500, 0x221000, 0x8A5A16,      0x1A140C, 0x201810, 0xFFB040, 0xD08020, 0x2A1404, 0xFFC060 },
         { 100, 40, 0.75f, 0x000802, 0x002006, 0x1E8A36,      0x0E1610, 0x121A14, 0x60FF80, 0x30C050, 0x042008, 0x60FF80 },
         { 300, 110, 0.7f, 0x140626, 0x6A2A30, 0x9A5030,    0x2A1820, 0x302028, 0xFFC080, 0xE08050, 0x301008, 0xFF6040 },
         { 170, 70, 0.45f, 0x08122A, 0x2C4C6C, 0x6A90AA,     0x506070, 0x5A6A7A, 0xD0F0FF, 0x90C0E0, 0x102030, 0x40C0FF },
-        { 270, 110, 0.75f, 0x0A0018, 0x3A0036, 0x2090A0,     0x1A1028, 0x201430, 0xFF60D0, 0xB030A0, 0x200818, 0x20F0FF },
+        { 285, 95, 0.6f, 0x07020F, 0x220A26, 0x3A6A78,     0x1A1028, 0x201430, 0xFF60D0, 0xB030A0, 0x200818, 0x20F0FF },
         { 55, 85, 0.6f, 0x08090A, 0x1A1D1C, 0x7A6A3A,       0x2A2A2E, 0x2E2E33, 0xB0E050, 0x80BC34, 0x0E1C08, 0xFF7A20 },
         { 22, 34, 0.7f, 0x070605, 0x1C1610, 0x7A5A2C,       0x1A1A1E, 0x1E1E22, 0xFFB848, 0xD88A24, 0x241204, 0xFFC860 },
         { 8, 46, 0.62f, 0x0A0808, 0x221614, 0x6E3A2C,       0x303034, 0x36363A, 0xFF7A3A, 0xC8481C, 0x2A0A04, 0xE03030 },
@@ -477,7 +477,7 @@ static void mp3_river(float ta, int look)
         MP3RIV* r = &mp3_riv[i]; float age = ta - r->t0, z = -1.85f - age * 1.4f;
         if (age < 0 || z < -3.3f) { r->on = 0; continue; }
         if (look == 1) mp3_line3(m3_v(r->x, fy, z), m3_v(r->x, fy, z + 0.22f), r->c);
-        else if (look == 2) mp3_cube(r->x, fy + 0.035f, z, 0.035f, r->c, 0.4f);
+        else if (look == 2) mp3_cube(r->x, fy + 0.035f, z, 0.035f, r->c, 0.2f);
         else m3_box(m3_v(r->x, fy + 0.006f, z + 0.11f), r->bl ? 0.022f : 0.032f, 0.006f, 0.11f, 0, NULL, r->c, 0.7f, 256);
         if (!(i & 31)) M3_HOOK();
     }
@@ -576,7 +576,7 @@ static void mp3_scene_rest(const Song* s, const char* name, double frac, int pau
                         uint32_t cc = mp3_panel.p[(int)((y + 0.5f) * mp3_panel.h / gy) * mp3_panel.w + (int)((x + 0.5f) * mp3_panel.w / gx)];
                         int lum = (cc >> 16 & 255) + (cc >> 8 & 255) + (cc & 255);
                         float bx = m->x - m->hx + (x + 0.5f) * m->hx * 2 / gx, by = m->y + m->hy - (y + 0.5f) * m->hy * 2 / gy;
-                        mp3_cube(bx, by, m->z - m->hz - (lum > 300 ? q * 0.6f : 0), m->hx / gx * 0.92f, cc, lum > 300 ? 0.3f : 0);
+                        mp3_cube(bx, by, m->z - m->hz - (lum > 300 ? q * 0.6f : 0), m->hx / gx * 0.92f, cc, lum > 300 ? 0.15f : 0);
                     }
                 }
             }
@@ -617,14 +617,14 @@ static void mp3_scene_rest(const Song* s, const char* name, double frac, int pau
             MP3DROP* d = &mp3_drop[i];
             d->v += dt * 6; d->y -= d->v * dt;
             if (d->y < -0.4f) d->on = 0;
-            else mp3_cube(d->x, d->y, -1.3f, 0.045f, d->c, 0.5f);
+            else mp3_cube(d->x, d->y, -1.3f, 0.045f, d->c, 0.3f);
         }
         M3_HOOK();
         /* the channels as stacks of blocks */
         for (c = 0; c < 16; c++)
         {
             int h = 1 + (g_viz.level[c] * 8 + 63) / 127;
-            for (k = 0; k < h; k++) mp3_cube(-1.8f + c * 0.24f, -H + 0.05f + k * 0.1f, -3.5f, 0.045f, mp3_chcol[c], k == h - 1 ? 0.5f : 0.1f);
+            for (k = 0; k < h; k++) mp3_cube(-1.8f + c * 0.24f, -H + 0.05f + k * 0.1f, -3.5f, 0.045f, mp3_chcol[c], k == h - 1 ? 0.3f : 0.05f);
         }
         return;
     }
