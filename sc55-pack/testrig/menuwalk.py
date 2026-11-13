@@ -28,7 +28,8 @@ def back(q, t0=90):
         if in_menu(t): return True, seen
         line = ' | '.join(l.strip() for l in t.split('\n') if l.strip())[:160]
         if not seen or seen[-1] != line: seen.append(line)
-        if 'Press any key' in t or 'any key' in t.lower(): q.key('spc')
+        if 'Restart the PC now?' in t: q.key('y')     # USBTEST: a USB keyboard stays off after it, unless restarted
+        elif 'Press any key' in t or 'any key' in t.lower(): q.key('spc')
         elif 'Keep this mode' in t: q.key('y')
         else: q.key('esc'); time.sleep(1.5); t = q.text()
         if not in_menu(t) and 'Esc' not in t and 'Q' in t: q.key('q')
@@ -62,7 +63,7 @@ def walk(d, cats=range(6), skip=()):
                 res.append((CATS[c], lab, 'STAYED', [l.strip() for l in t.split('\n')[16:23] if l.strip()][-1:])); continue
             ok, seen = back(q)
             res.append((CATS[c], lab, 'OK' if ok else 'STUCK', seen[:3]))
-            print('%-9s %-34s %s %s' % res[-1][:3] + (' :: ' + ' // '.join(seen[:2])[:200] if seen else ''), flush=True)
+            print('%-9s %-34s %s' % res[-1][:3] + (' :: ' + ' // '.join(seen[:2])[:200] if seen else ''), flush=True)
             if not ok: return res
     return res
 

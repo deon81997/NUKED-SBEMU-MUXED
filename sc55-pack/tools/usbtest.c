@@ -31,6 +31,7 @@
 static FILE* Log;
 static void out(const char* f, ...);
 static unsigned long long Cps;
+#define KBC_PENDING() ((inportb(0x64) & 0x21) == 0x01)
 static inline unsigned long long tsc(void);
 static void disks(void)                 /* USB disks: what they are, and block 0 */
 {
@@ -89,15 +90,19 @@ static inline unsigned long long tsc(void) { unsigned lo, hi; __asm__ __volatile
 static unsigned long ticks(void) { return _farpeekl(_dos_ds, 0x46C); }
 
 /* USB keyboard / mouse events: collected in the poll, printed by the main loop */
-static volatile int KEsc, KNew, MNew;
+static volatile int KEsc, KNew, MNew, KPress;   /* KPress: last newly pressed key (HID usage), for the restart question */
 static uint8_t KRep[8];
 static long MX, MY, MW; static int MBt;
 static void kb(int id, const uint8_t* r)
 {
-    int i;
+    int i, j;
     (void)id;
+    for (i = 2; i < 8; ++i)
+    {
+        if (r[i] == 0x29) KEsc = 1;
+        if (r[i] > 3) { for (j = 2; j < 8 && KRep[j] != r[i]; ++j) {} if (j == 8) KPress = r[i]; }
+    }
     memcpy(KRep, r, 8); KNew = 1;
-    for (i = 2; i < 8; ++i) if (r[i] == 0x29) KEsc = 1;
 }
 static void ms(int b, int dx, int dy, int dw) { MX += dx; MY += dy; MW += dw; MBt = b; MNew = 1; }
 
@@ -238,6 +243,59 @@ static void midi_tick(void)
     }
 }
 
+/* The BIOS drove the USB keyboard / mouse before USBTEST took the controllers (its legacy emulation); once
+ * USBTEST stops them they stay dead until the PC restarts - with a USB-only keyboard the user would be stuck at
+ * the prompt, or in the menu's USBTEST.TXT view. So when one is plugged in, ask now, while USBTEST still reads it.
+ * Y = restart, N / Esc / Enter / 60 s = back to DOS. Returns 1 for restart. */
+static int ask_restart(unsigned long long cps)
+{
+    static const char q[] = "A USB keyboard or mouse is plugged in. If it worked in DOS before USBTEST (through the BIOS), "
+        "it stays off now until the PC restarts. A PS/2 keyboard keeps working.";
+    unsigned long long st = tsc();
+    int k;
+    if (!(USBPAD_Have() & (USBPAD_HAVE_KBD | USBPAD_HAVE_MOUSE))) return 0;
+    out("\n%s\nRestart the PC now? Y = yes, N = no (back to DOS)\n", q);
+    if (Ui)
+    {
+        tui_panel(10, 8, 60, 9, 1, 0x4F, "USB keyboard / mouse");
+        tu_text(12, 9, 56, 4, 0x4F, q);
+        tui_put(12, 14, 0x4E, "Restart the PC now?   Y = yes   N = no, back to DOS");
+    }
+    while (KBC_PENDING()) (void)inportb(0x60);
+    KPress = 0;
+    while (tsc() - st < cps * 60ULL)
+    {
+        USBPAD_Poll();
+        k = KPress; KPress = 0;
+        if (k == 0x1C) return 1;                                 /* HID Y */
+        if (k == 0x11 || k == 0x29 || k == 0x28) return 0;      /* N, Esc, Enter */
+        if (KBC_PENDING())                                       /* PS/2 straight from the keyboard controller */
+        {
+            k = inportb(0x60);
+            if (k == 0x15) return 1;                             /* set 1 make codes: Y */
+            if (k == 0x31 || k == 0x01 || k == 0x1C) return 0;
+        }
+        if (Ui) { k = tu_poll(); if (k == 'y' || k == 'Y') return 1; if (k == 'n' || k == 'N' || k == 27 || k == 13) return 0; }
+        else if (kbhit()) { k = getch(); if (k == 'y' || k == 'Y') return 1; if (k == 'n' || k == 'N' || k == 27 || k == 13) return 0; }
+    }
+    return 0;
+}
+
+/* everything on disk first (DOS buffers, SMARTDRV), then the keyboard controller's reset line; 0CF9h if that fails */
+static void restart_pc(void)
+{
+    __dpmi_regs r;
+    int n;
+    memset(&r, 0, sizeof r); r.x.ax = 0x4A10; r.x.bx = 1; __dpmi_int(0x2F, &r);   /* SMARTDRV: commit the cache */
+    memset(&r, 0, sizeof r); r.h.ah = 0x0D; __dpmi_int(0x21, &r);                   /* DOS: flush buffers */
+    _farpokew(_dos_ds, 0x472, 0x1234);                                              /* warm boot */
+    for (n = 0; n < 100000 && (inportb(0x64) & 2); ++n) {}
+    outportb(0x64, 0xFE);
+    for (n = 0; n < 1000000; ++n) (void)inportb(0x80);
+    outportb(0xCF9, 0x02); outportb(0xCF9, 0x06);
+    for (;;) {}
+}
+
 int main(int argc, char** argv)
 {
     unsigned long long cps, a, t, start;
@@ -246,7 +304,7 @@ int main(int argc, char** argv)
     int n, i, secs = 0;
     uint32_t ch = 0;
     unsigned lastb[2] = { 0xFFFFFFFF, 0xFFFFFFFF };
-    int force = 0;
+    int force = 0, restart;
     const char* padprog = NULL;
     for (i = 1; i < argc; ++i)
     {
@@ -401,8 +459,10 @@ int main(int argc, char** argv)
         }
     }
     out("\n");
+    restart = ask_restart(cps);
     USBPAD_Shutdown();
     tu_end();
     if (Log) fclose(Log);
+    if (restart) restart_pc();
     return 0;
 }

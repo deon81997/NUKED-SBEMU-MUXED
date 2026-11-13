@@ -14,6 +14,8 @@ REL = os.environ.get('REL', '/home/claude/rel/NUKEDSB')
 MS71 = os.environ.get('MS71', '/tmp/dl/w98qi/ms71')
 FD = os.environ.get('FD', '/home/claude/fd')
 SF2 = os.environ.get('SF2', '/tmp/dl/timgm6mb/TIMGM6MB.SF2')
+# CP437 as drawn on screen: 00-1F and 7F are glyphs (►, ♪...), not control characters
+GLYPH = ' ☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼' + bytes(range(32, 127)).decode() + '⌂' + bytes(range(128, 256)).decode('cp437')
 
 def build(d, dos='msdos', sbopts='/A:220 /I:5 /D:1 /P:330 /VSF:C:\\SC55\\SF2\\TIMGM6MB.SF2 /JOY:1 /USBKB:1 /USBMS:2',
           menu=None, extra=None):
@@ -83,7 +85,7 @@ class Q:
         try:
             b = open(f, 'rb').read()
             cols = 80
-            return '\n'.join(bytes(b[r * cols * 2 + i * 2] for i in range(cols)).decode('cp437') for r in range(25))
+            return '\n'.join(''.join(GLYPH[c] for c in b[r * cols * 2:(r + 1) * cols * 2:2]) for r in range(25))
         except Exception: return ''
     def wait(s, needle, t=60):
         e = time.time() + t
