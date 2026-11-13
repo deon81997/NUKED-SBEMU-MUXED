@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later - part of NUKED SB-EMU, https://github.com/deon81997/NUKED-SBEMU-MUXED
 """wavcheck.py [--metro N] NAME=FILE.WAV ... : checks recordings made with notetest.sh WAV=... (one per synth / rate).
-Per file: seconds of sound, loudness, peak, clipped samples, dropouts (sudden silence of >= 30 ms in the middle of
-music) and clicks (jumps between neighbouring samples far above the music's own).
+Per file: seconds of sound, loudness, peak, clipped samples, dropouts (sound cut off in the middle of the
+music: loud to almost nothing within 10 ms, as a buffer underrun does) and clicks (jumps between neighbouring samples far above the music's own).
 --metro N: the recording starts with N notes one second apart (METRO.MID, made by fmtcheck.py's folder or by hand):
 counts them and checks the spacing (1.00 s +- 30 ms = the synth plays in time, nothing lost or bunched up).
 Exit code 1 if any file is silent, clips, drops out or (--metro) has the wrong beats."""
@@ -19,7 +19,7 @@ def beats(lv):
     # onsets: the 10 ms level rises above 30% of the loudest after being under 15% (lv = 10 ms blocks)
     top = max(lv) or 1; on = []; armed = True
     for i, v in enumerate(lv):
-        if armed and v > 0.3 * top: on.append(i / 100); armed = False
+        if armed and v > 0.3 * top and (not on or i / 100 - on[-1] >= 0.5): on.append(i / 100); armed = False
         elif v < 0.15 * top: armed = True
     return on
 for arg in args:
@@ -32,14 +32,10 @@ for arg in args:
     secs = len(on) / 100
     peak = max((abs(v) for v in x), default=0); clip = sum(1 for v in x if abs(v) >= 32767)
     drops = 0
-    if metro:   # the beats have silence between them by design: look for dropouts only in the music after them
-        bt = beats(lv); on = [i for i in on if bt[metro - 1:] and i > (bt[min(metro, len(bt)) - 1] + 1.5) * 100] if len(bt) >= metro else []
-    if on:
+    if on:   # a dropout = the sound cut off at once (loud -> almost nothing in 10 ms); a note's release fades over
+             # several blocks. Up to the last loud part (a song stopped by /Q is cut on purpose).
         top = max(lv[i] for i in on); loud_end = max(i for i in on if lv[i] > 0.1 * top)
-        a, b = on[0], loud_end; run = 0     # up to the last loud part: a song cut off by /Q rings out quietly after a short gap
-        for v in lv[a:b]:
-            run = run + 1 if v < 3 else 0
-            if run == 3: drops += 1
+        drops = sum(1 for i in range(on[0] + 1, loud_end) if lv[i - 1] > 0.2 * top and lv[i] < 0.01 * top)
     d = [abs(x[i + 1] - x[i]) for i in range(len(x) - 1)]
     typ = sorted(d)[int(len(d) * 0.999)] if d else 0
     clicks = sum(1 for v in d if typ and v > 6 * typ and v > 4000)
