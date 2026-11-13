@@ -498,8 +498,7 @@ emulated CPU, and that always runs at full speed.)
 
 <picture><img src="docs/90s/vox-sec-tower.gif" width="140" align="right" alt=""></picture>
 
-Every release runs on a whole fleet of emulated PCs, and on the real iron here (each release's
-HANDOFF note says what still waits for the real PCs):
+Every release gets tried on real iron here, plus a whole fleet of emulated PCs:
 
 <table>
 <tr>
