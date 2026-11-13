@@ -29,7 +29,7 @@ w('SC55/SBOPTS.TXT', '/A220 /I5 /D1 /P330 /VSF:C:\\SC55\\GM.SF2\n')
 w('SC55/TUNED.FLG', 'declined\n')
 w('SC55/MENU3D.CFG', 'ON=1\nSTYLE=1\nQUALITY=0\nLOOK=0\nTHEME=0\nMODE=0 0 0\nHZ=0\n')
 cfg = 'DEVICE=C:\\HIMEM.SYS\n'
-if mode == 'jem': cfg = 'DEVICE=C:\\HIMEM.SYS\nDEVICE=C:\\SC55\\RM\\JEMM\\JEMMEX.EXE X2MAX=8192 NOEMS\n'
+if mode == 'jem': cfg = 'DEVICE=C:\\SC55\\RM\\JEMM\\JEMMEX.EXE X2MAX=8192 NOEMS\n'   # as CONFIG.JEM: JEMMEX is the XMS host too (after HIMEM it fails to load)
 w('CONFIG.SYS', cfg + 'FILES=40\nBUFFERS=20\nDOS=HIGH,UMB\n')
 jl = 'C:\\SC55\\RM\\JEMM\\JLOAD.EXE C:\\SC55\\RM\\JEMM\\QPIEMU.DLL\n' if mode == 'jem' else ''
 w('AUTOEXEC.BAT', '''@ECHO OFF

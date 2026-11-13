@@ -370,9 +370,9 @@ static void build_menu(void)
     add(C_SETTINGS, "Timing & advanced", "Render-ahead and timer give-back (these keep game music at the right tempo), OPL on/off"
         " and core, output jack, sample-rate fix, CD audio, protected/real-mode support, which sound card, MIDI out port.",
         IT_BAT, c, 0, 0, NULL);
-    add(C_SETTINGS, "3D menu (F8)", "Shows this menu in 3D (640x480 VESA, drawn by the CPU - no 3D card needed). F3 picks the style: Panels,"
-        " Carousel (cards on a ring) or Module (a sound module whose display and knob are the menu). F8 comes back to"
-        " the text menu; holding Shift at start always gives the text menu.",
+    add(C_SETTINGS, "3D menu (F8)", "Shows this menu in 3D (any VESA mode or VGA 320x200, drawn by the CPU - no 3D card needed). F3 style (Panels,"
+        " Carousel, Module), F4 screen mode, F6 colours, F7 look, F1 keys. F8 comes back to the text menu; holding"
+        " Shift at start always gives the text menu.",
         IT_M3D, NULL, 0, 0, NULL);
     snprintf(c, sizeof c, "CALL %s\\SETTINGS.BAT /PAGE:JOY", g_home);
     add(C_SETTINGS, "Joystick (USB pad)", "A wired USB Xbox 360 pad (or compatible) as the gameport joystick (/JOY): sticks, buttons, dead zone,"

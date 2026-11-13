@@ -179,22 +179,44 @@ CONTENTS
         F8                            the 3D menu (see below)
         Esc                           back to DOS
       3D MENU (optional; the text menu stays the normal one): F8, or
-      Settings > 3D menu. A 640x480 VESA graphics version of the same menu,
-      drawn in 3D by the CPU (no 3D card needed). F3 there picks the look:
-      Panels (raised buttons), Carousel (a ring of cards) or Module (a rack
-      sound module with an LCD, buttons and a knob). The keys are the same
-      as in the text menu; F8 goes back to the text menu, Esc to DOS. F6
-      cycles the colours: the 3D screens (menu, SETTINGS, CD images,
-      GAMETEST, MIDPLAY) take the colour style of the text screens (Groovy,
-      Sunset, Ocean, Neon, Candy, Midnight; F3 in the text menu). F4
-      sets the speed: auto (the 3D scene at half resolution when the PC
-      draws fewer than 15 pictures a second), full or half; the top right
-      corner shows the frame rate for a few seconds. On a Pentium (not II)
-      the 3D menu is slow even at half resolution: the text menu is the
-      better choice there. MENU starts in 3D the next time if you left it in
-      3D (MENU3D.CFG); hold Shift while MENU starts for the text menu.
-      Without a 640x480 VESA mode (no VESA BIOS / UNIVBE) MENU says so and
-      stays in text.
+      Settings > 3D menu. A graphics version of the same menu, drawn in 3D
+      by the CPU (no 3D card needed). The keys are the same as in the text
+      menu; F8 goes back to the text menu, Esc to DOS. In the 3D menu:
+        F1   its keys (any key or a right click closes the help)
+        F3   style: Panels (raised buttons), Carousel (a ring of cards) or
+             Module (a rack sound module with an LCD, buttons and a knob)
+        F4   the screen list: speed (auto / full / half), refresh rate
+             (BIOS, 60 ... 100 Hz, VBE 3.0 cards only) and every mode your
+             card offers - VGA 320x200, 640x480, 800x600, 1024x768 ...
+             1600x1200 in 256 colours (dithered), 15/16/24/32 bit. A new
+             mode asks "Keep this mode?" for 10 s: Y (or click Yes) keeps
+             it; any other key or waiting brings the last mode back. Pick
+             only a rate your monitor can show.
+        F5   MIDI player (MIDPLAY)      F2  (on a game) saved settings
+        F6   colours: MIDPLAY's 11 themes (0 = the text style's colours)
+        F7   look: solid, vector (glowing lines) or voxel (blocks)
+      The layout follows the screen size: under 640x400 one small font and
+      a category switcher (Left/Right), from 1024x768 bigger letters. The
+      key bar at the bottom shows as many keys as fit; click them too. A
+      grey item says why it cannot run now (as the text menu does).
+      Speed auto draws the 3D scene at half resolution when the PC makes
+      fewer than 15 pictures a second; frames never go faster than the
+      screen's refresh. On a Pentium (not II) the text menu is the better
+      choice. MENU starts in 3D the next time if you left it in 3D
+      (MENU3D.CFG keeps style, look, colours, mode and refresh); hold Shift
+      while MENU starts for the text menu.
+      FALLBACKS: a mode that cannot be set, or does not fit in memory, goes
+      to a smaller mode, then the last good one, then 640x480, then VGA
+      320x200, then the text menu (which says why). Without any graphics
+      mode MENU stays in text.
+      IN A WINDOWS 98 DOS BOX the 3D menu uses VGA 320x200 (the one mode
+      Windows shows in a window); a VESA mode picked there (full screen,
+      ALT+ENTER) asks to be kept every time and is remembered apart from
+      the plain-DOS one. The menu gives its idle time back to Windows.
+      IF MENU CRASHES: the text screen comes back and MENU writes CRASH.TXT
+      in C:\SC55 (the error, the CPU registers, 3D mode/style/look/colours,
+      the chosen item, free memory and the last 50 keys/actions). Please
+      send that file with your report.
       SETTINGS, CD IMAGES AND GAMETEST IN 3D (since beta.77): while the 3D
       menu is on they open in 3D too, in the same look (F3) and speed (F4).
       F8 in any of them switches all of them (and MENU) between 3D and
@@ -216,9 +238,11 @@ CONTENTS
       through SBEMU works too): click a menu to open it, an item to choose
       it, the chosen item again to run it; the wheel moves up and down; a
       right click is "back" in questions, the file viewer and the display
-      modes. In the 3D menu: click the menu tabs (and in Panels the items);
-      in Carousel and Module click the middle to run the chosen item, the
-      left or right side for the previous or next one.
+      modes. In the 3D menu: click the menu tabs and the items; in Carousel
+      and Module click the middle to run the chosen item, the left or
+      right side for the previous or next one; right click closes F1/F4.
+      The file browser and the game editor take clicks too (click, click
+      again = Enter, right click = Esc).
       Nothing runs by itself. The menu writes your choice to MENUGO.BAT and
       exits; MENU.BAT runs it from plain DOS (SBEMU stays resident, so it
       must not be started from inside another program), then shows the
