@@ -300,19 +300,19 @@ static void mp3_theme_apply(void)
      * accent. The hardware styles copy the colours of the Roland boxes this pack emulates (no logos, NUKED stays) */
     static const struct { float h0, hs, sat; uint32_t s0, s1, grid, body, face, l0, l1, ink, acc; } T[11] = {
         { 0, 0, 0, 0, 0, 0,                                 0x26262C, 0x28282E, 0xA8E048, 0x7CB830, 0x10200A, 0xFFA030 },
-        { 0, 330, 1.0f, 0x05001A, 0x2A0050, 0xFF30D0,       0x18101E, 0x1C1424, 0x60F0FF, 0x30A0E0, 0x081830, 0xFF30D0 },
-        { 22, 22, 0.95f, 0x0C0600, 0x2A1400, 0xFFA020,      0x1A140C, 0x201810, 0xFFB040, 0xD08020, 0x2A1404, 0xFFC060 },
-        { 100, 40, 0.9f, 0x000A02, 0x002A08, 0x30FF60,      0x0E1610, 0x121A14, 0x60FF80, 0x30C050, 0x042008, 0x60FF80 },
-        { 300, 110, 0.85f, 0x1A0830, 0xC04830, 0xFF8040,    0x2A1820, 0x302028, 0xFFC080, 0xE08050, 0x301008, 0xFF6040 },
-        { 170, 70, 0.55f, 0x08142A, 0x6090C0, 0xC0F0FF,     0x506070, 0x5A6A7A, 0xD0F0FF, 0x90C0E0, 0x102030, 0x40C0FF },
-        { 270, 110, 0.9f, 0x0A0018, 0x500048, 0x20F0FF,     0x1A1028, 0x201430, 0xFF60D0, 0xB030A0, 0x200818, 0x20F0FF },
-        { 60, 70, 0.8f, 0x0A0A0C, 0x1E1E24, 0xFF8020,       0x2A2A2E, 0x2E2E33, 0xB0E050, 0x80BC34, 0x0E1C08, 0xFF7A20 },
-        { 25, 30, 0.9f, 0x060504, 0x201408, 0xFFB040,       0x1A1A1E, 0x1E1E22, 0xFFB848, 0xD88A24, 0x241204, 0xFFC860 },
-        { 0, 40, 0.85f, 0x0C0808, 0x281410, 0xFF5030,       0x303034, 0x36363A, 0xFF7A3A, 0xC8481C, 0x2A0A04, 0xE03030 },
-        { 90, 110, 0.6f, 0x24262A, 0x6A707A, 0x405060,      0xC8C2B4, 0xD0CABC, 0x98D278, 0x64A84C, 0x10240A, 0x404448 } };    if (g_ctheme == last && m3_theme_gen == lastgen) return;
+        { 0, 330, 0.85f, 0x05001A, 0x22003E, 0x9A2A88,       0x18101E, 0x1C1424, 0x60F0FF, 0x30A0E0, 0x081830, 0xFF30D0 },
+        { 22, 22, 0.85f, 0x0A0500, 0x221000, 0x8A5A16,      0x1A140C, 0x201810, 0xFFB040, 0xD08020, 0x2A1404, 0xFFC060 },
+        { 100, 40, 0.75f, 0x000802, 0x002006, 0x1E8A36,      0x0E1610, 0x121A14, 0x60FF80, 0x30C050, 0x042008, 0x60FF80 },
+        { 300, 110, 0.7f, 0x140626, 0x6A2A30, 0x9A5030,    0x2A1820, 0x302028, 0xFFC080, 0xE08050, 0x301008, 0xFF6040 },
+        { 170, 70, 0.45f, 0x08122A, 0x2C4C6C, 0x6A90AA,     0x506070, 0x5A6A7A, 0xD0F0FF, 0x90C0E0, 0x102030, 0x40C0FF },
+        { 270, 110, 0.75f, 0x0A0018, 0x3A0036, 0x2090A0,     0x1A1028, 0x201430, 0xFF60D0, 0xB030A0, 0x200818, 0x20F0FF },
+        { 55, 85, 0.6f, 0x08090A, 0x1A1D1C, 0x7A6A3A,       0x2A2A2E, 0x2E2E33, 0xB0E050, 0x80BC34, 0x0E1C08, 0xFF7A20 },
+        { 22, 34, 0.7f, 0x070605, 0x1C1610, 0x7A5A2C,       0x1A1A1E, 0x1E1E22, 0xFFB848, 0xD88A24, 0x241204, 0xFFC860 },
+        { 8, 46, 0.62f, 0x0A0808, 0x221614, 0x6E3A2C,       0x303034, 0x36363A, 0xFF7A3A, 0xC8481C, 0x2A0A04, 0xE03030 },
+        { 95, 110, 0.5f, 0x16181C, 0x363A42, 0x4A5260,      0xC8C2B4, 0xD0CABC, 0x98D278, 0x64A84C, 0x10240A, 0x404448 } };    if (g_ctheme == last && m3_theme_gen == lastgen) return;
     last = g_ctheme;
     for (c = 0; c < 16; c++)
-        mp3_chcol[c] = g_ctheme ? mp3_hsv(T[g_ctheme].h0 + T[g_ctheme].hs * ((c * 7) % 16) / 15.0f, T[g_ctheme].sat, 0.75f + 0.25f * (c & 1)) : mp3_chcol0[c];
+        mp3_chcol[c] = g_ctheme ? mp3_hsv(T[g_ctheme].h0 + T[g_ctheme].hs * ((c * 7) % 16) / 15.0f, T[g_ctheme].sat, 0.78f + 0.14f * (c & 1)) : mp3_chcol0[c];
     mp3_body = T[g_ctheme].body; mp3_facec = T[g_ctheme].face; mp3_lcd0 = T[g_ctheme].l0; mp3_lcd1 = T[g_ctheme].l1;
     mp3_ink = T[g_ctheme].ink; mp3_acc = T[g_ctheme].acc; mp3_themegen++;
     if (g_ctheme)
@@ -498,7 +498,8 @@ static void mp3_labels(void)
         if (p.z < 0.2f) continue;
         snprintf(b, sizeof b, "%s", pick[j] == 9 ? drum_kit(g_viz.prog[9]) : gm_names[g_viz.prog[pick[j]] & 127]);
         len = (int)strlen(b) * 8;
-        m3_text_sh(&m3_scr, (int)(M3W / 2 + p.x * f / p.z) - len / 2, (int)(M3H / 2 - p.y * f * m3_fyk / p.z) - 12 - j * 2, 0, b, mp3_chcol[pick[j]]);
+        { int lx = (int)(M3W / 2 + p.x * f / p.z) - len / 2; if (lx < 4) lx = 4; if (lx > M3W - len - 4) lx = M3W - len - 4;
+        m3_text_sh(&m3_scr, lx, (int)(M3H / 2 - p.y * f * m3_fyk / p.z) - 12 - j * 12, 0, b, mp3_chcol[pick[j]]); }
     }
 }
 
@@ -508,7 +509,7 @@ static void mp3_scene_rest(const Song* s, const char* name, double frac, int pau
     float H = 0.62f;
     if (g_scene == 1)
     {   /* ---------------------------------------------------- vector */
-        uint32_t acc = g_ctheme ? m3_gridc : 0x40FF90, dim = m3_mul(acc, 110 + (int)(mp3_drum * 140));
+        uint32_t acc = g_ctheme ? m3_lerpc(m3_gridc, 0xFFFFFF, 60) : 0x40FF90, dim = m3_mul(acc, 70 + (int)(mp3_drum * 60));
         float off = fmodf(ta * 1.5f, 1.0f), fy = -H - 0.02f;
         for (i = -10; i <= 10; i++) mp3_line3(m3_v(i * 1.0f, fy, -5.5f), m3_v(i * 1.0f, fy, 22), dim);
         for (i = 0; i < 26; i++) { float z = -5.5f + i - off; mp3_line3(m3_v(-10, fy, z), m3_v(10, fy, z), dim); }
@@ -671,7 +672,7 @@ static void mp3_draw(const Song* s, const char* name, uint64_t el_us, uint64_t t
     m3_fog = m3_fogc; m3_fog0 = 8; m3_fog1 = 24;
     mp3_theme_apply();                        /* C: colour theme over the style's colours */
     mp3_notes_scan((float)ta, dt);            /* new notes: the river, falling blocks, the drums' pulse */
-    m3_camera(0.6f * sinf((float)ta * 0.2f), 0.55f + 0.08f * sinf((float)ta * 0.13f) + (g_model == 2 ? 0.35f : 0) + 0.025f * mp3_drum, -6.6f - (g_model == 2 ? 0.6f : 0), -0.1f * sinf((float)ta * 0.2f), -0.16f);
+    m3_camera(0.6f * sinf((float)ta * 0.2f), 0.55f + 0.08f * sinf((float)ta * 0.13f) + (g_model == 2 ? 0.35f : 0) + 0.01f * mp3_drum, -6.6f - (g_model == 2 ? 0.6f : 0), -0.1f * sinf((float)ta * 0.2f), -0.16f);
     if (g_scene == 1)
     {   /* vector: always full resolution; last frame fades to 5/8 (afterglow) instead of a new sky */
         uint32_t* p = m3_fb; int i2, n2 = M3W * M3H;
