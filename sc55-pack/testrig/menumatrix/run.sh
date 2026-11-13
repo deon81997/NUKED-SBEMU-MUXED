@@ -3,7 +3,8 @@
 # MENU matrix part 2: run.sh DOS MODE HC PLUG [WORK]
 #   DOS  fd = FreeDOS (testrig/rufus/res/freedos), 71 = MS-DOS 7.1 (IO.SYS/MSDOS.SYS/COMMAND.COM/HIMEM.SYS from the
 #        Windows 98 QuickInstall v1.1.0 FULL.866, testrig/padkeys/mercy.py; folder $Q71, default /tmp/dl/w98qi/x)
-#   MODE j32 = JEMMEX + HDPMI32I + SBEMU; x32 = HIMEM.SYS only (no EMM) + HDPMI32I + SBEMU;
+#   MODE j32 = JEMMEX + HDPMI32I + SBEMU; x32 = HIMEM.SYS only (no EMM; FreeDOS: HimemX, $HX: github.com/
+#        Baron-von-Riedesel/HimemX built with JWasm, `jwasm -mz HimemX.asm`) + HDPMI32I + SBEMU;
 #        j16 = JEMMEX + QPIEMU + HDPMI16I + HDPMI32I + SBEMU + SBEMU16 (SC55J16.BAT order)
 #   HC   uhci (PIIX3), ohci (pci-ohci), ehci (ICH9 EHCI, high speed), ehcic (ICH9 EHCI + UHCI companions, sticks
 #        behind a full-speed hub -> companion), xhci (qemu-xhci, USB 2 ports)
@@ -19,11 +20,11 @@ rm -rf $W; mkdir -p $W/c/T $W/c/SC55/SF2 $W/c/CDSET $W/c/HDPMI $W/c/JEMM; C=$W/c
 cp $REL/CDSET/* $C/CDSET/; cp $REL/HDPMI/*.EXE $C/HDPMI/; cp $REL/JEMM/* $C/JEMM/; cp $SF $C/SC55/SF2/T.SF2
 for f in SBEMU USBDRV MPUTEST SBDIAG; do cp $R/output/$(echo $f | tr A-Z a-z).exe $C/SC55/$f.EXE; done
 cp $REL/SC55/SBEMU16.COM $C/SC55/; for f in UCDD.EXE SHSUCDX.COM; do [ -f $R/output/cdset/$f ] && cp $R/output/cdset/$f $C/CDSET/; done; [ -f $R/output/sbemu16.com ] && cp $R/output/sbemu16.com $C/SC55/SBEMU16.COM
-cp $T/dos/*.BAT $C/T/; nasm -f bin -o $C/DELAY.COM $R/testrig/delay.asm
+cp $T/dos/*.BAT $C/T/; nasm -f bin -o $C/DELAY.COM $R/testrig/delay.asm; nasm -f bin -o $C/T/HASISO.COM $T/dos/HASISO.ASM
 if [ $D = 71 ]; then cp $Q71/IO.SYS $Q71/COMMAND.COM $C/; cp $Q71/WINDOWS/HIMEM.SYS $C/
   tr -d '\r' < $Q71/MSDOS.SYS | sed 's/^BootGUI=1/BootGUI=0/;s/^Logo=1/Logo=0/;s/^AutoScan=1/AutoScan=0/' | sed 's/$/\r/' > $C/MSDOS.SYS
   export MKDISK_BOOT=msdos
-else cp $R/testrig/rufus/res/freedos/KERNEL.SYS $R/testrig/rufus/res/freedos/COMMAND.COM $C/; cp $Q71/WINDOWS/HIMEM.SYS $C/; unset MKDISK_BOOT; fi
+else cp $R/testrig/rufus/res/freedos/KERNEL.SYS $R/testrig/rufus/res/freedos/COMMAND.COM $C/; cp ${HX:-/tmp/dl/HIMEMX.EXE} $C/HIMEM.SYS; unset MKDISK_BOOT; fi   # MS HIMEM hangs the FreeDOS kernel: HimemX
 { if [ $MODE = x32 ]; then printf 'DEVICE=C:\\HIMEM.SYS\r\nDOS=HIGH\r\n'; else printf 'DEVICE=C:\\JEMM\\JEMMEX.EXE NOEMS\r\nDOS=HIGH,UMB\r\n'; fi
   printf 'FILES=40\r\nLASTDRIVE=Z\r\n'; } > $C/CONFIG.SYS
 SB="C:\SC55\SBEMU.EXE /JOY:1 /USBDISK:1 /VSF:C:\SC55\SF2\T.SF2 ${SBX:-}"

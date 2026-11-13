@@ -3567,12 +3567,18 @@ static void set_leds(void)
     LedsHave = l;
 }
 
+static int xhci_pipes(int h)                     /* xHCI h has a pad / keyboard / mouse pipe (disks poll their own events) */
+{
+    int k;
+    for (k = 0; k < MAX_PIPE; ++k) if (P[k].used && P[k].hc == h) return 1;
+    return 0;
+}
 static void step(void)
 {
     uint64_t t;
     int k, h, p;
     for (h = 0; h < HCn; ++h)                                           /* xHCI: transfer events to the pipes */
-        if (HC[h].type == T_XHCI && HC[h].nports && (HC[h].own || !Light)) x_events(h);
+        if (HC[h].type == T_XHCI && HC[h].nports && (xhci_pipes(h) || !Light)) x_events(h);
     for (k = 0; k < MAX_PIPE; ++k) if (P[k].used) pipe_poll(k);
     if (Light) return;
     t = tsc();
