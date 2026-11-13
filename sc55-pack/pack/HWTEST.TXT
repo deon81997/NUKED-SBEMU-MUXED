@@ -1,0 +1,39 @@
+NUKED SB-EMU - REAL HARDWARE CHECKLIST (beta.104)
+Things an emulator cannot confirm. Tick each one; for any failure keep
+C:\SC55\BUGREP.TXT (MENU > Tests > Bug report) and CRASH.TXT if there is one.
+
+DELL LATITUDE D810 (ICH6 UHCI + EHCI, SigmaTel AC'97, Dell keyboard controller)
+[ ] Sound: first note of a MIDI file and first sound of a game after some
+    seconds of silence - no click, nothing missing.
+[ ] Sound at 48 kHz (Settings > sample rate) - clean, not garbled (22 kHz is).
+[ ] After Windows 98 "Restart in MS-DOS mode": SBEMU has sound, USB pad works.
+[ ] USB Xbox 360 pad: JOYTEST sticks/buttons, then one real game with the pad.
+[ ] USB keyboard + USB mouse in SBEMU: KMTEST, then MENU and a game.
+[ ] Touchpad still works next to a USB mouse (CTMOUSE / MOUSE.COM).
+[ ] USB stick with /USBDISK:1 (MENU > Settings > Joystick > USB sticks):
+    FAT16, FAT32, exFAT and NTFS sticks get letters; COPY a big file from
+    each; unplug / replug; a game running from the stick while music plays.
+[ ] Two-partition stick used in Windows 98 first, then MS-DOS mode: both
+    letters readable (MENU > CD-ROM > USB drives).
+[ ] CD image (CD-ROM screen) with CD audio in a game, booted via BOOTCFG.
+[ ] MIDPLAY: 80x25, 80x50, 640x480 (F4) and 3D (S); 3D looks V (solid,
+    vector, voxel) - is voxel smooth enough?; Options > 3D screen mode.
+[ ] MENU 3D (F8): every style (F3), F4, F6.
+[ ] A 3D DOS game (Quake / Descent / Duke 3D) with SB sound + pad: no glitches.
+
+ASUS P5PE-VM (+ NEC uPD720101 USB card, wired Xbox 360 pad, Logitech receiver)
+[ ] beta.102 fix: Logitech receiver on the NEC card - MENU 3D F2/F3 and
+    MIDPLAY 3D V / C / J for a few minutes each: no GPF / "Stack Fault".
+    If it crashes: photo of the whole crash screen (all registers).
+[ ] Wired 360 pad on the NEC card and on the board's own USB: JOYTEST.
+[ ] USB stick on the NEC card (EHCI) with /USBDISK:1: DIR, COPY, a game.
+[ ] USBTEST.EXE (SBEMU not loaded): every device found, input shown.
+[ ] MIDPLAY 3D speed with voxel look; Options > 3D screen mode / refresh.
+[ ] Sound card in use: MIDI + digital sound in one game, 10 minutes.
+
+BOTH
+[ ] MS-DOS 7.1 (Win98 boot) and, if you have it, MS-DOS 6.22 boot disk:
+    SBEMU with USB sticks - spare letters D:/E: and exFAT/NTFS letters.
+[ ] MIDPLAY in a Windows 98 DOS box: windowed (Alt+Enter) and full screen,
+    text, panel and 3D views.
+[ ] SBEMU unload (if used) and back to the prompt without a hang.

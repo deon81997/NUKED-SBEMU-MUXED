@@ -1,3 +1,19 @@
+## beta.104 (2026-11-13, DOS session): emulator-coverable "NOT tested" items closed; HWTEST.TXT for the real PCs
+- exFAT / NTFS through the release build (beta.103 SBEMU, FreeDOS, QEMU EHCI, testrig/qemu-usbdrive.sh + new testrig/mkxn.sh
+  images): stick 1 MBR NTFS + exFAT (F: G:), stick 2 GPT exFAT (H:); DIR, long-name aliases, nested TYPE, 40-entry dir,
+  300 KB COPY from all three byte-exact, COPY to / DEL / MD refused and volumes unchanged. Spare FAT letters D:/E: listed
+  as "no FAT partition". PASS. Note: NTFS times show UTC (Windows stores UTC; DOS has no zone) - left as is.
+- 86Box (testrig/86box/run86.py VMDIR OUT): Pentium 133 (P/I-P55TP4XE) and Celeron (Mendocino) 300 (Acorp 6VIA90AP), ViRGE/DX,
+  ES1371, 64 MB: SBEMU loads; MIDPLAY text, panel, 3D, 3 looks x 4 players, themes cycled, quits; MENU text, 3D, styles
+  (Panels/Carousel/Module), back to text; no CRASH.TXT. 30/30 PASS each. "Few frames" hint shown in 3D on both (expected).
+- SC-55 ROM sets + MT-32 in notetest: done by the other session (see its 063ee1f note: 75 runs, 0 dropped).
+- NOT coverable here (need the user's files): MIDPLAY in a Win98 DOS box (no Win98 image), MS-DOS 6.22 / 7.1 with spare
+  USB letters (no IO.SYS/MSDOS.SYS). Both are in HWTEST.TXT; with the user's QuickInstall ISO (testrig/padkeys/isols.py)
+  a later session can do them in QEMU.
+- MENU shows "SBEMU not loaded" when no SC-55 ROMs / SoundFont are present (mpu_find needs SBEMU's synth) - by design?
+- HWTEST.TXT (pack/HWTEST.TXT -> NUKEDSB\HWTEST.TXT): one checklist per PC (D810, P5PE-VM) + both.
+- Zip: beta.103 + SBEMU.EXE, SC55MENU.EXE (version) swapped, HWTEST.TXT added.
+
 
 ## beta.103 (2026-11-13): MIDPLAY "out of memory" for songs on 8-12 MB PCs fixed
 - Cause: at start MIDPLAY prepared the 3D frame + depth buffers (640x480: 2.4 MB, more with DJGPP malloc rounding)
