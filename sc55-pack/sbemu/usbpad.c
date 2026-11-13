@@ -196,7 +196,7 @@ extern void PCI_WriteDWord(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg, 
 #define TRB_TYPE(t) ((uint32_t)(t) << 10)
 #define TRB_GTYPE(c) (((c) >> 10) & 0x3F)
 enum { TT_NORMAL = 1, TT_SETUP = 2, TT_DATA = 3, TT_STATUS = 4, TT_LINK = 6, TT_ENSLOT = 9, TT_DISSLOT = 10,
-       TT_ADDR = 11, TT_CONFEP = 12, TT_EVAL = 13, TT_RESETEP = 14, TT_SETDEQ = 16,
+       TT_ADDR = 11, TT_CONFEP = 12, TT_EVAL = 13, TT_RESETEP = 14, TT_STOPEP = 15, TT_SETDEQ = 16,
        TT_EV_XFER = 32, TT_EV_CMD = 33 };
 #define XCMD_TRBS 32
 #define XEVT_TRBS 128
@@ -231,7 +231,8 @@ typedef struct
 #define XO_IN   0x4000                  /* input context */
 #define XO_DEV  0x5000                  /* + device * 2048: output device contexts */
 #define XO_SPA  0xD000                  /* scratchpad buffer array */
-#define XO_SIZE 0xE000
+#define XO_MSD  0xE000                  /* + disk * 0x400: bulk OUT ring 0, bulk IN ring 0x200 */
+#define XO_SIZE 0xF000
 
 typedef struct
 {
@@ -298,6 +299,10 @@ typedef struct
     uint32_t tag, gen;
     int lok[MAX_LUN];                   /* LUN is a disk (INQUIRY type 0 / 0Eh) */
     USBPAD_Disk lun[MAX_LUN];
+    Ring xr[2];                         /* xHCI: bulk OUT [0] / IN [1] transfer rings */
+    uint32_t xtrb[2][4];                /* xHCI: the TRBs of the transfer in flight (events for others are stale) */
+    int xn[2], xi[2], xcc[2], xres[2];  /* their count; event: which TRB, completion code, residue */
+    volatile int xdone[2];
 } Msd;
 static Msd       Ms[MAX_MSD];
 static uint32_t  MsGen;
@@ -945,10 +950,13 @@ static uint32_t ring_push(Ring* r, uint32_t p0, uint32_t p1, uint32_t st, uint32
 static uint32_t ring_deq(const Ring* r) { return (r->ph + r->enq * 16) | (r->cyc ? 1 : 0); }
 
 /* drain the event ring of controller h */
+static volatile int XEvBusy;            /* x_events running (the interrupt's light step skips it meanwhile) */
 static void x_events(int h)
 {
     XHC* x = HC[h].x;
     int guard = 0, k;
+    if (XEvBusy) return;
+    XEvBusy = 1;
     for (;;)
     {
         volatile uint32_t* e = x->ev.t + x->ev.enq * 4;
@@ -969,6 +977,16 @@ static void x_events(int h)
                 if (ep == (q->out ? q->ep * 2 : q->ep * 2 + 1)) { q->xcc = cc; q->xres = (int)(e[2] & 0xFFFFFF); q->xdone = 1; break; }
                 if (q->outep && ep == q->outep * 2) { q->xocc = cc; q->xodone = 1; break; }
             }
+            for (k = 0; k < MAX_MSD; ++k)
+            {
+                Msd* s = &Ms[k];
+                int in, i;
+                if (!s->used || s->hc != h || D[s->dev].slot != slot) continue;
+                in = ep == s->in * 2 + 1 ? 1 : ep == s->out * 2 ? 0 : -1;
+                if (in < 0 || s->xdone[in]) continue;
+                for (i = 0; i < s->xn[in] && s->xtrb[in][i] != e[0]; ++i) {}
+                if (i < s->xn[in]) { s->xi[in] = i; s->xcc[in] = cc; s->xres[in] = (int)(e[2] & 0xFFFFFF); s->xdone[in] = 1; }
+            }
         }
         if (++x->ev.enq == XEVT_TRBS) { x->ev.enq = 0; x->evcyc ^= 1; }
         wr(x->rt + 0x38, x->ev.ph + x->ev.enq * 16);              /* ERDP (keeps EHB) */
@@ -976,6 +994,7 @@ static void x_events(int h)
     }
     wr(x->rt + 0x38, (x->ev.ph + x->ev.enq * 16) | 8);            /* ring empty: release EHB */
     wr(x->rt + 0x3C, 0);
+    XEvBusy = 0;
 }
 
 /* run one command; returns its completion code (1 = success), -1 timeout */
@@ -1655,7 +1674,7 @@ static int send_out(int k, const uint8_t* data, int len)
  * Synchronous, from the caller's context (USBPAD_Disk*) or from enumeration; nothing runs while no disk request
  * is made (no periodic transfers). UHCI: the TDs go on the control QH (one transfer at a time anyway); OHCI: the
  * disk's own IN / OUT EDs on the bulk list (put there at reset; only head / tail are written, while skipped:
- * no tail append, see oslow); EHCI: the async QH as for control transfers. xHCI: not yet. */
+ * no tail append, see oslow); EHCI: the async QH as for control transfers; xHCI: bulk rings per disk (x_bulk). */
 #define BCHUNK 2048                     /* bytes per bulk run (UHCI: 32 TDs of 64; EHCI) */
 #define OCHUNK 8192                     /* OHCI: per run, one 16-byte TD per packet (OT, 4 KB: 128 + CSW + tail) */
 #define OTN    140
@@ -1768,6 +1787,93 @@ static int e_bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, ui
     }
     fl(buf, len ? len : 1);
     if (csw) fl(csw, 16);
+    return got;
+}
+
+/* ---------------- xHCI disks: a bulk OUT and a bulk IN ring per disk (XO_MSD), added with one Configure Endpoint;
+ * a transfer = Normal TRBs (split at 64 KB lines, IN: ISP), IOC on the last; done = the event for the last TRB or
+ * a short packet's (an event for any other TRB is a leftover of an earlier transfer and is ignored) */
+static int x_disk_eps(Msd* s, int which, int redo)   /* which: bit 0 OUT, bit 1 IN; redo: drop + add (new ring, DATA0) */
+{
+    const Dev* d = &D[s->dev];
+    int h = s->hc, m = (int)(s - Ms), k, in, maxd = d->maxdci;
+    XHC* x = HC[h].x;
+    volatile uint32_t* ic = x->inctx;
+    volatile uint32_t* sc;
+    volatile uint32_t* out = x_out(h, s->dev);
+    zero(ic, 33 * 16);
+    ic[1] = 1;
+    for (in = 0; in < 2; ++in)
+    {
+        int dci = in ? s->in * 2 + 1 : s->out * 2;
+        uint32_t o = XO_MSD + (uint32_t)m * 0x400 + (in ? 0x200 : 0);
+        volatile uint32_t* e;
+        if (!(which & (1 << in))) continue;
+        if (redo)
+        {
+            x_cmd(h, 0, TRB_TYPE(TT_STOPEP) | ((uint32_t)d->slot << 24) | ((uint32_t)dci << 16), NULL);   /* halted: refused, fine */
+            ic[0] |= 1UL << dci;
+        }
+        ring_init(&s->xr[in], (volatile uint32_t*)((uint8_t*)x->mem.linearptr + o), x->pbase + o, XRING_TRBS);
+        ic[1] |= 1UL << dci;
+        if (dci > maxd) maxd = dci;
+        e = x_ctx(h, ic, dci + 1);
+        e[0] = 0;
+        e[1] = (3UL << 1) | ((in ? 6UL : 2UL) << 3) | ((uint32_t)s->mps << 16);
+        e[2] = s->xr[in].ph | 1; e[3] = 0; e[4] = 3072;
+    }
+    sc = x_ctx(h, ic, 1);
+    fl(out, 64);
+    for (k = 0; k < 4; ++k) sc[k] = out[k];
+    sc[0] = (sc[0] & ~(0x1FUL << 27)) | ((uint32_t)maxd << 27);
+    sc[3] = 0;
+    k = x_cmd(h, x->pbase + XO_IN, TRB_TYPE(TT_CONFEP) | ((uint32_t)d->slot << 24), NULL);
+    if (k != 1) { trace("x-bulk-conf cc%d ", k); return -1; }
+    D[s->dev].maxdci = maxd;
+    return 0;
+}
+static int x_bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us)
+{
+    int h = s->hc, n = 0, i, got, left = len, mps = s->mps;
+    uint32_t pb = PHYS(buf), lens[4];
+    uint64_t end;
+    s->xdone[in] = 0; s->xn[in] = 0;
+    do
+    {
+        uint32_t a = pb + (uint32_t)(len - left), c = 0x10000UL - (a & 0xFFFFUL), tds;
+        if (c > (uint32_t)left) c = (uint32_t)left;
+        lens[n] = c;
+        tds = (uint32_t)((left - (int)c + mps - 1) / mps); if (tds > 31) tds = 31;   /* TD size: packets after this TRB */
+        left -= (int)c;
+        s->xtrb[in][n] = s->xr[in].enq * 16 + s->xr[in].ph;
+        s->xn[in] = n + 1;
+        ring_push(&s->xr[in], c ? a : 0, 0, c | (tds << 17),
+            TRB_TYPE(TT_NORMAL) | (in ? (1UL << 2) : 0) | (left > 0 ? (1UL << 4) : (1UL << 5)));
+        ++n;
+    } while (left > 0 && n < 4);
+    wr(HC[h].x->db + D[s->dev].slot * 4, (uint32_t)(in ? s->in * 2 + 1 : s->out * 2));
+    end = tsc() + us2c(timeout_us);
+    for (;;)
+    {
+        x_events(h);
+        if (s->xdone[in] && (s->xi[in] == n - 1 || s->xcc[in] != 1)) break;
+        if (tsc() > end) break;
+    }
+    if (!s->xdone[in] || (s->xcc[in] != 1 && s->xcc[in] != 13))
+    {
+        trace("[xb%s cc%d] ", in ? "i" : "o", s->xdone[in] ? s->xcc[in] : -1);
+        return -1;                                            /* the caller's msd_clear sets the endpoint up again */
+    }
+    for (got = 0, i = 0; i < s->xi[in]; ++i) got += (int)lens[i];
+    got += (int)lens[s->xi[in]] - s->xres[in];
+    if (s->xcc[in] == 13 && s->xi[in] < n - 1)               /* short before the last TRB: the rest is skipped */
+    {   /* the controller may or may not report the last TRB too: wait for it a moment, so it can't land later */
+        uint64_t e2 = tsc() + us2c(2000);
+        s->xdone[in] = 0;
+        s->xtrb[in][0] = s->xtrb[in][n - 1]; s->xn[in] = 1;
+        while (!s->xdone[in] && tsc() < e2) x_events(h);
+    }
+    fl(buf, len ? len : 1);
     return got;
 }
 
@@ -1970,6 +2076,8 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
     }
     case T_EHCI:
         return e_bulk(s, in, buf, len, timeout_us, csw);
+    case T_XHCI:
+        return x_bulk(s, in, buf, len, timeout_us);
     default:
         return -1;
     }
@@ -1981,6 +2089,7 @@ static int bulk(Msd* s, int in, uint8_t* buf, int len, uint32_t timeout_us, uint
 static void msd_clear(Msd* s, int in)                 /* CLEAR_FEATURE(ENDPOINT_HALT), toggle back to DATA0 */
 {
     if (HC[s->hc].type == T_EHCI) e_qh_reset(s, in);
+    if (HC[s->hc].type == T_XHCI) x_disk_eps(s, in ? 2 : 1, 1);   /* stop, drop + add: new ring, host toggle DATA0 */
     control(s->dev, 0x02, 1, 0, (uint16_t)(in ? s->in | 0x80 : s->out), 0);
     if (in) s->tin = 0; else s->tout = 0;
 }
@@ -2013,7 +2122,7 @@ static int msd_cmd(Msd* s, int lun, const uint8_t* cdb, int cdblen, int in, uint
     }
     while (!comb && done < len)
     {
-        int max = HC[s->hc].type == T_EHCI ? DCMD : BCHUNK, c = len - done > (uint32_t)max ? max : (int)(len - done);
+        int max = HC[s->hc].type == T_EHCI || HC[s->hc].type == T_XHCI ? DCMD : BCHUNK, c = len - done > (uint32_t)max ? max : (int)(len - done);
         if (!in) memcpy(db, data + done, c);
         r = bulk(s, in, db, c, 5000000, NULL);
         if (r < 0) { msd_clear(s, in); break; }              /* STALL: the CSW says how it ended */
@@ -2098,6 +2207,7 @@ static void msd_add(int di, int ifc, int in, int out, int mps)
     memset(s, 0, sizeof(*s));
     s->dev = di; s->hc = D[di].hc; s->ifc = ifc; s->in = in; s->out = out; s->mps = mps;
     if (HC[s->hc].type == T_EHCI) { s->used = 1; e_disk_init(s); s->used = 0; }
+    if (HC[s->hc].type == T_XHCI && x_disk_eps(s, 3, 0) != 0) return;
     s->nlun = 1;
     if (control(di, 0xA1, 0xFE, 0, (uint16_t)ifc, 1) == 0) s->nlun = (CBuf[16] & 15) + 1;   /* GET_MAX_LUN (STALL: one) */
     if (s->nlun > MAX_LUN) s->nlun = MAX_LUN;
@@ -3151,7 +3261,6 @@ static int enumerate_(int di)
     for (k = 0; k < MAX_MSD && Ms[k].used; ++k) {}
     wantmsd = mifc >= 0 && min && mout && (Flags & USBPAD_F_DISK) && k < MAX_MSD;
     if (mifc >= 0 && !wantmsd) trace("disk not used%s ", (Flags & USBPAD_F_DISK) ? "" : " (off)");
-    if (wantmsd && HC[h].type == T_XHCI) { trace("disk on xHCI: not yet "); wantmsd = 0; }
     if (wantmsd && HC[h].type == T_OHCI && HC[h].ctlbulk && !getenv("USBCTLBULK"))
     {   /* NEC uPD720101 OHCI: disk transfers were marked done without being done, and try 10 froze the P5PE-VM
          * (likely the chip following stale TDs). Left alone until disks go through its EHCI (USB 2.0) */

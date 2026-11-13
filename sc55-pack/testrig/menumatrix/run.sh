@@ -17,7 +17,7 @@ T=$(cd "$(dirname "$0")" && pwd); R=$(cd $T/../.. && pwd); ST=${ST:-/home/claude
 SF=${SF:-/tmp/dl/timgm6mb/x/usr/share/sounds/sf2/TimGM6mb.sf2}; REL=${REL:-/tmp/rel/NUKEDSB/FILES}
 rm -rf $W; mkdir -p $W/c/T $W/c/SC55/SF2 $W/c/CDSET $W/c/HDPMI $W/c/JEMM; C=$W/c
 cp $REL/CDSET/* $C/CDSET/; cp $REL/HDPMI/*.EXE $C/HDPMI/; cp $REL/JEMM/* $C/JEMM/; cp $SF $C/SC55/SF2/T.SF2
-for f in SBEMU USBDRV MPUTEST; do cp $R/output/$(echo $f | tr A-Z a-z).exe $C/SC55/$f.EXE; done
+for f in SBEMU USBDRV MPUTEST SBDIAG; do cp $R/output/$(echo $f | tr A-Z a-z).exe $C/SC55/$f.EXE; done
 cp $REL/SC55/SBEMU16.COM $C/SC55/; for f in UCDD.EXE SHSUCDX.COM; do [ -f $R/output/cdset/$f ] && cp $R/output/cdset/$f $C/CDSET/; done; [ -f $R/output/sbemu16.com ] && cp $R/output/sbemu16.com $C/SC55/SBEMU16.COM
 cp $T/dos/*.BAT $C/T/; nasm -f bin -o $C/DELAY.COM $R/testrig/delay.asm
 if [ $D = 71 ]; then cp $Q71/IO.SYS $Q71/COMMAND.COM $C/; cp $Q71/WINDOWS/HIMEM.SYS $C/
@@ -26,27 +26,27 @@ if [ $D = 71 ]; then cp $Q71/IO.SYS $Q71/COMMAND.COM $C/; cp $Q71/WINDOWS/HIMEM.
 else cp $R/testrig/rufus/res/freedos/KERNEL.SYS $R/testrig/rufus/res/freedos/COMMAND.COM $C/; cp $Q71/WINDOWS/HIMEM.SYS $C/; unset MKDISK_BOOT; fi
 { if [ $MODE = x32 ]; then printf 'DEVICE=C:\\HIMEM.SYS\r\nDOS=HIGH\r\n'; else printf 'DEVICE=C:\\JEMM\\JEMMEX.EXE NOEMS\r\nDOS=HIGH,UMB\r\n'; fi
   printf 'FILES=40\r\nLASTDRIVE=Z\r\n'; } > $C/CONFIG.SYS
-SB='C:\SC55\SBEMU.EXE /JOY:1 /USBDISK:1 /VSF:C:\SC55\SF2\T.SF2'
-{ printf '@ECHO OFF\r\nSET PATH=C:\\;C:\\SC55\r\nVER > C:\\UT.TXT\r\nMEM >> C:\\UT.TXT\r\n'
+SB="C:\SC55\SBEMU.EXE /JOY:1 /USBDISK:1 /VSF:C:\SC55\SF2\T.SF2 ${SBX:-}"
+{ printf '@ECHO OFF\r\nSET PATH=C:\\;C:\\SC55\r\nSET SBEMULOG=C:\\SB.TXT\r\nVER > C:\\UT.TXT\r\nMEM >> C:\\UT.TXT\r\n'
   [ $MODE = j16 ] && printf 'C:\\JEMM\\JLOAD.EXE C:\\JEMM\\QPIEMU.DLL >> C:\\UT.TXT\r\nC:\\HDPMI\\HDPMI16I.EXE -r >> C:\\UT.TXT\r\n'
   printf 'C:\\HDPMI\\HDPMI32I.EXE -r -x >> C:\\UT.TXT\r\nECHO PLUG1> COM1\r\nDELAY\r\n%s > C:\\SB.TXT\r\n' "$SB"
   [ $MODE = j16 ] && printf 'C:\\SC55\\SBEMU16.COM >> C:\\UT.TXT\r\n'
-  printf 'ECHO PLUG2> COM1\r\nDELAY\r\nCALL C:\\T\\ALL.BAT A\r\nECHO SWAP> COM1\r\nDELAY\r\nCALL C:\\T\\ALL.BAT B\r\nECHO DONE>> C:\\UT.TXT\r\nECHO DONE> COM1\r\n'
+  printf 'ECHO PLUG2> COM1\r\nDELAY\r\nC:\\SC55\\SBDIAG.EXE START > NUL\r\nC:\\SC55\\MPUTEST.EXE /P:330 > NUL\r\nCALL C:\\T\\ALL.BAT A\r\nECHO SWAP> COM1\r\nDELAY\r\nCALL C:\\T\\ALL.BAT B\r\nC:\\SC55\\SBDIAG.EXE > NUL\r\nECHO DONE>> C:\\UT.TXT\r\nECHO DONE> COM1\r\n'
 } > $C/AUTOEXEC.BAT
 python3 $R/testrig/mkdisk.py build $C $W/q.img 100 >/dev/null || { echo "MKDISK FAILED"; exit 1; }
 case $HC in
   uhci) QX="-device piix3-usb-uhci,id=hc,addr=5"; BUS=hc.0;;
   ohci) QX="-device pci-ohci,id=hc,addr=5"; BUS=hc.0;;
-  xhci) QX="-device qemu-xhci,id=hc,addr=5"; BUS=hc.0;;
+  xhci) QX="-device qemu-xhci,id=hc,addr=5,p2=8,p3=0"; BUS=hc.0;;
   ehci|ehcic) QX="-device ich9-usb-ehci1,id=ehci,addr=1d.7,multifunction=on -device ich9-usb-uhci1,masterbus=ehci.0,firstport=0,addr=1d.0,multifunction=on -device ich9-usb-uhci2,masterbus=ehci.0,firstport=2,addr=1d.1,multifunction=on -device ich9-usb-uhci3,masterbus=ehci.0,firstport=4,addr=1d.2,multifunction=on"; BUS=ehci.0;;
 esac
 cp $ST/s1.img $ST/s2.img $ST/s3.img $W/
 MON=$W/mon.sock; M() { echo "$1" | socat - UNIX-CONNECT:$MON >/dev/null 2>&1; }
-timeout ${TMO:-420} qemu-system-i386 -m 64 -display none -no-reboot -audiodev wav,id=a,path=$W/out.wav -device AC97,audiodev=a \
+timeout ${TMO:-420} qemu-system-i386 -m 64 -display none -no-reboot -audiodev wav,id=a,path=$W/out.wav${AUDX-,timer-period=2000} -device AC97,audiodev=a \
   -drive file=$W/q.img,format=raw,if=ide,index=0 $QX -serial file:$W/com1.txt \
   -drive if=none,id=s1,file=$W/s1.img,format=raw,readonly=on -drive if=none,id=s2,file=$W/s2.img,format=raw,readonly=on \
   -drive if=none,id=s3,file=$W/s3.img,format=raw,readonly=on -monitor unix:$MON,server,nowait > $W/qemu.log 2>&1 & QP=$!
-plug() { if [ $HC = ehcic ]; then M "device_add usb-hub,bus=$BUS,port=1,id=hub"; sleep 0.3
+plug() { [ -n "${NOPLUG:-}" ] && return; if [ $HC = ehcic ]; then M "device_add usb-hub,bus=$BUS,port=1,id=hub"; sleep 0.3
            M "device_add usb-storage,bus=$BUS,port=1.1,drive=s1,id=us1"; M "device_add usb-storage,bus=$BUS,port=1.2,drive=s2,id=us2"
          else M "device_add usb-storage,bus=$BUS,port=1,drive=s1,id=us1"; M "device_add usb-storage,bus=$BUS,port=2,drive=s2,id=us2"; fi; }
 want=PLUG1; [ $PLUG = after ] && want=PLUG2; st=0
@@ -57,7 +57,7 @@ while kill -0 $QP 2>/dev/null; do sleep 0.5; s=$(tr -d '\r' < $W/com1.txt 2>/dev
   if echo "$s" | grep -q '^DONE'; then sleep 1; M "screendump $W/screen.ppm"; sleep 1; M quit; break; fi
 done
 [ $st = 2 ] || M "screendump $W/screen.ppm"; wait $QP 2>/dev/null
-python3 $R/testrig/mkdisk.py get $W/q.img UT.TXT $W/UT.TXT >/dev/null 2>&1; python3 $R/testrig/mkdisk.py get $W/q.img SB.TXT $W/SB.TXT >/dev/null 2>&1
+python3 $R/testrig/mkdisk.py get $W/q.img UT.TXT $W/UT.TXT >/dev/null 2>&1; python3 $R/testrig/mkdisk.py get $W/q.img SB.TXT $W/SB.TXT >/dev/null 2>&1; python3 $R/testrig/mkdisk.py get $W/q.img SBDETAIL.TXT $W/SBDETAIL.TXT >/dev/null 2>&1; python3 $R/testrig/mkdisk.py get $W/q.img SC55\\SBDIAG.TXT $W/SBDIAG.TXT >/dev/null 2>&1; python3 $R/testrig/mkdisk.py get $W/q.img SBDIAG.TXT $W/SBDIAG.TXT >/dev/null 2>&1
 grep -q '^DONE' <(tr -d '\r' < $W/com1.txt 2>/dev/null) || echo "TIMEOUT (stage $st)"
 # byte check of each install against the stick's DATA.BIN
 for d in $(tr -d '\r' < $W/UT.TXT 2>/dev/null | awk '/^CASE/{l=$2; p=$4} /^INSTALL OK/{print p l}'); do
