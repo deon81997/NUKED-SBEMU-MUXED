@@ -35,6 +35,7 @@ def sh(*a, **k):
 
 
 def release_zip():
+    if os.environ.get('MX_ZIP'): return os.environ['MX_ZIP']      # a candidate zip (mkzip.py)
     d = os.path.join(REPO, 'release')
     return os.path.join(d, sorted(f for f in os.listdir(d) if f.endswith('.zip'))[-1])
 

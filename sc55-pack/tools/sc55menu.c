@@ -656,7 +656,9 @@ static int pick_file(char* out, size_t sz, int cd)
     { char* bs = strrchr(dir, '\\'); if (bs && out[0]) bs[1] = 0; }
     crit_on();
     if (!crit_dir_ok(dir)) { if (cd) cd_home(dir, sizeof dir); if (!crit_dir_ok(dir)) snprintf(dir, sizeof dir, "C:\\"); }
+    void (*anim_was)(unsigned long) = tui_anim;
     memcpy(save, tui_scr, sizeof save);
+    tui_anim = 0;               /* the header animation would draw over the title and the folder line */
     tui_zoom(10, 3, 60, 21, 0x1F);
     for (;;)
     {
@@ -689,8 +691,8 @@ static int pick_file(char* out, size_t sz, int cd)
                 tui_putw(12, 6 + i, 56, k == sel ? 0x5F : (e[k].dir ? 0x1B : 0x1F), b);
             }
             if (!n) tui_put(13, 6, 0x17, cd ? "(no disc images or folders here)" : "(no programs or folders here)");
-            tui_put(12, 22, 0x13, cd ? "Enter open/choose  Bksp up  Tab drive  G home  N none  Esc"
-                                     : "Enter open/choose  Bksp up  Tab drive  T type path  Esc");
+            tui_put(12, 22, 0x13, cd ? "Enter choose  Bksp up  Tab drive  G home  N none  Esc"
+                                     : "Enter choose  Bksp up  Tab drive  T type path  Esc");
             c = tui_key();
             if (c == K_RCLICK) c = K_ESC;                                     /* right click: back */
             if (c == K_MOUSE)
@@ -744,6 +746,7 @@ static int pick_file(char* out, size_t sz, int cd)
     }
 done:
     crit_off();
+    tui_anim = anim_was;
     memcpy(tui_scr, save, sizeof save);
     return res;
 }

@@ -29,7 +29,7 @@ sys.path.insert(0, HERE)
 import mxdisk
 from mxvm import VM86, VMQ, cfg86
 
-SOUND_DB = -50.0          # RMS above this = sound
+SOUND_DB = -70.0          # RMS above this = sound (silence is -120; GOT's FM music idles around -52)
 GAME_SECS = 40            # how long each game runs
 GAME_KEYS = {}            # game -> {5 s slot: [keys]} to get past title screens
 GAME_QUIT = {'GOT': ['esc', 'y'], 'RAP': ['esc', 'y']}
@@ -63,7 +63,7 @@ class Run:
         return '\n'.join(r.replace('\n', '*').rstrip() for r in self.v.screen()[0])
 
     def has(self, s):
-        return re.search(s, self.scr(), re.I) is not None
+        return re.search(s, self.scr(), re.I | re.M) is not None
 
     def wait(self, s, ms):
         return self.v.wait_text(s, ms)
@@ -101,6 +101,7 @@ class Run:
         if not self.prompt(5000): raise Fail('MENU did not exit to DOS')
 
     def cdgui(self):
+        if self.has('Disc images'): return        # still in the CD images screen
         self.menu(); self.cat('CD-ROM')
         self.v.key('2', 300); self.v.key('ret', 0)
         if not self.wait('Disc images', 30000): raise Fail('CD images screen did not open')
@@ -121,6 +122,8 @@ class Run:
 
     def cd_folder(self):
         """D:, then the images folder"""
+        want = mxdisk.LFN_SHORT if self.kind == 'lfn' else 'CD'
+        if re.search(r'^\s+D:\\' + want + r'\s*$', self.v.screen()[0][4], re.I): return   # already there
         for _ in range(4):
             if re.search(r'^\s+D:\\', self.v.screen()[0][4]): break
             self.v.key('d', 1500)
@@ -249,8 +252,8 @@ class Run:
     def pick_image(self):
         """the menu's CD image picker: Tab to D:, the images folder, the image"""
         if not self.has("Choose the game's CD image"): raise Fail('CD image picker did not open')
-        for _ in range(6):
-            if any(re.match(r'^ {10,14}D:\\', r) for r in self.v.screen()[0]): break
+        for _ in range(6):     # the folder line under the title: '║ D:\'
+            if any(re.search(r'\u2551 D:\\', r) for r in self.v.screen()[0][2:5]): break
             self.v.key('tab', 1200)
         else: raise Fail('picker: drive D: not reached')
         self.picker_sel(mxdisk.LFN_SHORT if self.kind == 'lfn' else 'CD'); self.v.key('ret', 1200)
@@ -260,7 +263,7 @@ class Run:
         """Games page: the item called name -> its number -> Enter"""
         self.menu(); self.cat('Games')
         for r in self.v.screen()[0][7:16]:
-            m = re.search(r'(\d)\s+' + re.escape(name) + r'\b', r)
+            m = re.search(r'(\d)\s+(?:Play\s+)?' + re.escape(name) + r'\b', r)
             if m: self.v.key(m.group(1), 400); self.v.key('ret', 0); return
         raise Fail('game %s not on the Games page' % name)
 
@@ -283,10 +286,25 @@ class Run:
         else: self.log(step, None, '%s real-mode game under SC55.BAT: no sound expected (%.1f dB)' % (name, best))
 
     def quit_game(self, game):
-        for k in GAME_QUIT[game]:
-            self.v.key(k, 1500)
+        if game == 'GOT': self.got_quit()
+        else:
+            for k in GAME_QUIT[game]:
+                self.v.key(k, 1500)
         if not self.wait('F1 help F2 saved', 30000) and not self.prompt(5000):
             raise Fail('%s did not quit back to MENU' % game)
+
+    def got_quit(self):
+        """God of Thunder: Esc until its 'Quit to DOS?' box (the green border turns dark green), Enter, then a
+        key for the order screen it shows on the way out"""
+        from PIL import Image
+        tmp = os.path.join(self.out, 'q.png')
+        for _ in range(8):
+            if self.v.screen()[0]: break            # text mode: GOT has already quit (or never started)
+            self.v.key('esc', 2000); self.v.shot(tmp)
+            p = Image.open(tmp).convert('RGB').getpixel((10, 10))
+            if p[0] < 20 and 60 < p[1] < 100 and p[2] < 20:
+                self.v.key('ret', 4000); break
+        self.v.sleep(3000)
 
     def step_cdmusic(self, step):
         if self.kind == 'iso': return self.log(step, None, 'ISO has no audio tracks')
