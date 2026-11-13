@@ -488,7 +488,8 @@ static void draw_status(void)
     }
     else tui_put(61, 2, 0x0C, "\xFE Not loaded");
     const char* mt = opt_val("/VMT32", "");
-    if (mt[0] && strcmp(mt, "0") && strcasecmp(mt, "OFF")) tui_printf(61, 3, 0x07, "%s (Munt)", !strcasecmp(mt, "CM32L") ? "CM-32L" : "MT-32");
+    if (!strcmp(opt_val("/MUSB", "0"), "1")) tui_printf(61, 3, 0x07, "USB MIDI device");
+    else if (mt[0] && strcmp(mt, "0") && strcasecmp(mt, "OFF")) tui_printf(61, 3, 0x07, "%s (Munt)", !strcasecmp(mt, "CM32L") ? "CM-32L" : "MT-32");
     else if (sf[0]) { const char* b = strrchr(sf, '\\'); tui_printf(61, 3, 0x07, "SF %.14s", b ? b + 1 : sf); }
     else tui_printf(61, 3, 0x07, "SC-55 %.11s", opt_val("/VSCSET", "auto"));
     if (g_running && getenv("BLASTER"))

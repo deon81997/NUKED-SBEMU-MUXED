@@ -25,7 +25,8 @@ CONTENTS
    8. Playing MIDI files and testing
    9. Virtual CD drive and disc images
   10. CD-Audio through your sound card (HYBRID, experimental)
- 10b. USB in DOS: Xbox 360 pads on the gameport, USB keyboard and mouse
+ 10b. USB in DOS: Xbox 360 pads on the gameport, USB keyboard and mouse,
+      USB MIDI
   11. Real-mode games: JEMM+QPIEMU or QEMM (optional, you supply the files)
  11b. 16-bit protected-mode games (Jazz Jackrabbit): SC55J16.BAT
   12. Using your real CD-ROM drive in DOS
@@ -281,10 +282,12 @@ CONTENTS
       Plays a short test tune through the running SBEMU. /P: MPU port (hex),
       /L loop until a key is pressed.
 
-  C:\SC55\MIDPLAY.EXE [/B] [/D:dir] [/L] [/R1] [/H] [/S] [/GM | /N] [file.mid ...]
+  C:\SC55\MIDPLAY.EXE [/B] [/D:dir] [/L] [/R1] [/H] [/S] [/GM | /N] [/USB] [file.mid ...]
       Full-screen MIDI player with visualizer, playlist, file explorer
       and options (section 8). Also plays .MUS, .HMP and .XMI game music. With no file names it plays the MIDI files
       next to it (or, if set in Options, resumes where you quit).
+      /USB: plays on a USB MIDI device itself, without SBEMU (section 10b,
+      "USB MIDI"; use a PS/2 keyboard then).
 
   C:\SC55\CPUMHZ.EXE [/LOAD]
       Shows the real CPU clock speed, live (section 15).
@@ -323,8 +326,10 @@ CONTENTS
      Sound Blaster     Port 220/240, IRQ 5/7/9, 8-bit DMA 0/1/3,
                        16-bit DMA 5/6/7, Type (1-3 SB, 4-5 SB Pro, 6 SB16)
      MIDI              MPU-401 port (330 usual), MIDI synth (SC-55,
-                       SoundFont, MT-32 or CM-32L - see section 6b), and
-                       the two sub-menus below
+                       SoundFont, MT-32 or CM-32L - see section 6b - or
+                       "USB MIDI device": a real synth on a USB MIDI
+                       cable, /MUSB, section 10b), and the two sub-menus
+                       below
      Output            Sample rate 22050/32000/44100/48000 Hz, and the
                        "Timing & advanced" sub-menu
   SC-55 options        ROM set (/VSCSET), volume (/VSCGAIN), reverb/chorus
@@ -514,6 +519,9 @@ CONTENTS
      /P:330                MPU-401 UART port
      /MCOM:n               send MIDI to a COM port instead (1-4, or a base
                            address; 9 = hardware MPU only)
+     /MUSB:1               send MIDI to a USB MIDI device instead (class
+                           compliant, e.g. M-Audio Uno; section 10b). Needs
+                           /JOY:1; the SC-55 is not loaded then.
      /VMPU[:0]             virtual MPU-401 on (SC-55 or SoundFont); /VMPU=0
                            turns it off. Also switched on by /VSCROM, /VSCSET
                            or /VSF.
@@ -902,7 +910,7 @@ CONTENTS
 
 
 =============================================================================
- 10b. USB IN DOS: XBOX 360 PADS, USB KEYBOARD AND MOUSE  (experimental)
+ 10b. USB IN DOS: XBOX 360 PADS, USB KEYBOARD AND MOUSE, USB MIDI  (experimental)
 =============================================================================
 
   DOS games only know the analog PC joystick on the gameport (port 201h).
@@ -1113,6 +1121,7 @@ CONTENTS
        writes it all to USBTEST.TXT - send that with a bug report. It shows
        USB keyboards and mice too (keys pressed, mouse movement). Esc quits
        (PS/2 or USB keyboard).
+       Since beta.108 it also finds USB MIDI devices and plays a test note.
        Since beta.67 USBTEST will not start while SBEMU is loaded: both
        driving the same USB controllers crashed a PC (EMM386 error 06).
        Since beta.93 USBTEST also finds USB sticks and card readers (USB
@@ -1122,6 +1131,22 @@ CONTENTS
        for now: SBEMU does not give them a drive letter yet. NEC uPD720101
        USB cards: USB 2.0 sticks work; a USB 1.1-only stick is not used on
        that card (its USB 1.1 side froze a PC with one).
+
+  USB MIDI (beta.108): a class-compliant USB MIDI interface or keyboard
+  (M-Audio Uno, Roland UM-ONE, most USB keyboards with "MIDI" on the box)
+  plays the game's General MIDI on the real synth plugged into it.
+   - SETTINGS > MIDI synth > "USB MIDI device" (or SBEMU /MUSB:1). The
+     SC-55 emulation is then not loaded; games send MIDI to the MPU-401
+     at 330 as usual and SBEMU passes it on to the cable (running status
+     and SysEx handled, so GS/MT-32 resets and patch dumps get there).
+   - Any USB port (UHCI, OHCI, EHCI, xHCI, through hubs); it can be
+     plugged in or pulled out at any time. Needs /JOY:1 (the default).
+   - MIDPLAY /USB plays MIDI files on it without SBEMU (it takes the USB
+     controllers itself, so use a PS/2 keyboard; the laptop's own
+     keyboard is PS/2). With SBEMU /MUSB:1 loaded, play MIDPLAY as usual.
+   - USBTEST lists the device and plays a test note (middle C) as soon as
+     it is found; N plays it again. Notes from its MIDI IN socket are
+     shown live ("MIDI IN: 90 3C 64").
 
 
 =============================================================================

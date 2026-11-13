@@ -1,4 +1,4 @@
-NUKED SB-EMU - REAL HARDWARE CHECKLIST (beta.107)
+NUKED SB-EMU - REAL HARDWARE CHECKLIST (beta.108)
 Things an emulator cannot confirm. Tick each one; for any failure keep
 C:\SC55\BUGREP.TXT (MENU > Tests > Bug report) and CRASH.TXT if there is one.
 
@@ -32,6 +32,14 @@ ASUS P5PE-VM (+ NEC uPD720101 USB card, wired Xbox 360 pad, Logitech receiver)
 [ ] Sound card in use: MIDI + digital sound in one game, 10 minutes.
 
 BOTH
+[ ] beta.108 USB MIDI (M-Audio Uno): USBTEST (no SBEMU) lists "USB MIDI
+    out 0763:..." and the synth plays a short middle C; N plays it again;
+    a key on the synth's MIDI OUT -> Uno MIDI IN shows "MIDI IN: 90 ..".
+    D810 (ICH6) and the NEC card; through a hub too.
+[ ] SETTINGS > MIDI synth > USB MIDI device, then a General MIDI game and
+    MIDPLAY: music on the external synth, no stuck notes; pull the Uno out
+    and back in while it plays - the music comes back.
+[ ] MIDPLAY /USB (no SBEMU, PS/2 keyboard): plays on the Uno.
 [ ] MS-DOS 7.1 (Win98 boot) and, if you have it, MS-DOS 6.22 boot disk:
     SBEMU with USB sticks - spare letters D:/E: and exFAT/NTFS letters.
 [ ] MIDPLAY in a Windows 98 DOS box: windowed (Alt+Enter) and full screen,

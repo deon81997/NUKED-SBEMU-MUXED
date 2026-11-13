@@ -18,7 +18,8 @@
  *             on Intel 7/8/9-series the shared ports are switched over from EHCI (XUSB2PR)
  *   - USB hubs (any depth up to 4), as many as there are ports.
  *   - devices in use: up to two Xbox 360 pads (wired, or the wireless receiver's first slots), USB keyboards
- *     and USB mice (HID boot protocol), at once, on any mix of controllers and hubs. Each one is a "pipe"
+ *     and USB mice (HID boot protocol), USB disks and one USB MIDI device (USBPAD_F_MIDI: class compliant,
+ *     bulk OUT + IN as two pipes; see "USB MIDI" below), at once, on any mix of controllers and hubs. Each one is a "pipe"
  *     (its interrupt IN endpoint); every controller runs all the time with its own schedule:
  *       UHCI  frame list -> one QH per pipe slot (a TD only while that pipe is on this controller) -> control QH
  *       OHCI  HCCA (set once at reset: real chips such as NEC's read HcHCCA only when they start) interrupt
@@ -210,7 +211,7 @@ enum { TT_NORMAL = 1, TT_SETUP = 2, TT_DATA = 3, TT_STATUS = 4, TT_LINK = 6, TT_
 
 enum { T_UHCI, T_OHCI, T_EHCI, T_XHCI };
 enum { SP_FS, SP_LS, SP_HS };
-enum { PT_PAD, PT_KBD, PT_MOUSE };
+enum { PT_PAD, PT_KBD, PT_MOUSE, PT_MIDI, PT_MOUT };   /* USB MIDI: bulk IN (PT_MIDI) and bulk OUT (PT_MOUT) pipes */
 enum { PK_360, PK_GIP, PK_HID };          /* kinds of pad: Xbox 360 (wired / wireless), Xbox One (GIP), HID gamepad */
 
 typedef struct { volatile uint32_t* t; uint32_t ph; int n, enq, cyc; } Ring;
@@ -270,6 +271,7 @@ typedef struct
     int used, type, dev, hc, ifc, ep, mps, intv, tog, ocur, outep, outmps, otog, pad, wireless, wlpresent, watched;
     int opend; uint32_t ofn;            /* oslow OHCI: ED skipped at frame ofn, new TD goes in 2 frames later */
     int kind, gseq;                     /* PK_*; Xbox One: sequence number of the packets sent */
+    int out, olen, busy, needclr;       /* USB MIDI OUT pipe: q->ep is an OUT endpoint, olen bytes in obuf in flight */
     volatile uint32_t* td;              /* its IN TD(s): UHCI 1, OHCI 2, EHCI 2 (used in turn) */
     uint8_t *ibuf, *obuf;
     Ring xin, xout;
@@ -838,7 +840,7 @@ static void x_events(int h)
             {
                 Pipe* q = &P[k];
                 if (!q->used || q->hc != h || D[q->dev].slot != slot) continue;
-                if (ep == q->ep * 2 + 1) { q->xcc = cc; q->xres = (int)(e[2] & 0xFFFFFF); q->xdone = 1; break; }
+                if (ep == (q->out ? q->ep * 2 : q->ep * 2 + 1)) { q->xcc = cc; q->xres = (int)(e[2] & 0xFFFFFF); q->xdone = 1; break; }
                 if (q->outep && ep == q->outep * 2) { q->xocc = cc; q->xodone = 1; break; }
             }
         }
@@ -1043,6 +1045,8 @@ static const char* pipe_name(const Pipe* q)
     static char s[40];
     if (q->type == PT_KBD) return "keyboard";
     if (q->type == PT_MOUSE) return "mouse";
+    if (q->type == PT_MIDI) return "USB MIDI in";
+    if (q->type == PT_MOUT) return "USB MIDI out";
     snprintf(s, sizeof(s), "%s %d", q->kind == PK_GIP ? "Xbox One pad" : q->kind == PK_HID ? "USB gamepad" :
              q->wireless ? "wireless 360 pad" : "360 pad", q->pad + 1);
     return s;
@@ -1429,15 +1433,16 @@ static int x_conf_eps(int di)
         Pipe* q = &P[k];
         int idci, odci, iv;
         if (!q->used || q->dev != di) continue;
-        idci = q->ep * 2 + 1; odci = q->outep ? q->outep * 2 : 0;
-        iv = x_intv(d, q->intv);
+        int midi = q->type == PT_MIDI || q->type == PT_MOUT;     /* bulk endpoints: type 6 IN / 2 OUT, no interval */
+        idci = q->out ? q->ep * 2 : q->ep * 2 + 1; odci = q->outep ? q->outep * 2 : 0;
+        iv = midi ? 0 : x_intv(d, q->intv);
         ring_init(&q->xin, (volatile uint32_t*)(q->ibuf + 0x100), PHYS(q->ibuf + 0x100), XRING_TRBS);
         ring_init(&q->xout, (volatile uint32_t*)(q->ibuf + 0x300), PHYS(q->ibuf + 0x300), XRING_TRBS);
         ic[1] |= 1UL << idci;
         if (idci > maxd) maxd = idci;
         e = x_ctx(h, ic, idci + 1);
         e[0] = (uint32_t)iv << 16;
-        e[1] = (3UL << 1) | (7UL << 3) | ((uint32_t)q->mps << 16);
+        e[1] = (3UL << 1) | ((uint32_t)(midi ? (q->out ? 2 : 6) : 7) << 3) | ((uint32_t)q->mps << 16);
         e[2] = q->xin.ph | 1; e[3] = 0; e[4] = (uint32_t)q->mps | ((uint32_t)q->mps << 16);
         if (odci)
         {
@@ -2106,6 +2111,80 @@ int USBPAD_DiskWrite(int n, uint32_t lba, int count, const void* buf) { return d
 static volatile uint32_t* o_tdi(const Pipe* q, int i) { return q->td + i * 4; }
 static volatile uint32_t* e_tdi(const Pipe* q, int i) { return q->td + i * 16; }
 
+/* ================================================================== USB MIDI (class compliant: audio class, MIDIStreaming
+ * subclass; USB Device Class Definition for MIDI Devices 1.0). The MPU-401 byte stream is cut into 4-byte event packets
+ * (cable 0) by USBPAD_MidiByte - running status, SysEx in 3-byte pieces, real-time bytes in between - into a FIFO; the
+ * OUT pipe (the bulk OUT endpoint, put in the periodic schedule like the pads' pipes: one packet of up to 64 bytes a
+ * frame) takes up to 16 of them per transfer. Nothing waits: a transfer is started by one poll and collected by a later
+ * one. MIDI IN (the bulk IN endpoint) goes to the USBPAD_SetMidiIn callback, one MIDI message piece per packet. */
+#define MFIFO 1024                      /* event packets (power of two) */
+static volatile uint32_t MFifo[MFIFO];
+static volatile unsigned MHead, MTail;  /* MidiByte writes MHead, the OUT pipe reads MTail */
+static volatile int MidiPipe = -1;      /* the OUT pipe, -1 = no USB MIDI device */
+static uint32_t MidiSent, MidiDrop, MidiErr, MidiIn;
+static USBPAD_MidiInFn MidiInFn;
+static struct { uint8_t rs, need, n, d[2], sx[3], sxn, insx; } Mp;   /* MidiByte's parser */
+static void midi_put(uint32_t pk)
+{
+    unsigned h = MHead;
+    if (MidiPipe < 0) return;                       /* nobody to send to: dropped (no stale notes on a later plug-in) */
+    if (h - MTail >= MFIFO) { ++MidiDrop; return; }
+    MFifo[h & (MFIFO - 1)] = pk;
+    MHead = h + 1;
+}
+static uint32_t mpk(int cin, int a, int b, int c) { return (uint32_t)cin | (uint32_t)a << 8 | (uint32_t)b << 16 | (uint32_t)c << 24; }
+void USBPAD_MidiByte(uint8_t b)
+{
+    if (b >= 0xF8) { midi_put(mpk(0xF, b, 0, 0)); return; }             /* real time: anywhere, state unchanged */
+    if (b == 0xF0) { Mp.insx = 1; Mp.sx[0] = b; Mp.sxn = 1; Mp.rs = 0; return; }
+    if (b == 0xF7)
+    {
+        if (!Mp.insx) return;
+        Mp.sx[Mp.sxn++] = b;
+        midi_put(mpk(4 + Mp.sxn, Mp.sx[0], Mp.sxn > 1 ? Mp.sx[1] : 0, Mp.sxn > 2 ? Mp.sx[2] : 0));   /* CIN 5/6/7: ends with 1/2/3 bytes */
+        Mp.insx = 0; Mp.sxn = 0;
+        return;
+    }
+    if (Mp.insx)
+    {
+        if (b < 0x80)
+        {
+            Mp.sx[Mp.sxn++] = b;
+            if (Mp.sxn == 3) { midi_put(mpk(4, Mp.sx[0], Mp.sx[1], Mp.sx[2])); Mp.sxn = 0; }
+            return;
+        }
+        if (Mp.sxn) midi_put(mpk(4 + Mp.sxn, Mp.sx[0], Mp.sxn > 1 ? Mp.sx[1] : 0, 0));   /* cut short by a status byte: end it */
+        Mp.insx = 0; Mp.sxn = 0;
+    }
+    if (b >= 0x80)
+    {
+        Mp.n = 0;
+        if (b < 0xF0) { Mp.rs = b; Mp.need = (b & 0xE0) == 0xC0 ? 1 : 2; }
+        else if (b == 0xF1 || b == 0xF3) { Mp.rs = b; Mp.need = 1; }
+        else if (b == 0xF2) { Mp.rs = b; Mp.need = 2; }
+        else { Mp.rs = 0; if (b == 0xF6) midi_put(mpk(5, b, 0, 0)); }      /* tune request; F4/F5 undefined */
+        return;
+    }
+    if (!Mp.rs) return;                                                  /* data without a status: dropped */
+    Mp.d[Mp.n++] = b;
+    if (Mp.n < Mp.need) return;
+    Mp.n = 0;
+    if (Mp.rs < 0xF0) midi_put(mpk(Mp.rs >> 4, Mp.rs, Mp.d[0], Mp.need > 1 ? Mp.d[1] : 0));
+    else { midi_put(mpk(Mp.need + 1, Mp.rs, Mp.d[0], Mp.need > 1 ? Mp.d[1] : 0)); Mp.rs = 0; }   /* CIN 2/3: no running status */
+}
+void USBPAD_MidiReset(void) { memset(&Mp, 0, sizeof(Mp)); MTail = MHead; }
+int  USBPAD_MidiPending(void) { return MidiPipe < 0 ? 0 : (int)(MHead - MTail); }
+void USBPAD_SetMidiIn(USBPAD_MidiInFn fn) { MidiInFn = fn; }
+void USBPAD_MidiStats(uint32_t* sent, uint32_t* dropped, uint32_t* errors, uint32_t* in)
+{
+    if (sent) *sent = MidiSent;
+    if (dropped) *dropped = MidiDrop;
+    if (errors) *errors = MidiErr;
+    if (in) *in = MidiIn;
+}
+
+#define ILEN(q) ((q)->mps > 64 ? 64 : (q)->mps)
+#define MOUTB 256                       /* MIDI OUT: bytes per transfer (64 event packets; obuf = the pipe's ibuf area) */   /* IN transfer size (high-speed bulk MIDI: 512-byte packets, 64 asked for) */
 static int ArmSync;   /* arm_in: oslow rewrite right now (start_in has skipped the ED and waited already) */
 static void arm_in(int k)
 {
@@ -2115,11 +2194,30 @@ static void arm_in(int k)
     switch (HC[h].type)
     {
     case T_UHCI:
-        q->td[0] = LP_T;
-        q->td[1] = td_cs(d);
-        q->td[2] = td_tok(PID_IN, d->addr, q->ep, q->tog, q->mps);
-        q->td[3] = PHYS(q->ibuf);
-        fl(q->td, 16); fl(q->ibuf, 64);
+        if (q->out)
+        {   /* MIDI OUT: one TD per packet, depth first (several packets a frame) */
+            int i, n = (q->olen + q->mps - 1) / q->mps, tog = q->tog;
+            for (i = 0; i < n; ++i)
+            {
+                volatile uint32_t* t = q->td + i * 4;
+                int c = i + 1 < n ? q->mps : q->olen - i * q->mps;
+                t[0] = i + 1 < n ? (PHYS(q->td + (i + 1) * 4) | LP_VF) : LP_T;
+                t[1] = td_cs(d);
+                t[2] = td_tok(PID_OUT, d->addr, q->ep, tog, c);
+                t[3] = PHYS(q->obuf + i * q->mps);
+                tog ^= 1;
+            }
+            q->ocur = n;
+            fl(q->td, n * 16); fl(q->obuf, MOUTB);
+        }
+        else
+        {
+            q->td[0] = LP_T;
+            q->td[1] = td_cs(d);
+            q->td[2] = td_tok(PID_IN, d->addr, q->ep, q->tog, ILEN(q));
+            q->td[3] = PHYS(q->ibuf);
+            fl(q->td, 16); fl(q->ibuf, 64);
+        }
         PQ(h, k)[1] = PHYS(q->td);
         fl(PQ(h, k), 16);
         break;
@@ -2143,8 +2241,9 @@ static void arm_in(int k)
             fl(e, 16);
             tog = e[2] & 2;
             zero(nt, 4);
-            otd(o_tdi(q, q->ocur), OTD_IN | OTD_R, PHYS(q->ibuf), q->mps, nt);
-            fl(q->td, 32); fl(q->ibuf, 64);
+            if (q->out) otd(o_tdi(q, q->ocur), OTD_OUT, PHYS(q->obuf), q->olen, nt);
+            else otd(o_tdi(q, q->ocur), OTD_IN | OTD_R, PHYS(q->ibuf), ILEN(q), nt);
+            fl(q->td, 32); fl(q->ibuf, MOUTB);
             e[1] = PHYS(nt);
             e[2] = PHYS(o_tdi(q, q->ocur)) | tog;
             fl(e, 16);
@@ -2153,8 +2252,9 @@ static void arm_in(int k)
             break;
         }
         zero(nt, 4);
-        otd(o_tdi(q, q->ocur), OTD_IN | OTD_R, PHYS(q->ibuf), q->mps, nt);
-        fl(q->td, 32); fl(q->ibuf, 64);
+        if (q->out) otd(o_tdi(q, q->ocur), OTD_OUT, PHYS(q->obuf), q->olen, nt);
+        else otd(o_tdi(q, q->ocur), OTD_IN | OTD_R, PHYS(q->ibuf), ILEN(q), nt);
+        fl(q->td, 32); fl(q->ibuf, MOUTB);
         e[1] = PHYS(nt);
         fl(e, 16);
         q->ocur ^= 1;
@@ -2166,15 +2266,22 @@ static void arm_in(int k)
         volatile uint32_t* nt = e_tdi(q, q->ocur ^ 1);
         zero(nt, 16); nt[0] = LP_T; nt[1] = LP_T;           /* inactive: the controller waits on it */
         fl(nt, 64);
-        qtd(t, 1, 0, PHYS(q->ibuf), q->mps, nt);              /* written active last (token) */
-        fl(t, 64); fl(q->ibuf, 64);
+        if (q->out) qtd(t, 0, 0, PHYS(q->obuf), q->olen, nt);
+        else qtd(t, 1, 0, PHYS(q->ibuf), ILEN(q), nt);         /* written active last (token) */
+        fl(t, 64); fl(q->ibuf, MOUTB);
         q->ocur ^= 1;
         break;
     }
     default:
         q->xdone = 0;
-        fl(q->ibuf, 64);
-        ring_push(&q->xin, PHYS(q->ibuf), 0, (uint32_t)q->mps, TRB_TYPE(TT_NORMAL) | (1UL << 5) | (1UL << 2));
+        fl(q->ibuf, MOUTB);
+        if (q->out)
+        {
+            ring_push(&q->xin, PHYS(q->obuf), 0, (uint32_t)q->olen, TRB_TYPE(TT_NORMAL) | (1UL << 5));
+            wr(HC[h].x->db + d->slot * 4, (uint32_t)(q->ep * 2));
+            break;
+        }
+        ring_push(&q->xin, PHYS(q->ibuf), 0, (uint32_t)ILEN(q), TRB_TYPE(TT_NORMAL) | (1UL << 5) | (1UL << 2));
         wr(HC[h].x->db + d->slot * 4, (uint32_t)(q->ep * 2 + 1));
         break;
     }
@@ -2194,12 +2301,12 @@ static void start_in(int k)
         fl(e, 16);
         wait_us(1100);
         zero(o_tdi(q, 0), 4);
-        e[0] = ED_SKIP | (uint32_t)d->addr | ((uint32_t)q->ep << 7) | (2UL << 11) | (d->speed == SP_LS ? ED_LS : 0) | ((uint32_t)q->mps << 16);
+        e[0] = ED_SKIP | (uint32_t)d->addr | ((uint32_t)q->ep << 7) | ((q->out ? 1UL : 2UL) << 11) | (d->speed == SP_LS ? ED_LS : 0) | ((uint32_t)q->mps << 16);
         e[1] = PHYS(o_tdi(q, 0));
         e[2] = PHYS(o_tdi(q, 0));                                 /* e[3]: next ED, set at reset */
         fl(e, 16); fl(q->td, 32);
         q->opend = 0;
-        ArmSync = 1; arm_in(k); ArmSync = 0;
+        if (!q->out) { ArmSync = 1; arm_in(k); ArmSync = 0; }     /* OUT (MIDI): a TD only when there is data */
         e[0] &= ~ED_SKIP;
         fl(e, 16);
         return;
@@ -2212,11 +2319,11 @@ static void start_in(int k)
         e[4] = PHYS(e_tdi(q, 0));
         e[5] = LP_T;
         fl(e, 96); fl(q->td, 128);
-        arm_in(k);
+        if (!q->out) arm_in(k);
         ehci_relink(h);
         return;
     default:
-        arm_in(k);
+        if (!q->out) arm_in(k);
         return;
     }
 }
@@ -2236,7 +2343,8 @@ static void pipe_stop(int k)
     q->used = 0;
     if (q->type == PT_PAD) memset((void*)&Pad[q->pad], 0, sizeof(Pad[0]));
     else if (q->type == PT_KBD) { if (KbFn) KbFn(k, none); }       /* let go of every key it held */
-    else if (MsFn) MsFn(0, 0, 0, 0);
+    else if (q->type == PT_MOUT) { MidiPipe = -1; q->busy = 0; }
+    else if (q->type == PT_MOUSE && MsFn) MsFn(0, 0, 0, 0);
     trace("-%s ", pipe_name(q));
     snprintf(Desc, sizeof(Desc), "%s %04X:%04X unplugged", pipe_name(q), D[q->dev].vid, D[q->dev].pid);
     TRACE_Event(TR_USB, "- %s %04X:%04X unplugged", pipe_name(q), D[q->dev].vid, D[q->dev].pid);
@@ -2304,7 +2412,7 @@ static int poll_in(int k)
         fl(q->ibuf, 64);
         owr(h, O_INTSTS, 0x06);
         if (cc) { PQ(h, k)[2] = PHYS(o_tdi(q, q->ocur)); fl(PQ(h, k), 16); return cc == 4 ? -2 : -1; }
-        return (t[1] ? (int)(t[1] - PHYS(q->ibuf)) : q->mps) + 1;
+        return (t[1] ? (int)(t[1] - PHYS(q->out ? q->obuf : q->ibuf)) : (q->out ? q->olen : ILEN(q))) + 1;
     }
     case T_EHCI:
     {
@@ -2324,7 +2432,7 @@ static int poll_in(int k)
             ehci_sched(h, EC_PSE, 1);
             return (tk & QT_ERRS) ? -1 : -2;
         }
-        return q->mps - (int)((tk >> 16) & 0x7FFF) + 1;
+        return (q->out ? q->olen : ILEN(q)) - (int)((tk >> 16) & 0x7FFF) + 1;
     }
     default:
     {
@@ -2333,10 +2441,79 @@ static int poll_in(int k)
         cc = q->xcc;
         if (cc != 1 && cc != 13 && Light) return 0;                 /* error: leave it for the interrupt */
         q->xdone = 0;
-        if (cc == 1 || cc == 13) { fl(q->ibuf, 64); return q->mps - q->xres + 1; }
+        if (cc == 1 || cc == 13) { fl(q->ibuf, 64); return (q->out ? q->olen : ILEN(q)) - q->xres + 1; }
         x_recover(h, D[q->dev].slot, q->ep * 2 + 1, &q->xin);
         return cc == 6 ? -2 : -1;
     }
+    }
+}
+
+/* USB MIDI OUT pipe: collect the transfer in flight, start the next one (never waits) */
+static void mout_poll(int k)
+{
+    Pipe* q = &P[k];
+    unsigned t, n, i, maxn;
+    if (q->busy)
+    {
+        int r;
+        if (HC[q->hc].type == T_UHCI)
+        {   /* the TD chain: done when the last one is (or one failed); toggle flips per packet sent */
+            int i, n = q->ocur, ok = 0;
+            fl(q->td, n * 16);
+            r = 1;
+            for (i = 0; i < n; ++i)
+            {
+                uint32_t cs = q->td[i * 4 + 1];
+                if (cs & TD_ACTIVE) { r = 0; break; }
+                if (cs & TD_ERRMASK) { r = (cs & TD_STALL) ? -2 : -1; break; }
+                ++ok;
+            }
+            if (r == 0) return;
+            fl(PQ(q->hc, k), 16);
+            if (r > 0 && !(PQ(q->hc, k)[1] & LP_T)) return;           /* QH not moved on yet (see poll_in) */
+            if (ok & 1) q->tog ^= 1;
+            if (r < 0) { PQ(q->hc, k)[1] = LP_T; fl(PQ(q->hc, k), 16); }
+        }
+        else r = poll_in(k);
+        if (r == 0) return;
+        q->busy = 0;
+        if (r < 0) { ++MidiErr; if (r == -2) q->needclr = 1; }      /* that piece is lost */
+        else MidiSent += (unsigned)q->olen / 4;
+    }
+    if (q->needclr)
+    {
+        if (Light) return;
+        control(q->dev, 0x02, 1, 0, (uint16_t)q->ep, 0);              /* CLEAR_FEATURE(ENDPOINT_HALT): back to DATA0 */
+        q->tog = 0; q->needclr = 0;
+    }
+    t = MTail; n = MHead - t;
+    if (!n) return;
+    maxn = MOUTB / 4;
+    if (HC[q->hc].type == T_UHCI && (unsigned)q->mps * 16 < MOUTB) maxn = (unsigned)q->mps * 16 / 4;   /* 16 TDs at most */
+    if (n > maxn) n = maxn;
+    for (i = 0; i < n; ++i)
+    {
+        uint32_t pk = MFifo[(t + i) & (MFIFO - 1)];
+        q->obuf[i * 4] = (uint8_t)pk; q->obuf[i * 4 + 1] = (uint8_t)(pk >> 8);
+        q->obuf[i * 4 + 2] = (uint8_t)(pk >> 16); q->obuf[i * 4 + 3] = (uint8_t)(pk >> 24);
+    }
+    MTail = t + n;
+    q->olen = (int)n * 4;
+    q->busy = 1;
+    arm_in(k);
+}
+
+/* USB MIDI IN: event packets -> the MIDI bytes in them */
+static void midi_in(const uint8_t* r, int len)
+{
+    static const uint8_t cnt[16] = { 0, 0, 2, 3, 3, 1, 2, 3, 3, 3, 3, 3, 2, 2, 3, 1 };
+    int i;
+    for (i = 0; i + 4 <= len; i += 4)
+    {
+        int c = cnt[r[i] & 0x0F];
+        if (!c) continue;
+        ++MidiIn;
+        if (MidiInFn) MidiInFn(r + i + 1, c);
     }
 }
 
@@ -2542,7 +2719,9 @@ static void pad_leds(int k)
 static void pipe_poll(int k)
 {
     Pipe* q = &P[k];
-    int r = poll_in(k), len;
+    int r, len;
+    if (q->type == PT_MOUT) { mout_poll(k); return; }
+    r = poll_in(k);
     if (r == 0)
     {
         if (!Light && q->type == PT_PAD && !q->watched && !Pad[q->pad].reports && !q->wireless && tsc() - q->since > us2c(2000000))
@@ -2624,6 +2803,9 @@ static void pipe_poll(int k)
             memcpy(q->prev, rep, 8);
         }
         break;
+    case PT_MIDI:
+        midi_in(q->ibuf, len);
+        break;
     default:
         if (len >= 3 && MsFn)
             MsFn(q->ibuf[0] & 7, (int8_t)q->ibuf[1], (int8_t)q->ibuf[2], len >= 4 ? (int8_t)q->ibuf[3] : 0);
@@ -2652,7 +2834,7 @@ static int enumerate_(int di)
     int h = d->hc;
     uint8_t* b = CBuf + 16;
     int total, pos, cfgval, ishub, p, nf = 0, cur = -1, k, i, used = 0, pads = 0, kbds = 0, mice = 0;
-    int mifc = -1, inmsd = 0, min = 0, mout = 0, mmps = 64, wantmsd;
+    int mifc = -1, inmsd = 0, min = 0, mout = 0, mmps = 64, wantmsd, midis = 0;
     Fn f[MAX_PIPE];
     uint16_t vid, pid;
     int att = d->parent < 0 ? HC[h].fails[d->rootport] : 0;   /* earlier failed tries of this root port */
@@ -2772,6 +2954,7 @@ static int enumerate_(int di)
             else if (c == 3 && s == 1 && pr == 1) t = PT_KBD;
             else if (c == 3 && s == 1 && pr == 2) t = PT_MOUSE;
             else if (c == 3 && s <= 1 && pr == 0) { t = PT_PAD; kind = PK_HID; }   /* maybe a gamepad: its report descriptor says */
+            else if (c == 1 && s == 3) t = PT_MIDI;                                 /* audio class, MIDIStreaming */
             if (t < 0) continue;
             cur = nf++;
             memset(&f[cur], 0, sizeof(f[cur]));
@@ -2784,7 +2967,15 @@ static int enumerate_(int di)
             mmps = b[pos + 4] | (b[pos + 5] & 7) << 8;
             if (b[pos + 2] & 0x80) min = b[pos + 2] & 0x0F; else mout = b[pos + 2] & 0x0F;
         }
-        else if (type == 5 && cur >= 0 && pos + 6 < total && (b[pos + 3] & 3) == 3)
+        else if (type == 5 && cur >= 0 && f[cur].type == PT_MIDI && pos + 6 < total && (b[pos + 3] & 3) == 2)
+        {   /* MIDI: bulk IN / OUT (full speed 8-64 bytes, high speed 512) */
+            Fn* x = &f[cur];
+            int mps = b[pos + 4] | (b[pos + 5] & 7) << 8;
+            if (mps < 4) continue;
+            if (b[pos + 2] & 0x80) { if (!x->ep) { x->ep = b[pos + 2] & 0x0F; x->mps = mps; } }
+            else if (!x->outep) { x->outep = b[pos + 2] & 0x0F; x->outmps = mps; }
+        }
+        else if (type == 5 && cur >= 0 && f[cur].type != PT_MIDI && pos + 6 < total && (b[pos + 3] & 3) == 3)
         {
             Fn* x = &f[cur];
             int mps = b[pos + 4] | (b[pos + 5] & 7) << 8;
@@ -2809,7 +3000,7 @@ static int enumerate_(int di)
     }
     /* keep the ones there is room for */
     for (k = 0; k < MAX_PIPE; ++k)
-        if (P[k].used) { if (P[k].type == PT_PAD) ++pads; else if (P[k].type == PT_KBD) ++kbds; else ++mice; }
+        if (P[k].used) { if (P[k].type == PT_PAD) ++pads; else if (P[k].type == PT_KBD) ++kbds; else if (P[k].type == PT_MOUSE) ++mice; else ++midis; }
     for (i = 0; i < nf; ++i)
     {
         int ok = f[i].ep != 0;
@@ -2821,9 +3012,14 @@ static int enumerate_(int di)
         }
         if (f[i].type == PT_PAD) ok = ok && pads < USBPAD_PADS;
         else if (f[i].type == PT_KBD) ok = ok && (Flags & USBPAD_F_KBD) && kbds < 2;
+        else if (f[i].type == PT_MIDI)
+        {
+            ok = (f[i].ep || f[i].outep) && (Flags & USBPAD_F_MIDI) && !midis;   /* one USB MIDI device */
+            if (!ok) trace("midi not used%s ", (Flags & USBPAD_F_MIDI) ? "" : " (off)");
+        }
         else ok = ok && (Flags & USBPAD_F_MOUSE) && mice < 2;
         if (!ok) { f[i].type = -1; continue; }
-        if (f[i].type == PT_PAD) ++pads; else if (f[i].type == PT_KBD) ++kbds; else ++mice;
+        if (f[i].type == PT_PAD) ++pads; else if (f[i].type == PT_KBD) ++kbds; else if (f[i].type == PT_MIDI) ++midis; else ++mice;
         ++used;
     }
     for (k = 0; k < MAX_MSD && Ms[k].used; ++k) {}
@@ -2838,7 +3034,7 @@ static int enumerate_(int di)
     }
     if (!used && !wantmsd)
     {
-        snprintf(Desc, sizeof(Desc), "USB device %04X:%04X on %s: not used (no pad, keyboard, mouse or disk)", vid, pid, where(di));
+        snprintf(Desc, sizeof(Desc), "USB device %04X:%04X on %s: not used (no pad, keyboard, mouse, disk or MIDI)", vid, pid, where(di));
         return -1;
     }
     if (control(di, 0x00, 9, (uint16_t)cfgval, 0, 0) != 0) return 0;
@@ -2846,6 +3042,31 @@ static int enumerate_(int di)
     {
         Pipe* q;
         if (f[i].type < 0) continue;
+        if (f[i].type == PT_MIDI)
+        {   /* two pipes: OUT (to the synth) and IN (from its MIDI IN socket), each where there is one */
+            int dir;
+            for (dir = 0; dir < 2; ++dir)
+            {
+                int ep = dir ? f[i].ep : f[i].outep;
+                if (!ep) continue;
+                if (dir && HC[h].type == T_OHCI && PCI_ReadWord(HC[h].bus, HC[h].dev, HC[h].func, 0) == 0x106B)
+                {   /* QEMU's OHCI has one transfer in flight per controller: a bulk IN waiting for MIDI IN held
+                     * every OUT back, and its data buffer is shared (OUT bytes came back as IN). Real OHCIs: both */
+                    trace("midi in off (QEMU OHCI) ");
+                    continue;
+                }
+                for (k = 0; k < MAX_PIPE && P[k].used; ++k) {}
+                if (k == MAX_PIPE) { trace("midi: no pipe free "); break; }
+                q = &P[k];
+                memset(q, 0, sizeof(*q));
+                q->used = 1; q->type = dir ? PT_MIDI : PT_MOUT; q->dev = di; q->hc = h; q->ifc = f[i].ifc;
+                q->ep = ep; q->mps = dir ? f[i].mps : f[i].outmps; q->intv = 1; q->out = !dir;
+                q->td = (volatile uint32_t*)((uint8_t*)Mem.linearptr + M_PIPE + k * 0x800);
+                q->ibuf = (uint8_t*)Mem.linearptr + M_PIPE + k * 0x800 + 0x100;
+                q->obuf = q->out ? q->ibuf : q->ibuf + 0x40;          /* OUT: MOUTB bytes, up to the xHCI ring */
+            }
+            continue;
+        }
         for (k = 0; k < MAX_PIPE && P[k].used; ++k) {}
         if (k == MAX_PIPE) break;
         q = &P[k];
@@ -2919,6 +3140,7 @@ static int enumerate_(int di)
         }
         q->since = tsc();
         start_in(k);
+        if (q->type == PT_MOUT) { MTail = MHead; MidiPipe = k; }
         trace("+%s ", pipe_name(q));
         if (!Desc[0]) snprintf(Desc, sizeof(Desc), "%s %04X:%04X on %s", pipe_name(q), vid, pid, where(di));
         TRACE_Event(TR_USB, "+ %s %04X:%04X on %s", pipe_name(q), vid, pid, where(di));
@@ -3264,6 +3486,7 @@ int USBPAD_Have(void)
     for (k = 0; k < MAX_PIPE; ++k)
         if (P[k].used)
             r |= P[k].type == PT_KBD ? USBPAD_HAVE_KBD : P[k].type == PT_MOUSE ? USBPAD_HAVE_MOUSE
+                : (P[k].type == PT_MIDI || P[k].type == PT_MOUT) ? USBPAD_HAVE_MIDI
                 : P[k].pad ? USBPAD_HAVE_PAD2 : USBPAD_HAVE_PAD1;
     for (k = 0; k < MAX_MSD; ++k) if (Ms[k].used) r |= USBPAD_HAVE_DISK;
     return r;
@@ -3385,7 +3608,13 @@ void USBPAD_Shutdown(void)
                 uint8_t cdb[10] = { 0x35 };
                 Busy = 1; msd_cmd(&Ms[i], l, cdb, 10, 0, NULL, 0, NULL); Busy = 0;
             }
+    if (MidiPipe >= 0)                                   /* USB MIDI: what is still queued goes out first (1 s at most) */
+    {
+        uint64_t end = tsc() + us2c(1000000);
+        while ((MHead != MTail || P[MidiPipe].busy) && tsc() < end && MidiPipe >= 0) { Busy = 1; Light = 0; step(); Busy = 0; }
+    }
     Inited = 0;
+    MidiPipe = -1;
     for (i = 0; i < HCn; ++i)
     {
         if (!HC[i].nports) continue;
@@ -3444,5 +3673,5 @@ void USBPAD_Dump(char* out, int size)
 void USBPAD_Rearm(void)
 {
     int k;
-    for (k = 0; k < MAX_PIPE; ++k) if (P[k].used) start_in(k);
+    for (k = 0; k < MAX_PIPE; ++k) if (P[k].used) { P[k].busy = 0; start_in(k); }
 }

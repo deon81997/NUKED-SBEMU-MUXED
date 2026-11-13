@@ -37,6 +37,7 @@ typedef struct
 #define USBPAD_F_KBD   1
 #define USBPAD_F_MOUSE 2
 #define USBPAD_F_DISK  4        /* USB disks (mass storage, bulk-only): see docs/USB-STORAGE.md */
+#define USBPAD_F_MIDI  8        /* a USB MIDI device (class compliant: audio class, MIDIStreaming), OUT and IN */
 
 /* USBPAD_Have() bits */
 #define USBPAD_HAVE_PAD1  1
@@ -44,6 +45,7 @@ typedef struct
 #define USBPAD_HAVE_KBD   4
 #define USBPAD_HAVE_MOUSE 8
 #define USBPAD_HAVE_DISK  16
+#define USBPAD_HAVE_MIDI  32
 
 /* USB disks: every LUN (card reader slot) that is a disk is one drive, numbered 0.. in the order found */
 typedef struct
@@ -93,4 +95,14 @@ const char* USBPAD_Describe(void); /* last plug-in / unplug, e.g. "Xbox 360 pad 
 const char* USBPAD_Devices(void);  /* what is in use now, one line each */
 uint32_t USBPAD_Changes(void);     /* counts plug-ins and unplugs */
 
+
+/* USB MIDI (USBPAD_F_MIDI). MidiByte takes the MPU-401 / MIDI byte stream (running status, SysEx, real time in between)
+ * and queues USB-MIDI event packets; nothing touches the USB there (safe inside a port trap). Bytes are dropped while no
+ * USB MIDI device is in use. The queue goes out from USBPAD_Poll / PollLight, up to 16 packets per USB frame. */
+void USBPAD_MidiByte(uint8_t b);
+void USBPAD_MidiReset(void);               /* parser state cleared, queue emptied */
+int  USBPAD_MidiPending(void);             /* packets queued, not sent yet */
+typedef void (*USBPAD_MidiInFn)(const uint8_t* msg, int len);   /* MIDI IN: 1-3 bytes (one piece of a message), from Poll */
+void USBPAD_SetMidiIn(USBPAD_MidiInFn fn);
+void USBPAD_MidiStats(uint32_t* sent, uint32_t* dropped, uint32_t* errors, uint32_t* in);   /* packets; NULL = not wanted */
 #endif

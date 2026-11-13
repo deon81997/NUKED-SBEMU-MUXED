@@ -97,6 +97,8 @@
 
 <picture><img src="docs/90s/vox-sec-tv.gif" width="140" align="right" alt=""></picture>
 
+<picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/13/2026: beta.108.** **Your real synth over USB!!** A class-compliant USB MIDI cable or keyboard (M-Audio Uno, Roland UM-ONE ...) now plays the games' General MIDI: SETTINGS > MIDI synth > "USB MIDI device" (SBEMU /MUSB:1). Any USB port, through hubs, plug it in or out while the music plays. MIDPLAY /USB plays MIDI files on it without SBEMU, and USBTEST finds it and plays a test note. Also in: the MENU bug-hunt fixes (Home/End in the file browser, longer descriptions in 3D, F1/F5 in 3D and more).
+
 <picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/13/2026: beta.107.** **Checked in Windows 98 and MS-DOS 7.1!!** MIDPLAY runs in a Windows 98 DOS box, full screen and in a window: channel table, SC-55 panel and every 3D look all work, and it quits back to Windows cleanly. USB sticks under MS-DOS 7.1 (Windows 98's DOS) get their letters too: FAT read and write, exFAT and NTFS read-only, copies byte-exact. Fixed: in 320x200 the 3D view's song title no longer runs into "Song 1/1".
 
 <picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/13/2026: beta.106.** **SBEMU gets a flight recorder!!** While it runs, SBEMU now remembers what happened - USB devices plugged in or out, dropped MIDI, sound running dry, timer ticks given back, IRQ and DMA problems, CD images opened - and counts every Sound Blaster and MIDI command each game sends, marking the ones SBEMU does not emulate. It all lands in **SBTRACE.TXT** when you are back at the DOS prompt. **Bug reports explain themselves:** BUGREP.TXT now starts with up to 5 plain-English lines on what probably goes wrong, plus the version of every program. And the recorder caught a real bug on its first day: an unknown Sound Blaster command used to make SBEMU swallow every following command until the next reset - now it is skipped properly, and command 80h (silence) gives the interrupt games wait for.
@@ -105,10 +107,10 @@
 
 <picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/13/2026: beta.104.** **A checklist for real PCs!!** NUKEDSB\HWTEST.TXT lists, PC by PC, the things only real hardware can confirm (sound quirks, USB pads, keyboards, sticks, speed). Everything an emulator can check was checked first: exFAT and NTFS USB sticks (MBR and GPT) through this exact build (read, copy byte-exact, writes refused), and MIDPLAY + MENU in every view, 3D look, player and style on an emulated Pentium 133 and Celeron 300 (86Box), no crash.
 
-<picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/13/2026: beta.103.** **Music first on small PCs!!** On a PC with little memory (8-12 MB), MIDPLAY could say "out of memory" for a big MIDI file even in the text views: the 3D view had reserved its picture buffers at start. Now the 3D view only takes memory when it is shown, and when a song needs it, the 3D view gives its memory back and comes back smaller (down to 320x200) instead. Tested in 86Box and QEMU with 8 MB.
-
 <details>
 <summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
+
+<picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/13/2026: beta.103.** **Music first on small PCs!!** On a PC with little memory (8-12 MB), MIDPLAY could say "out of memory" for a big MIDI file even in the text views: the 3D view had reserved its picture buffers at start. Now the 3D view only takes memory when it is shown, and when a song needs it, the 3D view gives its memory back and comes back smaller (down to 320x200) instead. Tested in 86Box and QEMU with 8 MB.
 
 <picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/13/2026: beta.102.** **USB keyboard and mouse: safer in the 3D screens!!** Keys and mouse moves from USB now reach the PC's keyboard controller at the end of SBEMU's sound interrupt, so your program's keyboard and mouse handlers run when the CPU is back in the program, just like with a PS/2 keyboard, and not nested inside SBEMU. Meant for the MENU 3D crash on F2/F3 and MIDPLAY 3D's "Stack Fault" with a USB receiver on an add-in NEC USB card (not seen in QEMU, waiting for a real-PC test). Soak-tested 30 minutes per USB setup in QEMU, cycling every 3D look, theme, player and menu style.
 

@@ -1,4 +1,33 @@
-## MENU bug hunt (2026-11-13, DOS session) - IN PROGRESS, on main, NOT released (on top of beta.107; next DOS release = beta.108)
+## beta.108 (2026-11-13, DOS session): USB MIDI (class compliant, e.g. M-Audio Uno) - SBEMU /MUSB, MIDPLAY /USB, USBTEST
+- usbpad.c: audio class / MIDIStreaming interface (alt 0) -> two pipes, PT_MOUT (bulk OUT) and PT_MIDI (bulk IN), in the
+  periodic schedule like the pads (UHCI frame list QH, OHCI interrupt ED (D=OUT for the OUT pipe, oslow path shared),
+  EHCI periodic QH (split for FS behind a TT), xHCI bulk endpoint contexts type 2/6). Flag USBPAD_F_MIDI; one device.
+  USBPAD_MidiByte: MPU byte stream -> 4-byte USB-MIDI packets (running status, SysEx 3-byte pieces CIN 4/5/6/7, real time
+  CIN F anywhere, system common CIN 2/3) into a 1024-packet FIFO, no USB access (safe in a port trap); dropped while no
+  device. mout_poll never waits: a transfer of up to 256 bytes (64 events; UHCI: one TD per packet, depth first, 16 max)
+  started by one poll, collected by the next. Stall: CLEAR_FEATURE on the next full poll. IN: packets -> USBPAD_SetMidiIn
+  callback. OUT pipe obuf = its ibuf area (256 bytes up to the xHCI ring). ILEN(): IN transfers 64 bytes even with
+  512-byte HS endpoints. Shutdown flushes the FIFO (1 s max). QEMU's OHCI (106B): MIDI IN pipe not used (one transfer in
+  flight per controller there + shared buffer: OUT bytes came back as IN).
+- SBEMU: /MUSB:1 (needs /JOY:1): MAIN_MPU_330 out -> USBPAD_MidiByte; MPU trap installed for it; turns /VMPU (launchers)
+  and the SC-55 auto-load off. SETTINGS: MIDI synth "USB MIDI device" (writes /MUSB:1). MENU status: "USB MIDI device".
+- MIDPLAY /USB: links usbpad.c (makefile MIDPLAY_USB_SRC, -DMIDPLAY_USB), drives the controllers itself (no SBEMU, PS/2
+  keyboard: no USB keyboard there); no LCD queries then. USBTEST: lists it, test note (C4) when found, N again, MIDI IN shown.
+- Tests (testrig/midi/README.md, testrig/fakemidi.py = usbredir USB-MIDI device, QEMU 8.2 from Ubuntu): UHCI, OHCI, EHCI +
+  UHCI companions, EHCI HS (no companions), xHCI FS and HS: USBTEST note + MIDI IN; SBEMU /MUSB + MIDPLAY 35 s with
+  device_del/device_add at 30 s: event streams identical on all six, music resumes after the re-plug; MIDPLAY /USB; 360
+  pad + MIDI on one bus (UHCI, xHCI) both work. Parser host test: 190000 random bytes round-trip. MENU menurun.sh quick PASS.
+- Speed (86Box P2B-LS PII-450 ES1371, testrig/midi/perf.sh, SBEMU /JOY:1 /VMPU:1 without ROMs, MIDPLAY 40 s): SBDIAG
+  beta.107 344 int/s, avg 0.02 ms, ISR 1% = beta.108 identical. SC55LOG.EXE byte-identical to beta.107 (md5 2cd851ff..):
+  speed unchanged. No ROMs in this session: SC-55 render load not measured. /MUSB itself is off by default (SBDIAG cannot
+  measure without the VMPU side channel).
+- Not tested (needs the real PCs): the Uno on the D810 (ICH6) and on the NEC card (oslow OUT path: QEMU asserts with
+  -DOSLOWFORCE + usbredir async bulk); real MIDI IN. HWTEST.TXT has the items.
+- Zip: beta.107 + SBEMU MIDPLAY USBTEST SBSET SC55MENU GAMETEST JOYTEST KMTEST MPUTEST SBDIAG TIMETEST USBDRV PADCONV
+  SC55WAV SC55LOG CDGUI (version / tui.h / USB), README.TXT, HWTEST.TXT. Includes the MENU bug-hunt fixes below (tree
+  builds, menurun.sh quick PASS; its menuwalk / 3D / Win98 checks are still open). Personal pack: not in this session.
+
+## MENU bug hunt (2026-11-13, DOS session) - fixes released in beta.108 (see above); the open checks below stay open
 Stopped by the user mid-task. Tree builds; tests/m3host/menurun.sh and run.sh pass.
 - Done (tools/sc55menu.c, menu3d.h, tui.h):
   - New host test tests/m3host/menuasan.c + menurun.sh [quick|fit|ed|shots|seed N]: whole MENU on the fake DJGPP (fake disk

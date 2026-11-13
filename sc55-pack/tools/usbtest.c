@@ -6,6 +6,8 @@
  *                      both pads (sticks, triggers, buttons), USB keys pressed, mouse movement, every plug /
  *                      unplug. Esc (PS/2 or USB keyboard) quits.
  *                      USB disks: model, size, and the first bytes of block 0 (S: again).
+ *                      USB MIDI device: listed, a test note (middle C) as soon as it is found (N: again),
+ *                      MIDI IN shown live.
  *   USBTEST FILE       the same, also written to FILE (for a bug report)
  *   USBTEST FILE /T:n  ... and stop by itself after n seconds
  *   USBTEST /PAD:GAME.EXE  also: the pad layout SBEMU would use for that program (PADMAP.TXT / PADUSER.TXT next to
@@ -199,6 +201,42 @@ static void dump(const char* when)
 }
 /* usbpad.c reports plug/unplug to SBEMU's flight recorder; USBTEST has none */
 void TRACE_Event(int kind, const char* fmt, ...) { (void)kind; (void)fmt; }
+/* USB MIDI: test note (middle C on channel 1, half a second), MIDI IN shown as it comes */
+static unsigned long long NoteOff;
+static uint8_t MinB[64][3]; static int MinL[64]; static volatile unsigned MinH, MinT;
+static void midi_in(const uint8_t* m, int len)
+{
+    if (MinH - MinT >= 64) return;
+    memcpy(MinB[MinH & 63], m, len); MinL[MinH & 63] = len; ++MinH;
+}
+static void test_note(void)
+{
+    static const uint8_t on[] = { 0xC0, 0x00, 0x90, 0x3C, 0x64 };   /* piano, note on C4 velocity 100 */
+    unsigned i;
+    for (i = 0; i < sizeof on; ++i) USBPAD_MidiByte(on[i]);
+    NoteOff = tsc() + Cps / 2;
+    out("\nUSB MIDI: test note C4 sent (note off in 0.5 s)\n");
+}
+static void midi_tick(void)
+{
+    uint32_t sent, drop, err, in;
+    if (NoteOff && tsc() >= NoteOff)
+    {
+        USBPAD_MidiByte(0x3C); USBPAD_MidiByte(0x00);   /* running status: note on, velocity 0 = note off */
+        NoteOff = 0;
+        while (USBPAD_MidiPending()) USBPAD_Poll();
+        USBPAD_MidiStats(&sent, &drop, &err, &in);
+        out("USB MIDI: note off sent; packets sent %lu, dropped %lu, errors %lu, MIDI IN %lu\n",
+            (unsigned long)sent, (unsigned long)drop, (unsigned long)err, (unsigned long)in);
+    }
+    while (MinT != MinH)
+    {
+        int j, l = MinL[MinT & 63];
+        out("\nMIDI IN:");
+        for (j = 0; j < l; ++j) out(" %02X", MinB[MinT & 63][j]);
+        ++MinT;
+    }
+}
 
 int main(int argc, char** argv)
 {
@@ -234,7 +272,7 @@ int main(int argc, char** argv)
     tk = ticks(); while (ticks() == tk) {}
     a = tsc(); tk = ticks(); while (ticks() - tk < 4) {}
     cps = (tsc() - a) * 18206 / 4000; Cps = cps;
-    out("USBTEST - USB pad / keyboard / mouse / disk finder (same code as SBEMU /JOY), test build 11: USB 2.0 disks\nCPU %lu MHz\n", (unsigned long)(cps / 1000000));
+    out("USBTEST - USB pad / keyboard / mouse / disk / MIDI finder (same code as SBEMU /JOY), test build 11: USB 2.0 disks\nCPU %lu MHz\n", (unsigned long)(cps / 1000000));
     if (PadOn)
     {   /* the same files and look-up as SBEMU (its folder = this program's) */
         char dir[260], where[64], d[600];
@@ -264,7 +302,8 @@ int main(int argc, char** argv)
     }
     out("Looking for USB controllers and devices (up to 3 s)...\n");
     USBPAD_SetHid(kb, ms);
-    n = USBPAD_Init(cps, 3000, USBPAD_F_KBD | USBPAD_F_MOUSE | USBPAD_F_DISK, &msg);
+    USBPAD_SetMidiIn(midi_in);
+    n = USBPAD_Init(cps, 3000, USBPAD_F_KBD | USBPAD_F_MOUSE | USBPAD_F_DISK | USBPAD_F_MIDI, &msg);
     out("%s\n", USBPAD_Trace());
     out("\nResult: %s\n", msg);
     Result = msg;
@@ -275,9 +314,11 @@ int main(int argc, char** argv)
         return 1;
     }
     disks();
-    out("\nLive view - plug / unplug, move the sticks, type, move the mouse. Esc quits\n(closes by itself after 2 minutes without a key). D: pipe state, R: restart pipes, S: USB disks.\n");
+    if (USBPAD_Have() & USBPAD_HAVE_MIDI) test_note();
+    out("\nLive view - plug / unplug, move the sticks, type, move the mouse. Esc quits\n(closes by itself after 2 minutes without a key). D: pipe state, R: restart pipes, S: USB disks, N: USB MIDI test note.\n");
     {
         int shown = (int)strlen(USBPAD_Trace());
+        int MidiWas = (USBPAD_Have() & USBPAD_HAVE_MIDI) != 0;
         t = start = tsc();
         for (;;)
         {
@@ -291,7 +332,10 @@ int main(int argc, char** argv)
                 ch = USBPAD_Changes();
                 out("\n-- %s\n-- in use now:\n%s", USBPAD_Describe(), USBPAD_Devices()[0] ? USBPAD_Devices() : "(nothing)\n");
                 if (USBPAD_Have() & USBPAD_HAVE_DISK) disks();
+                if ((USBPAD_Have() & USBPAD_HAVE_MIDI) && !MidiWas) test_note();
+                MidiWas = (USBPAD_Have() & USBPAD_HAVE_MIDI) != 0;
             }
+            midi_tick();
             if (KNew)
             {
                 KNew = 0; KeySeen = 1;
@@ -305,6 +349,7 @@ int main(int argc, char** argv)
                 { int k = tu_poll(); if (k) KeySeen = 1; if (k == 27) break;
                   if (k == 'd' || k == 'D') dump("key D");
                   if (k == 's' || k == 'S') disks();
+                  if ((k == 'n' || k == 'N') && (USBPAD_Have() & USBPAD_HAVE_MIDI)) test_note();
                   if (k == 'r' || k == 'R') { dump("before R"); USBPAD_Rearm(); out("\n-- R: every pipe restarted\n"); } }
                 for (i = 0; i < USBPAD_PADS; ++i)
                 {
@@ -351,7 +396,7 @@ int main(int argc, char** argv)
              * keyboard controller, and closing by itself after 2 minutes without a key */
             if ((inportb(0x64) & 0x21) == 0x01 && inportb(0x60) == 0x01) break;
             if (!secs && tsc() - start > cps * 120ULL && !KeySeen) { out("\nNo key for 2 minutes: closing by itself.\n"); break; }
-            if (!Ui && kbhit() && getch() == 27) break;
+            if (!Ui && kbhit()) { int c = getch(); if (c == 27) break; if ((c == 'n' || c == 'N') && (USBPAD_Have() & USBPAD_HAVE_MIDI)) test_note(); }
             if (secs && tsc() - start > cps * (unsigned long long)secs) break;
         }
     }

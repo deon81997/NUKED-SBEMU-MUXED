@@ -486,6 +486,7 @@ static int mpu_debug = 0;
 static int mpu_dbg_ctr = 0;
 #endif
 
+static BOOL MAIN_MUSB;   /* /MUSB: MPU-401 data bytes also go to the USB MIDI device */
 static uint32_t MAIN_MPU_330(uint32_t port, uint32_t val, uint32_t out)
 {
 #if MPU_DEBUG
@@ -509,6 +510,7 @@ static uint32_t MAIN_MPU_330(uint32_t port, uint32_t val, uint32_t out)
     if (mpu401_aui.mpu401 && mpu401_aui.card_handler->card_mpu401_write)
       mpu401_aui.card_handler->card_mpu401_write(&mpu401_aui, 0, (uint8_t)(val & 0xff));
     ser_putbyte((int)(val & 0xff));
+    if (MAIN_MUSB) USBPAD_MidiByte((uint8_t)val);   /* /MUSB: queued only, sent from the next USB poll */
     return 0;
   } else {
     uint8_t val, hwval, hwval_valid = 0;
@@ -749,6 +751,7 @@ struct MAIN_OPT
     "/P", "UART mode MPU-401 IO address [*]", 0x330, 0,
     "/MCOM", "UART mode MPU-401 COM port (1=COM1, 2=COM2, 3=COM3, 4=COM4, 9:HW MPU only, otherwise base address)", 9, 0,
     "/COML", "List installed COM ports", 0, MAIN_SETCMD_HIDDEN,
+    "/MUSB", "UART mode MPU-401 to a USB MIDI device (class compliant, e.g. M-Audio Uno; 1=on, 0=off; needs /JOY:1, replaces the SC-55)", 0, MAIN_SETCMD_BASE10,
 #if MPU_DEBUG
     "/MDBG", "Enable MPU-401 debugging (0 to disable, 1 or 2 to enable)", 0, 0,
 #endif
@@ -824,6 +827,7 @@ enum EOption
     OPT_MPUADDR,
     OPT_MPUCOMPORT,
     OPT_COMPORTLIST,
+    OPT_MUSB,
 #if MPU_DEBUG
     OPT_MDBG,
 #endif
@@ -1684,6 +1688,13 @@ int main(int argc, char* argv[])
     }
 #endif
 
+#if SBEMU_VMPU
+    if(MAIN_Options[OPT_MUSB].value && VMPU_ENABLED) //USB MIDI device instead of the SC-55 (the launchers pass /VMPU)
+    {
+        MAIN_Options[OPT_VMPU_VOICES].value = 0;
+        MAIN_Options[OPT_VMPU_VOICES].setcmd |= MAIN_SETCMD_SET;   //no SC-55 auto-load either
+    }
+#endif
     //HW MPU is the default, if VMPU being set, override HW MPU. othewise error.
     //should be checked before MAIN_TSR_InstallationCheck
     if((MAIN_Options[OPT_SCMPU].value || (MAIN_Options[OPT_MPUCOMPORT].value != 9 && MAIN_Options[OPT_MPUCOMPORT].value != 0)) && VMPU_ENABLED)
@@ -1720,7 +1731,7 @@ int main(int argc, char* argv[])
     //options (/SCMPU, /MPUCOM) or an explicit /VMPU leave the choice to the user.
     if(!(MAIN_Options[OPT_VMPU_VOICES].setcmd&MAIN_SETCMD_SET) && !VMPU_ENABLED
         && !MAIN_Options[OPT_SCMPU].value && (MAIN_Options[OPT_MPUCOMPORT].value == 9 || MAIN_Options[OPT_MPUCOMPORT].value == 0)
-        && MAIN_Options[OPT_MPUADDR].value)
+        && !MAIN_Options[OPT_MUSB].value && MAIN_Options[OPT_MPUADDR].value)
     {
         char rompath[_MAX_PATH];
         const char* rd = (const char*)MAIN_Options[OPT_VMPU_SF].value;
@@ -1898,8 +1909,9 @@ int main(int argc, char* argv[])
         MAIN_Print_Enabled_Newline(true);
     }
 
+    MAIN_MUSB = MAIN_Options[OPT_MUSB].value && MAIN_Options[OPT_JOY].value;
     if(MAIN_Options[OPT_MPUADDR].value && 
-        (MAIN_Options[OPT_MPUCOMPORT].value || VMPU_ENABLED)
+        (MAIN_Options[OPT_MPUCOMPORT].value || VMPU_ENABLED || MAIN_MUSB)
     )
     {
 #if SBEMU_VMPU
@@ -2211,7 +2223,7 @@ int main(int argc, char* argv[])
         else
         {
             int flags = (MAIN_Options[OPT_USBKB].value ? USBPAD_F_KBD : 0) | (MAIN_Options[OPT_USBMS].value ? USBPAD_F_MOUSE : 0)
-                | (MAIN_Options[OPT_USBDISK].value ? USBPAD_F_DISK : 0);
+                | (MAIN_Options[OPT_USBDISK].value ? USBPAD_F_DISK : 0) | (MAIN_MUSB ? USBPAD_F_MIDI : 0);
             VKBC_Init(MAIN_TCps, 0);
             USBPAD_SetHid(&VKBC_UsbKeys, &VKBC_UsbMouse);
             int usb_ok;
@@ -2241,6 +2253,12 @@ int main(int argc, char* argv[])
                         MAIN_CPrintf(YELLOW, "  BIOS joystick (INT 15h AH=84h) not hooked: no memory.\n");
                 }
                 MAIN_CPrintf(LIGHTGRAY, "  USB: %s.\n", msg);
+                if(MAIN_MUSB)
+                {
+                    printf("MPU-401 MIDI to a USB MIDI device (/MUSB): ");
+                    MAIN_Print_Enabled_Newline(TRUE);
+                    MAIN_CPrintf(LIGHTGRAY, (USBPAD_Have() & USBPAD_HAVE_MIDI) ? "  USB MIDI device found.\n" : "  No USB MIDI device yet: plug it in any time.\n");
+                }
                 if(MAIN_Options[OPT_USBMS].value && !enableRM)
                 {
                     /* no real-mode traps: the mouse driver's own port I/O can't be seen, so the USB mouse goes
@@ -2319,6 +2337,8 @@ int main(int argc, char* argv[])
         MAIN_D("USB steps: %s\n", USBPAD_Trace());
         USBPAD_TraceStop();
     }
+    else if(MAIN_Options[OPT_MUSB].value)
+        MAIN_CPrintf(YELLOW, "USB MIDI (/MUSB) needs SBEMU's USB (/JOY:1): off.\n");
 
     MAIN_LogCommit();
     /* Close the log before going resident. Until beta.28 the resident SBEMU kept SBLOG.TXT open as its
@@ -3289,7 +3309,7 @@ static void MAIN_TSR_Interrupt()
                     if(MAIN_Options[OPT_PM].value) HDPMIPT_Install_IOPortTrap(0x388, 0x38B, iodt, 4, &OPL3IOPT_PM);
                 }
 
-                if(MAIN_Options[OPT_MPUADDR].value && (MAIN_Options[OPT_MPUCOMPORT].value || VMPU_ENABLED) )
+                if(MAIN_Options[OPT_MPUADDR].value && (MAIN_Options[OPT_MPUCOMPORT].value || VMPU_ENABLED || MAIN_MUSB) )
                 {
                     _LOG("install mpu\n");
 #if SBEMU_VMPU

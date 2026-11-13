@@ -81,7 +81,7 @@ static Field F[NF] = {
     { "16-bit DMA",      "/H",       { "5", "6", "7" }, 3, 0, 0, "16-bit DMA channel (SB16 only).", {0}, 0 },
     { "Type",            "/T",       { "1", "2", "3", "4", "5", "6" }, 6, 4, 4, "1/2/3 = Sound Blaster, 4/5 = Pro, 6 = SB16.", {0}, 0 },
     { "MPU-401 port",    "/P",       { "330", "300", "310", "320", "332", "334" }, 6, 0, 0, "Where games find General MIDI. 330 is the usual one.", {0}, "MIDI" },
-    { "MIDI synth",      0,          { "sc55", "sf", "mt32", "cm32l" }, 4, 0, 0, "SC-55 / MT-32 / CM-32L need their ROMs in ROMS; a SoundFont is lightest on the CPU.", {0}, 0 },
+    { "MIDI synth",      0,          { "sc55", "sf", "mt32", "cm32l", "usb" }, 5, 0, 0, "SC-55 / MT-32 / CM-32L need their ROMs in ROMS; a SoundFont is lightest; USB: a real synth on a USB MIDI cable.", {0}, 0 },
     { "SC-55 options",   0,          { "" }, 1, 0, 0, "ROM set, volume, reverb/chorus, note limit, speed control. Enter opens.", {0}, 0 },
     { "SoundFont options", 0,        { "" }, 1, 0, 0, "SoundFont file, voices, reverb, chorus. Enter opens.", {0}, 0 },
     { "Sample rate",     "/K",       { "22050", "32000", "44100", "48000" }, 4, 0, 0, "Output rate. Higher = clearer but heavier: 22050 Hz with the SC-55.", {0}, "Output" },
@@ -199,6 +199,7 @@ static void set_labels(void)
     F[F_RATE].labels[2] = "Good    44100 Hz"; F[F_RATE].labels[3] = "High    48000 Hz";
     F[F_SYNTH].labels[0] = "SC-55 emulation (ROMs)"; F[F_SYNTH].labels[1] = "SoundFont (.sf2 file)";
     F[F_SYNTH].labels[2] = "MT-32 emulation (ROMs)"; F[F_SYNTH].labels[3] = "CM-32L emulation (ROMs)";
+    F[F_SYNTH].labels[4] = "USB MIDI device (M-Audio Uno ...)";
     F[F_SF].labels[0] = 0;
     { static const char* g[8] = { "100% (default)", "50%", "75%", "125%", "150%", "200%", "300%", "400%" }; for (i = 0; i < 8; i++) F[F_SCGAIN].labels[i] = g[i]; }
     onoff(F_SCFX, "On (accurate)", "Off (faster, dry sound)");
@@ -259,7 +260,12 @@ static void build_line(char* out)
         if (!F[i].opt) continue;
         if (is_sf_field(i) && !using_sf()) continue;      /* SoundFont settings only with the SoundFont */
         if (is_sc_field(i) && !using_sc55() && !(i == F_SCGAIN && !using_sf())) continue; /* SC-55 settings only with the SC-55 (its gain also sets the MT-32's) */
-        if (i == F_MPU && F[F_SYNTH].cur >= 2)           /* MT-32 / CM-32L (Munt) */
+        if (i == F_MPU && F[F_SYNTH].cur == 4)           /* USB MIDI device: SBEMU's USB host sends the MPU-401's MIDI */
+        {
+            sprintf(t, "%s/MUSB:1", out[0] ? " " : "");
+            strcat(out, t);
+        }
+        else if (i == F_MPU && F[F_SYNTH].cur >= 2)      /* MT-32 / CM-32L (Munt) */
         {
             sprintf(t, "%s/VMT32:%s", out[0] ? " " : "", F[F_SYNTH].cur == 2 ? "MT32" : "CM32L");
             strcat(out, t);
@@ -291,6 +297,7 @@ static void parse_tokens(char* s)
             if (!strcasecmp(tok + 7, "CM32L")) F[F_SYNTH].cur = 3;
             else if (strcasecmp(tok + 7, "0") && strcasecmp(tok + 7, "OFF")) F[F_SYNTH].cur = 2;
         }
+        if (!strcasecmp(tok, "/MUSB:1")) F[F_SYNTH].cur = 4;
         if (!strncasecmp(tok, "/VSF:", 5))
         {
             strncpy(g_sf, tok + 5, sizeof g_sf - 1);
@@ -830,6 +837,7 @@ static void draw_row(int i, int sel)
 /* a combination that is too heavy for a Pentium M class CPU, or "" */
 static const char* warning(void)
 {
+    if (F[F_SYNTH].cur == 4) return "USB MIDI: plug the cable in (any USB port); with /JOY:0 there is no USB in DOS.";
     if (F[F_SYNTH].cur >= 2) return "MT-32 games: choose \"Roland MT-32 / LAPC-I\" in the game's setup, not General MIDI.";
     if (!using_sf() && F[F_RATE].cur >= 2) return "Heavy: the SC-55 at 44.1/48 kHz is too much for most laptops. Use 22050 Hz.";
     if (!using_sf() && F[F_ROMSET].cur && strstr(F[F_ROMSET].vals[F[F_ROMSET].cur], "mk2")) return "Note: the SC-55mkII ROM set is heavier than the original SC-55.";

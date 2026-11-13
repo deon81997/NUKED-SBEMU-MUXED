@@ -34,6 +34,8 @@ static void out_byte(unsigned char b) { printf("%llu %02X\n", (unsigned long lon
 static uint64_t now_us(void) { return g_now_us; }
 static unsigned long g_busy_waits;
 static int mpu_busy(void) { return 0; }
+static int g_usb;
+static void usb_poll(void) {}
 static __attribute__((unused)) void sleep_ms(int ms) { g_now_us += (uint64_t)ms * 1000; }
 #else
 #include <pc.h>
@@ -157,12 +159,60 @@ static int key_read(void)
 
 static unsigned long g_bytes_out, g_notes_out;   /* /T statistics: MIDI bytes and note-ons sent */
 static unsigned long g_busy_waits;                /* /T: times the synth's queue was full (events sent later) */
-static int mpu_busy(void) { return !g_dry && (inportb(base + 1) & 0x40); }
+/* /USB: a USB MIDI device driven by MIDPLAY itself (sbemu/usbpad.c, the USB host SBEMU /JOY uses), no SBEMU needed */
+static int g_usb;
+#ifdef MIDPLAY_USB
+#include "usbpad.h"
+#include "dpmi/dpmi.h"
+void TRACE_Event(int kind, const char* fmt, ...) { (void)kind; (void)fmt; }   /* usbpad.c's flight-recorder calls (SBEMU only) */
+static void usb_poll(void) { if (g_usb) USBPAD_Poll(); }
+static int usb_start(void)
+{
+    const char* msg = "";
+    unsigned long tk;
+    uint64_t a, cps;
+    DPMI_Init();
+    tk = _farpeekl(_dos_ds, 0x46C); while (_farpeekl(_dos_ds, 0x46C) == tk) {}
+    a = rdtsc64(); tk = _farpeekl(_dos_ds, 0x46C); while (_farpeekl(_dos_ds, 0x46C) - tk < 4) {}
+    cps = (rdtsc64() - a) * 18206 / 4000;
+    printf("USB MIDI: looking for the device (up to 3 s)... ");
+    fflush(stdout);
+    if (!USBPAD_Init(cps, 3000, USBPAD_F_MIDI, &msg)) { printf("%s.\n", msg); return 0; }
+    if (!(USBPAD_Have() & USBPAD_HAVE_MIDI))
+    {
+        uint64_t end = rdtsc64() + cps * 2;                   /* a hub or a slow device: a little longer */
+        while (!(USBPAD_Have() & USBPAD_HAVE_MIDI) && rdtsc64() < end) USBPAD_Poll();
+    }
+    puts((USBPAD_Have() & USBPAD_HAVE_MIDI) ? "found." : "none yet (plugged in later, it is used then).");
+    g_usb = 1;
+    atexit(USBPAD_Shutdown);                                  /* what is still queued goes out, the controllers stop */
+    return 1;
+}
+#else
+static void usb_poll(void) {}
+static int usb_start(void) { puts("USB MIDI: not in this build."); return 0; }
+#endif
+static int mpu_busy(void)
+{
+#ifdef MIDPLAY_USB
+    if (g_usb) { USBPAD_Poll(); return USBPAD_MidiPending() > 900; }   /* its queue holds 1024 event packets */
+#endif
+    return !g_dry && (inportb(base + 1) & 0x40);
+}
 static void out_byte(unsigned char b)
 {
     uint64_t end;
     if (g_dry) return;
     g_bytes_out++;
+#ifdef MIDPLAY_USB
+    if (g_usb)
+    {
+        end = now_us() + 1000000;
+        while (USBPAD_MidiPending() > 1000 && now_us() < end) USBPAD_Poll();
+        USBPAD_MidiByte(b);
+        return;
+    }
+#endif
     end = now_us() + 1000000;
     while ((inportb(base + 1) & 0x40) && now_us() < end) {} /* DRR busy */
     outportb(base, b);
@@ -919,6 +969,7 @@ static void set_speed(int sp)
 static void mp_pump(void)
 {
     uint64_t t;
+    usb_poll();
     if (!P.loaded || P.paused || P.busy || P.i >= P.s.nev) return;
     P.busy = 1;
     t = song_time();
@@ -1489,7 +1540,7 @@ static void lcd_query(void)
 {
     int i;
     uint64_t t = now_us();
-    if (g_dry) { g_lcd_ok = 0; g_lcd_load = -1; return; }
+    if (g_dry || g_usb) { g_lcd_ok = 0; g_lcd_load = -1; return; }
     if (t < g_lcd_next) return;
     g_lcd_next = t + 100000;             /* 10 times a second: 150 trapped port reads each */
     outportb(base + 1, 0xB0);
@@ -2630,6 +2681,7 @@ int main(int argc, char** argv)
         else if (!strncasecmp(a, "/Q:", 3)) g_quit_s = atol(a + 3);
         else if (!strncasecmp(a, "/V:", 3)) g_view = atoi(a + 3) % 3;
         else if (!strcasecmp(a, "/X")) g_dry = 1;
+        else if (!strcasecmp(a, "/USB")) g_usb = 2;
         else if (a[0] == '/')
         {
             puts("MIDPLAY [options] [file.mid ...]  plays MIDI files through SBEMU's MPU-401 (run SC55.BAT first)\n"
@@ -2637,6 +2689,7 @@ int main(int argc, char** argv)
                  "  /D:dir     every MIDI file in that folder      /B   start in the file explorer\n"
                  "  /L repeat all   /R1 repeat one   /H shuffle    /S   plain one-line display\n"
                  "  /GM GM System On instead of the GS reset   /N no reset   /P:330 MPU port (hex)\n"
+                 "  /USB       play on a USB MIDI device (M-Audio Uno ...) itself, without SBEMU (PS/2 keyboard)\n"
                  "In the player: F1 shows every key.");
             return 2;
         }
@@ -2649,8 +2702,9 @@ int main(int argc, char** argv)
     mp3_win = g_win;
     { int* m = g_m3cfg[g_win != 0]; mp3_want_w = m[0]; mp3_want_h = m[1]; mp3_want_b = m[2]; mp3_hz = m[3]; }
     if (g_mpuport && !p_arg) base = g_mpuport;
-    { int p = g_dry ? 0 : mpu_find(base); if (p) base = p; }
-    if (!g_dry)
+    if (g_usb) { g_usb = 0; if (!g_dry && !usb_start()) return 1; }
+    { int p = g_dry || g_usb ? 0 : mpu_find(base); if (p) base = p; }
+    if (!g_dry && !g_usb)
     {
         printf("MPU-401 at port %Xh: ", base);
         if (!mpu_detect()) { puts("no answer.\nIs SBEMU loaded (SC55.BAT) with its MPU-401 on? Run SC55.BAT first, in the same DOS session."); return 1; }
