@@ -161,6 +161,24 @@ Stopped by the user mid-task. Tree builds; tests/m3host/menurun.sh and run.sh pa
   catcher writes CRASH.TXT). If it still crashes: CRASH.TXT / the HDPMI exception dump (CS:EIP, SS:ESP, error code) and the
   SBEMU log; next step would be an HDPMI32I with ?USE_HOST_MEM=0.
 
+## beta.109 (2026-11-13): SC-55 anti-alias low-pass (/VSCLPF), offline renderer, ST "hum" explained
+- sc55/sc55engine.hpp: 3 biquads (6th order Butterworth, fc = 0.42 x card rate) on the native frames before the linear
+  resampler, only when the card rate < native; integer DF1, Q28 coefficients, 8 extra fraction bits (no x87 denormal
+  slowdowns). set_lowpass(); SC55_SetLowpass; VMPU_SetSC55Lowpass; SBEMU option /VSCLPF:0|1 (OPT_VSC_LPF, default 1,
+  also changeable on a resident SBEMU). NOT in SBSET (SETTINGS) yet.
+- tests/engine_test.cpp: test_antialias_lowpass (both native rates x 11025..48000): 1.5x Nyquist -32..-84 dB, 2x Nyquist
+  -52..-inf dB, in band -0.15..0 dB, chunk invariance; the exact-arithmetic tests run with set_lowpass(false).
+  Cost: ~4% on top of the SC-55 (offline render 6.3 -> 6.6 s); QEMU "needs" 218 -> 224%.
+- tests/sc55render.cpp (make -f tests/Makefile.host out/sc55render): MIDPLAY host byte list -> WAV through SBEMU's real
+  SC-55 path, any ROM set / rate / filter, as fast as the host. Use THIS to judge sound, not QEMU recordings.
+- CORRECTION to the recording section below: the ST "hum" in QEMU was NOT aliasing. (1) QEMU TCG renders every SC-55
+  set too slowly (needs 106-265%, only CM-300 < 100%), so SBEMU's render-ahead runs dry and pads silence every 128-frame
+  block; (2) the SC-55ST (st-v1.01) idles with a real 517 Hz tone + harmonics at -36 dBFS (also in upstream
+  nuked-sc55-render, so it is the core or the ST ROM, not SBEMU). Chopped by (1) it became the out/128 Hz hum. The
+  filter does not change (2) (in band). Open: report the ST idle tone upstream / compare with a real SC-55ST.
+- Zip = beta.108 zip + SBEMU.EXE (1.0.0-beta.109) + README.TXT (/VSCLPF in the option list). To test on real PCs:
+  SC-55 at 22050 with /VSCLPF:1 vs :0 (whistles on high notes / cymbals), CPU headroom on the D810 / Celeron.
+
 ## MIDPLAY sound recordings per ROM set x rate (2026-11-13, done)
 - notetest.sh: WAV=file (QEMU HDA; AC97 records only silence), SND, WARM / TAIL (silent songs: in QEMU the SC-55 starts
   up and renders late), SCREEN=1 (SBEMU's synth / ROM-set line from VGA text memory via the QEMU monitor). Test songs

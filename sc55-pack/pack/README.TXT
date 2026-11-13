@@ -541,6 +541,12 @@ CONTENTS
                            which could freeze notes.
      /VSCFX:0|1            0 = skip the SC-55's reverb/chorus engine (faster,
                            dry sound). 1 = on (default)
+     /VSCLPF:0|1           1 = low-pass filter before the SC-55's sound is
+                           converted to the sound card's rate (default, since
+                           beta.109): without it, sound above half the card's
+                           rate came back as faint whistles and tones (worst
+                           at 11025/22050 Hz). Costs about 4% on top of the
+                           SC-55. 0 = off (as before).
      /VSCAUTO:0|1          1 = automatic speed control (default): if the CPU
                            cannot render the SC-55 in real time, SBEMU sheds
                            reverb/chorus, so games keep their

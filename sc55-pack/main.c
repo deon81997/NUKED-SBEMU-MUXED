@@ -765,6 +765,7 @@ struct MAIN_OPT
     "/VSCVOICES", "SC-55 note limit (4-24, 0=off): most notes held at once; the oldest is released first, like a real synth. Lighter on the CPU", 0, MAIN_SETCMD_BASE10,
     "/VSCFX", "SC-55 reverb and chorus (1=on, 0=off: lighter on the CPU, sound is dry)", 1, MAIN_SETCMD_BASE10,
     "/VSCAUTO", "SC-55 automatic speed control (1=on: sheds voices/effects when the CPU cannot keep up, so games keep their timing; 0=off)", 1, MAIN_SETCMD_BASE10,
+    "/VSCLPF", "SC-55 low-pass before the rate conversion (1=on: sound above half the card's rate no longer folds back as whistles; 0=off, as before beta.109)", 1, MAIN_SETCMD_BASE10,
     "/VSCAHEAD", "SC-55/SoundFont render-ahead in ms (0=off: render inside each interrupt like beta.16; default 50)", 50, MAIN_SETCMD_BASE10,
     "/VTIMER", "Give the game back timer ticks lost while SBEMU renders music (1=on, 0=off). Keeps MIDI tempo right in games", 1, MAIN_SETCMD_BASE10,
     "/VSF", "Play the MPU-401 with this SoundFont (.sf2 file) instead of the SC-55 emulation (much lighter on the CPU)", (uintptr_t)"", MAIN_SETCMD_STR,
@@ -841,6 +842,7 @@ enum EOption
     OPT_VSC_VOICES,
     OPT_VSC_FX,
     OPT_VSC_AUTO,
+    OPT_VSC_LPF,
     OPT_VSC_AHEAD,
     OPT_VTIMER,
     OPT_VSF,
@@ -1668,6 +1670,7 @@ int main(int argc, char* argv[])
     if(MAIN_Options[OPT_VSC_VOICES].value < 0 || MAIN_Options[OPT_VSC_VOICES].value > 28 || (MAIN_Options[OPT_VSC_VOICES].value > 0 && MAIN_Options[OPT_VSC_VOICES].value < 4)
         || MAIN_Options[OPT_VSC_FX].value < 0 || MAIN_Options[OPT_VSC_FX].value > 1
         || MAIN_Options[OPT_VSC_AUTO].value < 0 || MAIN_Options[OPT_VSC_AUTO].value > 1
+        || MAIN_Options[OPT_VSC_LPF].value < 0 || MAIN_Options[OPT_VSC_LPF].value > 1
         || MAIN_Options[OPT_VSC_AHEAD].value < 0 || MAIN_Options[OPT_VSC_AHEAD].value > 150
         || MAIN_Options[OPT_VTIMER].value < 0 || MAIN_Options[OPT_VTIMER].value > 1)
     {
@@ -1928,6 +1931,7 @@ int main(int argc, char* argv[])
             VMPU_SetSC55Options((const char*)MAIN_Options[OPT_VSC_SET].value, MAIN_Options[OPT_VSC_GAIN].value);
             VMPU_SetSC55Lite(MAIN_Options[OPT_VSC_FX].value, MAIN_Options[OPT_VSC_VOICES].value);
             VMPU_SetSC55Auto(MAIN_Options[OPT_VSC_AUTO].value);
+            VMPU_SetSC55Lowpass(MAIN_Options[OPT_VSC_LPF].value);
             VMPU_SetAhead(MAIN_Options[OPT_VSC_AHEAD].value);
             if(MAIN_USE_MT32) //Roland MT-32 / CM-32L (Munt) instead of the SC-55: ROMs from the same folder
                 VMPU_SelectMT32(1, (const char*)MAIN_Options[OPT_VMT32].value);
@@ -3233,6 +3237,8 @@ static void MAIN_TSR_Interrupt()
                 VMPU_SetAhead(MAIN_Options[OPT_VSC_AHEAD].value);
             if(OPT_CHANGED(OPT_VSC_AUTO))
                 VMPU_SetSC55Auto(MAIN_Options[OPT_VSC_AUTO].value);
+            if(OPT_CHANGED(OPT_VSC_LPF))
+                VMPU_SetSC55Lowpass(MAIN_Options[OPT_VSC_LPF].value);
             if(OPT_CHANGED(OPT_VSC_VOICES) || OPT_CHANGED(OPT_VSC_FX))
                 VMPU_SetSC55Lite(MAIN_Options[OPT_VSC_FX].value, MAIN_Options[OPT_VSC_VOICES].value);
             #endif

@@ -32,6 +32,7 @@ void VMPU_SetSC55Lite(int fx_on, int max_voices); /* speed-ups for slow CPUs: re
 int VMPU_FrameCap(int requested, int card_spi);
 void VMPU_SetMidiVolume(int percent); /* /VMIDIVOL: General MIDI music volume, 0-400% */ /* most frames one interrupt may render (keeps the game timer ticking) */
 void VMPU_SetAhead(int ms); /* render-ahead FIFO length, 0 = off */
+void VMPU_SetSC55Lowpass(int on); /* anti-alias low-pass before the rate conversion (default on) */
 void VMPU_SetSC55Auto(int on); /* governor: keeps the SC-55 render time below the audio period by shedding voices/effects */
 void VMPU_SelectMT32(int on, const char* model); /* /VMT32: Roland MT-32 / CM-32L (Munt); model auto, mt32 or cm32l; call before VMPU_Init */
 void VMPU_SelectSoundFont(int on);

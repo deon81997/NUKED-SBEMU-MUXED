@@ -41,6 +41,7 @@ int SC55_PostByte(uint8_t b);         /* 1 = queued, 0 = queue full (byte droppe
 int SC55_Queued(void);                /* MIDI bytes waiting for the emulated SC-55 (diagnostics) */
 int SC55_Busy(void);                  /* 1 while the queue is nearly full (MPU-401 "DRR") */
 void SC55_SetGain(int percent);
+void SC55_SetLowpass(int on);         /* anti-alias low-pass before the rate conversion; default on */
 void SC55_SetLite(int fx_on, int max_voices); /* fx_on 0 = no reverb/chorus; max_voices 0 = all */
 void SC55_SetMixVolume(int q8);       /* host mixer volume 0..256, applied on top of the gain */
 

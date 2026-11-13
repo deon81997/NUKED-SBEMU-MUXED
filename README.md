@@ -97,6 +97,8 @@
 
 <picture><img src="docs/90s/vox-sec-tv.gif" width="140" align="right" alt=""></picture>
 
+<picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/13/2026: beta.109.** **Cleaner SC-55 sound at every output rate!!** The emulated SC-55 runs at about 64-66 kHz, and SBEMU converts that down to your sound card's rate. Everything above half that rate used to fold back as faint whistles and tones (worst at 11025 and 22050 Hz). Now a proper low-pass filter goes first: tones above the card's range are 40-117 dB quieter, and the music itself changes by at most 0.15 dB. About 4% more CPU; **/VSCLPF:0** turns it off.
+
 <picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/13/2026: beta.108.** **Your real synth over USB!!** A class-compliant USB MIDI cable or keyboard (M-Audio Uno, Roland UM-ONE ...) now plays the games' General MIDI: SETTINGS > MIDI synth > "USB MIDI device" (SBEMU /MUSB:1). Any USB port, through hubs, plug it in or out while the music plays. MIDPLAY /USB plays MIDI files on it without SBEMU, and USBTEST finds it and plays a test note. Also in: the MENU bug-hunt fixes (Home/End in the file browser, longer descriptions in 3D, F1/F5 in 3D and more).
 
 <picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/13/2026: beta.107.** **Checked in Windows 98 and MS-DOS 7.1!!** MIDPLAY runs in a Windows 98 DOS box, full screen and in a window: channel table, SC-55 panel and every 3D look all work, and it quits back to Windows cleanly. USB sticks under MS-DOS 7.1 (Windows 98's DOS) get their letters too: FAT read and write, exFAT and NTFS read-only, copies byte-exact. Fixed: in 320x200 the 3D view's song title no longer runs into "Song 1/1".
@@ -105,10 +107,10 @@
 
 <picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/13/2026: beta.105.** **Pick your MIDI port in MIDPLAY!!** Options now has an "MPU-401 port" row: Auto finds SBEMU's MPU-401 like before, or step through 300h-360h to send the music to a second or a real MPU-401. Only ports that answer are offered, the switch happens while the song plays, and the choice is kept in MIDPLAY.CFG.
 
-<picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/13/2026: beta.104.** **A checklist for real PCs!!** NUKEDSB\HWTEST.TXT lists, PC by PC, the things only real hardware can confirm (sound quirks, USB pads, keyboards, sticks, speed). Everything an emulator can check was checked first: exFAT and NTFS USB sticks (MBR and GPT) through this exact build (read, copy byte-exact, writes refused), and MIDPLAY + MENU in every view, 3D look, player and style on an emulated Pentium 133 and Celeron 300 (86Box), no crash.
-
 <details>
 <summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
+
+<picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/13/2026: beta.104.** **A checklist for real PCs!!** NUKEDSB\HWTEST.TXT lists, PC by PC, the things only real hardware can confirm (sound quirks, USB pads, keyboards, sticks, speed). Everything an emulator can check was checked first: exFAT and NTFS USB sticks (MBR and GPT) through this exact build (read, copy byte-exact, writes refused), and MIDPLAY + MENU in every view, 3D look, player and style on an emulated Pentium 133 and Celeron 300 (86Box), no crash.
 
 <picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/13/2026: beta.103.** **Music first on small PCs!!** On a PC with little memory (8-12 MB), MIDPLAY could say "out of memory" for a big MIDI file even in the text views: the 3D view had reserved its picture buffers at start. Now the 3D view only takes memory when it is shown, and when a song needs it, the 3D view gives its memory back and comes back smaller (down to 320x200) instead. Tested in 86Box and QEMU with 8 MB.
 

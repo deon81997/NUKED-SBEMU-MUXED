@@ -536,6 +536,10 @@ void SC55_SetLite(int fx_on, int max_voices)
     PCM_LiteFx = fx_on == 0;
     PCM_MaxVoices = max_voices;
 }
+void SC55_SetLowpass(int on)
+{
+    if (g_engine) g_engine->set_lowpass(on != 0);
+}
 void SC55_SetGain(int percent)
 {
     if (g_engine) g_engine->set_gain_percent(percent);

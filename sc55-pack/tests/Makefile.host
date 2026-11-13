@@ -1,8 +1,11 @@
 # Host-side tests (Linux/macOS/MinGW with g++ 11+). Run:  make -f tests/Makefile.host
 # engine_test      - MIDI queue, resampler, gain, idle gating (fake core, no ROMs needed)
 # synth_errors_test- ROM discovery / error messages (fake files, links the real core)
+# sc55render       - (not in 'all') MIDI byte list -> WAV through SBEMU's SC-55 path, any ROM set / rate, no real-time
+#                    limit: make -f tests/Makefile.host out/sc55render   (needs your ROMs to run)
 CXX ?= g++
 CORE := upstream/Nuked-SC55/src/backend
+comma := ,
 FLAGS := -std=gnu++20 -O1 -g -fsanitize=address,undefined -I sc55/config -I sc55 -I $(CORE) \
          -include sc55/shim/sc55_compat.h
 CORE_SRC := $(wildcard $(CORE)/*.cpp)
@@ -18,3 +21,8 @@ out/synth_errors_test: tests/synth_errors_test.cpp sc55/sc55synth.cpp $(CORE_SRC
 	@mkdir -p out
 	gcc -O1 -c $(CORE)/sha/sha224-256.c -o out/sha.o
 	$(CXX) $(FLAGS) tests/synth_errors_test.cpp sc55/sc55synth.cpp $(CORE_SRC) out/sha.o -o $@
+
+out/sc55render: tests/sc55render.cpp sc55/sc55synth.cpp sc55/sc55engine.hpp $(CORE_SRC) $(CORE)/sha/sha224-256.c
+	@mkdir -p out
+	gcc -O2 -c $(CORE)/sha/sha224-256.c -o out/sha_r.o
+	$(CXX) $(subst -O1 -g -fsanitize=address$(comma)undefined,-O2,$(FLAGS)) tests/sc55render.cpp sc55/sc55synth.cpp $(CORE_SRC) out/sha_r.o -o $@

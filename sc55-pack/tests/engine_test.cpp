@@ -31,6 +31,7 @@ struct FakeCore
     int slope = 10;                 // PCM16 units per native frame
     int bias = 0;                   // PCM16 units added to every frame (MK1 DC)
     bool silent = false;            // emit zeros
+    double sine_hz = 0, sine_amp = 0, native = 64000; // sine_hz > 0: emit a sine at that frequency instead of the ramp
     bool dead = false;              // never emit
     // UART model
     unsigned uart_cap = 16;         // usable bytes in the ring
@@ -59,6 +60,7 @@ struct FakeCore
         if (step_count % steps_per_frame == 0)
         {
             int32_t raw = silent ? 0 : (int32_t)((int64_t)(n * slope + bias) * 32768);
+            if (sine_hz > 0) raw = (int32_t)(std::lround(sine_amp * std::sin(2 * 3.14159265358979 * sine_hz * n / native)) * 32768);
             if (silent && bias) raw = (int32_t)((int64_t)bias * 32768);
             n++;
             sink(ud, raw, raw);
@@ -76,6 +78,7 @@ static void test_resample_linear_and_chunk_invariance()
         FakeCore c1, c2;
         c1.slope = c2.slope = 1; // keep the ramp inside int16 for the whole run
         Eng e1(c1, 64000, 0), e2(c2, 64000, 0);
+        e1.set_lowpass(false); e2.set_lowpass(false);   // this test checks the interpolator's arithmetic exactly
         CHECK(e1.prime(10), "prime");
         CHECK(e2.prime(10), "prime");
         const int total = 5000;
@@ -109,6 +112,46 @@ static void test_resample_linear_and_chunk_invariance()
     }
 }
 
+// the anti-alias low-pass: a tone above the card's Nyquist must not fold back; a tone in the band must pass
+static double tone_rms(uint32_t native, uint32_t out_rate, double hz, bool lpf, std::vector<int16_t>* keep = nullptr, int chunk = 0)
+{
+    FakeCore c; c.sine_hz = hz; c.sine_amp = 16000; c.native = native;
+    Eng e(c, native, 0); e.set_lowpass(lpf);
+    e.prime(10);
+    const int total = (int)out_rate / 2; std::vector<int16_t> pcm(total * 2);
+    if (chunk) for (int p = 0; p < total; p += chunk) e.render(pcm.data() + p * 2, p + chunk > total ? total - p : chunk, out_rate, false);
+    else e.render(pcm.data(), total, out_rate, false);
+    if (keep) *keep = pcm;
+    double sum = 0; int n = 0;
+    for (int i = total / 4; i < total; i++) { sum += (double)pcm[2 * i] * pcm[2 * i]; n++; }   // after the filter settles
+    return std::sqrt(sum / n);
+}
+static void test_antialias_lowpass()
+{
+    printf("resampler: anti-alias low-pass\n");
+    const double full = 16000 / std::sqrt(2.0);
+    for (uint32_t native : {64000u, 66207u})
+        for (uint32_t out : {11025u, 22050u, 32000u, 44100u, 48000u})
+        {
+            double stop = 20 * std::log10(tone_rms(native, out, 0.75 * out > 0.45 * native ? 0.45 * native : 0.75 * out, true) / full);
+            double far = 20 * std::log10(tone_rms(native, out, 1.0 * out > 0.45 * native ? 0.45 * native : 1.0 * out, true) / full);
+            double pass = 20 * std::log10(tone_rms(native, out, 0.1 * out, true) / full);
+            double nolpf = 20 * std::log10(tone_rms(native, out, 0.75 * out > 0.45 * native ? 0.45 * native : 0.75 * out, false) / full);
+            printf("  native %u -> %u: 1.5x Nyquist %.1f dB, 2x %.1f dB (without the filter %.1f dB), in band %.2f dB\n", native, out, stop, far, nolpf, pass);
+            CHECK(stop < -30, "native %u out %u: tone at 1.5x Nyquist only %.1f dB down", native, out, stop);
+            CHECK(far < -45, "native %u out %u: tone at 2x Nyquist only %.1f dB down", native, out, far);
+            CHECK(nolpf > -20, "native %u out %u: test not sensitive (no filter: %.1f dB)", native, out, nolpf);
+            CHECK(pass > -0.6 && pass < 0.3, "native %u out %u: in-band tone changed by %.2f dB", native, out, pass);
+        }
+    std::vector<int16_t> a, b;
+    tone_rms(64000, 22050, 3000, true, &a, 0); tone_rms(64000, 22050, 3000, true, &b, 37);
+    CHECK(a == b, "low-pass: chunked render differs");
+    // the ST's tones (17 and 32 kHz at 66207 Hz) at 22050: must be far down
+    double st = 20 * std::log10(tone_rms(66207, 22050, 32061, true) / full), st2 = 20 * std::log10(tone_rms(66207, 22050, 17077, true) / full);
+    printf("  SC-55ST tones at 22050: 32 kHz %.1f dB, 17 kHz %.1f dB\n", st, st2);
+    CHECK(st < -50 && st2 < -40, "ST tones not removed: %.1f / %.1f dB", st, st2);
+}
+
 static void test_dc_offset_and_gain_and_mix()
 {
     printf("DC offset, gain, saturating mix\n");
@@ -117,6 +160,7 @@ static void test_dc_offset_and_gain_and_mix()
         c.silent = true;
         c.bias = 512; // MK1 DC bias
         Eng e(c, 64000, 512);
+        e.set_lowpass(false);   // exact gain arithmetic
         CHECK(e.prime(10), "prime");
         std::vector<int16_t> out(200 * 2, 99);
         e.render(out.data(), 200, 48000, false);
@@ -129,6 +173,7 @@ static void test_dc_offset_and_gain_and_mix()
         c.slope = 0;
         c.bias = 20000;
         Eng e(c, 64000, 0);
+        e.set_lowpass(false);   // exact gain arithmetic
         e.prime(10);
         e.set_gain_percent(200);
         std::vector<int16_t> out(10 * 2);
@@ -283,6 +328,7 @@ static void test_preempting_producer()
 int main()
 {
     test_resample_linear_and_chunk_invariance();
+    test_antialias_lowpass();
     test_dc_offset_and_gain_and_mix();
     test_midi_throttling_and_order();
     test_idle_gating();

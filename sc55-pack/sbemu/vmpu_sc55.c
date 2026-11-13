@@ -147,6 +147,12 @@ static int NL_Byte(uint8_t b)
     return 1;
 }
 
+static int VMPU_Lpf = 1;
+void VMPU_SetSC55Lowpass(int on)
+{
+    VMPU_Lpf = on;
+    if (SC55_IsLoaded()) SC55_SetLowpass(on);
+}
 static void Gov_Apply(void);
 void VMPU_SetSC55Lite(int fx_on, int max_voices)
 {
@@ -440,6 +446,7 @@ BOOL VMPU_Init(int baseaddr, int* voices, int freq, const char* romdir)
         return FALSE;
 
     SC55_SetLite(VMPU_LiteFx, 0); /* only after the firmware has booted */
+    SC55_SetLowpass(VMPU_Lpf);
     Gov_Calibrate();
     VMPU_AckPending = 0;
     VMPU_base = baseaddr;

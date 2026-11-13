@@ -5,7 +5,11 @@
 //     MPU-401 port trap (producer) and drained into the core's UART by the
 //     audio interrupt (consumer);
 //   * a sample FIFO and linear resampler from the core's native output rate
-//     (64000 Hz SC-55, 66207 Hz SC-55mkII) to the sound card's rate;
+//     (64000 Hz SC-55, 66207 Hz SC-55mkII) to the sound card's rate, with an
+//     anti-alias low-pass in front of it when the card's rate is lower (6th
+//     order Butterworth at 42% of the card's rate, integer maths): without it
+//     everything above half the card's rate folded back as audible tones (the
+//     SC-55's ultrasonic content would whistle at low card rates);
 //   * MK1 DC-bias removal, output gain and saturating mix into SBEMU's buffer;
 //   * idle gating, so the (CPU hungry) emulation only runs while there is MIDI
 //     traffic or an audible tail.
@@ -26,6 +30,7 @@
 #pragma once
 
 #include <atomic>
+#include <cmath>
 #include <stdint.h>
 #include <stddef.h>
 
@@ -77,6 +82,8 @@ public:
         mix_q8_ = v < 0 ? 0 : (v > 256 ? 256 : v);
         update_gain();
     }
+    // Anti-alias low-pass before the resampler (on by default). Takes effect at the next render().
+    void set_lowpass(bool on) { lpf_want_ = on; }
     int gain_percent() const { return gain_; }
     uint32_t native_rate() const { return native_rate_; }
     bool stalled() const { return stalled_; }
@@ -140,11 +147,12 @@ public:
                 for (int i = 0; i < frames * 2; i++) pcm[i] = 0;
             return;
         }
-        if (out_rate != out_rate_)
+        if (out_rate != out_rate_ || lpf_want_ != lpf_set_)
         {
             out_rate_ = out_rate;
             step_ = ((uint64_t)native_rate_ << 32) / out_rate_; // native frames per output frame, 32.32
             phase_ = 0;
+            lpf_setup();
         }
         wake_if_midi();
         feed();
@@ -182,7 +190,7 @@ public:
             for (uint32_t adv = (uint32_t)(phase_ >> 32); adv; adv--)
             {
                 a_ = b_;
-                b_ = next_native();
+                b_ = lpf_on_ ? lowpass(next_native()) : next_native();
             }
             phase_ &= 0xFFFFFFFFull;
             if (stalled_) // core died mid-block: finish the block as silence
@@ -195,6 +203,42 @@ public:
     }
 
 private:
+    // ---- anti-alias low-pass: 3 biquads (Butterworth Q 0.518, 0.707, 1.932), direct form I, Q28 coefficients,
+    // samples carried with 8 extra fraction bits; integers only (no FPU denormal slowdowns as notes fade out).
+    struct Biquad { int32_t b0, b1, b2, a1, a2; int32_t x1[2], x2[2], y1[2], y2[2]; };
+    void lpf_setup()
+    {
+        lpf_set_ = lpf_want_;
+        lpf_on_ = lpf_want_ && out_rate_ < native_rate_;
+        if (!lpf_on_) return;
+        static const double q[3] = { 0.51763809, 0.70710678, 1.93185165 };
+        const double fc = 0.42 * out_rate_, k = std::tan(3.14159265358979 * fc / native_rate_);
+        for (int i = 0; i < 3; i++)
+        {
+            const double n = 1.0 / (1.0 + k / q[i] + k * k), sc = 268435456.0; // 2^28
+            Biquad& b = lpf_[i];
+            b.b0 = (int32_t)std::floor(k * k * n * sc + 0.5); b.b1 = 2 * b.b0; b.b2 = b.b0;
+            b.a1 = (int32_t)std::floor(2.0 * (k * k - 1.0) * n * sc + 0.5);
+            b.a2 = (int32_t)std::floor((1.0 - k / q[i] + k * k) * n * sc + 0.5);
+            for (int c = 0; c < 2; c++) b.x1[c] = b.x2[c] = b.y1[c] = b.y2[c] = 0;
+        }
+    }
+    static int32_t biquad(Biquad& b, int c, int32_t x)
+    {
+        const int64_t acc = (int64_t)b.b0 * x + (int64_t)b.b1 * b.x1[c] + (int64_t)b.b2 * b.x2[c]
+                          - (int64_t)b.a1 * b.y1[c] - (int64_t)b.a2 * b.y2[c];
+        const int32_t y = (int32_t)((acc + (1 << 27)) >> 28);
+        b.x2[c] = b.x1[c]; b.x1[c] = x; b.y2[c] = b.y1[c]; b.y1[c] = y;
+        return y;
+    }
+    Frame lowpass(Frame f)
+    {
+        int32_t l = (int32_t)f.l * 256, r = (int32_t)f.r * 256;
+        for (int i = 0; i < 3; i++) { l = biquad(lpf_[i], 0, l); r = biquad(lpf_[i], 1, r); }
+        l = (l + 128) >> 8; r = (r + 128) >> 8;
+        return Frame{(int16_t)clamp16(l), (int16_t)clamp16(r)};
+    }
+
     void update_gain() { gain_q8_ = (base_q8_ * mix_q8_ + 128) >> 8; }
     static int32_t clamp16(int32_t v) { return v > 32767 ? 32767 : (v < -32768 ? -32768 : v); }
 
@@ -286,6 +330,8 @@ private:
     uint32_t out_rate_ = 0;
     uint32_t native_count_ = 0;
     bool feeding_ = false, started_ = false, stalled_ = false;
+    bool lpf_want_ = true, lpf_set_ = false, lpf_on_ = false;
+    Biquad lpf_[3] = {};
 
     // MIDI queue: producer owns tail_, consumer owns head_
     uint8_t ring_[kRing];
