@@ -24,6 +24,7 @@
 #include "fsread/fsread.h"
 
 #define UR_UNITS 8
+#define UR_SPARE 2              /* letters kept for exFAT / NTFS sticks plugged in after SBEMU starts */
 #define UR_FILES 48
 #define UR_FINDS 24
 #define UR_STUB  0x100
@@ -177,12 +178,48 @@ static int find_parts(int disk, uint32_t* out, int max)
 
 static uint32_t boot_sig(RUnit* u) { return dread(u->disk, u->start, 1, Blk) ? 0 : crc32(Blk, 512) | 1; }
 
+static int unit_no(RUnit* u);
+static int owners(const USBPAD_Disk* d)
+{
+    int k, c = 0;
+    for (k = 0; k < NR; ++k) if (RU[k]->gen == d->gen && RU[k]->lun == d->lun) ++c;
+    return c;
+}
+static void note(RUnit* u)                                      /* USBDRV's row for this drive */
+{
+    const USBPAD_Disk* di = u->disk >= 0 ? USBPAD_DiskInfo(u->disk) : NULL;
+    char nm[40];
+    snprintf(nm, sizeof nm, "%s %s", di ? di->vendor : "", di ? di->product : "");
+    USBDISK_RedirNote(unit_no(u), u->drive, u->disk < 0 ? 3 : !u->ok ? 4 : u->v.type == FSR_NTFS ? 2 : 1, u->disk < 0 ? "" : nm);
+}
+/* a spare drive without a stick takes a new stick's first exFAT / NTFS partition, else the next one of a stick that
+ * has fewer drives than such partitions (as usbdisk.c's spare FAT drives) */
+static int spare_adopt(RUnit* u)
+{
+    uint32_t p[UR_UNITS];
+    const USBPAD_Disk* d;
+    int k, o, pass, nd = USBPAD_Disks();
+    for (pass = 0; pass < 2; ++pass)
+        for (k = 0; k < nd; ++k)
+        {
+            if (!(d = USBPAD_DiskInfo(k)) || !d->ready) continue;
+            o = owners(d);
+            if ((pass == 0 && o) || (pass == 1 && !o)) continue;
+            if (find_parts(k, p, UR_UNITS) <= o) continue;
+            cache_drop(k);
+            u->disk = k; u->gen = d->gen; u->lun = d->lun; u->idx = o; u->ok = 0;
+            return 1;
+        }
+    return 0;
+}
+
 /* the unit's stick there and mounted? (follows the stick by gen + lun, re-mounts a new medium) */
 static int ucheck(RUnit* u, int probe)
 {
     const USBPAD_Disk* d = NULL;
-    int n, nd = USBPAD_Disks(), k;
+    int n, nd = USBPAD_Disks(), k, was = u->ok;
     uint32_t now = DPMI_LoadD(0x46C);
+    if (u->disk < 0 && !spare_adopt(u)) return 0;
     for (n = 0; n < nd; ++n)
         if ((d = USBPAD_DiskInfo(n)) && d->gen == u->gen && d->lun == u->lun) break;
     if (n < nd) { if (n != u->disk) { cache_drop(u->disk); cache_drop(n); u->disk = n; } }
@@ -200,12 +237,12 @@ static int ucheck(RUnit* u, int probe)
             if (k < NR) continue;
             if (find_parts(n, p, UR_UNITS) > u->idx) { d = c; break; }
         }
-        if (!d) { u->ok = 0; return 0; }
+        if (!d) { u->ok = 0; if (was) note(u); return 0; }
         for (k = 0; k < NR; ++k)
             if (RU[k]->gen == og && RU[k]->lun == ol) { RU[k]->gen = d->gen; RU[k]->lun = d->lun; RU[k]->disk = n; RU[k]->ok = 0; }
         cache_drop(n);
     }
-    if (!d->ready) { u->ok = 0; return 0; }
+    if (!d->ready) { u->ok = 0; if (was) note(u); return 0; }
     if (u->ok && probe && now - u->last >= 37)
     {   /* idle 2 s: a card swapped in a reader keeps the gen */
         cache_drop(u->disk);
@@ -221,6 +258,7 @@ static int ucheck(RUnit* u, int probe)
             if (!fsr_mount(&u->v, rcb, u, u->start, u->work, sizeof u->work)) { u->ok = 1; u->mgen++; u->freeok = 0; u->sig = boot_sig(u); }
         }
     }
+    if (u->ok != was || !u->ok) note(u);
     u->last = now;
     return u->ok;
 }
@@ -519,10 +557,9 @@ int USBREDIR_Install(void)
     DPMI_REG r;
     uint32_t lol, mask = 0, old, sdafar;
     uint8_t stub[UR_STUB];
-    int disks = USBPAD_Disks(), d, i, lastdrive, nblk, drive;
+    int disks = USBPAD_Disks(), d, i, lastdrive, nblk, drive, nfound;
     Letters[0] = 0;
     if (NR) return NR;
-    if (!disks) { strcpy(Msg, "no USB disk"); return 0; }
     for (d = 0; d < disks && NR < UR_UNITS; ++d)
     {
         uint32_t p[UR_UNITS];
@@ -538,7 +575,15 @@ int USBREDIR_Install(void)
             RU[NR++] = u;
         }
     }
-    if (!NR) { strcpy(Msg, "no exFAT / NTFS partition on the USB disk(s)"); return 0; }
+    nfound = NR;
+    for (i = 0; i < UR_SPARE && NR < UR_UNITS; ++i)             /* spare drives: exFAT / NTFS sticks plugged in later */
+    {
+        RUnit* u = (RUnit*)calloc(1, sizeof(RUnit));
+        if (!u) break;
+        u->disk = -1; u->gen = 0xFFFFFE00UL + (uint32_t)i; u->lun = -1; u->mgen = 1;
+        RU[NR++] = u;
+    }
+    if (!NR) { strcpy(Msg, "no memory"); return 0; }
 
     memset(&r, 0, sizeof r); r.w.ax = 0x5D06; dos_call(&r);
     Sda = DPMI_SEGOFF2L(r.w.ds, r.w.si); sdafar = (uint32_t)r.w.ds << 16 | r.w.si;
@@ -577,21 +622,18 @@ int USBREDIR_Install(void)
         DPMI_StoreB(c + 0, (uint8_t)('A' + RU[i]->drive)); DPMI_StoreB(c + 1, ':'); DPMI_StoreB(c + 2, '\\');
         DPMI_StoreD(c + 0x45, 0);                               /* no DPB */
         DPMI_StoreW(c + 0x4F, 2);                               /* backslash offset */
+        DPMI_StoreD(c + 0x49, 0x52554253);                      /* "SBUR": redirector record = ours (uCDD mounts images here) */
         DPMI_StoreW(c + 0x43, 0xC000);                          /* network + physical */
     }
     DPMI_StoreD(0x2F * 4, (uint32_t)Seg << 16 | 0x40);
     __asm__ __volatile__("sti");
 
     for (i = 0; i < NR; ++i) sprintf(Letters + strlen(Letters), "%s%c:", i ? " " : "", 'A' + RU[i]->drive);
-    for (i = 0; i < NR; ++i)
-    {
-        const USBPAD_Disk* di = USBPAD_DiskInfo(RU[i]->disk);
-        char nm[40];
-        snprintf(nm, sizeof nm, "%s %s", di ? di->vendor : "", di ? di->product : "");
-        USBDISK_RedirNote(i, RU[i]->drive, RU[i]->v.type == FSR_NTFS ? 2 : 1, nm);
-    }
-    sprintf(Msg, "%d drive(s) %s, first %s %lu MB, read-only", NR, Letters, RU[0]->v.type == FSR_NTFS ? "NTFS" : "exFAT",
-        (unsigned long)((RU[0]->v.nclus * RU[0]->v.cs) >> 20));
+    for (i = 0; i < NR; ++i) note(RU[i]);
+    if (nfound && RU[0]->disk >= 0)
+        sprintf(Msg, "%d drive(s) %s, first %s %lu MB, read-only", NR, Letters, RU[0]->v.type == FSR_NTFS ? "NTFS" : "exFAT",
+            (unsigned long)((RU[0]->v.nclus * RU[0]->v.cs) >> 20));
+    else sprintf(Msg, "exFAT / NTFS drive(s) %s ready for USB sticks plugged in now (read-only)", Letters);
     return NR;
 }
 

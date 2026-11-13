@@ -47,6 +47,7 @@ typedef struct
     uint32_t last;             /* BIOS tick of the last access */
     uint32_t sig;              /* CRC of LBA 0 + the partition's boot sector: tells a swapped card (same gen) */
     int drive;                 /* 0 = A: */
+    int nparts;                /* FAT partitions on its stick at the last medium check */
 } Unit;
 
 static Unit U[UD_UNITS];
@@ -259,6 +260,33 @@ static int owned(const USBPAD_Disk* d)              /* some drive has this stick
     for (k = 0; k < NU; ++k) if (U[k].gen == d->gen && U[k].lun == d->lun) return 1;
     return 0;
 }
+static int owners(const USBPAD_Disk* d)             /* how many drives have this stick */
+{
+    int k, c = 0;
+    for (k = 0; k < NU; ++k) if (U[k].gen == d->gen && U[k].lun == d->lun) ++c;
+    return c;
+}
+/* a spare drive that has no stick yet takes, in this order: a new stick with a FAT partition (its first one); the
+ * next FAT partition of a stick that has fewer drives than FAT partitions (a 2-partition stick plugged in later gets
+ * both spare letters when no other stick is waiting). Sticks without one are left to usbredir.c's spare letters. */
+static const USBPAD_Disk* spare_adopt(int u)
+{
+    Part p[UD_UNITS];
+    const USBPAD_Disk* d;
+    int k, o, nd = USBPAD_Disks(), pick = -1, part = 0, pass;
+    for (pass = 0; pass < 2 && pick < 0; ++pass)
+        for (k = 0; k < nd && pick < 0; ++k)
+        {
+            if (!(d = USBPAD_DiskInfo(k)) || !d->ready) continue;
+            o = owners(d);
+            if (pass == 0 && !o && find_parts(k, p, UD_UNITS) > 0) pick = k;
+            else if (pass == 1 && o && find_parts(k, p, UD_UNITS) > o) { pick = k; part = o; }
+        }
+    if (pick < 0 || !(d = USBPAD_DiskInfo(pick))) return NULL;
+    cache_drop(pick);
+    U[u].disk = pick; U[u].gen = d->gen; U[u].lun = d->lun; U[u].part = part; U[u].ok = 0; U[u].changed = 1;
+    return d;
+}
 static const USBPAD_Disk* unit_disk(int u)
 {
     uint32_t old = U[u].gen;
@@ -277,7 +305,8 @@ static const USBPAD_Disk* unit_disk(int u)
     /* our stick is gone: a disk no drive owns becomes this drive's new medium - its old number first, then any (a
      * spare drive, made for sticks plugged in after SBEMU started, has none: disk -1) */
     n = -1;
-    if (from >= 0 && (d = USBPAD_DiskInfo(from)) && !owned(d)) n = from;
+    if (from < 0) return spare_adopt(u);
+    if ((d = USBPAD_DiskInfo(from)) && !owned(d)) n = from;
     for (k = 0; n < 0 && k < nd; ++k) if ((d = USBPAD_DiskInfo(k)) && !owned(d)) n = k;
     if (n < 0 || !(d = USBPAD_DiskInfo(n))) return NULL;
     if (from >= 0) cache_drop(from);
@@ -298,14 +327,15 @@ static uint32_t unit_sig(int u)
 }
 
 /* what USBDRV.EXE shows (stub segment + UD_INFO): [0] 0 no stick / 1 FAT drive / 2 stick without a usable FAT
- * partition, [1] 12/16/32, [2..3] 0, [4..] "vendor product" */
+ * partition / 3 stick with fewer FAT partitions than this drive's number, [1] 12/16/32, [2] partition number (1..),
+ * [3] FAT partitions on the stick, [4..] "vendor product" */
 static void info_set(int u, int state)
 {
     char b[UD_INFOSZ];
     const USBPAD_Disk* d = state && U[u].disk >= 0 ? USBPAD_DiskInfo(U[u].disk) : NULL;
     if (!Seg) return;
     memset(b, 0, sizeof b);
-    b[0] = (char)state; b[1] = (char)(state == 1 ? U[u].fat : 0);
+    b[0] = (char)state; b[1] = (char)(state == 1 ? U[u].fat : 0); b[2] = (char)(U[u].part + 1); b[3] = (char)U[u].nparts;
     if (d) snprintf(b + 4, sizeof b - 4, "%s %s", d->vendor, d->product);
     DPMI_LMemcpy(DPMI_SEGOFF2L(Seg, UD_INFO + u * UD_INFOSZ), DPMI_PTR2L(b), sizeof b);
 }
@@ -315,7 +345,7 @@ static int unit_check_(int u);
 static int unit_check(int u)
 {
     int r = unit_check_(u);
-    info_set(u, r ? 1 : U[u].disk >= 0 && USBPAD_DiskInfo(U[u].disk) && USBPAD_DiskInfo(U[u].disk)->ready ? 2 : 0);
+    info_set(u, r ? 1 : U[u].disk >= 0 && USBPAD_DiskInfo(U[u].disk) && USBPAD_DiskInfo(U[u].disk)->ready ? (U[u].nparts > 0 ? 3 : 2) : 0);
     return r;
 }
 static int unit_check_(int u)
@@ -328,6 +358,7 @@ static int unit_check_(int u)
     cache_drop(U[u].disk);
     U[u].changed = 1; U[u].ok = 0; U[u].gen = d->gen;
     n = find_parts(U[u].disk, p, UD_UNITS);
+    U[u].nparts = n;
     if (U[u].part >= n) return 0;
     U[u].start = p[U[u].part].start; U[u].size = p[U[u].part].size; U[u].fat = p[U[u].part].fat;
     if (load_bpb(u)) return 0;
@@ -621,7 +652,8 @@ int USBDISK_Install(void)
 
 const char* USBDISK_Letters(void) { return Letters; }
 
-/* usbredir.c's exFAT / NTFS drives, listed by USBDRV: [0] drive + 1, [1] 1 exFAT / 2 NTFS, [4..] stick name */
+/* usbredir.c's exFAT / NTFS drives, listed by USBDRV: [0] drive + 1, [1] 1 exFAT / 2 NTFS / 3 waiting for a stick
+ * (spare) / 4 stick out, [4..] stick name */
 void USBDISK_RedirNote(int i, int drive, int type, const char* name)
 {
     char b[UD_INFOSZ];

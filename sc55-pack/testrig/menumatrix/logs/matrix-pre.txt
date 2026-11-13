@@ -1,0 +1,10 @@
+fd  j32  uhci   after   A=1,        B=5,      badbytes=0 loud=0.0s FAIL
+fd  j32  uhci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 loud=2.7s PASS
+fd  j32  ohci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 loud=5.4s PASS
+fd  j32  ohci   after   A=1,        B=5,      badbytes=0 loud=0.0s FAIL
+fd  j32  ehci   after   A=1,        B=5,      badbytes=0 loud=1.0s FAIL
+fd  j32  ehci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 loud=0.0s FAIL
+fd  j32  ehcic  after   A=1,        B=5,      badbytes=0 loud=0.9s FAIL
+fd  j32  ehcic  before  A=1,2,3,4,  B=3,4,5,  badbytes=0 loud=4.2s PASS
+fd  j32  xhci   before  A=          B=        badbytes=0 loud=0.0s FAIL
+fd  j32  xhci   after   A=          B=        badbytes=0 loud=0.0s FAIL

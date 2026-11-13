@@ -198,11 +198,49 @@ mdm_local_path:
     int 21h
     jc .bad
     test dx, 1000h
-    jnz .bad
+    jnz .usb
     clc
+    ret
+.usb:
+    dec bl
+    call sbemu_usb_drive
     ret
 .bad:
     stc
+    ret
+
+; NUKED SB-EMU: BL = drive (0 = A). CF clear when it is an exFAT / NTFS USB stick letter of SBEMU /USBDISK
+; (a read-only redirector drive whose CDS redirector record SBEMU sets to "SBUR"). Its files are read through
+; DOS like a local disk's, so images there can be mounted.
+sbemu_usb_drive:
+    push es
+    push bx
+    push cx
+    push di
+    push ax
+    mov cl, bl
+    mov ah, 52h
+    int 21h
+    cmp cl, [es:bx+21h]
+    jae .no
+    les di, [es:bx+16h]
+    mov al, 58h
+    mul cl
+    add di, ax
+    cmp dword [es:di+49h], 52554253h
+    jne .no
+    test byte [es:di+44h], 80h
+    jz .no
+    clc
+    jmp .out
+.no:
+    stc
+.out:
+    pop ax
+    pop di
+    pop cx
+    pop bx
+    pop es
     ret
 
 mdm_segment dw 0

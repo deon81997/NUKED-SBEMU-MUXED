@@ -1,0 +1,41 @@
+
+FreeCom version 0.86 - WATCOMC - XMS_Swap [Dec 30 2024 22:10:51]
+HDPMI32 now resident
+D:  QEMU QEMU HARDDISK           FAT16      32 MB     31 MB
+E:  QEMU QEMU HARDDISK           -       no FAT partition (exFAT / NTFS: later)
+CASE D D:\GAME1.ISO A
+The image is mounted.
+Drive M:
+DISC 1
+MOUNT OK
+INSTALL OK
+PLAY OK
+MPU-401 at port 330h: found. Playing test tune...
+  piano scale
+  chord with strings and bass
+  drums
+Done. No sound? Check volume, the SC55LOG.TXT result and that the card is the one SBEMU uses.
+The image is unmounted.
+Drive M:
+UNMOUNT OK
+D:  QEMU QEMU HARDDISK           FAT16      32 MB     31 MB
+E:  QEMU QEMU HARDDISK           -       no FAT partition (exFAT / NTFS: later)
+CASE D D:\GAME5.ISO B
+The image is mounted.
+Drive M:
+DISC 5
+MOUNT OK
+INSTALL OK
+PLAY OK
+MPU-401 at port 330h: found. Playing test tune...
+  piano scale
+  chord with strings and bass
+  drums
+Done. No sound? Check volume, the SC55LOG.TXT result and that the card is the one SBEMU uses.
+The image is unmounted.
+Drive M:
+UNMOUNT OK
+DONE
+BYTES AD OK
+BYTES BD OK
+WAV 6 s, 0.0 s loud

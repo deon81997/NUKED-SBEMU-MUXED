@@ -1,3 +1,45 @@
+## MENU matrix part 2 (2026-11-13, DOS session) - UNFINISHED, branch wip/menumatrix-2026-11-13, no release
+- No "MENU matrix" section existed; built new from beta.104's stick test: sc55-pack/testrig/menumatrix/
+  (mkstick.sh = stick images, run.sh DOS MODE HC PLUG = one QEMU run, all.sh = whole matrix, dos/*.BAT, wavrms.py).
+  Per ISO on each USB letter: UCDD mount from the stick, install (COPY to C:, host byte check), play (MPUTEST through
+  SBEMU /VSF TimGM6mb, QEMU AC97 -> WAV), unmount; then s1 swapped for s3 on the same port, again. DOS -> host via COM1.
+  Modes: j32 (JEMMEX+SBEMU), x32 (HIMEM only), j16 (JEMMEX+QPIEMU+HDPMI16I+SBEMU16). HC: uhci ohci ehci ehcic
+  (full-speed hub -> companion UHCI) xhci. MS-DOS 6.22: not run (no disks; assumed skip, stays in HWTEST.TXT).
+- Results before fixes (logs/matrix-pre.txt, FreeDOS j32 only, 10 of 60 runs): "before" PASS on uhci/ohci/ehci/ehcic
+  once UCDD fix 1 is in; FAILS: (a) release UCDD refuses images on exFAT/NTFS letters ("Use an image on a local hard
+  disk", 4409h says network) - FIXED + verified (fd j32 ehci before: all 7 cases PASS, bytes OK); (b) plug-after:
+  only partition 1 of a 2-partition stick gets a spare letter, exFAT/NTFS sticks get none - FIX WRITTEN, UNTESTED;
+  (c) xHCI: no disks at all ("disk on xHCI: not yet", usbpad.c ~2830) - NOT FIXED; (d) "loud" WAV check flaky in
+  QEMU with 2 VMs at once (same case 4.8 s / 0.0 s) - rig issue, try J=1; (e) USBDRV after a swap to a 1-partition
+  stick showed the old 2nd letter as "no FAT partition (exFAT/NTFS: later)" - new state 3 text, untested.
+- Code changes (all build; only the UCDD + SBUR part tested):
+  - third_party/ucdd/src/mdm_helper.asm: mdm_local_path accepts a network drive whose CDS +49h = "SBUR" (sbemu_usb_drive).
+  - sbemu/usbredir.c: CDS +49h = "SBUR"; 2 spare exFAT/NTFS letters always (UR_SPARE), spare_adopt/owners/note,
+    USBDRV note types 3 (waiting) / 4 (stick out). NOTE: adds 2 network letters + INT 2Fh hook for every /USBDISK:1 user.
+  - sbemu/usbdisk.c: spare FAT letters adopt per partition (spare_adopt: new stick first, then the next FAT partition
+    of a stick with fewer letters); nparts + info bytes [2]=part, [3]=nparts, state 3.
+  - tools/usbdrv.c: rows for redir type 3, state 3; re-reads the note after asking.
+- Not measured yet: 86Box PII-450 SBDIAG load / SC55LOG speed (src at /tmp/dl/86box, not built). SC55LOG needs the
+  user's SC-55 ROMs (none here). Changes run only at install / mount / medium check (expected 0% at runtime).
+- Next 3 steps: 1) implement xHCI bulk (Msd rings in XHC mem: XO_SIZE +0x1000, Configure Endpoint type 2/6, Normal
+  TRBs split at 64 KB, events by slot/dci in x_events, msd_clear = Reset EP + Set TR Dequeue) and drop the "not yet";
+  2) run all.sh (J=1 for sound) for fd+71 x j32/x32/j16 x 5 HCs x before/after, fix, fill a results table here;
+  3) 86Box PII-450 before/after (SBDIAG idle + STRESS.MID), then release beta.106 per the Release recipe.
+- Resume: clone; DJGPP + apt (qemu-system-x86 socat mtools exfatprogs exfat-fuse ntfs-3g gdisk fdisk dosfstools
+  genisoimage nasm); testrig/rufus/res/freedos + rufus/src -> rufus checkout; unzip release zip to /tmp/rel;
+  QuickInstall: mercy.py FULL.866 -> /tmp/dl/w98qi/x (IO.SYS MSDOS.SYS COMMAND.COM WINDOWS\HIMEM.SYS);
+  `make -j2; sh tools/ucdd/mkcdset.sh; bash testrig/menumatrix/mkstick.sh /home/claude/vm/st` (root);
+  `testrig/menumatrix/run.sh fd j32 ehci before`; `J=1 testrig/menumatrix/all.sh`.
+- Open bugs / repro: xHCI sticks never appear (run.sh fd j32 xhci before -> USBDRV D:/E: "(no stick)",
+  logs/fd-j32-xhci-before-*); plug-after letters (run.sh fd j32 uhci after on the release-era code -> only DISC 1,
+  logs/fd-j32-uhci-after-UT.txt). SB.TXT stays empty with "> C:\SB.TXT" (SBEMU writes the screen directly): set SBEMULOG.
+- Test downloads (keep out of repo/zips): Windows 98 QuickInstall v1.1.0 win98qi_v1.1.0_ALL.iso
+  (github.com/oerg866/win98-quickinstall/releases/download/v1.1.0/win98qi_v1.1.0_ALL.iso; gh release download is blocked,
+  plain curl of that URL works) -> /tmp/dl/w98qi; rufus (github.com/pbatard/rufus, depth 1) -> /tmp/dl/rufus;
+  TimGM6mb.sf2 (Ubuntu timgm6mb-soundfont 1.3-5, apt-get download) -> /tmp/dl/timgm6mb; 86Box @0935207 +
+  github.com/86Box/roms -> /tmp/dl/86box; DJGPP build-djgpp v3.4 gcc 12.2.0. No "VM store" section exists in HANDOFF:
+  nothing big uploaded (stick images are rebuilt by mkstick.sh).
+
 ## beta.111 (2026-11-13, DOS session): release candidate - menu walk, SETUP/UNINSTAL/CLEANUP, Win98 test, USB review
 - Branch wip/release-rc-2026-11-13 rebased on beta.110 (its own /VER packver.c + BUGREP block dropped: main's packver.h +
   SBDIAG DOCTOR already do it). Zip = beta.110 zip + all 17 EXEs rebuilt (VERSION beta.111) + SETUP UNINSTAL CLEANUP

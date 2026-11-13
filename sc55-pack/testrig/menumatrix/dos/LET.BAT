@@ -1,0 +1,4 @@
+@ECHO OFF
+IF NOT EXIST %1:\*.ISO GOTO END
+FOR %%f IN (%1:\*.ISO) DO CALL C:\T\ONE.BAT %1 %%f %2
+:END

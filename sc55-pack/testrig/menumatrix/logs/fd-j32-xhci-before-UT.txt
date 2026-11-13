@@ -1,0 +1,9 @@
+
+FreeCom version 0.86 - WATCOMC - XMS_Swap [Dec 30 2024 22:10:51]
+HDPMI32 now resident
+D:  (no stick)                   -       empty - plug a stick in, then R
+E:  (no stick)                   -       empty - plug a stick in, then R
+D:  (no stick)                   -       empty - plug a stick in, then R
+E:  (no stick)                   -       empty - plug a stick in, then R
+DONE
+WAV 2 s, 0.0 s loud

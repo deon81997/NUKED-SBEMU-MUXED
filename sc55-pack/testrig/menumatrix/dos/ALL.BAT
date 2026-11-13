@@ -1,0 +1,5 @@
+@ECHO OFF
+REM ALL.BAT PHASE - every ISO on every USB letter D: to L:
+IF NOT "%CDVM%"=="1" CALL C:\CDSET\CDON.BAT>> C:\UT.TXT
+C:\SC55\USBDRV.EXE /T>> C:\UT.TXT
+FOR %%d IN (D E F G H I J K L) DO CALL C:\T\LET.BAT %%d %1
