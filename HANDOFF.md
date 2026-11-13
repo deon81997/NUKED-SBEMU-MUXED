@@ -1,3 +1,20 @@
+## beta.107 (2026-11-13, DOS session): Win98 DOS box + MS-DOS 7.1 USB letters tested; 320x200 3D title fix
+- Source of Win98 / MS-DOS 7.1: public QuickInstall reference ISO (github.com/oerg866/win98-quickinstall releases v1.1.0,
+  win98qi_v1.1.0_ALL.iso, 1.3 GB; OSROOTS/1/FULL.866 -> testrig/padkeys/isols.py + mercy.py for IO.SYS/MSDOS.SYS/COMMAND.COM).
+  Win98 VM: testrig/mkfat32.py empty 1024 MB disk, boot the ISO with Enter spam, it installs 98SE (98Lite Micro) and
+  reboots; then boot from disk (QEMU pc, pentium3, 128 MB, std-vga, sb16). Rufus headers needed: br_fat16_0x3e.h,
+  br_fat32_0x0.h, br_fat32_0x52.h, br_fat32_0x3f0.h (testrig/rufus is gitignored).
+- Win98 DOS box (MIDPLAY /X from a FAT16 D: disk via Start > Run): opens full screen; channel table, SC-55 panel, 3D (mode 13h)
+  solid/vector/voxel all draw; Alt+Enter -> window: 3D, text, panel shown in the window; S back to 3D from a window switches
+  Windows to full screen (Windows' choice); Esc quits to the desktop. VESA modes in a DOS box not tried.
+- Bug found + fixed: 3D view at 320x200 - "name - title" ran into "Song 1/1" (midplay3d.h mp3_bar: title cut to the room left).
+- MS-DOS 7.1 (MKDISK_BOOT=msdos, BootGUI=0) + beta.104 SBEMU /USBDISK:1, 3 sticks at boot: FAT16 D: (read, COPY exact,
+  write CFG.TXT landed on the image), spare letters E:/F: for the exFAT/NTFS sticks ("Not ready" if used - expected),
+  redirector G: NTFS, H:/I: exFAT (MBR / GPT): DIR, TYPE nested, 40-entry dir, COPY byte-exact x3, COPY/MD refused.
+  MS-DOS 6.22: not available (Win98 ISO has 7.1 only) - stays on HWTEST.TXT.
+- Zip: beta.106 + every exe carrying the version (GAMETEST JOYTEST KMTEST MIDPLAY MPUTEST SBDIAG SBEMU SC55MENU TIMETEST
+  USBDRV CDGUI), HWTEST.TXT header. QEMU usb3d smoke (2 min) fine. Personal pack built from the user's beta.98 personal zip.
+
 ## beta.106 (2026-11-13): flight recorder (SBTRACE.TXT), per-program SB/MIDI command counts, BUGREP doctor
 - sbemu/trace.c/.h: two RAM banks (ISR fills one); 64-event ring (same event within 2 s counts up), 6 program slots
   (current PSP from the DOS SDA +10h, name from its MCB; matched by PSP *and* name - DOS reuses PSPs). Hooks: sbemu.c

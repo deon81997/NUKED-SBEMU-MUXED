@@ -285,10 +285,16 @@ static void mp3_bar(const char* name, const char* title, uint64_t el_us, uint64_
     unsigned long el = (unsigned long)((el_us > total_us ? total_us : el_us) / 1000000ULL);
     m3_rect(&m3_scr, 0, 0, M3W, 24, 0x000000, 150);
     m3_text_sh(&m3_scr, 8, 4, 0, "MIDPLAY", 0xFFFFFF);
-    snprintf(b, sizeof b, "%.30s%s%.28s", name, title[0] ? "  -  " : "", title);
-    m3_text(&m3_scr, 80, 4, 0, b, 0xB0D0FF, 256);
-    snprintf(b, sizeof b, "Song %d/%d", g_cur + 1, g_npl);
-    m3_text(&m3_scr, M3W - 8 - (int)strlen(b) * 8, 4, 0, b, 0x9090A8, 256);
+    {   /* name - title, cut so it never runs into "Song n/m" (320x200: "NUKED STRESSong 1/1") */
+        char sg[32]; int room;
+        snprintf(sg, sizeof sg, "Song %d/%d", g_cur + 1, g_npl);
+        snprintf(b, sizeof b, "%.30s%s%.28s", name, title[0] ? "  -  " : "", title);
+        room = (M3W - 8 - (int)strlen(sg) * 8 - 8 - 80) / 8;
+        if (room < 0) room = 0;
+        if ((int)strlen(b) > room) b[room] = 0;
+        m3_text(&m3_scr, 80, 4, 0, b, 0xB0D0FF, 256);
+        m3_text(&m3_scr, M3W - 8 - (int)strlen(sg) * 8, 4, 0, sg, 0x9090A8, 256);
+    }
     {   /* time bar; small screens (VGA 320x200) get a slimmer band without the key line */
         int bh = M3H >= 400 ? 46 : 22, ty = M3H - bh + 4;
         m3_rect(&m3_scr, 0, M3H - bh, M3W, bh, 0x000000, 160);

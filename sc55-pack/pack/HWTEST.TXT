@@ -1,4 +1,4 @@
-NUKED SB-EMU - REAL HARDWARE CHECKLIST (beta.104)
+NUKED SB-EMU - REAL HARDWARE CHECKLIST (beta.107)
 Things an emulator cannot confirm. Tick each one; for any failure keep
 C:\SC55\BUGREP.TXT (MENU > Tests > Bug report) and CRASH.TXT if there is one.
 
