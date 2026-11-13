@@ -55,6 +55,12 @@ type-to-jump. Files: tools/midplay.c only (+ pack/README.TXT section 8, testrig/
   takes --pitch n --pitchat ms n --ab a b loops --sleep s --info. Also run: tests/m3host/run.sh (4101 frames, 0
   failures) and notetest.sh "/VSF:C:\SC55\GM.SF2 /VSFVOICES:24" on all formats + busy song: 0 bytes dropped (note:
   plain /VSF without a path = SC-55 without ROMs = everything "dropped").
+- ROM x rate matrix (user's personal zip ROMs, notetest, 10 s each of T.MID/T.MUS/T.HMP/T.XMI/BUSY.MID): every complete
+  set found by hash - mk1 v1.00/1.10/1.20/1.21/2.00, mk2 v1.01, st v1.01, sc155 rev1, sc155mk2 v1.01, cm300 v1.30, jv880
+  v1.0.0/1.0.1 (/VSCSET:name) + /VMT32:MT32 + /VMT32:CM32L + SoundFont, each at /K11025, 22050, 32000, 44100, 48000:
+  75 runs, 0 bytes dropped (SoundFont runs show "busy" = MIDPLAY waited, nothing lost). Incomplete in the zip: cm300
+  v1.10/1.20, scb55, rlp3237. SBEMU's ROM set confirmed on screen (QEMU screendump) for mk2. QEMU's wav audiodev
+  recorded only silence, so the sound itself was not checked; SBDIAG's synth section reads 0 in QEMU.
 - Not tested: the new keys interactively in QEMU/86Box (only through the host build), real game files (made-up test
   files only - try Doom .MUS, Descent .HMP, Ultima/Dune II .XMI), real hardware (D810, P5PE).
 - Zip = beta.100 zip + FILES/SC55/MIDPLAY.EXE + README.TXT.
