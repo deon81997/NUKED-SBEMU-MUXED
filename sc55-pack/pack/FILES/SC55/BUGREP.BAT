@@ -5,8 +5,10 @@ REM Usage: BUGREP [folder]   (the menu item Files, Make a bug report, does this 
 REM Nothing is changed or sent anywhere. ROM files are listed by name only.
 SET BR=%1
 IF "%BR%"=="" SET BR=C:\SC55
-SET BRF=%BR%\BUGREP.TXT
-ECHO Writing %BRF% ...
+SET BRF=%BR%\BUGREP.$$$
+ECHO Writing %BR%\BUGREP.TXT ...
+REM SBEMU writes its flight recorder (SBTRACE.TXT) first
+IF EXIST %BR%\SBDIAG.EXE %BR%\SBDIAG.EXE FLUSH > NUL
 ECHO ==== NUKED SB-EMU bug report> %BRF%
 VER>> %BRF%
 ECHO.| DATE>> %BRF%
@@ -33,6 +35,9 @@ IF EXIST %BR%\SBOPTS.BAT TYPE %BR%\SBOPTS.BAT>> %BRF%
 ECHO.>> %BRF%
 ECHO ==== SBEMU messages (SBLOG.TXT)>> %BRF%
 IF EXIST %BR%\SBLOG.TXT TYPE %BR%\SBLOG.TXT>> %BRF%
+ECHO.>> %BRF%
+ECHO ==== SBEMU flight recorder (SBTRACE.TXT: events, and what each program sent)>> %BRF%
+IF EXIST %BR%\SBTRACE.TXT TYPE %BR%\SBTRACE.TXT>> %BRF%
 ECHO.>> %BRF%
 ECHO ==== SBEMU start-up details (SBDETAIL.TXT)>> %BRF%
 IF EXIST %BR%\SBDETAIL.TXT TYPE %BR%\SBDETAIL.TXT>> %BRF%
@@ -61,6 +66,12 @@ ECHO ==== Files>> %BRF%
 DIR %BR%>> %BRF%
 DIR %BR%\ROMS>> %BRF%
 ECHO ==== end>> %BRF%
+REM the summary of likely problems and every program's version go on top (SBDIAG DOCTOR)
+IF EXIST %BR%\BUGREP.TXT DEL %BR%\BUGREP.TXT
+IF EXIST %BR%\SBDIAG.EXE %BR%\SBDIAG.EXE DOCTOR %BR% %BRF% %BR%\BUGREP.TXT
+IF NOT EXIST %BR%\BUGREP.TXT COPY %BRF% %BR%\BUGREP.TXT > NUL
+DEL %BRF%
+SET BRF=%BR%\BUGREP.TXT
 ECHO Done: %BRF%
 ECHO Copy it to a USB stick or floppy and attach it to your bug report.
 SET BRF=

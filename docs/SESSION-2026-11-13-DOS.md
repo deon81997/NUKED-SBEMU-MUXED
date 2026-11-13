@@ -41,14 +41,7 @@
 - Not done/open: SBSET.EXE in zip not rebuilt (zip copy 130 KB smaller than a fresh build; built differently).
   86Box rufus clone lives untracked in testrig/rufus.
 
-## Task in progress (not started in code)
-"Debugging aids": 1) SBEMU flight recorder: RAM ring buffer of runtime events (USB plug/unplug, dropped MIDI, late
-renders, timer replays, DMA/IRQ problems, CD mounts) written to SBTRACE.TXT when DOS is idle at the prompt.
-2) Per-game trace: count every SB DSP and MIDI command, flag unsupported ones. 3) BUGREP "doctor": 5-line
-plain-English summary of likely problems at the top of BUGREP.TXT, plus all tool versions. Test 86Box/QEMU, release,
-update README.TXT (sc55-pack/pack/README.TXT) + HANDOFF. Report in 5 lines.
-- Found so far: BUGREP is sc55-pack/pack/FILES/SC55/BUGREP.BAT (67 lines, plain batch: VER, SET, MEM /C,
-  CONFIG/AUTOEXEC, SBOPTS, SBLOG.TXT, SBDETAIL.TXT, SC55LOG, SBDIAG, GAMETEST, USBTEST, Win98 log, CD flags, DIR);
-  MENU calls it (tools/sc55menu.c:419 `CALL %s\BUGREP.BAT %s`). The doctor needs a small EXE (e.g. extend SBDIAG or a
-  new tool) that reads those files and writes the summary first. Next: look at SBEMU's resident side (main.c,
-  idle/INT 28h or INT 21h hooks) for where to flush SBTRACE.TXT.
+## Debugging aids: done in beta.106 (see HANDOFF). Test disk recipe: /tmp/tr/d = FreeDOS + FDCONFIG
+`DEVICE=C:\JEMMEX.EXE NOEMS` + AUTOEXEC `JLOAD C:\QPIEMU.DLL`, `HDPMI32I -r`, `SET SBEMULOG=C:\SC55\SBLOG.TXT`,
+`C:\SC55\SBEMU`, then TRTEST / `CALL C:\SC55\BUGREP C:\SC55` (batch avoids flaky monitor typing). JEMM files from the
+release zip FILES/JEMM. Other session released beta.104/105 meanwhile: always fetch before numbering.

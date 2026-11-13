@@ -13,9 +13,11 @@
 #include <string.h>
 #include <stdarg.h>
 #include <pc.h>
+#include <dos.h>
 #include <unistd.h>
 #include "mpuport.h"
 #include "toolui.h"
+#include "doctor.h"
 
 static int g_port = 0x330;
 static FILE* g_log;
@@ -181,6 +183,14 @@ int main(int argc, char** argv)
     int reasons = 0;
 
     if (cmd[0] == '/' || cmd[0] == '-') ++cmd;
+    if (!stricmp(cmd, "DOCTOR") || !stricmp(cmd, "FLUSH"))
+    {   /* SBEMU writes its flight recorder (SBTRACE.TXT) now (MPU command A9h), then BUGREP's summary */
+        int p = mpu_from_blaster(getenv("BLASTER"));                /* SBEMU writes P<port> to BLASTER */
+        if (!p) p = 0x330;
+        outportb(p + 1, 0xA9); delay(300); mpu_drain(p);             /* (nothing happens without SBEMU) */
+        if (!stricmp(cmd, "FLUSH")) { printf("Asked SBEMU (MPU-401 %Xh) to write SBTRACE.TXT.\n", p); return 0; }
+        return doctor_main(argc, argv);                              /* the summary at the top of BUGREP.TXT */
+    }
     if (!stricmp(cmd, "?") || !stricmp(cmd, "H"))
     {
         printf("SBDIAG START   start measuring (run SC55 first)\n"

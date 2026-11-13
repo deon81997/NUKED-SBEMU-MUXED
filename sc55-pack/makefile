@@ -7,7 +7,8 @@ DEBUG ?= 0
 # 0: original SBEMU build with the TinySoundFont SoundFont synth
 VSC55 ?= 1
 
-VERSION ?= 1.0.0-beta.105-usb-sc55
+VERSION ?= 1.0.0-beta.106-usb-sc55
+PACKVER = -DNSB_VER=\"$(VERSION)\" -include tools/packver.h
 
 INCLUDES := -I./mpxplay -I./sbemu -I./drivers/include -I./sc55 -I./third_party/nuked-opl3-fast
 DEFINES := -D__DOS__ -DSBEMU -DDEBUG=$(DEBUG) -DSBEMU_VSC55=$(VSC55) -DMAIN_SBEMU_VER=\"$(VERSION)\"
@@ -135,7 +136,7 @@ SBEMU_SRC := sbemu/dbopl.cpp \
 		 irqguard.c \
 
 ifeq ($(VSC55),1)
-SBEMU_SRC += sbemu/vmpu_sc55.c sbemu/vmpu_sf.c sbemu/vdiag.c
+SBEMU_SRC += sbemu/vmpu_sc55.c sbemu/vmpu_sf.c sbemu/vdiag.c sbemu/trace.c
 else
 SBEMU_SRC += sbemu/vmpu.c
 endif
@@ -212,17 +213,17 @@ output/tools/sc55wav.o: tools/sc55wav.cpp sc55/sc55synth.h
 $(MPUTEST): tools/mputest.c $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
-	$(SILENTCMD)$(CC) -O2 -Wall -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
+	$(SILENTCMD)$(CC) $(PACKVER) -O2 -Wall -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
 
 output/gametest.exe: tools/gametest.c $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
-	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< -lm $(if $(filter 0,$(DEBUG)),-s,)
+	$(SILENTCMD)$(CC) $(PACKVER) -O2 -Wall -march=i586 -o $@ $< -lm $(if $(filter 0,$(DEBUG)),-s,)
 
 output/sbdiag.exe: tools/sbdiag.c $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
-	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
+	$(SILENTCMD)$(CC) $(PACKVER) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
 
 USBTEST_SRC := tools/usbtest.c sbemu/usbpad.c sbemu/padmap.c sbemu/padconvl.c mpxplay/au_cards/pcibios.c mpxplay/au_cards/au_base.c \
 	sbemu/dpmi/dpmi.c sbemu/dpmi/dpmi_dj2.c sbemu/dpmi/xms.c sbemu/dpmi/dbgutil.c sbemu/dpmi/dpmi_tsr.c \
@@ -235,7 +236,7 @@ output/usbtest.exe: $(USBTEST_SRC) sbemu/usbpad.h sbemu/padmap.h $(wildcard tool
 output/padconv.exe: tools/padmap/padconv.c
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
-	$(SILENTCMD)$(CC) -O2 -march=i386 -o $@ $< -s
+	$(SILENTCMD)$(CC) $(PACKVER) -O2 -march=i386 -o $@ $< -s
 
 # USB disk block device stub (bytes in a header; the header is committed, nasm only needed after an .asm change)
 sbemu/usbdiskbin.h: sbemu/usbdisk.asm
@@ -253,27 +254,27 @@ output/sbemu16.com: tools/sbemu16.asm
 output/usbdrv.exe: tools/usbdrv.c $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
-	$(SILENTCMD)$(CC) -O2 -Wall -march=i386 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
+	$(SILENTCMD)$(CC) $(PACKVER) -O2 -Wall -march=i386 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
 
 output/kmtest.exe: tools/kmtest.c $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
-	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
+	$(SILENTCMD)$(CC) $(PACKVER) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
 
 output/joytest.exe: tools/joytest.c $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
-	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
+	$(SILENTCMD)$(CC) $(PACKVER) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
 
 output/timetest.exe: tools/timetest.c $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
-	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
+	$(SILENTCMD)$(CC) $(PACKVER) -O2 -Wall -march=i586 -o $@ $< $(if $(filter 0,$(DEBUG)),-s,)
 
 $(MIDPLAY): tools/midplay.c $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
-	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< -lm $(if $(filter 0,$(DEBUG)),-s,)
+	$(SILENTCMD)$(CC) $(PACKVER) -O2 -Wall -march=i586 -o $@ $< -lm $(if $(filter 0,$(DEBUG)),-s,)
 
 output/tools/sbset.o: tools/sbset.c sc55/sc55synth.h $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
@@ -289,12 +290,12 @@ SC55MENU := output/sc55menu.exe
 $(SC55MENU): tools/sc55menu.c $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
-	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -ffast-math -DMENU_VER=\"$(VERSION)\" -o $@ $< -lm $(if $(filter 0,$(DEBUG)),-s,)
+	$(SILENTCMD)$(CC) $(PACKVER) -O2 -Wall -march=i586 -ffast-math -DMENU_VER=\"$(VERSION)\" -o $@ $< -lm $(if $(filter 0,$(DEBUG)),-s,)
 
 $(CDGUI): tools/cdgui.c $(wildcard tools/*.h)
 	@mkdir -p $(dir $@)
 	$(SILENTMSG) "CC\t$@\n"
-	$(SILENTCMD)$(CC) -O2 -Wall -march=i586 -o $@ $< -lm $(if $(filter 0,$(DEBUG)),-s,)
+	$(SILENTCMD)$(CC) $(PACKVER) -O2 -Wall -march=i586 -o $@ $< -lm $(if $(filter 0,$(DEBUG)),-s,)
 
 # same tool, but it also writes the whole report to SC55LOG.TXT next to the exe
 output/tools/sc55log.o: tools/sc55wav.cpp sc55/sc55synth.h

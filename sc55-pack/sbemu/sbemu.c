@@ -1,3 +1,4 @@
+#include "trace.h"
 #include "platform.h"
 #include "dpmi/dbgutil.h"
 #include "sbemu.h"
@@ -17,6 +18,26 @@ typedef struct
 #define SBEMU_DSPCMD_SKIP1 -2
 #define SBEMU_DSPCMD_SKIP2 -3
 #define SBEMU_DSPCMD_DIRECT -4 //to resolve conflict of SBEMU_CMD_8BIT_DIRECT / SBEMU_CMD_MODE_PCM16_MONO
+#define SBEMU_DSPCMD_SILENCE -5 //0x80: 2 length bytes, then the "silence done" IRQ
+
+/* the DSP commands SBEMU emulates (the flight recorder counts the others as not supported) */
+int SBEMU_DSP_Known(uint8_t c)
+{
+    static const uint8_t ok[] = { 0x10, 0x14, 0x16, 0x17, 0x1C, 0x1F, 0x40, 0x41, 0x42, 0x45, 0x48, 0x74, 0x75, 0x76, 0x77,
+        0x7D, 0x7F, 0x80, 0x90, 0x91, 0xB0, 0xB2, 0xB4, 0xB6, 0xC0, 0xC2, 0xC4, 0xC6, 0xD0, 0xD1, 0xD3, 0xD4, 0xD5, 0xD6, 0xD9,
+        0xDA, 0xE0, 0xE1, 0xE2, 0xE3, 0xE4, 0xE8, 0xF2, 0xF3 };
+    unsigned i; for(i = 0; i < sizeof ok; i++) if(ok[i] == c) return 1;
+    return 0;
+}
+/* parameter bytes of the commands SBEMU does not emulate, so they are skipped instead of eating the next commands
+   (until beta.105 an unknown command took every following byte as its parameters until the next DSP reset) */
+static int SBEMU_DSP_ParamBytes(uint8_t c)
+{
+    if(c == 0x0E || c == 0x24) return 2;          /* ASP register write; 8-bit record, single cycle */
+    if(c == 0x0F || c == 0x38) return 1;          /* ASP register read; MIDI out via the DSP */
+    if((c >= 0xB0 && c <= 0xBF) || (c >= 0xC0 && c <= 0xCF)) return 3;   /* other SB16 transfers (record): mode + length */
+    return 0;                                     /* 20h, 28h, 2Ch, 30h-37h, 98h, 99h, D8h, E7h, Fxh: no parameters */
+}
 
 #define SBEMU_RESET_START 0
 #define SBEMU_RESET_END 1
@@ -254,8 +275,19 @@ void SBEMU_DSP_Write(uint16_t port, uint8_t value)
     int OldStarted = SBEMU_Started;
     if(SBEMU_DSPCMD == -1)
     {
+        TRACE_Dsp(value);
+        if(value == 0xB2) value = 0xB0;           /* single cycle with the FIFO on: the FIFO does not matter here */
+        if(value == 0xC2) value = 0xC0;
         SBEMU_DSPCMD = value;
         SBEMU_DSPCMD_Subindex = 0;
+        if(!SBEMU_DSP_Known(value))
+        {
+            int n = SBEMU_DSP_ParamBytes(value);
+            SBEMU_DSPCMD = n == 0 ? SBEMU_DSPCMD_INVALID : n == 1 ? SBEMU_DSPCMD_SKIP1 : SBEMU_DSPCMD_SKIP2;
+            if(n == 3) SBEMU_DSPCMD_Subindex = -1;
+            return;
+        }
+        if(value == 0x80) { SBEMU_DSPCMD = SBEMU_DSPCMD_SILENCE; return; }
         switch(SBEMU_DSPCMD)
         {
             case SBEMU_CMD_TRIGGER_IRQ:
@@ -495,6 +527,15 @@ void SBEMU_DSP_Write(uint16_t port, uint8_t value)
                 ++SBEMU_DSPCMD_Subindex;
             }
             break;
+            case SBEMU_DSPCMD_SILENCE:   /* 80h: no sound for the given length, then an IRQ (games wait for it) */
+            {
+                if(++SBEMU_DSPCMD_Subindex >= 2)
+                {
+                    SBEMU_MixerRegs[SBEMU_MIXERREG_INT_STS] |= 0x1;
+                    SBEMU_TriggerIRQ = 1;
+                }
+            }
+            break;
         }
         if(SBEMU_DSPCMD_Subindex >= 2)
             SBEMU_DSPCMD = SBEMU_DSPCMD_INVALID;
@@ -576,12 +617,14 @@ uint8_t SBEMU_DSP_ReadStatus(uint16_t port)
 {
     _LOG("SBEMU: DSP RS\n");
     SBEMU_RS += 0x80;
+    if(SBEMU_MixerRegs[SBEMU_MIXERREG_INT_STS] & 0x1) TRACE_IrqAck();
     SBEMU_MixerRegs[SBEMU_MIXERREG_INT_STS] &= ~0x1;
     return SBEMU_RS;
 }
 
 uint8_t SBEMU_DSP_INT16ACK(uint16_t port)
 {
+    if(SBEMU_MixerRegs[SBEMU_MIXERREG_INT_STS] & 0x2) TRACE_IrqAck();
     SBEMU_MixerRegs[SBEMU_MIXERREG_INT_STS] &= ~0x2;
     return 0xFF;
 }

@@ -1,4 +1,5 @@
 /* CDLINK - see cdlink.h. GPL-2.0-or-later. */
+#include "trace.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -426,6 +427,7 @@ static int io_open(void* user, const CDLINK_Box* box)
     path[128] = 0;
     n = (int)strlen(path);
     if (n == 0) return 1;
+    { const char* b = strrchr(path, '\\'); TRACE_Event(TR_CD, "CD image %.36s", b ? b + 1 : path); }
     if (n > 4 && ieq(path + n - 4, ".CUE", 4))
     {
         char name[130];

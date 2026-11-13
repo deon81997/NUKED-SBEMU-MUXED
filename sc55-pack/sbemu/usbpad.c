@@ -42,6 +42,7 @@
  * joystick/xpad.c. Controllers after the UHCI 1.1, OHCI 1.0a, EHCI 1.0 and xHCI 1.2 specs, Linux
  * pci-quirks.c (BIOS handoff, Intel port switch), USBDDOS (crazii, GPL-2.0) and xhci98's DOS
  * qualification tool (Yeo Kheng Meng, GPL-2.0: PORTSC safe-write mask, handoff, reset order). */
+#include "trace.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -2011,7 +2012,7 @@ static void msd_gone(int di)
 {
     int m;
     for (m = 0; m < MAX_MSD; ++m)
-        if (Ms[m].used && Ms[m].dev == di) { Ms[m].used = 0; ++MsGen; if (HC[Ms[m].hc].type == T_EHCI) ehci_ring(Ms[m].hc); }
+        if (Ms[m].used && Ms[m].dev == di) { TRACE_Event(TR_USB, "- disk %04X:%04X unplugged", D[di].vid, D[di].pid); Ms[m].used = 0; ++MsGen; if (HC[Ms[m].hc].type == T_EHCI) ehci_ring(Ms[m].hc); }
 }
 
 static Msd* msd_find(int n, int* lun)                 /* drive n -> disk + LUN */
@@ -2238,6 +2239,7 @@ static void pipe_stop(int k)
     else if (MsFn) MsFn(0, 0, 0, 0);
     trace("-%s ", pipe_name(q));
     snprintf(Desc, sizeof(Desc), "%s %04X:%04X unplugged", pipe_name(q), D[q->dev].vid, D[q->dev].pid);
+    TRACE_Event(TR_USB, "- %s %04X:%04X unplugged", pipe_name(q), D[q->dev].vid, D[q->dev].pid);
     devlist();
 }
 
@@ -2919,11 +2921,13 @@ static int enumerate_(int di)
         start_in(k);
         trace("+%s ", pipe_name(q));
         if (!Desc[0]) snprintf(Desc, sizeof(Desc), "%s %04X:%04X on %s", pipe_name(q), vid, pid, where(di));
+        TRACE_Event(TR_USB, "+ %s %04X:%04X on %s", pipe_name(q), vid, pid, where(di));
     }
     if (wantmsd)
     {
         msd_add(di, mifc, min, mout, mmps);
         if (!Desc[0]) snprintf(Desc, sizeof(Desc), "USB disk %04X:%04X on %s", vid, pid, where(di));
+        TRACE_Event(TR_USB, "+ disk %04X:%04X on %s", vid, pid, where(di));
     }
     devlist();
     return 1;

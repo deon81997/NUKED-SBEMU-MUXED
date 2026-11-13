@@ -129,6 +129,7 @@ uint8_t SBEMU_Mixer_Read(uint16_t port);
 
 void SBEMU_DSP_Reset(uint16_t port, uint8_t value);
 void SBEMU_DSP_Write(uint16_t port, uint8_t value);
+int SBEMU_DSP_Known(uint8_t cmd);
 uint8_t SBEMU_DSP_Read(uint16_t port);
 uint8_t SBEMU_DSP_WriteStatus(uint16_t port);
 uint8_t SBEMU_DSP_ReadStatus(uint16_t port); //read buffer status. 

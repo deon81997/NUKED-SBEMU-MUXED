@@ -1305,6 +1305,28 @@ CONTENTS
   (ROMs by name only). Nothing is changed or sent anywhere. Run SC55 once
   first, so SBLOG.TXT and SBDETAIL.TXT are from the problem.
 
+  Since beta.106 the report starts with a short summary of the likely
+  problems in plain words ("what probably goes wrong", up to 5 lines,
+  found by SBDIAG DOCTOR in the logs) and the version of every program in
+  C:\SC55, then the full report as before.
+
+  FLIGHT RECORDER (SBTRACE.TXT, since beta.106): while SBEMU is loaded it
+  keeps the last 64 events in memory - USB devices plugged in or out,
+  MIDI bytes dropped, late renders (the sound ran dry), game timer ticks
+  given back, DMA and IRQ problems, CD images opened - and, for every
+  program that used the sound card, how many of each Sound Blaster DSP
+  command, MPU-401 command and MIDI message it sent. Commands SBEMU does
+  not emulate are marked NOT SUPPORTED. Nothing is written while a game
+  runs: SBEMU adds it to C:\SC55\SBTRACE.TXT when you are back at the DOS
+  prompt (the file starts again past 64 KB), or at once with SBDIAG FLUSH
+  (BUGREP does that, so it works from MENU too). BUGREP includes it.
+  SET SBEMUTRACE=OFF before SBEMU turns it off; SET SBEMUTRACE=path
+  writes it elsewhere.
+  Found with it (beta.106): an unknown DSP command (e.g. 24h, record) made
+  SBEMU take every following byte as its parameters until the next reset.
+  Unknown commands are now skipped with the right number of bytes, 80h
+  (silence) gives its interrupt, and B2h/C2h play like B0h/C0h.
+
   SBDETAIL.TXT is written every time SC55.BAT starts SBEMU: the command
   line, every option and whether you set it, DOS and Windows versions,
   the CPU, every PCI sound device with its IRQ, the card SBEMU chose,

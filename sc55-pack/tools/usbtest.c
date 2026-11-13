@@ -197,6 +197,9 @@ static void dump(const char* when)
     USBPAD_Dump(b, sizeof b);
     out("\n-- pipes (%s):\n%s", when, b);
 }
+/* usbpad.c reports plug/unplug to SBEMU's flight recorder; USBTEST has none */
+void TRACE_Event(int kind, const char* fmt, ...) { (void)kind; (void)fmt; }
+
 int main(int argc, char** argv)
 {
     unsigned long long cps, a, t, start;

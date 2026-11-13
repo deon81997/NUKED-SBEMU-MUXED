@@ -1,4 +1,5 @@
 #include "vdiag.h"
+#include "trace.h"
 #include "untrapio.h"
 #include "dpmi/dpmi.h"
 #include <string.h>
@@ -274,6 +275,7 @@ void DIAG_Trap(uint32_t port)
 
 void DIAG_Fifo(int fill, uint32_t under_total)
 {
+    TRACE_Underruns(under_total);
     if (!DIAG_Armed) return;
     if (!D_UnderInit) { D_UnderBase = under_total; D_UnderInit = 1; }
     D_UnderNow = under_total;
@@ -286,8 +288,8 @@ void DIAG_BiosClock(uint64_t e, uint64_t g)
     if (!D_BiosInit) { D_BiosExp0 = e; D_BiosGot0 = g; D_BiosInit = 1; }
     D_BiosExp = e - D_BiosExp0; D_BiosGot = g - D_BiosGot0;
 }
-void DIAG_TimerReplayed(uint32_t n) { if (DIAG_Armed) D_Replayed += n; }
-void DIAG_Midi(int dropped) { if (DIAG_Armed) { ++D_MidiBytes; if (dropped) ++D_MidiDropped; } }
+void DIAG_TimerReplayed(uint32_t n) { TRACE_Replayed(n); if (DIAG_Armed) D_Replayed += n; }
+void DIAG_Midi(int dropped) { if (dropped) TRACE_MidiDropped(); if (DIAG_Armed) { ++D_MidiBytes; if (dropped) ++D_MidiDropped; } }
 void DIAG_SetSynthInfo(int gov_level, int fx_on, int voices) { D_GovLevel = (uint32_t)gov_level; D_Fx = (uint32_t)fx_on; D_Voices = (uint32_t)voices; }
 
 static void put(int i, uint32_t v) { D_Buf[4*i] = (uint8_t)v; D_Buf[4*i+1] = (uint8_t)(v >> 8); D_Buf[4*i+2] = (uint8_t)(v >> 16); D_Buf[4*i+3] = (uint8_t)(v >> 24); }

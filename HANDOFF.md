@@ -1,3 +1,28 @@
+## beta.106 (2026-11-13): flight recorder (SBTRACE.TXT), per-program SB/MIDI command counts, BUGREP doctor
+- sbemu/trace.c/.h: two RAM banks (ISR fills one); 64-event ring (same event within 2 s counts up), 6 program slots
+  (current PSP from the DOS SDA +10h, name from its MCB; matched by PSP *and* name - DOS reuses PSPs). Hooks: sbemu.c
+  command start (TRACE_Dsp), 22E/22F reads with INT_STS set (TRACE_IrqAck), MAIN_InvokeIRQ (TRACE_Irq: 16 raised, 0 acked
+  -> event), render DMA addr 0 (TRACE_DmaCheck), MPU wrapper MAIN_MPU_T0/T1 around whatever handler is set (VMPU or
+  hardware; MAIN_MPU_Wrap at both setups), vdiag.c DIAG_Midi/Fifo/TimerReplayed, usbpad.c plug/unplug, cdlink io_open.
+- Written by TRACE_Idle from INT 28h (now always hooked) when InDOS=1, no critical error and the current PSP is the
+  shell (own parent / COMMAND / 4DOS / NDOS); or TRACE_Flush on MPU command A9h when InDOS=0 (SBDIAG FLUSH; BUGREP
+  does it first, so the MENU workflow is covered). Appends to SBTRACE.TXT next to SBEMULOG (64 KB cap, then new);
+  SBEMUTRACE=OFF / =path. Path is only set when SBEMULOG is set (SC55.BAT does).
+- Bug found by the trace: unknown DSP commands left SBEMU_DSPCMD set, so every later byte was a parameter until a
+  DSP reset. Now SBEMU_DSP_Known() + parameter-byte table (24h 2, 0Eh 2, 0Fh/38h 1, Bxh/Cxh record 3, others 0)
+  skip them; 80h = 2 bytes then IRQ (SBEMU_DSPCMD_SILENCE); B2h/C2h map to B0h/C0h.
+- BUGREP doctor: tools/doctor.h in SBDIAG (`SBDIAG DOCTOR folder body out`): <=5 plain-English lines from SBLOG
+  (no IRQs, Error/Failed, VMPU warning, Windows), ROMS empty, BLASTER unset, SBTRACE (IRQ never acked, DMA not set up,
+  NOT SUPPORTED DSP, intelligent MPU, MIDI dropped, late renders), GAMETEST FAIL; then versions of every EXE/COM/SYS
+  in the folder ("NSBVER <ver>" marker: makefile PACKVER forces tools/packver.h into 11 tool links; SBEMU/MENU have
+  the version string). BUGREP.BAT writes the body to BUGREP.$$$, doctor puts summary on top.
+- Tests: TRTEST (a small DJGPP program: E1, D1, 40, 80, 24, 20x F2 without ack, 14 without DMA, MPU FF/3F/AC, notes,
+  SysEx, pitch bend). QEMU (FreeDOS + JEMMEX + QPIEMU + HDPMI32I + SBEMU on AC97, usb-kbd hot-plug via device_add) and
+  86Box P2B-LS ES1371: SBTRACE + BUGREP summary as expected. Host doctor test with sample files (/tmp/dr).
+- Zip: SBEMU, SC55MENU, SBDIAG, MIDPLAY, GAMETEST, MPUTEST, TIMETEST, JOYTEST, KMTEST, USBTEST, USBDRV, PADCONV,
+  SC55WAV, SC55LOG, CDSET/CDGUI, BUGREP.BAT, README.TXT. SBSET.EXE still not swapped (see beta.100).
+- Real hardware to check: SBTRACE.TXT after a few games on the D810 and P5PE-VM; BUGREP from MENU.
+
 ## beta.105 (2026-11-13, DOS session): MIDPLAY Options > "MPU-401 port"
 - tools/midplay.c: g_mpuport (0 = Auto: mpu_find = /P, BLASTER P=, search), Options row 13 cycles Auto / 300..360,
   only ports that answer (mpu_probe from mpuport.h, instant on an empty port) - silent ones are skipped, wraps to Auto.

@@ -2,6 +2,7 @@
 #include <sys/farptr.h>
 #include <go32.h>
 #include "sbemu/vdiag.h"
+#include "sbemu/trace.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -150,6 +151,8 @@ static DPMI_ISR_HANDLE MAIN_Int28Handle;   /* DOS idle (prompt, keyboard waits):
 static DPMI_REG MAIN_Int28REG;
 static BOOL MAIN_Int28On;
 static void MAIN_Int28();
+static BOOL MAIN_CdlOn;                     /* CD-Audio link up: INT 28h also serves it */
+static char MAIN_TracePath[260];            /* SBTRACE.TXT (flight recorder), next to SBEMULOG; empty = off */
 static void MAIN_CDService();
 /* BIOS joystick: INT 15h AH=84h answered from the USB pad. A small real-mode stub sends only AH=84h to SBEMU
  * (INT 15h also carries the keyboard intercept AH=4Fh on every key, block moves etc.: those go on directly) */
@@ -577,6 +580,16 @@ static QEMM_IODT MAIN_MPUIODT[2] =
     0x331, &MAIN_MPU_331
 };
 
+/* flight recorder: every byte the program writes to the MPU-401, then the real handler (VMPU or hardware) */
+static uint32_t (*MAIN_MPUReal[2])(uint32_t port, uint32_t val, uint32_t out);
+static uint32_t MAIN_MPU_T0(uint32_t port, uint32_t val, uint32_t out) { if(out) TRACE_Mpu(0, (uint8_t)val); return MAIN_MPUReal[0](port, val, out); }
+static uint32_t MAIN_MPU_T1(uint32_t port, uint32_t val, uint32_t out) { if(out) { TRACE_Mpu(1, (uint8_t)val); if((val & 0xFF) == 0xA9) TRACE_Flush(); } return MAIN_MPUReal[1](port, val, out); }
+static void MAIN_MPU_Wrap(void)
+{
+    if(MAIN_MPUIODT[0].handler != &MAIN_MPU_T0) { MAIN_MPUReal[0] = MAIN_MPUIODT[0].handler; MAIN_MPUIODT[0].handler = &MAIN_MPU_T0; }
+    if(MAIN_MPUIODT[1].handler != &MAIN_MPU_T1) { MAIN_MPUReal[1] = MAIN_MPUIODT[1].handler; MAIN_MPUIODT[1].handler = &MAIN_MPU_T1; }
+}
+
 static QEMM_IODT MAIN_OPL3IODT[4] =
 {
     0x388, &MAIN_OPL3_388,
@@ -881,6 +894,7 @@ static int MAIN_SB_DSPVersion[] =
 
 static void MAIN_InvokeIRQ(uint8_t irq) //generate virtual IRQ
 {
+    TRACE_Irq(irq);
     #if MAIN_TRAP_RMPIC_ONDEMAND
     if(MAIN_Options[OPT_RM].value) QEMM_Install_IOPortTrap(MAIN_VIRQ_IODT, countof(MAIN_VIRQ_IODT), &MAIN_VIRQ_IOPT);
     #endif
@@ -1388,6 +1402,8 @@ int main(int argc, char* argv[])
             char* e;
             strcpy(dbuf, ln);
             e = strrchr(dbuf, '\\'); if(!e) e = strrchr(dbuf, '/'); if(!e) e = strrchr(dbuf, ':');
+            strcpy(e ? e + 1 : dbuf, "SBTRACE.TXT");
+            strcpy(MAIN_TracePath, dbuf);
             strcpy(e ? e + 1 : dbuf, "SBDETAIL.TXT");
             dn = dbuf;
         }
@@ -1957,7 +1973,7 @@ int main(int argc, char* argv[])
         }
 #endif
 
-        for(int i = 0; i < countof(MAIN_MPUIODT); ++i) MAIN_MPUIODT[i].port = MAIN_Options[OPT_MPUADDR].value+i;
+        for(int i = 0; i < countof(MAIN_MPUIODT); ++i) MAIN_MPUIODT[i].port = MAIN_Options[OPT_MPUADDR].value+i; MAIN_MPU_Wrap();
         if(enableRM && !(MPURMInstalled=QEMM_Install_IOPortTrap(MAIN_MPUIODT, 2, &MPUIOPT)))
         {
             MAIN_CPrintf(RED, "Error: Failed installing MPU-401 IO port trap for QEMM.\n");
@@ -2140,6 +2156,7 @@ int main(int argc, char* argv[])
     {
         if(CDLINK_Init(MAIN_Options[OPT_VCDA].value))
         {
+            MAIN_CdlOn = TRUE;
             MAIN_CPrintf(LIGHTGRAY, "CD-Audio: uCDD link found, audio tracks of mounted CUE/BIN images play through this sound card.\n");
             /* the image is read with DOS file calls: after the card's interrupt (when DOS is free) and from
              * INT 28h, which DOS calls while it waits for a key (the prompt, PAUSE) */
@@ -2148,6 +2165,17 @@ int main(int argc, char* argv[])
         }
         else
             MAIN_CPrintf(YELLOW, "CD-Audio: the uCDD driver (built with --sbemu-link) is not loaded, /VCDA ignored.\n");
+    }
+    /* flight recorder: SBTRACE.TXT is written from INT 28h while DOS waits at the prompt */
+    {
+        const char* tp = getenv("SBEMUTRACE");
+        if(tp && *tp) { if(!stricmp(tp, "OFF")) MAIN_TracePath[0] = 0; else if(strlen(tp) < sizeof(MAIN_TracePath)) strcpy(MAIN_TracePath, tp); }
+        if(MAIN_TracePath[0] && TRACE_Init(MAIN_TracePath))
+        {
+            if(!MAIN_Int28On) MAIN_Int28On = DPMI_InstallRealModeISR(0x28, MAIN_Int28, &MAIN_Int28REG, &MAIN_Int28Handle, FALSE) == 0;
+            MAIN_D("Flight recorder: %s, INT 28h %s\n", MAIN_TracePath, MAIN_Int28On ? "hooked" : "FAILED");
+            TRACE_Event(TR_INFO, "SBEMU %s started", MAIN_SBEMU_VER);
+        }
     }
 
 #if SBEMU_PCSPEAKER
@@ -2503,7 +2531,8 @@ static void MAIN_CDService()
 
 static void MAIN_Int28()
 {
-    CDLINK_Service(1);
+    if(MAIN_CdlOn) CDLINK_Service(1);
+    TRACE_Idle();
     DPMI_CallRealModeOldISR(&MAIN_Int28Handle, &MAIN_Int28REG);
 }
 
@@ -2579,6 +2608,7 @@ static void MAIN_Interrupt()
     if(digital)//&& DMA_Count != 0x10000) //-1(0xFFFF)+1=0
     {
         uint32_t DMA_Addr = VDMA_GetAddress(dma);
+        TRACE_DmaCheck(dma, DMA_Addr, DMA_Count);
         int32_t DMA_Index = VDMA_GetIndex(dma);
         uint32_t SB_Bytes = SBEMU_GetSampleBytes();
         uint32_t SB_Pos = SBEMU_GetPos();
@@ -3297,7 +3327,7 @@ static void MAIN_TSR_Interrupt()
                         MAIN_MPUIODT[1].handler = &MAIN_MPU_331; //331
                     }
 #endif
-                    for(int i = 0; i < countof(MAIN_MPUIODT); ++i) MAIN_MPUIODT[i].port = MAIN_Options[OPT_MPUADDR].value+i;
+                    for(int i = 0; i < countof(MAIN_MPUIODT); ++i) MAIN_MPUIODT[i].port = MAIN_Options[OPT_MPUADDR].value+i; MAIN_MPU_Wrap();
                     if(MAIN_Options[OPT_RM].value) QEMM_Install_IOPortTrap(MAIN_MPUIODT, 2, &MPUIOPT);
                     if(MAIN_Options[OPT_PM].value) HDPMIPT_Install_IOPortTrap(MAIN_Options[OPT_MPUADDR].value, MAIN_Options[OPT_MPUADDR].value+1, MAIN_MPUIODT, 2, &MPUIOPT_PM);
                 }
