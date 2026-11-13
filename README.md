@@ -850,7 +850,7 @@ before they ever reached my real hardware.
 
 <picture><img src="docs/90s/vox-sec-gift.gif" width="140" align="right" alt=""></picture>
 
-Everything listed here was written for this pack by **Claude**. Some of it is brand new (the menus and screens,
+Everything listed here was written for this pack by **Claude**. Some of it is <a href="#-whats-new-">brand new</a> (the menus and screens,
 the test tools, the pad-keys system, the test rigs); some of it builds on other people's projects, and those rows say
 **based on...** so you know whose shoulders it stands on. SBEMU itself, the emulator cores, the DOS drivers we bundle
 and the Xbox 360 driver for Windows 98 are their original authors' work (see [Thanks](#-thanks-to-my-friends-)).
