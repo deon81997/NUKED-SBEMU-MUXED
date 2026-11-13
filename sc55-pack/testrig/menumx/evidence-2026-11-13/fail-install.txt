@@ -1,0 +1,24 @@
+C:\SC55>IF EXIST C:\GOT\GOT.EXE ECHO INSTALLED-GOT
+INSTALLED-GOT
+C:\SC55>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,24 @@
+C:\SC55>C:\CDSET\CDPLAY M: 2
+OK
+C:\SC55>C:\CDSET\CDPLAY M: STOP
+OK
+C:\SC55>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

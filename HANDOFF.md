@@ -1,3 +1,42 @@
+## WIP: MENU matrix (2026-11-13, DOS session, branch wip/menu-matrix-2026-11-13, NOT released)
+Task: scripted game mount + install matrix through MENU (rows fat12/16/32 x iso/cue/mdm/lfn, columns real
+SC55JEM / protected SC55; GOT = real-mode game, Raptor 1.2 = DOS4GW), fix failures, HANDOFF "MENU matrix", release.
+- Done: sc55-pack/testrig/menumx/: mxdisk.py (C: FreeDOS FAT16 + release zip, SETUP+CDINST at first boot;
+  D: FAT12/16/32 with MBR, GOT/RAP discs as ISO or CUE+2 tone tracks, GAMES.MDM, long-name folder + long BIN names),
+  mxvm.py (VM86: 86Box P2B-LS PII-450 + automation socket incl. `audio level`; VMQ: QEMU, untested),
+  menumx.py (run/all/table, steps boot mount dir install game cdmusic unmount disc2 dir2 install2 game2 swap),
+  mxsh.py / nav.py (poke a running VM: `python3 mxsh.py VMDIR start CYL`, `scr`, `k KEY`, `t TEXT`, `lvl MS`).
+- First run fat16-cue rm (evidence-2026-11-13/): boot, mount, dir OK; install really OK (harness bug: the
+  `^INSTALLED-` check needs re.M); game step stuck in the CD image picker (pick_image: Tab/folder selection);
+  cdmusic FAIL = real bug below. Raptor install (Apogee INSTALL.EXE key loop), GAME_QUIT keys, QEMU backend: untested.
+- OPEN BUG (confirmed in 86Box): no CD music in the normal MENU flow. SC55.BAT/SC55JEM.BAT load SBEMU without
+  /VCDA, uCDD (CDON) loads later from CD images, and the resident SBEMU ignores /VCDA given later (main.c TSR update
+  path has no OPT_VCDA handling; CDLINK_Init only at load, line ~2139). Only HYBRID.BAT works, and it is PM only.
+  Repro: boot, SC55JEM, MENU > CD-ROM > CD images > D:\CD\GOT.CUE > Enter, Esc to DOS, `C:\CDSET\CDPLAY M: 2`
+  -> card silent (86Box `audio level` -120 dB). Planned fix: SC55RUN.BAT calls CDON first when C:\CDSET\UCDD.EXE
+  exists and passes /VCDA:100 before @SBOPTS (saved settings can turn it off); measure idle CD-link cost first
+  (SBDIAG load + SC55LOG, PII-450) - if >1% keep it off by default and make it a Settings switch.
+- Session 2 (15:40): harness fixed: re.M, cdgui reuse, Games "Play X" regex, pick_image ('\u2551 D:\\'), GOT quit
+  (Esc until dark-green "Quit to DOS?" box, pixel 10,10), SOUND_DB -70, MX_ZIP=candidate zip (/home/claude/mx/mkzip.py:
+  newest release zip + output/*.exe + pack BATs, SPDX lines stripped like the release). MENU fix (tools/sc55menu.c
+  pick_file): header animation drew over the picker title + folder line -> tui_anim off while open; hint line shortened.
+  Run fat16-cue rm: boot/mount/dir/install/unmount OK; game + disc2.. not yet re-run after the last fixes.
+- NEW OPEN BUG (86Box, SC55JEM): GOT says "SoundBlaster ... BLASTER" (its SB check fails) - flaky: works on some runs,
+  fails after a CD mount, under COMMAND /C, without CONFIG.GOT. GOT check (GOT.EXE is LZ91-packed; unpacker at
+  /tmp/got/unlz.py, code 0x5C62 in the image): 35 game ticks settle, plays 128 B @4000 Hz (DSP 14), waits 70 ticks
+  (~1 s at its 70 Hz count) for the IRQ, else D0 + message. SBIRQ.COM (testrig-style probe: same DSP/DMA, TSC timed)
+  always gets IRQ 7 in 32 ms, so SBEMU's IRQ path works; SBDIAG during a failed GOT: card IRQs 92/s, SB port traps
+  1041/s, no virtual IRQ. Not solved. DEBUG=1 build is useless here (card IRQs stop after going resident).
+- Next: 1) run `menumx.py run fat16-cue rm` (MX_ZIP) to check game/disc2/install2 (Raptor INSTALL.EXE, sound setup);
+  2) GOT bug above; 3) CD-music fix (SC55RUN.BAT: CDON first, /VCDA:100 before @SBOPTS; sbset.c /VCDA default ->
+  100 with "Off" writing /VCDA:0) with SBDIAG/SC55LOG before/after; 4) `menumx.py all`, table, release.
+- Rebuild: docs/SESSION-2026-11-13-DOS.md (DJGPP, apt deps, 86Box @0935207 + xpad diff, roms) + rufus clone in
+  testrig/rufus. Test downloads (keep out of repo): HIMEMX.EXE from
+  https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/repositories/1.3/base/himemx.zip -> /tmp/dl/himemx
+  (mxdisk.py env HIMEMX); QuickInstall v1.1.0 dosflop.img (FreeDOS floppy, no HIMEM) -> /tmp/dl/w98qi (unused).
+- Resume: rebuild (DJGPP, 86Box), `python3 /home/claude/mx/mkzip.py /home/claude/mx/cand.zip` (copy mkzip.py from
+  testrig/menumx/mkzip.py), then `cd sc55-pack/testrig/menumx && MX_ZIP=/home/claude/mx/cand.zip python3 menumx.py run fat16-cue rm --keep`.
+
 VM store (2026-11-13): ready VMs in deon81997/priavte store-dos71, store-freedos, store-w98qi-qemu, store-w98qi-86box (Win98 QI v1.1.0 /P i + /P j), store-86box-irq (440BX/VIA/SiS + SB16|AWE64 + ES1371 + CMI8738); see vms/README.md. Test downloads: FD13-LiteUSB.zip (ibiblio FreeDOS 1.3).
 ## beta.114 (2026-11-13, DOS session): M-Audio Uno froze the P5PE-VM - USB MIDI watchdog, [midi] step logs, real-Uno fake
 - Report (user, beta.113): the Uno froze the ASUS P5PE-VM (first said D810) on every port, with any or no other USB

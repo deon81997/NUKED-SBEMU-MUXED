@@ -1,0 +1,25 @@
+█▄ █ █  █ █ ▄▀ █▀▀▀ █▀▀▄  ▄▀▀▀ █▀▀▄      █▀▀▀ █▄ ▄█ █  █  ┌─ SBEMU ───────────┐
+█▀▄█ █  █ █▀▄  █▀▀  █  █   ▀▀▄ █▀▀▄ ▀▀▀  █▀▀  █ ▀ █ █  █  │ ■ Loaded CPU   0% │
+█  █ ▀▄▄▀ █  █ █▄▄▄ █▄▄▀  ▄▄▄▀ █▄▄▀      █▄▄▄ █   █ ▀▄▄▀  │ SC-55 auto        │
+                                                          │ SB220 I7 D1 P330  │
+ SBEMU · Nuked-SC55 · MT-32 · SoundFont    beta.104       └───────────────────┘
+         ║  ..  (up)                                                ║
+ ┌─ Games║  TEST.CUE                                                ║─────────┐
+ │       ║                                                          ║         │
+ │ GOT   ║                                                          ║         │
+ │ + new ║                                                          ║         │
+ │       ║                                                          ║         │
+ │       ║                                                          ║         │
+ │       ║                                                          ║         │
+ │       ║                                                          ║         │
+ │       ║                                                          ║         │
+ │       ║                                                          ║         │
+ │       ║                                                          ║         │
+ │       ║                                                          ║         │
+ │       ║                                                          ║         │
+ │       ║                                                          ║re the   │
+ │       ║                                                          ║ir CD,   │
+ │       ║ Enter open/choose  Bksp up  Tab drive  G home  N none  Esc any ... │
+ └───────╚══════════════════════════════════════════════════════════╝─────────┘
+
+  field  Enter change it  Esc back to the list
