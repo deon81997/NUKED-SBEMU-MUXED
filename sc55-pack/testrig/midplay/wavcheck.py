@@ -16,10 +16,10 @@ def load(f):
 bad = 0; metro = 0; args = sys.argv[1:]
 if args[:1] == ['--metro']: metro = int(args[1]); args = args[2:]
 def beats(lv):
-    # onsets: the 50 ms level rises above 30% of the loudest after being under 15% (lv = 10 ms blocks)
-    l5 = [max(lv[i:i + 5]) for i in range(0, len(lv) - 5, 5)]; top = max(l5) or 1; on = []; armed = True
-    for i, v in enumerate(l5):
-        if armed and v > 0.3 * top: on.append(i / 20); armed = False
+    # onsets: the 10 ms level rises above 30% of the loudest after being under 15% (lv = 10 ms blocks)
+    top = max(lv) or 1; on = []; armed = True
+    for i, v in enumerate(lv):
+        if armed and v > 0.3 * top: on.append(i / 100); armed = False
         elif v < 0.15 * top: armed = True
     return on
 for arg in args:
@@ -29,17 +29,21 @@ for arg in args:
     blk = r // 100                                          # 10 ms blocks
     lv = [math.sqrt(sum(v * v for v in x[i:i + blk]) / blk) for i in range(0, len(x) - blk, blk)]
     on = [i for i, v in enumerate(lv) if v > 30]
+    secs = len(on) / 100
     peak = max((abs(v) for v in x), default=0); clip = sum(1 for v in x if abs(v) >= 32767)
     drops = 0
+    if metro:   # the beats have silence between them by design: look for dropouts only in the music after them
+        bt = beats(lv); on = [i for i in on if bt[metro - 1:] and i > (bt[min(metro, len(bt)) - 1] + 1.5) * 100] if len(bt) >= metro else []
     if on:
-        a, b = on[0], on[-1]; run = 0
+        top = max(lv[i] for i in on); loud_end = max(i for i in on if lv[i] > 0.1 * top)
+        a, b = on[0], loud_end; run = 0     # up to the last loud part: a song cut off by /Q rings out quietly after a short gap
         for v in lv[a:b]:
             run = run + 1 if v < 3 else 0
             if run == 3: drops += 1
     d = [abs(x[i + 1] - x[i]) for i in range(len(x) - 1)]
     typ = sorted(d)[int(len(d) * 0.999)] if d else 0
     clicks = sum(1 for v in d if typ and v > 6 * typ and v > 4000)
-    secs = len(on) / 100; loud = 20 * math.log10(max(1, sum(lv[i] for i in on) / max(1, len(on))) / 32768)
+    loud = 20 * math.log10(max(1, sum(lv[i] for i in on) / max(1, len(on))) / 32768)
     ok = secs > 2 and not clip and not drops
     mtxt = ''
     if metro:
