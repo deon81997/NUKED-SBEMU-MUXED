@@ -48,6 +48,14 @@ Review for 2,000-10,000 files, deep folders, long names. No fixed-size song arra
 - Note: our HDPMI is built from crazii HEAD, not the exact old v0.1-beta4fix2 binary (38646 bytes). Watch for regressions.
 - Still open: SSF2T MAKESWP hangs on exit with SBEMU resident (see the SSF2T section).
 
+## Known issue (2026-11-13, not fixed): crashes in 3D programs with a USB keyboard/mouse on the NEC OHCI
+- P5PE-VM, Logitech Unifying receiver (046d:c52b) on the NEC card's OHCI (log: "OHCI 2 lost a TD: ED rewrite per
+  transfer from now"): MENU 3D GPF on F2/F3 (all styles), MIDPLAY 3D "Stack Fault" - both at harmless instructions
+  (fault really during an interrupt). PS/2 keyboard: fine. Keys arrive correctly (F1-F12 = 3A-45, no media mode).
+- QEMU (UHCI, usb-kbd + usb-mouse, beta.98): 3.5 min of F2/F3/F4/F6/arrows + mouse in all 3D styles, no crash.
+- Workaround: keyboard/mouse on the motherboard's USB, NEC card for sticks (its EHCI). Not pursued further (can't
+  test the NEC quirk here). Idea if it comes back: keep HID off the NEC OHCI, or save the FPU in the RMCB callbacks.
+
 ## beta.98 (2026-11-12): USB letters refused after Win98 "Restart in MS-DOS mode"
 - Symptom (user's P5PE-VM, NEC EHCI): D: E: "Invalid function", stub 0 calls, INT 21h 7302h CF ax 000Fh, 36h FFFF.
   F8 clean boot fine. Reproduced in QEMU (/home/claude/w98, stock.iso as CD): only when the stick was mounted in
