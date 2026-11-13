@@ -994,6 +994,7 @@ static int g_ui = 1;                   /* 0 = /S plain one-line display */
 static char g_home[260], g_cfg[300], g_m3u[300], g_shf[300];
 /* options, kept in MIDPLAY.CFG */
 static int g_view = 0;                 /* player: 0 channel table, 1 SC-55 front panel, 2 3D */
+static int g_scene, g_ctheme, g_model; /* 3D: V look (solid, vector, voxel), C colours, J player (midplay3d.h) */
 static int g_reset = 0;                /* before each song: 0 GS reset, 1 GM On, 2 nothing */
 static int g_startlast = 1;            /* no files given: 1 the last playlist (and song), 0 MIDPLAY's folder */
 static int g_gap = 0;                  /* seconds of silence between songs */
@@ -1092,6 +1093,9 @@ static void cfg_load(void)
         if (!v) continue;
         *v++ = 0; v[strcspn(v, "\r\n")] = 0; n = atoi(v);
         if (!strcmp(line, "VIEW")) g_view = n >= 0 && n <= 2 ? n : 0;
+        else if (!strcmp(line, "SCENE3D")) g_scene = n >= 0 && n <= 2 ? n : 0;
+        else if (!strcmp(line, "THEME3D")) g_ctheme = n >= 0 && n <= 6 ? n : 0;
+        else if (!strcmp(line, "PLAYER3D")) g_model = n >= 0 && n <= 3 ? n : 0;
         else if (!strcmp(line, "REPEAT")) g_rep = n >= 0 && n <= 2 ? n : 0;
         else if (!strcmp(line, "SHUFFLE")) g_shuf = n >= 0 && n <= 2 ? n : 0;
         else if (!strcmp(line, "RESET")) g_reset = n >= 0 && n <= 2 ? n : 0;
@@ -1120,6 +1124,7 @@ static void cfg_save(void)
         fprintf(f, "MODE3D=%d %d %d\nHZ3D=%d\nMODE3DW=%d %d %d\nHZ3DW=%d\n", g_m3cfg[0][0], g_m3cfg[0][1], g_m3cfg[0][2], g_m3cfg[0][3],
                 g_m3cfg[1][0], g_m3cfg[1][1], g_m3cfg[1][2], g_m3cfg[1][3]);
     }
+    fprintf(f, "SCENE3D=%d\nTHEME3D=%d\nPLAYER3D=%d\n", g_scene, g_ctheme, g_model);
     fprintf(f, "VIEW=%d\nREPEAT=%d\nSHUFFLE=%d\nRESET=%d\nSTART=%d\nGAP=%d\nSPEED=%d\nDIR=%s\nLAST=%d\nPOS=%lu\n",
             g_view, g_rep, g_shuf, g_reset, g_startlast, g_gap, P.speed, g_lastdir, g_cur,
             P.loaded ? (unsigned long)(song_time() / 1000000ULL) : 0UL);
@@ -1880,6 +1885,7 @@ static void page_help(void)
         "  \x18 \x19   choose a channel (or the SC-55 part)  M mute it  O solo it  U all on",
         "  [ ]   slower / faster, BACKSPACE = 100%     B  the files     Q  quit",
         "  S     channels \x1A SC-55 front panel \x1A 3D   (F4 in 3D: full / half resolution)",
+        "  3D:   V look (solid / vector / voxel)   C colours   J player (module, boombox, jukebox, turntable)",
         "~PLAYLIST~   (type a name to jump to it)",
         "  ENTER play   DEL remove   ^\x18 ^\x19 move   F5 sort: name, title, length, shuffle",
         "  ^S save it as .M3U   ^O open a .M3U   INS add songs",
@@ -2017,6 +2023,9 @@ static void key_player(int k)
     case 's': case 'S':
         g_view = (g_view + 1) % 3; screen_sync(); cfg_save(); break;
     case 'b': case 'B': go_page(PG_FILES); break;
+    case 'v': case 'V': g_scene = (g_scene + 1) % 3; mp3_force = 1; cfg_save(); msg("3D look: %s", mp3_scene_name[g_scene]); break;
+    case 'c': case 'C': g_ctheme = (g_ctheme + 1) % 7; mp3_force = 1; cfg_save(); msg("3D colours: %s", mp3_theme_name[g_ctheme]); break;
+    case 'j': case 'J': g_model = (g_model + 1) % 4; mp3_force = 1; cfg_save(); msg("3D player: %s", mp3_model_name[g_model]); break;
     case K_F4: if (mp3_on) { m3_half = !m3_half; m3_rw = m3_half ? M3W / 2 : M3W; m3_rh = m3_half ? M3H / 2 : M3H; mp3_slow = 0; return; } break;
     case K_MOUSE:
         if (tui_my == 4 && tui_mx >= 9 && tui_mx < 67 && P.loaded) mp_seek(P.total * (uint64_t)(tui_mx - 9) / 58);

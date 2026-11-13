@@ -21,7 +21,10 @@ static int    mp3_slow;               /* frames so slow that the picture barely 
 static double mp3_last_frame, mp3_frame_ms;
 static float  mp3_col[16];            /* smoothed column heights */
 static M3SURF mp3_panel, mp3_keys, mp3_face;   /* mp3_face: the module's brushed face, made once */
-static const uint32_t mp3_chcol[16] = {
+static const uint32_t mp3_chcol0[16] = {                 /* the channels' colours: C picks a theme (mp3_theme_apply) */
+    0x40A0FF, 0x40E0A0, 0xA0E040, 0xFFD040, 0xFF9040, 0xFF5060, 0xE060C0, 0xA070FF,
+    0x60C0FF, 0xFFFFFF, 0x50FFD0, 0xC0FF60, 0xFFB0A0, 0xFF80E0, 0xB0A0FF, 0x80D0D0 };
+static uint32_t mp3_chcol[16] = {                 /* the colours in use: C picks a theme (mp3_theme_apply) */
     0x40A0FF, 0x40E0A0, 0xA0E040, 0xFFD040, 0xFF9040, 0xFF5060, 0xE060C0, 0xA070FF,
     0x60C0FF, 0xFFFFFF, 0x50FFD0, 0xC0FF60, 0xFFB0A0, 0xFF80E0, 0xB0A0FF, 0x80D0D0 };
 
@@ -266,6 +269,317 @@ static void mp3_bar(const char* name, const char* title, uint64_t el_us, uint64_
     }
 }
 
+/* ===================================================================== looks, colour themes and players (V C J) ==
+ * V: solid (the 3D view as it was), vector (glowing lines on black with an afterglow, like an arcade vector monitor;
+ * smooth Wu lines, always full resolution: lines are cheap) and voxel (everything built from blocks, notes fall as
+ * blocks onto the keys). C: colour themes (channel colours, sky, floor). J: the player in the middle (the NUKED
+ * module, a boombox, a jukebox, a turntable); each is a few boxes, drawn solid, as lines or as blocks. */
+static const char* const mp3_scene_name[3] = { "solid", "vector", "voxel" };
+static const char* const mp3_theme_name[7] = { "classic", "neon", "amber CRT", "green phosphor", "sunset", "ice", "synthwave" };
+static const char* const mp3_model_name[4] = { "NUKED module", "boombox", "jukebox", "turntable" };
+
+static uint32_t mp3_hsv(float h, float sat, float v)
+{
+    float r, g, b, f, p, q, t; int i;
+    h = fmodf(h, 360.0f); if (h < 0) h += 360.0f; h /= 60.0f; i = (int)h; f = h - i;
+    p = v * (1 - sat); q = v * (1 - sat * f); t = v * (1 - sat * (1 - f));
+    switch (i) { case 0: r = v; g = t; b = p; break; case 1: r = q; g = v; b = p; break; case 2: r = p; g = v; b = t; break;
+                 case 3: r = p; g = q; b = v; break; case 4: r = t; g = p; b = v; break; default: r = v; g = p; b = q; }
+    return (uint32_t)(r * 255) << 16 | (uint32_t)(g * 255) << 8 | (uint32_t)(b * 255);
+}
+/* after the F3 style set the scene's colours (m3_theme_sync), a theme other than classic paints over them */
+static void mp3_theme_apply(void)
+{
+    static int last = -1, lastgen = -1; int c;
+    /* hue start, hue span, saturation, sky top, sky bottom, grid */
+    static const struct { float h0, hs, sat; uint32_t s0, s1, grid; } T[7] = {
+        { 0, 0, 0, 0, 0, 0 },
+        { 0, 330, 1.0f, 0x05001A, 0x2A0050, 0xFF30D0 },
+        { 22, 22, 0.95f, 0x0C0600, 0x2A1400, 0xFFA020 },
+        { 100, 40, 0.9f, 0x000A02, 0x002A08, 0x30FF60 },
+        { 300, 110, 0.85f, 0x1A0830, 0xC04830, 0xFF8040 },
+        { 170, 70, 0.55f, 0x08142A, 0x6090C0, 0xC0F0FF },
+        { 270, 110, 0.9f, 0x0A0018, 0x500048, 0x20F0FF } };
+    if (g_ctheme == last && m3_theme_gen == lastgen) return;
+    last = g_ctheme;
+    for (c = 0; c < 16; c++)
+        mp3_chcol[c] = g_ctheme ? mp3_hsv(T[g_ctheme].h0 + T[g_ctheme].hs * ((c * 7) % 16) / 15.0f, T[g_ctheme].sat, 0.75f + 0.25f * (c & 1)) : mp3_chcol0[c];
+    if (g_ctheme)
+    {
+        m3_sky0 = T[g_ctheme].s0; m3_sky1 = T[g_ctheme].s1; m3_gridc = m3_glowc = T[g_ctheme].grid;
+        m3_floorbg = m3_mul(T[g_ctheme].s0, 300); m3_fogc = m3_mul(T[g_ctheme].s1, 160);
+        m3_make_floor();
+    }
+    else if (lastgen >= 0) { m3_theme_from_pal(tui_palette()); }
+    lastgen = m3_theme_gen;
+}
+
+/* ---- the players: boxes. kind 0 plain, 1 the screen (the LCD texture on its front), 2 a speaker / knob facing us
+ * (hx = radius), 3 a light strip in channel colours, 4 the turntable's platter (turns) */
+typedef struct { float x, y, z, hx, hy, hz; uint32_t col; int kind; } MP3BOX;
+static int mp3_model(MP3BOX* b, float ta)
+{
+    int n = 0; float fz = 0.6f;
+#define MB(X, Y, Z, HX, HY, HZ, C, K) (b[n].x = (X), b[n].y = (Y), b[n].z = (Z), b[n].hx = (HX), b[n].hy = (HY), b[n].hz = (HZ), b[n].col = (C), b[n].kind = (K), n++)
+    switch (g_model)
+    {
+    case 1:     /* boombox: body, cassette window (the LCD), two speakers, a handle */
+        MB(0, 0.25f, fz, 2.4f, 0.7f, 0.55f, 0x2C2C34, 0);
+        MB(0, 0.3f, fz - 0.56f, 0.75f, 0.38f, 0.02f, 0, 1);
+        MB(-1.55f, 0.22f, fz - 0.57f, 0.55f, 0, 0.1f, 0x18181C, 2);
+        MB(1.55f, 0.22f, fz - 0.57f, 0.55f, 0, 0.1f, 0x18181C, 2);
+        MB(-1.6f, 1.15f, fz, 0.08f, 0.22f, 0.08f, 0x505058, 0);
+        MB(1.6f, 1.15f, fz, 0.08f, 0.22f, 0.08f, 0x505058, 0);
+        MB(0, 1.42f, fz, 1.68f, 0.06f, 0.08f, 0x505058, 0);
+        break;
+    case 2:     /* jukebox: tall cabinet, rounded top in steps, window (the LCD), speaker, light strips */
+        MB(0, 0.45f, fz, 1.3f, 1.05f, 0.6f, 0x6A2418, 0);
+        MB(0, 1.62f, fz, 1.1f, 0.12f, 0.55f, 0x7A2C1C, 0);
+        MB(0, 1.84f, fz, 0.8f, 0.1f, 0.5f, 0x8A3420, 0);
+        MB(0, 2.0f, fz, 0.45f, 0.06f, 0.45f, 0x9A3C24, 0);
+        MB(0, 0.85f, fz - 0.61f, 0.95f, 0.38f, 0.02f, 0, 1);
+        MB(0, -0.15f, fz - 0.62f, 0.42f, 0, 0.08f, 0x201010, 2);
+        MB(-1.18f, 0.6f, fz - 0.62f, 0.06f, 0.95f, 0.04f, 0, 3);
+        MB(1.18f, 0.6f, fz - 0.62f, 0.06f, 0.95f, 0.04f, 0, 3);
+        break;
+    case 3:     /* turntable: plinth, platter (turns), tonearm, a small display */
+        MB(0, -0.2f, fz - 0.4f, 2.4f, 0.16f, 1.1f, 0x34343C, 0);
+        MB(-0.55f, 0.0f, fz - 0.4f, 0.95f, 0.04f, 0.95f, 0x141418, 4);
+        MB(-0.55f, 0.06f, fz - 0.4f, 0.25f, 0.03f, 0.25f, 0xC03020, 4);
+        MB(1.25f, 0.12f, fz - 0.05f, 0.08f, 0.16f, 0.08f, 0xA0A0A8, 0);
+        MB(0.85f, 0.3f, fz - 0.5f, 0.42f, 0.025f, 0.03f, 0xC0C0C8, 0);
+        MB(1.55f, 0.1f, fz - 1.52f, 0.6f, 0.18f, 0.02f, 0, 1);
+        break;
+    default:    /* the NUKED module */
+        MB(0, 0.35f, fz, 2.6f, 0.62f, 1.2f, 0x26262C, 1);
+        MB(-2.72f, 0.35f, fz - 1.17f, 0.12f, 0.62f, 0.03f, 0x303036, 0);
+        MB(2.72f, 0.35f, fz - 1.17f, 0.12f, 0.62f, 0.03f, 0x303036, 0);
+        MB(-2.6f + (464 / 512.0f) * 5.2f, 0.35f + 0.62f - 0.62f, fz - 1.36f, 0.32f, 0, 0.16f, 0x303038, 2);
+        break;
+    }
+#undef MB
+    (void)ta;
+    return n;
+}
+
+/* ---- vector drawing: smooth (Wu) lines added onto the picture, which fades a little every frame (afterglow) */
+static void mp3_addpx(int x, int y, uint32_t c, int a)
+{
+    uint32_t* p; int r, g, b;
+    if ((unsigned)x >= (unsigned)m3_rw || (unsigned)y >= (unsigned)m3_rh || a <= 0) return;
+    p = &m3_fb[y * M3W + x];
+    r = (*p >> 16 & 255) + ((c >> 16 & 255) * a >> 8); g = (*p >> 8 & 255) + ((c >> 8 & 255) * a >> 8); b = (*p & 255) + ((c & 255) * a >> 8);
+    *p = (uint32_t)(r > 255 ? 255 : r) << 16 | (uint32_t)(g > 255 ? 255 : g) << 8 | (uint32_t)(b > 255 ? 255 : b);
+}
+static void mp3_wline(float x0, float y0, float x1, float y1, uint32_t c)
+{
+    int steep = fabsf(y1 - y0) > fabsf(x1 - x0), x, xe; float t, gr, y;
+    if (steep) { t = x0; x0 = y0; y0 = t; t = x1; x1 = y1; y1 = t; }
+    if (x0 > x1) { t = x0; x0 = x1; x1 = t; t = y0; y0 = y1; y1 = t; }
+    if (x1 - x0 < 0.5f) return;
+    if (x0 < -2000 || x1 > 4000) return;
+    gr = (y1 - y0) / (x1 - x0);
+    x = (int)(x0 + 0.5f); xe = (int)(x1 + 0.5f); y = y0 + gr * (x - x0);
+    for (; x <= xe; x++, y += gr)
+    {
+        int yi = (int)floorf(y); int a = (int)((y - yi) * 256);
+        if (steep) { mp3_addpx(yi, x, c, 256 - a); mp3_addpx(yi + 1, x, c, a); }
+        else { mp3_addpx(x, yi, c, 256 - a); mp3_addpx(x, yi + 1, c, a); }
+    }
+}
+static void mp3_line3(M3V a, M3V b, uint32_t c)
+{
+    M3P p = m3_xf(a, 0, 0, 1), q = m3_xf(b, 0, 0, 1); float f = m3_f * m3_rw / M3_FBASE, nz = 0.1f;
+    if (p.z < nz && q.z < nz) return;
+    if (p.z < nz) { float t = (nz - p.z) / (q.z - p.z); p.x += (q.x - p.x) * t; p.y += (q.y - p.y) * t; p.z = nz; }
+    if (q.z < nz) { float t = (nz - q.z) / (p.z - q.z); q.x += (p.x - q.x) * t; q.y += (p.y - q.y) * t; q.z = nz; }
+    mp3_wline(m3_rw / 2 + p.x * f / p.z, m3_rh / 2 - p.y * f * m3_fyk / p.z, m3_rw / 2 + q.x * f / q.z, m3_rh / 2 - q.y * f * m3_fyk / q.z, c);
+}
+static void mp3_wbox(float x, float y, float z, float hx, float hy, float hz, float yaw, uint32_t c)
+{
+    static const int e[12][2] = { {0,1},{1,2},{2,3},{3,0},{4,5},{5,6},{6,7},{7,4},{0,4},{1,5},{2,6},{3,7} };
+    static const int k[8][3] = { {-1,1,-1},{1,1,-1},{1,-1,-1},{-1,-1,-1},{-1,1,1},{1,1,1},{1,-1,1},{-1,-1,1} };
+    M3V v[8]; int i; float cy = cosf(yaw), sy = sinf(yaw);
+    for (i = 0; i < 8; i++)
+    {
+        float px = k[i][0] * hx, py = k[i][1] * hy, pz = k[i][2] * hz;
+        v[i] = m3_v(x + px * cy + pz * sy, y + py, z - px * sy + pz * cy);
+    }
+    for (i = 0; i < 12; i++) mp3_line3(v[e[i][0]], v[e[i][1]], c);
+}
+static void mp3_wcircle(float x, float y, float z, float r, float rot, uint32_t c)
+{
+    int i; M3V p0 = m3_v(x + r, y, z);
+    for (i = 1; i <= 24; i++)
+    {
+        float a = i * 6.2831853f / 24; M3V p1 = m3_v(x + r * cosf(a), y + r * sinf(a), z);
+        mp3_line3(p0, p1, c); p0 = p1;
+    }
+    mp3_line3(m3_v(x, y, z), m3_v(x + r * cosf(rot), y + r * sinf(rot), z), c);
+}
+
+/* the keys' positions on the keyboard quad (x from -2.8 to 2.8): note -> centre x, black or not */
+static float mp3_keyx(int n, int* black)
+{
+    static const int bl[12] = { 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0 };
+    int i, wk = 0;
+    for (i = 12; i < n; i++) if (!bl[i % 12]) wk++;
+    *black = bl[n % 12];
+    return -2.8f + (wk + (*black ? 0.0f : 0.5f)) * 5.6f / 63;
+}
+
+/* ---- voxel: falling note blocks */
+typedef struct { float x, y, v; uint32_t c; int on; } MP3DROP;
+static MP3DROP mp3_drop[48];
+static unsigned char mp3_nlast[128];
+
+static void mp3_cube(float x, float y, float z, float h, uint32_t c, float glow) { m3_box(m3_v(x, y, z), h, h, h, 0, NULL, c, glow, 256); }
+
+static void mp3_scene_rest(const Song* s, const char* name, double frac, int paused, float ta, float dt)
+{
+    MP3BOX b[12]; int n = mp3_model(b, ta), i, c, k;
+    float H = 0.62f;
+    if (g_scene == 1)
+    {   /* ---------------------------------------------------- vector */
+        uint32_t acc = g_ctheme ? m3_gridc : 0x40FF90, dim = m3_mul(acc, 110);
+        float off = fmodf(ta * 1.5f, 1.0f), fy = -H - 0.02f;
+        for (i = -10; i <= 10; i++) mp3_line3(m3_v(i * 1.0f, fy, -5.5f), m3_v(i * 1.0f, fy, 22), dim);
+        for (i = 0; i < 26; i++) { float z = -5.5f + i - off; mp3_line3(m3_v(-10, fy, z), m3_v(10, fy, z), dim); }
+        M3_HOOK();
+        for (i = 0; i < n; i++)
+        {
+            MP3BOX* q = &b[i];
+            if (q->kind == 2) { mp3_wcircle(q->x, q->y, q->z, q->hx, (float)(frac * 6.28), acc); mp3_wcircle(q->x, q->y, q->z, q->hx * 0.55f, 0, dim); }
+            else if (q->kind == 4) mp3_wbox(q->x, q->y, q->z, q->hx, q->hy, q->hz, ta * 2.2f, acc);
+            else if (q->kind == 3) { for (c = 0; c < 8; c++) mp3_wbox(q->x, q->y - q->hy + (c + 0.5f) * q->hy / 4, q->z, q->hx, q->hy / 9, q->hz, 0, g_viz.level[c * 2] > 20 ? mp3_chcol[c * 2] : dim); }
+            else if (q->kind == 1)
+            {   /* the screen: its frame and the 16 channel levels as bars */
+                mp3_wbox(q->x, q->y, q->z, q->hx, q->hy, 0.01f, 0, acc);
+                for (c = 0; c < 16; c++)
+                {
+                    float bx = q->x - q->hx * 0.9f + c * q->hx * 1.8f / 15, h = q->hy * 1.6f * g_viz.level[c] / 127.0f;
+                    mp3_line3(m3_v(bx, q->y - q->hy * 0.8f, q->z - 0.02f), m3_v(bx, q->y - q->hy * 0.8f + h, q->z - 0.02f), mp3_chcol[c]);
+                }
+                if (g_model == 0) mp3_wbox(q->x, q->y, q->z, q->hx, q->hy, q->hz, 0, acc);
+            }
+            else mp3_wbox(q->x, q->y, q->z, q->hx, q->hy, q->hz, 0, acc);
+        }
+        M3_HOOK();
+        /* the keyboard: its outline, each note that plays shoots a beam up in its channel's colour */
+        mp3_line3(m3_v(-2.8f, -0.34f, -0.95f), m3_v(2.8f, -0.34f, -0.95f), acc); mp3_line3(m3_v(-2.8f, -0.62f, -1.75f), m3_v(2.8f, -0.62f, -1.75f), acc);
+        mp3_line3(m3_v(-2.8f, -0.34f, -0.95f), m3_v(-2.8f, -0.62f, -1.75f), acc); mp3_line3(m3_v(2.8f, -0.34f, -0.95f), m3_v(2.8f, -0.62f, -1.75f), acc);
+        for (k = 12; k < 120; k++)
+        {
+            int bl; float x = mp3_keyx(k, &bl);
+            if (!bl && !(k % 12)) mp3_line3(m3_v(x - 2.8f / 63, -0.34f, -0.95f), m3_v(x - 2.8f / 63, -0.62f, -1.75f), dim);
+            if (g_viz.nl[k] > 0)
+            {
+                uint32_t cc = mp3_chcol[g_viz.ncol[k] & 15]; float h = 0.2f + g_viz.nl[k] / 127.0f * 1.4f, z = bl ? -1.15f : -1.4f, y = bl ? -0.42f : -0.5f;
+                mp3_line3(m3_v(x, y, z), m3_v(x, y + h, z + 0.3f), cc);
+            }
+        }
+        M3_HOOK();
+        for (c = 0; c < 16; c++)
+        {
+            float target = 0.03f + g_viz.level[c] / 127.0f * 0.36f;
+            mp3_col[c] += (target - mp3_col[c]) * (1 - expf(-dt * 12));
+            mp3_wbox(-1.8f + c * 0.24f, -H - 0.02f + mp3_col[c] / 2, -3.5f, 0.085f, mp3_col[c] / 2, 0.085f, 0, mp3_chcol[c]);
+        }
+        return;
+    }
+    if (g_scene == 2)
+    {   /* ---------------------------------------------------- voxel */
+        float q = 0.11f;
+        mp3_make_panel(s->title[0] ? s->title : base_of(name), frac, paused);
+        for (i = 0; i < n; i++)
+        {
+            MP3BOX* m = &b[i];
+            if (m->kind == 1)
+            {   /* the screen as big pixels: the LCD texture sampled into blocks, the lit ones stand out */
+                int gx = (int)(m->hx * 2 / (q * 2)), gy = (int)(m->hy * 2 / (q * 2)), x, y;
+                if (gx > 36) gx = 36; if (gy > 12) gy = 12;
+                if (g_model == 0) m3_box(m3_v(m->x, m->y, m->z), m->hx, m->hy, m->hz, 0, NULL, 0x26262C, 0, 256);
+                for (y = 0; y < gy; y++)
+                {
+                    M3_HOOK();
+                    for (x = 0; x < gx; x++)
+                    {
+                        uint32_t cc = mp3_panel.p[(int)((y + 0.5f) * mp3_panel.h / gy) * mp3_panel.w + (int)((x + 0.5f) * mp3_panel.w / gx)];
+                        int lum = (cc >> 16 & 255) + (cc >> 8 & 255) + (cc & 255);
+                        float bx = m->x - m->hx + (x + 0.5f) * m->hx * 2 / gx, by = m->y + m->hy - (y + 0.5f) * m->hy * 2 / gy;
+                        mp3_cube(bx, by, m->z - m->hz - (lum > 300 ? q * 0.6f : 0), m->hx / gx * 0.92f, cc, lum > 300 ? 0.3f : 0);
+                    }
+                }
+            }
+            else if (m->kind == 2)
+            {   /* a disc of blocks */
+                int r = (int)(m->hx / q), x, y;
+                for (y = -r; y <= r; y++) for (x = -r; x <= r; x++)
+                    if (x * x + y * y <= r * r)
+                    {
+                        int ring = (x * x + y * y) * 4 / (r * r + 1);
+                        float pump = ring == 0 ? 0.04f * (g_viz.level[9] / 127.0f) : 0;
+                        mp3_cube(m->x + x * q, m->y + y * q, m->z - pump, q * 0.48f, m3_mul(m->col, 140 + ring * 40), 0);
+                    }
+            }
+            else if (m->kind == 3)
+            {
+                for (c = 0; c < 8; c++)
+                    mp3_cube(m->x, m->y - m->hy + (c + 0.5f) * m->hy / 4, m->z, m->hy / 9, g_viz.level[c * 2] > 20 ? mp3_chcol[c * 2] : 0x302020, g_viz.level[c * 2] > 20 ? 0.6f : 0);
+            }
+            else m3_box(m3_v(m->x, m->y, m->z), m->hx, m->hy, m->hz, m->kind == 4 ? ta * 2.2f : 0, NULL, m->col, 0, 256);
+        }
+        M3_HOOK();
+        /* the keys as blocks; a playing key sinks and glows */
+        for (k = 21; k < 109; k++)
+        {
+            int bl; float x = mp3_keyx(k, &bl), lv = g_viz.nl[k] / 127.0f;
+            uint32_t cc = g_viz.nl[k] > 0 ? mp3_chcol[g_viz.ncol[k] & 15] : bl ? 0x202024 : 0xE0E0E4;
+            mp3_cube(x, (bl ? -0.36f : -0.48f) - lv * 0.05f, bl ? -1.2f : -1.38f, bl ? 0.03f : 0.042f, cc, lv > 0 ? 0.4f : 0);
+            if (g_viz.nl[k] > mp3_nlast[k] + 8)
+            {   /* a new note: a block drops onto its key */
+                for (i = 0; i < 48 && mp3_drop[i].on; i++) {}
+                if (i < 48) { mp3_drop[i].on = 1; mp3_drop[i].x = x; mp3_drop[i].y = 1.6f; mp3_drop[i].v = 0; mp3_drop[i].c = cc; }
+            }
+            mp3_nlast[k] = (unsigned char)g_viz.nl[k];
+        }
+        for (i = 0; i < 48; i++) if (mp3_drop[i].on)
+        {
+            MP3DROP* d = &mp3_drop[i];
+            d->v += dt * 6; d->y -= d->v * dt;
+            if (d->y < -0.4f) d->on = 0;
+            else mp3_cube(d->x, d->y, -1.3f, 0.045f, d->c, 0.5f);
+        }
+        M3_HOOK();
+        /* the channels as stacks of blocks */
+        for (c = 0; c < 16; c++)
+        {
+            int h = 1 + (g_viz.level[c] * 8 + 63) / 127;
+            for (k = 0; k < h; k++) mp3_cube(-1.8f + c * 0.24f, -H + 0.05f + k * 0.1f, -3.5f, 0.045f, mp3_chcol[c], k == h - 1 ? 0.5f : 0.1f);
+        }
+        return;
+    }
+    /* ---------------------------------------------------- solid, another player than the module */
+    mp3_make_panel(s->title[0] ? s->title : base_of(name), frac, paused);
+    for (i = 0; i < n; i++)
+    {
+        MP3BOX* m = &b[i];
+        if (m->kind == 1) m3_box(m3_v(m->x, m->y, m->z), m->hx, m->hy, m->hz, 0, &mp3_panel, 0x26262C, 0, 256);
+        else if (m->kind == 2) m3_knob3d(m3_v(m->x, m->y, m->z), m->hx, m->hz, (float)(frac * 6.28), 0.02f * g_viz.level[9] / 127.0f);
+        else if (m->kind == 3) { for (c = 0; c < 8; c++) m3_box(m3_v(m->x, m->y - m->hy + (c + 0.5f) * m->hy / 4, m->z), m->hx, m->hy / 9, m->hz, 0, NULL, g_viz.level[c * 2] > 20 ? mp3_chcol[c * 2] : 0x402020, g_viz.level[c * 2] > 20 ? 0.6f : 0, 256); }
+        else m3_box(m3_v(m->x, m->y, m->z), m->hx, m->hy, m->hz, m->kind == 4 ? ta * 2.2f : 0, NULL, m->col, 0, 256);
+    }
+    M3_HOOK();
+    mp3_make_keys();
+    m3_quad(m3_v(-2.8f, -0.34f, -0.95f), m3_v(2.8f, -0.34f, -0.95f), m3_v(2.8f, -0.62f, -1.75f), m3_v(-2.8f, -0.62f, -1.75f), &mp3_keys, 0xFFFFFF, 0.15f, 256, 0);
+    for (c = 0; c < 16; c++)
+    {
+        float target = 0.03f + g_viz.level[c] / 127.0f * 0.36f;
+        mp3_col[c] += (target - mp3_col[c]) * (1 - expf(-dt * 12));
+        m3_box(m3_v(-1.8f + c * 0.24f, -H - 0.02f + mp3_col[c] / 2, -3.5f), 0.085f, mp3_col[c] / 2, 0.085f, 0, NULL, mp3_chcol[c], g_viz.count[c] > 0 ? 0.5f : 0.12f, 256);
+    }
+}
+
 static void mp3_draw(const Song* s, const char* name, uint64_t el_us, uint64_t total_us, int paused, int done)
 {
     double t = m3_now(), t0, hz, period, ta; float W = 2.6f, H = 0.62f, D = 1.2f, dt; int c, idle = paused || done || !s->nev;
@@ -286,11 +600,29 @@ static void mp3_draw(const Song* s, const char* name, uint64_t el_us, uint64_t t
     lcd_query();
     m3_bgphase = (float)ta;
     m3_fog = m3_fogc; m3_fog0 = 8; m3_fog1 = 24;
-    m3_camera(0.6f * sinf((float)ta * 0.2f), 0.55f + 0.08f * sinf((float)ta * 0.13f), -6.6f, -0.1f * sinf((float)ta * 0.2f), -0.16f);
-    m3_sky();
+    mp3_theme_apply();                        /* C: colour theme over the style's colours */
+    m3_camera(0.6f * sinf((float)ta * 0.2f), 0.55f + 0.08f * sinf((float)ta * 0.13f) + (g_model == 2 ? 0.35f : 0), -6.6f - (g_model == 2 ? 0.6f : 0), -0.1f * sinf((float)ta * 0.2f), -0.16f);
+    if (g_scene == 1)
+    {   /* vector: always full resolution; last frame fades to 5/8 (afterglow) instead of a new sky */
+        uint32_t* p = m3_fb; int i2, n2 = M3W * M3H;
+        m3_rw = M3W; m3_rh = M3H;
+        for (i2 = 0; i2 < n2; i2++) { uint32_t v = p[i2]; p[i2] = (v >> 1 & 0x7F7F7F) + (v >> 3 & 0x1F1F1F); if (!(i2 & 0x7FFF)) M3_HOOK(); }
+    }
+    else
+    {
+        if (m3_rw != (m3_half ? M3W / 2 : M3W)) { m3_rw = m3_half ? M3W / 2 : M3W; m3_rh = m3_half ? M3H / 2 : M3H; }
+        m3_sky();
+        M3_HOOK();
+        m3_draw_floor(-H - 0.02f, 256);
+    }
     M3_HOOK();
-    m3_draw_floor(-H - 0.02f, 256);
-    M3_HOOK();
+    if (g_scene || g_model)
+    {
+        mp3_scene_rest(s, name, frac, paused, (float)ta, dt);
+        M3_HOOK();
+        if (g_scene != 1) m3_upscale();
+        goto bar;
+    }
     /* the module */
     mp3_make_panel(s->title[0] ? s->title : base_of(name), frac, paused);
     m3_box(m3_v(0, 0.35f, 0.6f), W, H, D, 0, &mp3_panel, 0x26262C, 0, 256);
@@ -315,6 +647,7 @@ static void mp3_draw(const Song* s, const char* name, uint64_t el_us, uint64_t t
     }
     M3_HOOK();
     m3_upscale();
+bar:
     mp3_bar(base_of(name), s->title, el_us, total_us, paused, done);
     M3_HOOK();
     if (!mp3_win && (m3_now() - t0) < 0.75 / hz)
