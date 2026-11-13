@@ -797,6 +797,8 @@ struct MAIN_OPT
     "/USBKB", "USB keyboard typed through the PC's keyboard controller (1=on, 0=off; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
     "/USBMS", "USB mouse for a DOS mouse driver loaded after SBEMU (1=auto, 2=always, 0=off; needs /JOY:1). Without JEMM/QEMM it goes through the BIOS, next to the touchpad", 1, MAIN_SETCMD_BASE10,
     "/USBDISK", "USB sticks / card readers as DOS drive letters, FAT12/16/32, read and write (1=on, 0=off; needs /JOY:1 and LASTDRIVE high enough). Experimental", 0, MAIN_SETCMD_BASE10,
+    "/USB", "USB in DOS at all: 0 = SBEMU does not touch any USB controller (no USB pad / keyboard / mouse / disk / MIDI; the BIOS keeps its USB keyboard), 1 = on", 1, MAIN_SETCMD_BASE10,
+    "/USBSKIP", "USB controllers SBEMU leaves alone, e.g. /USBSKIP:1033:00E0 (PCI vendor:device) or /USBSKIP:01:05.2 (PCI bus:device.function), several joined with +. The IDs are in SBDETAIL.TXT", (uintptr_t)"", MAIN_SETCMD_STR,
     "/JOYBIOS", "BIOS joystick calls (INT 15h AH=84h) answered from the USB pad too (1=on, 0=off; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
     "/PADKEYS", "Pad buttons -> keyboard keys with a layout per game, from PADMAP.TXT / PADUSER.TXT in SBEMU's folder (1=on, 0=off: only /JOYKEY; needs /JOY:1)", 1, MAIN_SETCMD_BASE10,
     "/PADLOG", "Show which pad layout the loaded SBEMU picked for the last programs started (SBEMU /PADLOG)", 0, MAIN_SETCMD_BASE10,
@@ -870,6 +872,8 @@ enum EOption
     OPT_USBKB,
     OPT_USBMS,
     OPT_USBDISK,
+    OPT_USB,
+    OPT_USBSKIP,
     OPT_JOYBIOS,
     OPT_PADKEYS,
     OPT_PADLOG,
@@ -1912,7 +1916,7 @@ int main(int argc, char* argv[])
         MAIN_Print_Enabled_Newline(true);
     }
 
-    MAIN_MUSB = MAIN_Options[OPT_MUSB].value && MAIN_Options[OPT_JOY].value;
+    MAIN_MUSB = MAIN_Options[OPT_MUSB].value && MAIN_Options[OPT_JOY].value && MAIN_Options[OPT_USB].value;
     if(MAIN_Options[OPT_MPUADDR].value && 
         (MAIN_Options[OPT_MPUCOMPORT].value || VMPU_ENABLED || MAIN_MUSB)
     )
@@ -2216,7 +2220,12 @@ int main(int argc, char* argv[])
     MAIN_Print_Enabled_Newline(MAIN_PCSPEAKER_Installed);
 #endif // SBEMU_PCSPEAKER
 
-    if(MAIN_Options[OPT_JOY].value)
+    if(MAIN_Options[OPT_JOY].value && !MAIN_Options[OPT_USB].value)
+    {
+        printf("USB: off (/USB:0) - no USB controller touched.\n");
+        MAIN_D("USB: off (/USB:0)\n");
+    }
+    if(MAIN_Options[OPT_JOY].value && MAIN_Options[OPT_USB].value)
     {
         const char* bad = NULL;
         const char* msg = "";
@@ -2231,7 +2240,8 @@ int main(int argc, char* argv[])
             VKBC_Init(MAIN_TCps, 0);
             USBPAD_SetHid(&VKBC_UsbKeys, &VKBC_UsbMouse);
             int usb_ok;
-            if(MAIN_Det) { MAIN_D("USB live: "); USBPAD_SetTraceHook(MAIN_UsbTrace); }
+            USBPAD_SetSkip((const char*)MAIN_Options[OPT_USBSKIP].value);
+            if(MAIN_Det) { MAIN_D("USB live:\n"); USBPAD_SetTraceHook(MAIN_UsbTrace); }
             usb_ok = USBPAD_Init(MAIN_TCps, 3000, flags, &msg);
             USBPAD_SetTraceHook(NULL);
             MAIN_D("\n");

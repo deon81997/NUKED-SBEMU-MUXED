@@ -22,6 +22,10 @@ DELL LATITUDE D810 (ICH6 UHCI + EHCI, SigmaTel AC'97, Dell keyboard controller)
 [ ] A 3D DOS game (Quake / Descent / Duke 3D) with SB sound + pad: no glitches.
 
 ASUS P5PE-VM (+ NEC uPD720101 USB card, wired Xbox 360 pad, Logitech receiver)
+[ ] beta.110: board USB AND the NEC card both on, keyboard, mouse, stick
+    plugged in: SC55.BAT starts (no freeze). If it freezes: reboot, send
+    C:\SC55\SBDETAIL.TXT (last "[usb]" line = where). Then try
+    SC55 /USBSKIP:1033:00E0 and SC55 /USB:0 and say which start.
 [ ] beta.102 fix: Logitech receiver on the NEC card - MENU 3D F2/F3 and
     MIDPLAY 3D V / C / J for a few minutes each: no GPF / "Stack Fault".
     If it crashes: photo of the whole crash screen (all registers).

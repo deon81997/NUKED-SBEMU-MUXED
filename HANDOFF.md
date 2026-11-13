@@ -1,3 +1,36 @@
+## beta.110 (2026-11-13, DOS session): freeze with two USB 2.0 hosts (P5PE-VM: ICH5 + NEC uPD720101 card)
+- Report: hard freeze while SC55.BAT starts SBEMU's USB with the ICH5 (4 UHCI + EHCI 24DD) and a Belkin F5U219 (NEC
+  EHCI 1033:00E0 + 2 OHCI 1033:0035, no option ROM) both on; Win98 fine; board alone worked; card alone untested.
+- QEMU repro rig: testrig/usbmulti.py (ICH9 EHCI + 3 UHCI companions, ich9-usb-ehci2 + 2 pci-ohci companions -
+  QEMU's usb-ehci takes no companions; USB keyboard + stick on one, mouse + stick on the other; pm = HIMEM.SYS from
+  the 86Box rig's Win98 image, jem = JEMMEX + JLOAD QPIEMU from JemmB_v586). beta.109 does NOT freeze there (QEMU has
+  no BIOS SMI code), both modes, with and without /USBDISK:1. So the fix is from the audit:
+- Audit (usbpad.c): every register poll already had a bound (tsc or a counter) - no software endless loop. Found:
+  (1) each controller was taken from the BIOS only when its own setup ran, in type order (EHCI before its UHCI
+  companions): the BIOS's SMI code could still run the companions while CONFIGFLAG / port owner changed on the EHCI,
+  and with the card in, a second EHCI did the same; (2) a timeout (BIOS handoff, HCHalted, HCRESET, OHCI HCR) did not
+  drop the controller, it just went on with it; (3) no D3 -> D0; (4) EHCI USBSTS / OHCI status left pending (the NEC
+  chip has no INTx-disable bit, so a shared IRQ line could be held); (5) the trace stopped going to SBDETAIL once its
+  4 KB buffer was full; (6) a 17th controller was dropped silently. No USB IRQ is used (polled), controller list 16.
+- Fix: phase 1 for ALL controllers in PCI order (as Linux's early quirks; on Intel the UHCIs come before their EHCI):
+  power D0, UHCI LEGSUP 8F00 + stop + INTx off, OHCI ownership change + all interrupts off + status cleared, EHCI
+  USBLEGSUP handoff (BIOS not letting go in 1 s: taken anyway, as Linux, logged) + stop + USBINTR 0 + USBSTS cleared.
+  Phase 2 = the old setup order. Any wait that times out logs "[usb] bb:dd.f TYPE: <step> timed out, controller
+  skipped" and that controller is not used. Every step is logged BEFORE it runs ("[usb] ..." lines in SBDETAIL.TXT,
+  committed per line; trace buffer 8 KB, full buffer still feeds SBDETAIL).
+- Switches: /USB:0 (SBEMU touches no USB controller; also turns /MUSB off), /USBSKIP:<list> ("vvvv:dddd" or "bb:dd.f",
+  joined with + because a batch %1 splits at commas); skipped = not touched at all (no bus master). USBTEST / MIDPLAY
+  /USB: SET USBSKIP=... . README.TXT, HWTEST.TXT (P5PE-VM item first).
+- Tests (QEMU usbmulti.py): pm and jem, default and /USBDISK:1 (4 drive letters), /USBSKIP:8086:293c+00:06.0 (both
+  "skipped", nothing else touched), /USB:0: all reach DONE, same devices as beta.109. USB start-up step time the
+  same within QEMU noise (fsync per line, about 14 more lines).
+- Speed (86Box P2B-LS PII-450 ES1371, midi/perf.sh, SBEMU /JOY:1 /VMPU:1, no ROMs): beta.109 344 int/s avg 0.02 ms
+  ISR 1% = beta.110 identical. SC55LOG.EXE md5 8cc1f00a.. identical (no USB code in it). Runtime path unchanged
+  (the change is start-up only). 86Box with automation rebuilt from testrig/86box/README.md into /home/claude/86box/86box.
+- Not tested (needs the P5PE-VM): whether phase 1 is the fix; HWTEST.TXT has the steps (SBDETAIL.TXT, then
+  /USBSKIP:1033:00E0, /USB:0). If it still freezes, the last "[usb]" line names the step.
+- Zip: beta.109 + all built tools (version), README.TXT, HWTEST.TXT. Personal pack: not in this session.
+
 ## beta.108 (2026-11-13, DOS session): USB MIDI (class compliant, e.g. M-Audio Uno) - SBEMU /MUSB, MIDPLAY /USB, USBTEST
 - usbpad.c: audio class / MIDIStreaming interface (alt 0) -> two pipes, PT_MOUT (bulk OUT) and PT_MIDI (bulk IN), in the
   periodic schedule like the pads (UHCI frame list QH, OHCI interrupt ED (D=OUT for the OUT pipe, oslow path shared),

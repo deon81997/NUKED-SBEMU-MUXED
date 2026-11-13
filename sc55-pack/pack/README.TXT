@@ -960,6 +960,16 @@ CONTENTS
      is plugged in as SBEMU starts (the touchpad is then not used);
      2 = always.
   0 = off. Test with MENU > Tests > Keyboard / mouse test (KMTEST).
+  USB off / one controller left alone (beta.110): /USB:0 = SBEMU touches
+  no USB controller at all (the BIOS keeps its USB keyboard). /USBSKIP:
+  leaves single controllers alone, by PCI ID or PCI place, several
+  joined with +: /USBSKIP:1033:00E0 (an NEC uPD720101 card's USB 2.0 part) or
+  /USBSKIP:01:05.2. The IDs are in SBDETAIL.TXT ("USB live:" lines).
+  If the PC freezes while SBEMU starts USB, the last "[usb]" line in
+  SBDETAIL.TXT names the controller and the step; skip that one. A
+  controller that does not answer in time is now skipped by itself
+  ("timed out, controller skipped"). USBTEST and MIDPLAY /USB: SET
+  USBSKIP=1033:00E0 before starting them does the same.
   USB disks (/USBDISK:1, off by default, experimental, needs /JOY:1): USB
   sticks and card readers plugged in when SBEMU starts get DOS drive
   letters (the next free ones, up to LASTDRIVE - put LASTDRIVE=Z in

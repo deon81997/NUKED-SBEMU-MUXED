@@ -247,6 +247,7 @@ typedef struct
     uint32_t ering;                     /* EHCI: async ring after the control QH (disk QHs), 0 = none */
     int      ctlbulk;                   /* OHCI whose bulk list was not served (P5PE-VM NEC): disk transfers on the
                                          * control ED instead (o_run_tds, as the pads' OUT reports) */
+    int      skip;                      /* beta.110: hc_quiesce failed - not set up, not used */
     int      oslow;                     /* OHCI that misses tail-appended TDs (NEC uPD720101): every new IN TD
                                          * goes in by rewriting the ED while it is skipped for a frame */
 } HCI;
@@ -337,7 +338,7 @@ static volatile int Busy;
 static int       Inited, Light, Settling;
 
 /* short trace of what happened (start-up report / SBDETAIL), oldest first, stops when full */
-static char      Trace[4096]; static int TraceN, TraceOff;
+static char      Trace[8192]; static int TraceN, TraceOff;
 void USBPAD_TraceStop(void) { TraceOff = 1; }   /* SBEMU: no libc formatting inside its interrupt */
 static void (*TraceHook)(const char* s);
 void USBPAD_SetTraceHook(void (*fn)(const char* s)) { TraceHook = fn; }
@@ -345,7 +346,15 @@ static void trace(const char* f, ...)
 {
     va_list a;
     int n0 = TraceN;
-    if (TraceOff || TraceN >= (int)sizeof(Trace) - 2) return;
+    if (TraceOff) return;
+    if (TraceN >= (int)sizeof(Trace) - 2)          /* buffer full: the live log (SBDETAIL) still gets the line */
+    {
+        char l[200];
+        if (!TraceHook) return;
+        va_start(a, f); vsnprintf(l, sizeof(l), f, a); va_end(a);
+        TraceHook(l);
+        return;
+    }
     va_start(a, f);
     TraceN += vsnprintf(Trace + TraceN, sizeof(Trace) - TraceN, f, a);
     va_end(a);
@@ -557,11 +566,59 @@ static uint32_t mem_bar(uint8_t b, uint8_t d, uint8_t f, uint8_t reg)
     return bar & ~0xFUL;
 }
 
+/* beta.110: controllers to leave alone (SBEMU /USBSKIP, or the USBSKIP environment variable for the tools):
+ * a list of "vvvv:dddd" (PCI vendor:device, hex) and / or "bb:dd.f" (PCI location, hex), separated by + , ; or
+ * blanks (+ survives a batch file's %1). A skipped controller is not touched at all (not even bus master on), so the BIOS keeps it. */
+static const char* SkipList;
+void USBPAD_SetSkip(const char* list) { SkipList = list; }
+static int hc_skipped(uint8_t b, uint8_t d, uint8_t f)
+{
+    const char* p = SkipList && *SkipList ? SkipList : getenv("USBSKIP");
+    uint16_t vid = PCI_ReadWord(b, d, f, 0), did = PCI_ReadWord(b, d, f, 2);
+    while (p && *p)
+    {
+        unsigned x, y, z; char t[24]; int n = 0;
+        while (*p == ',' || *p == ';' || *p == ' ' || *p == '+') ++p;
+        while (*p && *p != ',' && *p != ';' && *p != ' ' && *p != '+' && n < 23) t[n++] = *p++;
+        t[n] = 0;
+        if (!n) break;
+        if (strchr(t, '.') && sscanf(t, "%x:%x.%x", &x, &y, &z) == 3) { if (x == b && y == d && z == f) return 1; }
+        else if (sscanf(t, "%x:%x", &x, &y) == 2 && x == vid && y == did) return 1;
+    }
+    return 0;
+}
+
+/* PCI power state D0 (a controller Windows or a BIOS left in D3 answers every register with FFFFFFFFh) */
+static void pci_d0(uint8_t b, uint8_t d, uint8_t f)
+{
+    int cp, guard = 0;
+    if (!(PCI_ReadWord(b, d, f, 6) & 0x10)) return;              /* no capability list */
+    for (cp = PCI_ReadByte(b, d, f, 0x34) & 0xFC; cp >= 0x40 && guard++ < 48; cp = PCI_ReadByte(b, d, f, (uint8_t)(cp + 1)) & 0xFC)
+        if (PCI_ReadByte(b, d, f, (uint8_t)cp) == 1)
+        {
+            uint16_t pm = PCI_ReadWord(b, d, f, (uint8_t)(cp + 4));
+            if (pm & 3)
+            {
+                PCI_WriteWord(b, d, f, (uint8_t)(cp + 4), (uint16_t)(pm & ~3));
+                wait_us(10000);                                   /* D3hot -> D0: 10 ms */
+                trace("%02x:%02x.%x: power state D%d -> D0 ", b, d, f, pm & 3);
+            }
+            return;
+        }
+}
+
 static void hc_found(uint8_t b, uint8_t d, uint8_t f, uint32_t cls)
 {
     HCI* h;
     uint32_t bar;
-    if (HCn >= MAX_HC) return;
+    if (cls != 0x0C0300 && cls != 0x0C0310 && cls != 0x0C0320 && cls != 0x0C0330) return;
+    if (hc_skipped(b, d, f))
+    {
+        trace("%02x:%02x.%x %04x:%04x: skipped (USBSKIP)\n", b, d, f, PCI_ReadWord(b, d, f, 0), PCI_ReadWord(b, d, f, 2));
+        return;
+    }
+    if (HCn >= MAX_HC) { trace("%02x:%02x.%x: more than %d USB controllers, not used\n", b, d, f, MAX_HC); return; }
+    pci_d0(b, d, f);
     h = &HC[HCn];
     memset(h, 0, sizeof(*h));
     h->bus = b; h->dev = d; h->func = f;
@@ -598,6 +655,18 @@ static void hc_found(uint8_t b, uint8_t d, uint8_t f, uint32_t cls)
 }
 
 /* ================================================================== controller bring-up */
+/* beta.110: every bring-up step is logged BEFORE it runs (SBEMU: straight into SBDETAIL.TXT, committed), so a PC
+ * that freezes names the controller and the step; a hardware wait that times out drops that controller */
+static void ustep(int i, const char* what)
+{
+    trace("[usb] %02x:%02x.%x %s: %s\n", HC[i].bus, HC[i].dev, HC[i].func, tname(i), what);
+}
+static int hc_fail(int i, const char* what)
+{
+    trace("[usb] %02x:%02x.%x %s: %s timed out, controller skipped\n", HC[i].bus, HC[i].dev, HC[i].func, tname(i), what);
+    return 0;
+}
+
 static void ehci_handoff(int i)
 {
     HCI* h = &HC[i];
@@ -610,10 +679,65 @@ static void ehci_handoff(int i)
             PCI_WriteByte(h->bus, h->dev, h->func, (uint8_t)(eecp + 3), 1);
             for (n = 0; n < 1000 && (PCI_ReadByte(h->bus, h->dev, h->func, (uint8_t)(eecp + 2)) & 1); ++n) wait_us(1000);
             if (PCI_ReadByte(h->bus, h->dev, h->func, (uint8_t)(eecp + 2)) & 1)
-                PCI_WriteByte(h->bus, h->dev, h->func, (uint8_t)(eecp + 2), 0); /* BIOS did not let go */
+            {
+                PCI_WriteByte(h->bus, h->dev, h->func, (uint8_t)(eecp + 2), 0); /* BIOS did not let go (as Linux: take it) */
+                ustep(i, "BIOS did not let go in 1 s, taken anyway");
+            }
             PCI_WriteDWord(h->bus, h->dev, h->func, (uint8_t)(eecp + 4), 0xE0000000UL); /* SMIs off */
         }
         eecp = (cap >> 8) & 0xFF;
+    }
+}
+
+/* beta.110, phase 1 (P5PE-VM freeze with the ICH5 and the NEC card both on): every controller, in PCI order (as
+ * Linux's early PCI quirks do: on Intel the UHCI companions come before their EHCI), is taken from the BIOS, stopped
+ * and has its interrupts off BEFORE any of them is set up - so no BIOS SMI code still runs on one controller while
+ * port routing (CONFIGFLAG) changes on another, and no controller is left raising its PCI interrupt (the NEC chip has
+ * no INTx-disable bit) on a line shared with the sound card or another controller. 0 = leave this one alone. */
+static int hc_quiesce(int i)
+{
+    HCI* h = &HC[i];
+    int n;
+    switch (h->type)
+    {
+    case T_UHCI:
+        ustep(i, "legacy support off, stop");
+        PCI_WriteWord(h->bus, h->dev, h->func, UHCI_LEGSUP, 0x8F00);   /* legacy off, SMIs off, PIRQ off */
+        PCI_WriteWord(h->bus, h->dev, h->func, 0x04, (uint16_t)(PCI_ReadWord(h->bus, h->dev, h->func, 0x04) | 0x405));
+        outportw(h->io + U_INTR, 0);
+        outportw(h->io + U_CMD, 0);
+        for (n = 0; n < 20 && !(inportw(h->io + U_STS) & STS_HALT); ++n) wait_us(1000);
+        if (!(inportw(h->io + U_STS) & STS_HALT)) return hc_fail(i, "stop (HCHalted)");
+        outportw(h->io + U_STS, 0x3F);
+        return 1;
+    case T_OHCI:
+        if (ord(i, 0) == 0xFFFFFFFFUL) return hc_fail(i, "register read");
+        if (ord(i, O_CONTROL) & OC_IR)                        /* the BIOS's SMM code owns it */
+        {
+            ustep(i, "BIOS handoff (OwnershipChange), interrupts off");
+            /* as Linux does: enable the OwnershipChange interrupt first - some BIOSes only get their SMI from it */
+            owr(i, 0x10, (1UL << 30));
+            owr(i, O_CMDSTS, OS_OCR);
+            for (n = 0; n < 1000 && (ord(i, O_CONTROL) & OC_IR); ++n) wait_us(1000);
+            if (ord(i, O_CONTROL) & OC_IR) return hc_fail(i, "BIOS handoff");
+        }
+        else ustep(i, "interrupts off");
+        owr(i, O_INTDIS, 0xC000007FUL);
+        owr(i, O_INTSTS, 0x7FUL);
+        return 1;
+    case T_EHCI:
+        if (rd(h->mmio) == 0xFFFFFFFFUL) return hc_fail(i, "register read");
+        ustep(i, "BIOS handoff (USBLEGSUP), stop, interrupts off");
+        ehci_handoff(i);
+        h->op = h->mmio + (rd(h->mmio) & 0xFF);
+        ewr(i, E_INTR, 0);
+        ewr(i, E_CMD, erd(i, E_CMD) & ~(EC_RS | EC_PSE | EC_ASE));
+        for (n = 0; n < 50 && !(erd(i, E_STS) & ES_HALT); ++n) wait_us(1000);
+        if (!(erd(i, E_STS) & ES_HALT)) return hc_fail(i, "stop (HCHalted)");
+        ewr(i, E_STS, 0x3F);
+        return 1;
+    default:                                                  /* xHCI: its handoff is in xhci_setup */
+        return 1;
     }
 }
 
@@ -623,13 +747,13 @@ static int ehci_setup(int i)
     HCI* h = &HC[i];
     uint32_t hcs;
     int n, p;
-    ehci_handoff(i);
     h->op = h->mmio + (rd(h->mmio) & 0xFF);
     hcs = rd(h->mmio + 4);
     h->nports = (int)(hcs & 0xF);
     h->ncc = (int)((hcs >> 12) & 0xF);
     ewr(i, E_CMD, erd(i, E_CMD) & ~(EC_RS | EC_PSE | EC_ASE));
     for (n = 0; n < 50 && !(erd(i, E_STS) & ES_HALT); ++n) wait_us(1000);
+    if (!(erd(i, E_STS) & ES_HALT)) return hc_fail(i, "stop (HCHalted)");
     ewr(i, E_INTR, 0);
     trace("EHCI %02x:%02x.%x: %d ports, %d companions, cap %02lx -> %s\n", h->bus, h->dev, h->func, h->nports, h->ncc,
         (unsigned long)(rd(h->mmio) & 0xFF), !h->ncc ? "driven directly" : (Flags & USBPAD_F_DISK) && !getenv("USBNOHS") ?
@@ -641,6 +765,7 @@ static int ehci_setup(int i)
          * explicitly too (Port Owner, which is only writable while CONFIGFLAG=1) and power it: an empty port
          * can otherwise stay with the halted EHCI, so a device plugged in later is never seen, and on a card
          * no BIOS has set up the port power can still be off */
+        ustep(i, "ports to the companions (CONFIGFLAG 1 -> port owner -> 0)");
         ewr(i, E_CONFIG, 1);
         wait_us(1000);
         for (p = 0; p < h->nports; ++p) eport_set(i, p, EP_PO | ((hcs & 0x10) ? EP_PP : 0), EP_PE);
@@ -651,8 +776,10 @@ static int ehci_setup(int i)
         ++EhciGiven;
         return 0;
     }
+    ustep(i, "reset, run, CONFIGFLAG 1");
     ewr(i, E_CMD, EC_HCRST);
     for (n = 0; n < 100 && (erd(i, E_CMD) & EC_HCRST); ++n) wait_us(1000);
+    if (erd(i, E_CMD) & EC_HCRST) return hc_fail(i, "reset (HCRESET)");
     ewr(i, E_INTR, 0);
     if (rd(h->mmio + 8) & 1) ewr(i, E_SEG, 0);         /* 64-bit capable: our structures are below 4 GB */
     for (n = 0; n < 1024; ++n) h->fl[n] = LP_T;        /* periodic list: filled by ehci_relink() */
@@ -670,19 +797,21 @@ static int ehci_setup(int i)
     return 1;
 }
 
-static void uhci_reset(int i)
+static int uhci_reset(int i)
 {
     HCI* h = &HC[i];
     int n, k;
     uint16_t io = h->io;
     PCI_WriteWord(h->bus, h->dev, h->func, UHCI_LEGSUP, 0x8F00);  /* legacy off, SMIs off, PIRQ off */
-    PCI_WriteWord(h->bus, h->dev, h->func, 0x04, (uint16_t)(PCI_ReadWord(h->bus, h->dev, h->func, 0x04) | 0x05));
+    PCI_WriteWord(h->bus, h->dev, h->func, 0x04, (uint16_t)(PCI_ReadWord(h->bus, h->dev, h->func, 0x04) | 0x405));
     outportw(io + U_INTR, 0);
     outportw(io + U_CMD, 0);
     for (n = 0; n < 20 && !(inportw(io + U_STS) & STS_HALT); ++n) wait_us(1000);
+    ustep(i, "global reset, reset");
     outportw(io + U_CMD, CMD_GRST); wait_us(20000); outportw(io + U_CMD, 0); wait_us(1000);
     outportw(io + U_CMD, CMD_HCRST);
     for (n = 0; n < 100 && (inportw(io + U_CMD) & CMD_HCRST); ++n) wait_us(100);
+    if (inportw(io + U_CMD) & CMD_HCRST) return hc_fail(i, "reset (HCRESET)");
     outportw(io + U_INTR, 0);
     outportw(io + U_STS, 0x3F);
     /* schedule, for good: frame list -> pipe QH 0 -> ... -> pipe QH 5 -> control QH. A pipe's QH has
@@ -696,6 +825,7 @@ static void uhci_reset(int i)
     for (k = 0; k < 1024; ++k) h->fl[k] = PHYS(PQ(i, 0)) | LP_Q;
     fl(h->fl, 4096); fl(h->ctl, 0x400);
     h->run = 0;                                   /* started by uhci_run() when a device needs it */
+    return 1;
 }
 
 /* UHCI on / off. Only controllers with something on them run (four ICH6 controllers all running from the
@@ -723,19 +853,12 @@ static void uhci_run(int i, int on)
     }
 }
 
-static void ohci_reset(int i)
+static int ohci_reset(int i)
 {
     HCI* h = &HC[i];
     uint32_t fi, rha, w;
     int n, p, k;
-    if (ord(i, O_CONTROL) & OC_IR)                            /* the BIOS's SMM code owns it */
-    {
-        /* as Linux does: enable the OwnershipChange interrupt first - some BIOSes only get their SMI from it */
-        owr(i, 0x10, (1UL << 30));
-        owr(i, O_CMDSTS, OS_OCR);
-        for (n = 0; n < 1000 && (ord(i, O_CONTROL) & OC_IR); ++n) wait_us(1000);
-        trace("OHCI %02x:%02x.%x: BIOS handoff %s ", h->bus, h->dev, h->func, (ord(i, O_CONTROL) & OC_IR) ? "FAILED" : "ok");
-    }
+    if (ord(i, O_CONTROL) & OC_IR) return hc_fail(i, "BIOS handoff");   /* hc_quiesce did the handoff */
     /* legacy keyboard emulation (HceControl, OHCI 1.0a appendix B): with the BIOS gone, an emulation left on
      * keeps catching ports 60h/64h and the PS/2 keyboard goes dead (P5PE-VM + NEC card, beta.57 USBTEST) */
     if (ord(i, 0) & 0x100)
@@ -748,8 +871,10 @@ static void ohci_reset(int i)
     if (fi < 11000 || fi > 13000) fi = 11999;
     owr(i, O_CONTROL, 0);
     wait_us(50000);
+    ustep(i, "reset, run, port power");
     owr(i, O_CMDSTS, OS_HCR);
     for (n = 0; n < 100 && (ord(i, O_CMDSTS) & OS_HCR); ++n) wait_us(10);
+    if (ord(i, O_CMDSTS) & OS_HCR) return hc_fail(i, "reset (HCR)");
     owr(i, O_FMINT, ((ord(i, O_FMINT) & 0x80000000UL) ^ 0x80000000UL) | (((fi - 210) * 6 / 7) << 16) | fi);
     owr(i, O_PERSTART, fi * 9 / 10);
     owr(i, O_LSTHRESH, 0x628);
@@ -788,6 +913,7 @@ static void ohci_reset(int i)
     if (w < 20) w = 20;
     if (w > 100) w = 100;
     wait_us(w * 1000);
+    return 1;
 }
 
 /* ---------------- xHCI rings */
@@ -3535,7 +3661,10 @@ int USBPAD_Init(uint64_t cps, int wait_ms, int flags, const char** msg)
     fl(base, (int)size);
     trace("mem %08lx, clflush %d\n", (unsigned long)PBase, ClLine);
 
-    /* xHCI first (it may take ports away from EHCI), then EHCI (hands ports to companions or keeps
+    /* phase 1: all of them from the BIOS, stopped, interrupts off (hc_quiesce) */
+    for (i = 0; i < HCn; ++i)
+        HC[i].skip = !hc_quiesce(i);
+    /* phase 2: xHCI first (it may take ports away from EHCI), then EHCI (hands ports to companions or keeps
      * them), then the UHCI / OHCI companions. Controllers that fail to come up are dropped. Every one
      * runs from here on, with its own schedule. */
     for (j = 0; j < 4; ++j)
@@ -3545,12 +3674,13 @@ int USBPAD_Init(uint64_t cps, int wait_ms, int flags, const char** msg)
         {
             int ok = 1;
             if (HC[i].type != order[j]) continue;
+            if (HC[i].skip) { HC[i].nports = 0; continue; }
             switch (HC[i].type)
             {
             case T_XHCI: ok = xhci_setup(i); if (ok) HC[i].idx = ++XhciN; break;
             case T_EHCI: ok = ehci_setup(i); if (ok) HC[i].idx = ++EhciN; break;
-            case T_UHCI: uhci_reset(i); HC[i].idx = ++UhciN; break;
-            default:     ohci_reset(i); HC[i].idx = ++OhciN; break;
+            case T_UHCI: ok = uhci_reset(i); if (ok) HC[i].idx = ++UhciN; break;
+            default:     ok = ohci_reset(i); if (ok) HC[i].idx = ++OhciN; break;
             }
             if (!ok) HC[i].nports = 0;                   /* not used */
             else ++usable;
@@ -3561,6 +3691,8 @@ int USBPAD_Init(uint64_t cps, int wait_ms, int flags, const char** msg)
         snprintf(m, sizeof(m), "no usable USB controller found");
         return 0;
     }
+    trace("[usb] controllers ready: %d in use, %d EHCI with its ports handed to companions, %d not used; looking at the ports\n",
+        usable, EhciGiven, HCn - usable - EhciGiven);
     wait_us(20000);
     strcpy(Desc, "nothing connected");
     S = S_SCAN; Cur = -1; NextScan = NextMon = NextHub = 0;

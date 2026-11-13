@@ -78,6 +78,9 @@ typedef void (*USBPAD_MouseFn)(int buttons, int dx, int dy, int dw);
  * and waits up to wait_ms for what is plugged in to be set up. cps = TSC cycles per second. Returns the number of
  * usable controllers (0 = nothing usable). Messages go to *msg (a static string). */
 int  USBPAD_Init(uint64_t cps, int wait_ms, int flags, const char** msg);
+/* beta.110: controllers USBPAD_Init leaves alone: "vvvv:dddd" and / or "bb:dd.f" (hex), separated by + , ; or blanks.
+ * NULL / "" = the USBSKIP environment variable (the tools). Set before USBPAD_Init; the string must stay. */
+void USBPAD_SetSkip(const char* list);
 void USBPAD_SetHid(USBPAD_KbdFn kb, USBPAD_MouseFn ms);
 void USBPAD_SetLeds(int leds);     /* keyboard LEDs: bit 0 num, 1 caps, 2 scroll (sent on the next full poll) */
 void USBPAD_Poll(void);
