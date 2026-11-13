@@ -88,6 +88,13 @@ static int mp3_buffers(int w, int h)
     return 1;
 }
 
+/* the music comes first: the frame / depth buffers are given back when a song needs the memory (3D must be off) */
+static int mp3_free_buffers(void)
+{
+    if (mp3_on || (!m3_fb && !m3_zb)) return 0;
+    free(m3_fb); free(m3_zb); m3_fb = NULL; m3_zb = NULL; mp3_have = 0;
+    return 1;
+}
 /* buffers and textures, made before the music starts (switching to 3D later then costs only the mode set) */
 static void mp3_prepare(void)
 {

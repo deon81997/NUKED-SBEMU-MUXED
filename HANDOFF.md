@@ -1,4 +1,13 @@
 
+## beta.103 (2026-11-13): MIDPLAY "out of memory" for songs on 8-12 MB PCs fixed
+- Cause: at start MIDPLAY prepared the 3D frame + depth buffers (640x480: 2.4 MB, more with DJGPP malloc rounding)
+  even in the text views; at 8 MB only ~0.8 MB DPMI memory was left, the 140 KB stress song (35570 events) failed.
+- Fix: mp3_prepare only when the 3D view is on at start; start_index: song "out of memory" -> to_text(),
+  mp3_free_buffers(), load again; the 3D view then comes back through the low-memory fallback (smaller mode).
+  ui_log records failed songs and "3D memory freed"; CRASH.TXT also shows DPMI free memory.
+- Tested 8 MB (QEMU and 86Box P2B-LS/ViRGE): text view plays (1.7 MB left); 3D view plays, 3D at 320x200.
+  ASan host test still clean. Zip: MIDPLAY, SBEMU, SC55MENU (version) swapped.
+
 ## beta.102 (2026-11-13, DOS session): USB keyboard/mouse bytes enter the 8042 at the END of the sound interrupt (vkbc.c, main.c)
 - Was "Known issue": P5PE-VM, Logitech Unifying 046d:c52b on the NEC card's OHCI ("ED rewrite per transfer" mode): MENU 3D GPF
   on F2/F3, MIDPLAY 3D "Stack Fault", both at harmless instructions; PS/2 keyboard fine.

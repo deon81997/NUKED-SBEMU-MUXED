@@ -2434,6 +2434,10 @@ static void crash_write(FILE* f, int sig)
     fprintf(f, "Look %d (%s), theme %d (%s), player %d (%s), style %d, frame %.0f ms%s\n",
             g_scene, mp3_scene_name[g_scene % 3], g_ctheme, mp3_theme_name[g_ctheme % 11], g_model, mp3_model_name[g_model % 4],
             tui_theme, mp3_frame_ms, mp3_lod ? ", voxel LOD" : "");
+#ifdef __DJGPP__
+    { __dpmi_free_mem_info fm; if (__dpmi_get_free_memory_information(&fm) == 0)
+        fprintf(f, "DPMI memory: largest free block %lu KB, free pages %lu KB\n", fm.largest_available_free_block_in_bytes >> 10, fm.total_number_of_free_pages * 4UL); }
+#endif
     fprintf(f, "Song: %s, %s, %lu of %lu s%s\n", g_cur >= 0 && g_cur < g_npl ? g_pl[g_cur].path : "-", P.loaded ? "loaded" : "none",
             (unsigned long)(P.loaded ? song_time() / 1000000ULL : 0), (unsigned long)(P.total / 1000000ULL), P.paused ? ", paused" : "");
     fprintf(f, "\nLast %d actions (seconds since start, oldest first):\n", UL_N);
@@ -2531,7 +2535,14 @@ static int start_index(int i)
         if (i >= g_npl) i = 0;
         g_cur = i;
         q_playing(i);
-        if (mp_start(g_pl[i].path, g_reset, err, sizeof err))
+        int ok = mp_start(g_pl[i].path, g_reset, err, sizeof err);
+        if (!ok && !strcmp(err, "out of memory"))
+        {   /* the music before the pictures: give back the 3D buffers and try again (3D comes back smaller if it fits) */
+            int was3d = mp3_on;
+            if (was3d) to_text();
+            if (mp3_free_buffers() || was3d) { ui_log("song %d: 3D memory freed", i); ok = mp_start(g_pl[i].path, g_reset, err, sizeof err); }
+        }
+        if (ok)
         {
             g_plays++;
             ui_log("song %d %.30s", i, base_of(g_pl[i].path));
@@ -2539,6 +2550,7 @@ static int start_index(int i)
             return 1;
         }
         msg("%s: %s", base_of(g_pl[i].path), err);
+        ui_log("song %d failed: %.24s", i, err);
         g_pl[i].have = 1; g_pl[i].si.ok = -1;
         i = g_shuf ? next_index(0) : i + 1;        /* a song that cannot be played: the next one in the same order */
         tries++;
@@ -2646,7 +2658,7 @@ int main(int argc, char** argv)
         if (!g_npl || want_browse) go_page(PG_FILES);
     }
     crash_install();
-    if (g_ui) { m3_vbe_probe(); mp3_prepare(); if (m3_vbest >= 0) mp3_make_panel("", 0, 0); screen_sync(); ui_frame(); }   /* the slow BIOS work (3D mode, first frame) before the music */
+    if (g_ui) { m3_vbe_probe(); if (want_3d()) mp3_prepare(); if (m3_vbest >= 0) mp3_make_panel("", 0, 0); screen_sync(); ui_frame(); }   /* the slow BIOS work (3D mode, first frame) before the music */
     if (g_npl)
     {
         if (start_index(g_cur >= 0 ? g_cur : g_shuf ? next_index(0) : 0) && seek_resume && g_last_pos > 2)   /* shuffle: a random first song */
