@@ -161,24 +161,24 @@ Stopped by the user mid-task. Tree builds; tests/m3host/menurun.sh and run.sh pa
   catcher writes CRASH.TXT). If it still crashes: CRASH.TXT / the HDPMI exception dump (CS:EIP, SS:ESP, error code) and the
   SBEMU log; next step would be an HDPMI32I with ?USE_HOST_MEM=0.
 
-## MIDPLAY sound recordings per ROM set x rate (2026-11-13, PAUSED by the user, unfinished)
-Goal (user): hear / check what every synth actually plays in QEMU, not only "0 bytes dropped".
-- testrig/midplay/notetest.sh new env: WAV=file records the sound card (QEMU's AC97 recorded ONLY SILENCE, so WAV switches
-  to `-device intel-hda -device hda-output`; SBEMU drives it fine), SND=QEMU sound device options, WARM=s / TAIL=s
-  silent songs before / after the test songs (in QEMU TCG the SC-55 starts up and renders late: without WARM the first
-  notes bunched up, without TAIL the end was cut off), SCREEN=1 reads SBEMU's start-up lines from VGA text memory
-  through the QEMU monitor -> $OUT/SCREEN.TXT ("MPU: Roland SC-55 emulation, ROM set mk1-v1.21, ROMs: ..." = proof of
-  which set was really loaded).
-- testrig/midplay/wavcheck.py [--metro N] NAME=WAV...: seconds of sound, level, peak, clipping, dropouts, clicks;
-  --metro: N beats 1.00 s +-30 ms apart. METRO.MID = 20 piano notes one second apart (made by hand in the session; the
-  zip's test-files/ has it). Verified: SC-55mkII with WARM=15 TAIL=20 -> 20/20 beats exactly 1.000 s apart.
-- KNOWN FALSE ALARM to fix next: "dropouts" also counts the silence BETWEEN metronome beats (CHECK on both finished runs).
-  Measure dropouts only in the BUSY.MID part (after the 20th beat), or record METRO and BUSY in separate runs.
-- Matrix (matrix2.sh in the zip: WARM=15 METRO.MID QSECS=21, BUSY.MID QSECS=15, TAIL=20, SCREEN=1, WAV, 2 runs in
-  parallel, ~110 s each, 75 jobs = jobs.txt): only mk1-v1.00 at 11025 and 22050 finished (ROM set confirmed on screen,
-  20/20 beats; 11025 gaps 0.950-1.050 = within one 50 ms block, check finer). Resume: ./runall2.sh (skip done jobs).
-- Then: run wavcheck over all, make an MP3 per synth at 44100 (ffmpeg) for the user to listen to.
-- Earlier (no recordings) matrix: all 75 jobs 0 bytes dropped (see beta.101 section).
+## MIDPLAY sound recordings per ROM set x rate (2026-11-13, done)
+- notetest.sh: WAV=file (QEMU HDA; AC97 records only silence), SND, WARM / TAIL (silent songs: in QEMU the SC-55 starts
+  up and renders late), SCREEN=1 (SBEMU's synth / ROM-set line from VGA text memory via the QEMU monitor). Test songs
+  testrig/midplay/METRO.MID (20 piano notes 1 s apart) and PAD.MID (string chord held 10 s), both on channel 1.
+- wavcheck.py [--metro N]: sound, level, peak, clipping, dropouts (= sound cut off loud -> nothing within 10 ms, before
+  the last loud part), clicks, beats (10 ms resolution, 0.5 s debounce, +-30 ms).
+- Matrix (75 runs, 2 QEMUs at once): every run 0 bytes dropped and the ROM set confirmed on screen. Findings:
+  1. SC-55ST (st-v1.01): a constant tone under everything. Upstream nuked-sc55-render (built in /tmp/nb, needs
+     librtmidi-dev libsdl2-dev) does the same at its native 66207 Hz: the tone is ~17 kHz / 32 kHz there (core / ROM).
+     SBEMU's LINEAR resampler (sc55/sc55engine.hpp) folds it to an AUDIBLE 170-600 Hz hum (pitch changes with /K).
+     => SBEMU needs an anti-alias low-pass before decimating (also helps every set's highs). NOT done.
+  2. MT-32 / CM-32L silent: test songs on channel 1 (MT-32 parts 2-9, rhythm 10). On channel 2 (METRO2/PAD2): 20/20
+     beats 0.99-1.01 s, no dropouts. Not a bug.
+  3. JV-880 silent: upstream renderer silent with METRO.MID too (JV-880 is not GM/GS). Not ours; untested further.
+  4. SC-55 family: beats 20/20 everywhere, jitter up to +-50 ms (SoundFont +-40, MT-32 +-10: probably /VSCAHEAD 50 ms
+     render blocks); 0-20 short gaps (10-20 ms silence) with 2 QEMUs, 1 when mk1-v1.20 /K11025 ran alone -> mostly QEMU
+     load, not decided for real PCs.
+- Listening MP3s (44100, +20 dB): sent to the user as recordings-beta101.zip (not in the repo).
 
 ## beta.101 (2026-11-13): MIDPLAY - MUS/HMP/XMI, transpose, A-B loop, sleep timer, Ctrl+F search
 User asked for: karaoke lyrics (DROPPED by the user mid-task - not needed), mute/solo, tempo + pitch, A-B loop,
