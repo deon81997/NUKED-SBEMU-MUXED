@@ -1094,7 +1094,7 @@ static void cfg_load(void)
         *v++ = 0; v[strcspn(v, "\r\n")] = 0; n = atoi(v);
         if (!strcmp(line, "VIEW")) g_view = n >= 0 && n <= 2 ? n : 0;
         else if (!strcmp(line, "SCENE3D")) g_scene = n >= 0 && n <= 2 ? n : 0;
-        else if (!strcmp(line, "THEME3D")) g_ctheme = n >= 0 && n <= 6 ? n : 0;
+        else if (!strcmp(line, "THEME3D")) g_ctheme = n >= 0 && n <= 10 ? n : 0;
         else if (!strcmp(line, "PLAYER3D")) g_model = n >= 0 && n <= 3 ? n : 0;
         else if (!strcmp(line, "REPEAT")) g_rep = n >= 0 && n <= 2 ? n : 0;
         else if (!strcmp(line, "SHUFFLE")) g_shuf = n >= 0 && n <= 2 ? n : 0;
@@ -2024,7 +2024,7 @@ static void key_player(int k)
         g_view = (g_view + 1) % 3; screen_sync(); cfg_save(); break;
     case 'b': case 'B': go_page(PG_FILES); break;
     case 'v': case 'V': g_scene = (g_scene + 1) % 3; mp3_force = 1; cfg_save(); msg("3D look: %s", mp3_scene_name[g_scene]); break;
-    case 'c': case 'C': g_ctheme = (g_ctheme + 1) % 7; mp3_force = 1; cfg_save(); msg("3D colours: %s", mp3_theme_name[g_ctheme]); break;
+    case 'c': case 'C': g_ctheme = (g_ctheme + 1) % 11; mp3_force = 1; cfg_save(); msg("3D colours: %s", mp3_theme_name[g_ctheme]); break;
     case 'j': case 'J': g_model = (g_model + 1) % 4; mp3_force = 1; cfg_save(); msg("3D player: %s", mp3_model_name[g_model]); break;
     case K_F4: if (mp3_on) { m3_half = !m3_half; m3_rw = m3_half ? M3W / 2 : M3W; m3_rh = m3_half ? M3H / 2 : M3H; mp3_slow = 0; return; } break;
     case K_MOUSE:
