@@ -161,6 +161,19 @@ Stopped by the user mid-task. Tree builds; tests/m3host/menurun.sh and run.sh pa
   catcher writes CRASH.TXT). If it still crashes: CRASH.TXT / the HDPMI exception dump (CS:EIP, SS:ESP, error code) and the
   SBEMU log; next step would be an HDPMI32I with ?USE_HOST_MEM=0.
 
+## README screenshots + art (2026-11-13, PARTLY DONE - user paused at usage limit)
+- Retaken from beta.109 in QEMU (rig: /home/claude/shots: c/ = pack installed like SETUP + ROMs + test MIDI/MUS/HMP/XMI/KAR
+  + CD images; start.sh = QEMU pentium3, AC97, pci-ohci + testrig/fakepad.py live pad; shot.py = monitor sendkey/screendump.
+  NOTE: SeaBIOS doubles grey arrow keys): joytest, main-menu (Sunset), menu-3d-panels/carousel/module, settings,
+  settings-3d, automatic-setup, midplay-channels (key+2, A-B, sleep shown)/panel/playlist/files/options/3d/3d-looks.
+- STILL OLD: cd-images-groovy/classic/midnight, cd-images-3d, cd-files, gametest + gametest-3d, sbdiag, timetest,
+  usbdrv (ok, 11-12), win98-settings.png + w98 shots (need the Win98 VM), padkeys game shots (fine).
+- All version-stamped tools in the beta.109 zip rebuilt (same source, now say beta.109; SBSET also gets the low-pass).
+  SC55WAV/SC55LOG not swapped. sc55synth.o's PGO profile is stale (core profiles still used).
+- TODO from the user: a section listing everything brand new (now "brand new" only links to What's NEW), and new
+  90s art (make90s.py icons) for each new feature: USB MIDI row reuses icon-sc55; game music, A-B/key/sleep, low-pass,
+  test bench have no art yet. Repo About description/topics: user pastes them (proxy refuses settings writes).
+
 ## beta.109 (2026-11-13): SC-55 anti-alias low-pass (/VSCLPF), offline renderer, ST "hum" explained
 - sc55/sc55engine.hpp: 3 biquads (6th order Butterworth, fc = 0.42 x card rate) on the native frames before the linear
   resampler, only when the card rate < native; integer DF1, Q28 coefficients, 8 extra fraction bits (no x87 denormal
