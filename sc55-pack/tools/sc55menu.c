@@ -25,6 +25,8 @@
 #include "safewr.h"
 #include "mpuport.h"
 #include "crit24.h"
+#include <stdarg.h>
+#include <time.h>
 
 static int MPU = 0x330;          /* the MPU-401 port from the saved settings (/P) */
 #define NGAMES 4
@@ -55,6 +57,20 @@ typedef struct {
 } ITEM;
 static ITEM g_it[80];
 static int g_n;
+
+/* the last 50 things the user did (keys, menus, 3D modes, what was run): written to CRASH.TXT if the menu crashes */
+#define UL_N 50
+static char g_ulog[UL_N][48]; static unsigned g_ulog_n;
+static int g_in3d;              /* the 3D menu is on the screen */
+static int g_win;               /* running in a Windows DOS box (INT 2Fh AX=1600h) */
+static void ui_log(const char* fmt, ...)
+{
+    char* d = g_ulog[g_ulog_n++ % UL_N]; int k;
+    va_list ap; va_start(ap, fmt);
+    k = snprintf(d, 12, "%7.1f ", (double)uclock() / UCLOCKS_PER_SEC);
+    if (k < 0 || k > 11) k = 0;
+    vsnprintf(d + k, sizeof g_ulog[0] - (size_t)k, fmt, ap); va_end(ap);
+}
 
 /* ---------------------------------------------------------------- helpers */
 static int sbemu_present(void)
@@ -510,6 +526,18 @@ static void draw_status(void)
 
 static int g_itop;                    /* first item shown (the list scrolls past 6 items) */
 static int g_reveal = 99;             /* items shown so far after a category change (animation) */
+/* the key bar; a click on one of its keys is that key (keybar_key) */
+static const char g_keybar[] = "Enter F1 help F2 saved F3 style F4 screen F5 MIDI F6 anim F7 font F8 3D Esc";
+static int keybar_key(const char* bar, int x0, int mx)
+{   /* the word under column mx (bar drawn from column x0): "Enter", "Esc" or "Fn" with the word after it */
+    int i = mx - x0, s, len = (int)strlen(bar);
+    if (i < 0 || i >= len) return 0;
+    for (s = i; s > 0 && !(bar[s - 1] == ' ' && (bar[s] == 'F' || bar[s] == 'E')); s--) ;
+    if (bar[s] == 'F' && isdigit((unsigned char)bar[s + 1])) return 0x13A + (bar[s + 1] - '0');
+    if (!strncmp(bar + s, "Enter", 5)) return K_ENTER;
+    if (!strncmp(bar + s, "Esc", 3)) return K_ESC;
+    return 0;
+}
 static void draw(int cat, int sel)
 {
     int idx[80], n = cat_items(cat, idx), i, y;
@@ -587,7 +615,7 @@ static void draw(int cat, int sel)
         tui_printf(60, 24, (BG_DESK << 4) | 0x0B, "%s \xFA %dx%d", tui_theme_name[tui_theme], tui_cols, tui_rows);
     }
     tui_fill(1, 25, 80, 1, 0x30, ' ');
-    tui_put(2, 25, 0x30, "\x18\x19\x1B\x1A Enter F1 help F2 saved F3 style F4 screen F5 MIDI F6 anim F7 font Esc");
+    tui_put(2, 25, 0x30, g_keybar);
 }
 
 static int g_cat, g_sel;
@@ -664,6 +692,13 @@ static int pick_file(char* out, size_t sz, int cd)
             tui_put(12, 22, 0x13, cd ? "Enter open/choose  Bksp up  Tab drive  G home  N none  Esc"
                                      : "Enter open/choose  Bksp up  Tab drive  T type path  Esc");
             c = tui_key();
+            if (c == K_RCLICK) c = K_ESC;                                     /* right click: back */
+            if (c == K_MOUSE)
+            {   /* click a name to choose it, the chosen one again to open / take it */
+                if (!tui_hit(12, 6, 56, 15) || top + tui_my - 6 >= n) continue;
+                if (top + tui_my - 6 != sel) { sel = top + tui_my - 6; continue; }
+                c = K_ENTER;
+            }
             if (c == K_ESC) goto done;
             if (c == K_UP && sel > 0) sel--;
             else if (c == K_DOWN && sel + 1 < n) sel++;
@@ -765,6 +800,22 @@ static void game_editor(void)
         tui_put(2, 25, 0x30, fld < 0 ? "\x18\x19 choose  Enter edit / add  Del remove  Esc save and back"
                                      : "\x18\x19 field  Enter change it  Esc back to the list");
         c = tui_key();
+        if (c == K_RCLICK) c = K_ESC;                                         /* right click: back */
+        if (c == K_MOUSE)
+        {   /* a game in the list, or a field of the chosen game; clicking the chosen one again = Enter */
+            int row = tui_my - 9;
+            c = 0;
+            if (tui_hit(3, 9, 26, 14) && row <= g_ngp && row < 14)
+            {
+                if (row == sel && fld < 0) c = K_ENTER; else { sel = row; fld = -1; }
+            }
+            else if (g && tui_hit(33, 9, 45, 10))
+            {
+                row = (tui_my - 9) / 2;
+                if (row == fld) c = K_ENTER; else fld = row;
+            }
+            if (!c) continue;
+        }
         if (fld < 0)
         {
             if (c == K_ESC) break;
@@ -830,10 +881,10 @@ static void help(void)
         "F7               letters: Terminus, Terminus bold or the VGA font",
         "F4               display mode: 80x25 ... 80x60, VESA modes",
         "F5               MIDI player (MIDPLAY) from anywhere in the menu",
-        "F8               3D menu (F8 there comes back here; F3 there = 3D style,",
-        "                 F6 = colours, F4 = full / half resolution)",
+        "F8               3D menu (F8 there comes back here; F1 there: its keys)",
         "Esc              back to DOS (type MENU to come back)",
-        "",
+        "Mouse            click a menu or item (again: run it), a key below,",
+        "                 wheel = up/down, right click = back",
         "Nothing runs by itself: the menu writes your choice to MENUGO.BAT,",
         "exits, and MENU.BAT runs it from plain DOS, then shows the menu again.",
         "Grey items need SBEMU loaded (or not loaded, for Start).",
@@ -898,6 +949,7 @@ static int load_sel(void)
 /* MENUGO.BAT: what MENU.BAT runs after the menu exits */
 static int write_go(const ITEM* it, int saved_only)
 {
+    ui_log("run: %.30s%s", it->label, saved_only ? " (F2)" : "");
     char p[300], tmp[310], opts[260] = ""; FILE* f; const char* s;
     const GAMEP* g = it->kind == IT_GAME && it->gp >= 0 && it->gp < g_ngp ? &g_gp[it->gp] : NULL;
     int profile;
@@ -979,6 +1031,89 @@ static int jump_letter(int sel, int c)
 
 #include "menu3d.h"
 
+/* ---- crash catcher: a CPU exception (or abort) restores the text screen and writes CRASH.TXT next to SC55MENU.EXE:
+ * the signal, the CPU registers, the screen (text / 3D mode, style, look, colours), the item and the last 50 actions.
+ * As MIDPLAY's (beta.100). */
+#include <signal.h>
+#ifdef __DJGPP__
+#include <setjmp.h>
+#include <sys/exceptn.h>
+#endif
+static volatile int g_crashing;
+static const char* sig_name(int sig)
+{
+    switch (sig)
+    {
+    case SIGSEGV: return "SIGSEGV (page fault, general protection or stack fault)";
+    case SIGFPE: return "SIGFPE (divide error or FPU exception)";
+    case SIGILL: return "SIGILL (invalid opcode)";
+    case SIGABRT: return "SIGABRT (abort)";
+#ifdef SIGNOFP
+    case SIGNOFP: return "SIGNOFP (no FPU)";
+#endif
+    default: return "?";
+    }
+}
+static void crash_write(FILE* f, int sig)
+{
+    unsigned i, n;
+    fprintf(f, "SC55MENU %s crashed: signal %d = %s\n", MENU_VER, sig, sig_name(sig));
+#ifdef __DJGPP__
+    if (sig != SIGABRT && __djgpp_exception_state_ptr)
+    {
+        const struct __jmp_buf* j = &(*__djgpp_exception_state_ptr)[0];
+        static const char* const exc[] = { "divide error", "debug", "NMI", "breakpoint", "overflow", "bound", "invalid opcode",
+            "no FPU", "double fault", "FPU overrun", "invalid TSS", "segment not present", "stack fault", "general protection",
+            "page fault", "?", "FPU error", "alignment" };
+        unsigned e = (unsigned)j->__signum;
+        fprintf(f, "CPU exception %02Xh (%s)\n", e, e < sizeof exc / sizeof exc[0] ? exc[e] : "hardware interrupt / other");
+        fprintf(f, "EIP=%08lX EFLAGS=%08lX CS=%04X DS=%04X ES=%04X FS=%04X GS=%04X SS=%04X\n",
+                (unsigned long)j->__eip, (unsigned long)j->__eflags, j->__cs, j->__ds, j->__es, j->__fs, j->__gs, j->__ss);
+        fprintf(f, "EAX=%08lX EBX=%08lX ECX=%08lX EDX=%08lX\nESI=%08lX EDI=%08lX EBP=%08lX ESP=%08lX\n",
+                (unsigned long)j->__eax, (unsigned long)j->__ebx, (unsigned long)j->__ecx, (unsigned long)j->__edx,
+                (unsigned long)j->__esi, (unsigned long)j->__edi, (unsigned long)j->__ebp, (unsigned long)j->__esp);
+        fprintf(f, "(EIP: rebuild this SC55MENU.EXE without -s and look it up with nm / addr2line)\n");
+    }
+#endif
+    fprintf(f, "Screen: %s, text style %d, display %dx%d%s\n", g_in3d ? "3D menu" : "text menu", tui_theme, tui_cols, tui_rows, g_win ? ", Windows DOS box" : "");
+    fprintf(f, "3D mode: %dx%d %d bit (VESA mode %Xh, %s), drawn %dx%d%s, refresh %d Hz set / %.1f seen, VBE %d\n",
+            M3W, M3H, m3_bpp, m3_mode, m3_lfb ? "linear" : "banked", m3_rw, m3_rh, m3_half ? " (half)" : "", m3_refresh, m3_refresh_seen, m3_vbever);
+    fprintf(f, "3D chosen: %dx%d %d bit (0 = auto), last good %dx%d %d bit, buffers %d pixels, overlay %d\n",
+            m3_want_w, m3_want_h, m3_want_b, m3_ok_w, m3_ok_h, m3_ok_b, m3_have, m3_over);
+    fprintf(f, "Style %d (%s), look %d (%s), colours %d (%s), quality %d, frame %.0f ms%s\n", m3_style, m3_stylename[m3_style % M3_STYLES],
+            m3_look, m3_lookname[m3_look % 3], m3_ctheme, m3_theme_names[m3_ctheme % 11], m3_quality, m3_frame_ms, m3_lod ? ", voxel LOD" : "");
+    fprintf(f, "Menu %d, item %d of %d: %s\n", g_cat, g_sel, g_n, g_sel >= 0 && g_sel < g_n ? g_it[g_sel].label : "-");
+#ifdef __DJGPP__
+    { __dpmi_free_mem_info fm; if (__dpmi_get_free_memory_information(&fm) == 0)
+        fprintf(f, "DPMI memory: largest free block %lu KB, free pages %lu KB\n", fm.largest_available_free_block_in_bytes >> 10, fm.total_number_of_free_pages * 4UL); }
+#endif
+    fprintf(f, "\nLast %d actions (seconds since start, oldest first):\n", UL_N);
+    n = g_ulog_n < UL_N ? g_ulog_n : UL_N;
+    for (i = g_ulog_n - n; i != g_ulog_n; i++) fprintf(f, "  %s\n", g_ulog[i % UL_N]);
+}
+static void crash_handler(int sig)
+{
+    char path[300]; FILE* f; __dpmi_regs r;
+    if (g_crashing) _exit(3);
+    g_crashing = 1;
+    m3_hook = NULL; tui_anim = NULL;
+    memset(&r, 0, sizeof r); r.x.ax = 0x0003; __dpmi_int(0x10, &r);          /* text mode 80x25 (also the default font) */
+    snprintf(path, sizeof path, "%s\\CRASH.TXT", g_home[0] ? g_home : ".");
+    f = fopen(path, "w");
+    if (f) { crash_write(f, sig); fclose(f); }
+    crash_write(stdout, sig);
+    printf("\nThe menu crashed. %s %s - please send it. Type MENU to start it again.\n", f ? "Written to" : "Could not write", path);
+    fflush(stdout);
+    _exit(3);
+}
+static void crash_install(void)
+{
+    signal(SIGSEGV, crash_handler); signal(SIGFPE, crash_handler); signal(SIGILL, crash_handler); signal(SIGABRT, crash_handler);
+#ifdef SIGNOFP
+    signal(SIGNOFP, crash_handler);
+#endif
+}
+
 int main(int argc, char** argv)
 {
     int c, firstrun, m3_start_r = 1;
@@ -995,6 +1130,13 @@ int main(int argc, char** argv)
     { char p[300]; home_path(p, "MENUGO.BAT"); remove(p); }
 
     putenv("LFN=n");                       /* 8.3 names: the menu writes them into batch files for plain DOS */
+    crash_install();
+    {   /* a Windows DOS box: the 3D menu starts in VGA 320x200 there (a window can show it), the clock is measured longer */
+        __dpmi_regs r; memset(&r, 0, sizeof r); r.x.ax = 0x1600; __dpmi_int(0x2F, &r);
+        g_win = r.h.al != 0 && r.h.al != 0x80;
+        m3_win = g_win; if (g_win) m3_time_ticks = 18;
+    }
+    ui_log("start %s%s", MENU_VER, g_win ? " (Windows)" : "");
     read_sbopts();
     { const char* pv = opt_val("/P", "330"); long v = strtol(pv, NULL, 16); if (v >= 0x200 && v <= 0x3FF) MPU = (int)v; }
     g_running = sbemu_present();
@@ -1010,7 +1152,7 @@ int main(int argc, char** argv)
     {
         int r = m3_main();
         if (r == 0) return 0;
-        if (r == 2) { char p[300]; home_path(p, "MENU3D.CFG"); remove(p); }
+        if (r == 2) { m3_on = 0; m3_cfg_save(); }
         m3_start_r = r;
     }
     tui_theme_load(g_home);
@@ -1036,7 +1178,7 @@ int main(int argc, char** argv)
                       "Reset them to the plain 80x25 screen for good?"))
         { char p[300]; home_path(p, "THEME.CFG"); remove(p); tui_theme_save(g_home); }
     }
-    if (m3_start_r == 2) tui_message("3D menu", "This PC's video BIOS has no 640x480 VESA mode with 15/16/24/32-bit colour, so the 3D menu cannot be shown.");
+    if (m3_start_r == 2) tui_message("3D menu", "No graphics mode could be set for the 3D menu (not even VGA 320x200), or there is not enough memory for it.");
     if (g_goerr) { g_goerr = 0; tui_message("Error", "Cannot write MENUGO.BAT in the SC55 folder (disk full or write-protected?)."); }
     v = getenv("MENUVIEW");
     if (v && *v) view(v);
@@ -1065,8 +1207,14 @@ int main(int argc, char** argv)
             }
             if (tui_hit(78, 8, 1, 1)) g_sel = move_in(g_cat, g_sel, -1);
             if (tui_hit(78, 15, 1, 1)) g_sel = move_in(g_cat, g_sel, 1);
-            if (c != K_ENTER) continue;
+            if (tui_my == 25) c = keybar_key(g_keybar, 2, tui_mx);           /* a key in the key bar */
+            if (!c || c == K_MOUSE) continue;
         }
+        if (c == K_RCLICK) continue;                                          /* right click: nothing to go back to here */
+        ui_log("key %03X cat %d sel %d", c, g_cat, g_sel);
+#ifdef CRASHKEY
+        if (c == '!') *(volatile int*)0xFFFFFFF0 = 1;                       /* test build only: a GPF for the crash catcher */
+#endif
         if (c == K_ESC) break;
         if (c == K_UP) g_sel = move_in(g_cat, g_sel, -1);
         else if (c == K_DOWN) g_sel = move_in(g_cat, g_sel, 1);
@@ -1078,12 +1226,13 @@ int main(int argc, char** argv)
         else if (c == 0x142 || (c == K_ENTER && g_it[g_sel].kind == IT_M3D))     /* F8: the 3D menu */
         {
             int r;
-            save_sel(&g_it[g_sel]); m3_cfg_save(); tui_done();
+            save_sel(&g_it[g_sel]); m3_on = 1; m3_cfg_save(); tui_done();
+            ui_log("3D on");
             r = m3_main();
             if (r == 0) return 0;
-            if (r == 2) { char p[300]; home_path(p, "MENU3D.CFG"); remove(p); }
+            if (r == 2) { m3_on = 0; m3_cfg_save(); }
             tui_init();
-            if (r == 2) tui_message("3D menu", "This PC's video BIOS has no 640x480 VESA mode with 15/16/24/32-bit colour, so the 3D menu cannot be shown.");
+            if (r == 2) tui_message("3D menu", "No graphics mode could be set for the 3D menu (not even VGA 320x200), or there is not enough memory for it.");
             if (g_goerr) { g_goerr = 0; tui_message("Error", "Cannot write MENUGO.BAT in the SC55 folder (disk full or write-protected?)."); }
             continue;
         }

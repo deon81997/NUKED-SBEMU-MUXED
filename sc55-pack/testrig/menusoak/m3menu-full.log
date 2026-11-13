@@ -1,0 +1,40 @@
+ 640x350   8 bit  frames 3314
+ 640x400  15 bit  frames 3586
+ 640x480   8 bit  frames 3854
+ 640x480  15 bit  frames 4122
+ 640x480  16 bit  frames 4394
+ 640x480  24 bit  frames 4662
+ 640x480  32 bit  frames 4930
+ 720x480  24 bit  frames 5202
+ 800x600   8 bit  frames 5471
+ 800x600  15 bit  frames 5740
+ 800x600  16 bit  frames 6013
+ 800x600  24 bit  frames 6282
+ 800x600  32 bit  frames 6551
+ 848x480   8 bit  frames 6824
+1024x600  15 bit  frames 7094
+1024x768  16 bit  frames 7364
+1152x864  24 bit  frames 7638
+1280x720  32 bit  frames 7908
+1280x800   8 bit  frames 8178
+1280x960  15 bit  frames 8452
+1280x1024 16 bit  frames 8722
+1360x768  24 bit  frames 8992
+1366x768  32 bit  frames 9266
+1400x1050  8 bit  frames 9536
+1440x900  15 bit  frames 9806
+1599x1199 16 bit  frames 10080
+1600x900  24 bit  frames 10350
+1600x1200  8 bit  frames 10620
+1600x1200 15 bit  frames 10894
+1600x1200 16 bit  frames 11164
+1600x1200 24 bit  frames 11434
+1600x1200 32 bit  frames 11708
+OOM limit 16384 KB: fell back to 1600x1200
+OOM limit 8192 KB: fell back to 1600x1200
+OOM limit 4096 KB: fell back to 1280x720
+OOM limit 2048 KB: fell back to 800x600
+OOM limit 600 KB: fell back to 320x200
+OOM limit 100 KB: text menu, 0x0
+15879 frames, 0 failures
+EXIT 0

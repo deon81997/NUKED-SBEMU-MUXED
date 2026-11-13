@@ -352,13 +352,14 @@ static void m3_present(void)
 
 /* ------------------------------------------------------------------------------------------- time */
 static unsigned long long m3_rdtsc(void) { unsigned long long t; asm volatile("rdtsc" : "=A"(t)); return t; }
+static int m3_time_ticks = 3;      /* BIOS ticks to measure the TSC over; a Windows DOS box needs 18 (late, bursty ticks) */
 static void m3_time_init(void)
 {
     unsigned long t = m3_ticks(); unsigned long long a;
     while (m3_ticks() == t) ;
     t = m3_ticks(); a = m3_rdtsc();
-    while (m3_ticks() < t + 3) ;
-    m3_tsc_us = (double)(m3_rdtsc() - a) / (3 * 54925.4);
+    while (m3_ticks() < t + (unsigned long)m3_time_ticks) ;
+    m3_tsc_us = (double)(m3_rdtsc() - a) / (m3_time_ticks * 54925.4);
     if (m3_tsc_us < 1) m3_tsc_us = 1;
     m3_t0 = m3_rdtsc();
 }

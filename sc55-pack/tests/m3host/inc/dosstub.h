@@ -74,6 +74,9 @@ static inline void clrscr(void) {}
 static inline void setdisk(int d) { (void)d; }
 static inline int getdisk(void) { return 2; }
 static inline void delay(unsigned ms) { (void)ms; }
+#ifndef D_OK
+#define D_OK F_OK
+#endif
 #define FA_RDONLY 1
 #define FA_HIDDEN 2
 #define FA_SYSTEM 4
