@@ -510,6 +510,10 @@ static M3P m3_xf(M3V w, float u, float v, float l)
 
 typedef struct { float sx, sy, iz, uz, vz, lz; } M3S;
 static int m3_texwrap;                     /* the texture repeats (the floor) instead of being clamped */
+/* float -> int clamped to +-lim (also NaN): a plain (int) of a value out of range is undefined in C (x86: 80000000h, and
+   the 16.16 steps made from it then overflow). Points close to the camera give such values. */
+static inline int m3_fi(float v, float lim) { if (!(v > -lim)) return -(int)lim; if (v > lim) return (int)lim; return (int)v; }
+#define M3_FXL 536870912.0f        /* 2^29: 16.16 values and their differences stay inside an int */
 static void m3_tri_raster(const M3S* a0, const M3S* b0, const M3S* c0, const M3SURF* tex, uint32_t col, int alpha, int zwrite)
 {
     const M3S *a = a0, *b = b0, *c = c0, *t;
@@ -518,7 +522,7 @@ static void m3_tri_raster(const M3S* a0, const M3S* b0, const M3S* c0, const M3S
     if (b->sy > c->sy) { t = b; b = c; c = t; }
     if (a->sy > b->sy) { t = a; a = b; b = t; }
     if (c->sy - a->sy < 1e-4f) return;
-    ys = (int)ceilf(a->sy); ye = (int)ceilf(c->sy);
+    ys = m3_fi(ceilf(a->sy), 65536.0f); ye = m3_fi(ceilf(c->sy), 65536.0f);
     if (ys < 0) ys = 0; if (ye > m3_rh) ye = m3_rh;
     for (y = ys; y < ye; y++)
     {
@@ -534,7 +538,7 @@ static void m3_tri_raster(const M3S* a0, const M3S* b0, const M3S* c0, const M3S
         if (L.sx > R.sx) { M3S tt = L; L = R; R = tt; }
         dx = R.sx - L.sx; if (dx < 1e-6f) continue;
         diz = (R.iz - L.iz) / dx; duz = (R.uz - L.uz) / dx; dvz = (R.vz - L.vz) / dx; dlz = (R.lz - L.lz) / dx;
-        xs = (int)ceilf(L.sx); xe = (int)ceilf(R.sx);
+        xs = m3_fi(ceilf(L.sx), 65536.0f); xe = m3_fi(ceilf(R.sx), 65536.0f);
         if (xs < 0) xs = 0; if (xe > m3_rw) xe = m3_rw;
         { float pre = (float)xs - L.sx; iz = L.iz + diz * pre; uz = L.uz + duz * pre; vz = L.vz + dvz * pre; lz = L.lz + dlz * pre; }
         /* perspective-correct every 16 pixels, linear in between: one divide per 16 pixels, and the pixels
@@ -548,10 +552,10 @@ static void m3_tri_raster(const M3S* a0, const M3S* b0, const M3S* c0, const M3S
                 int n = xe - x > 16 ? 16 : xe - x, j;
                 float z0 = 1.0f / iz, iz1 = iz + diz * n, z1 = 1.0f / iz1;
                 float f0 = (z0 - m3_fog0) * fk, f1 = (z1 - m3_fog0) * fk;
-                int U = (int)(uz * z0 * tw * 65536.0f), V = (int)(vz * z0 * th * 65536.0f), Lq = (int)(lz * z0 * 256.0f * 65536.0f);
-                int U1 = (int)((uz + duz * n) * z1 * tw * 65536.0f), V1 = (int)((vz + dvz * n) * z1 * th * 65536.0f);
-                int L1 = (int)((lz + dlz * n) * z1 * 256.0f * 65536.0f);
-                int F = (int)(f0 * 65536.0f), F1 = (int)(f1 * 65536.0f);
+                int U = m3_fi(uz * z0 * tw * 65536.0f, M3_FXL), V = m3_fi(vz * z0 * th * 65536.0f, M3_FXL), Lq = m3_fi(lz * z0 * 256.0f * 65536.0f, M3_FXL);
+                int U1 = m3_fi((uz + duz * n) * z1 * tw * 65536.0f, M3_FXL), V1 = m3_fi((vz + dvz * n) * z1 * th * 65536.0f, M3_FXL);
+                int L1 = m3_fi((lz + dlz * n) * z1 * 256.0f * 65536.0f, M3_FXL);
+                int F = m3_fi(f0 * 65536.0f, M3_FXL), F1 = m3_fi(f1 * 65536.0f, M3_FXL);
                 int dU = (U1 - U) / n, dV = (V1 - V) / n, dL = (L1 - Lq) / n, dF = (F1 - F) / n;
                 float* zp = m3_zb + y * M3W + x;
                 uint32_t* fp = m3_fb + y * M3W + x;
@@ -691,14 +695,15 @@ static uint32_t m3_prgb(const unsigned char (*pal)[3], int i) { return (uint32_t
 static void m3_make_floor(void)
 {
     int x, y;
-    if (!m3_floor.p) m3_floor = m3_surf(128, 128);
+    static uint32_t px[128 * 128], px2[128 * 128];            /* static: never out of memory */
+    if (!m3_floor.p) { m3_floor.w = m3_floor.h = 128; m3_floor.p = px; }
+    if (!m3_floor_solid.p) { m3_floor_solid.w = m3_floor_solid.h = 128; m3_floor_solid.p = px2; }
     for (y = 0; y < 128; y++) for (x = 0; x < 128; x++)
     {
         int l = (x % 32 == 0 || y % 32 == 0) ? 1 : 0, l2 = (x % 32 == 1 || y % 32 == 1 || x % 32 == 31 || y % 32 == 31);
         uint32_t t = (x / 32 + y / 32) & 1 ? m3_tile0 : m3_tile1;
         m3_floor.p[y * 128 + x] = l ? m3_gridc : l2 ? m3_blend(t, m3_gridc, 70) : t;   /* lines with a soft glow edge */
     }
-    if (!m3_floor_solid.p) m3_floor_solid = m3_surf(128, 128);
     for (x = 0; x < 128 * 128; x++) m3_floor_solid.p[x] = m3_blend(m3_floorbg, m3_floor.p[x], 160);   /* over the sky's lower part */
 }
 static void m3_theme_from_pal(const unsigned char (*pal)[3])

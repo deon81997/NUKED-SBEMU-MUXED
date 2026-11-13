@@ -1010,6 +1010,18 @@ static void msg(const char* fmt, ...)
     g_msg_until = now_us() + 3000000;
 }
 
+/* the last 50 things the user did (keys, pages, 3D modes, songs): written to CRASH.TXT if MIDPLAY crashes */
+#define UL_N 50
+static char g_ulog[UL_N][48]; static unsigned g_ulog_n;
+static void ui_log(const char* fmt, ...)
+{
+    char* d = g_ulog[g_ulog_n++ % UL_N]; int k;
+    va_list ap; va_start(ap, fmt);
+    k = snprintf(d, 12, "%7.1f ", (double)(now_us() / 100000ULL) / 10.0);
+    if (k < 0 || k > 11) k = 0;
+    vsnprintf(d + k, sizeof g_ulog[0] - (size_t)k, fmt, ap); va_end(ap);
+}
+
 /* every MIDI file in dir, sorted; returns how many were added */
 static int scan_dir(const char* dir)
 {
@@ -1922,6 +1934,8 @@ static void to_text(void)
 }
 static void screen_sync(void)
 {
+    if (want_3d() && !mp3_on) ui_log("3D on: want %dx%d %d", mp3_want_w, mp3_want_h, mp3_want_b);
+    else if (!want_3d() && mp3_on) ui_log("3D off");
     if (want_3d()) { if (!mp3_on && !mp3_enter()) { g_view = 0; msg("No 3D screen mode worked here (not even VGA 320x200): the text views stay."); } }
     else to_text();
 }
@@ -2034,8 +2048,96 @@ static void key_player(int k)
     default: break;
     }
 }
+/* ---- crash catcher: a CPU exception (or abort) restores the text screen and writes CRASH.TXT next to MIDPLAY.EXE:
+ * the signal, the CPU registers, the screen mode, the 3D look/theme/player and the last 50 UI actions. */
+#include <signal.h>
+#include <setjmp.h>
+#ifdef __DJGPP__
+#include <sys/exceptn.h>
+#endif
+static volatile int g_crashing;
+static const char* sig_name(int sig)
+{
+    switch (sig)
+    {
+    case SIGSEGV: return "SIGSEGV (page fault, general protection or stack fault)";
+    case SIGFPE: return "SIGFPE (divide error or FPU exception)";
+    case SIGILL: return "SIGILL (invalid opcode)";
+    case SIGABRT: return "SIGABRT (abort)";
+#ifdef SIGNOFP
+    case SIGNOFP: return "SIGNOFP (no FPU)";
+#endif
+#ifdef SIGTRAP
+    case SIGTRAP: return "SIGTRAP (debug exception)";
+#endif
+    default: return "?";
+    }
+}
+static void crash_write(FILE* f, int sig)
+{
+    unsigned i, n;
+    fprintf(f, "MIDPLAY crashed: signal %d = %s\n", sig, sig_name(sig));
+#ifdef __DJGPP__
+    if (sig != SIGABRT && __djgpp_exception_state_ptr)
+    {
+        const struct __jmp_buf* j = &(*__djgpp_exception_state_ptr)[0];
+        static const char* const exc[] = { "divide error", "debug", "NMI", "breakpoint", "overflow", "bound", "invalid opcode",
+            "no FPU", "double fault", "FPU overrun", "invalid TSS", "segment not present", "stack fault", "general protection",
+            "page fault", "?", "FPU error", "alignment" };
+        unsigned e = (unsigned)j->__signum;
+        fprintf(f, "CPU exception %02Xh (%s)\n", e, e < sizeof exc / sizeof exc[0] ? exc[e] : "hardware interrupt / other");
+        fprintf(f, "EIP=%08lX EFLAGS=%08lX CS=%04X DS=%04X ES=%04X FS=%04X GS=%04X SS=%04X\n",
+                (unsigned long)j->__eip, (unsigned long)j->__eflags, j->__cs, j->__ds, j->__es, j->__fs, j->__gs, j->__ss);
+        fprintf(f, "EAX=%08lX EBX=%08lX ECX=%08lX EDX=%08lX\nESI=%08lX EDI=%08lX EBP=%08lX ESP=%08lX\n",
+                (unsigned long)j->__eax, (unsigned long)j->__ebx, (unsigned long)j->__ecx, (unsigned long)j->__edx,
+                (unsigned long)j->__esi, (unsigned long)j->__edi, (unsigned long)j->__ebp, (unsigned long)j->__esp);
+        fprintf(f, "(EIP: rebuild this MIDPLAY.EXE without -s and look it up with nm / addr2line)\n");
+    }
+#endif
+    fprintf(f, "Screen: %s, page %d, view %d, text mode %s%s\n", mp3_on ? "3D" : "text", g_page, g_view, tui_mode_id, g_win ? ", Windows DOS box" : "");
+    fprintf(f, "3D mode: %dx%d %d bit (VESA mode %Xh, %s), drawn %dx%d%s, refresh %d Hz set / %.1f seen, VBE %d\n",
+            M3W, M3H, m3_bpp, m3_mode, m3_lfb ? "linear" : "banked", m3_rw, m3_rh, m3_half ? " (F4 half)" : "",
+            m3_refresh, m3_refresh_seen, m3_vbever);
+    fprintf(f, "3D chosen: %dx%d %d bit (0 = auto), last good %dx%d %d bit, buffers %d pixels\n",
+            mp3_want_w, mp3_want_h, mp3_want_b, mp3_ok_w, mp3_ok_h, mp3_ok_b, mp3_have);
+    fprintf(f, "Look %d (%s), theme %d (%s), player %d (%s), style %d, frame %.0f ms%s\n",
+            g_scene, mp3_scene_name[g_scene % 3], g_ctheme, mp3_theme_name[g_ctheme % 11], g_model, mp3_model_name[g_model % 4],
+            tui_theme, mp3_frame_ms, mp3_lod ? ", voxel LOD" : "");
+    fprintf(f, "Song: %s, %s, %lu of %lu s%s\n", g_cur >= 0 && g_cur < g_npl ? g_pl[g_cur].path : "-", P.loaded ? "loaded" : "none",
+            (unsigned long)(P.loaded ? song_time() / 1000000ULL : 0), (unsigned long)(P.total / 1000000ULL), P.paused ? ", paused" : "");
+    fprintf(f, "\nLast %d actions (seconds since start, oldest first):\n", UL_N);
+    n = g_ulog_n < UL_N ? g_ulog_n : UL_N;
+    for (i = g_ulog_n - n; i != g_ulog_n; i++) fprintf(f, "  %s\n", g_ulog[i % UL_N]);
+}
+static void crash_handler(int sig)
+{
+    char path[300]; FILE* f; __dpmi_regs r;
+    if (g_crashing) _exit(3);
+    g_crashing = 1;
+    m3_hook = NULL; tui_hook = NULL;
+    memset(&r, 0, sizeof r); r.x.ax = 0x0003; __dpmi_int(0x10, &r);          /* text mode 80x25 (also the default font) */
+    snprintf(path, sizeof path, "%s\\CRASH.TXT", g_home[0] ? g_home : ".");
+    f = fopen(path, "w");
+    if (f) { crash_write(f, sig); fclose(f); }
+    crash_write(stdout, sig);
+    printf("\nMIDPLAY crashed. %s %s - please send it.\n", f ? "Written to" : "Could not write", path);
+    fflush(stdout);
+    if (!g_dry) silence();                                                  /* no hanging notes */
+    _exit(3);
+}
+static void crash_install(void)
+{
+    signal(SIGSEGV, crash_handler); signal(SIGFPE, crash_handler); signal(SIGILL, crash_handler); signal(SIGABRT, crash_handler);
+#ifdef SIGNOFP
+    signal(SIGNOFP, crash_handler);
+#endif
+}
 static void handle_key(int k)
 {
+    ui_log("key %04X page %d view %d%s", k, g_page, g_view, mp3_on ? " 3D" : "");
+#ifdef CRASHKEY
+    if (k == '!') *(volatile int*)0xFFFFFFF0 = 1;                       /* test build only: a GPF for the crash catcher */
+#endif
     if (mp3_on && mp3_ask_until) { mp3_answer(k == 'y' || k == 'Y'); mp3_force = 1; cfg_save(); return; }   /* "keep this mode?" */
     /* everywhere */
     if (k == K_F1) { if (g_page == PG_HELP) go_page(g_back); else go_page(PG_HELP); return; }
@@ -2096,6 +2198,7 @@ static int start_index(int i)
         if (mp_start(g_pl[i].path, g_reset, err, sizeof err))
         {
             g_plays++;
+            ui_log("song %d %.30s", i, base_of(g_pl[i].path));
             if (g_stfile[0]) { FILE* f = fopen(g_stfile, "a"); if (f) { fprintf(f, "start %d %s (act %d, t %lu ms)\n", i, g_pl[i].path, g_act, (unsigned long)(now_us() / 1000)); fclose(f); } }
             return 1;
         }
@@ -2206,6 +2309,7 @@ int main(int argc, char** argv)
         tui_mouse_init();
         if (!g_npl || want_browse) go_page(PG_FILES);
     }
+    crash_install();
     if (g_ui) { m3_vbe_probe(); mp3_prepare(); if (m3_vbest >= 0) mp3_make_panel("", 0, 0); screen_sync(); ui_frame(); }   /* the slow BIOS work (3D mode, first frame) before the music */
     if (g_npl)
     {

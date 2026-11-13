@@ -680,6 +680,13 @@ CONTENTS
   if the screen stays black, press any other key (or wait 10 s) and the
   last mode comes back. A mode that cannot be set falls back to the last
   good one, then 640x480, then VGA 320x200, then the text views.
+  NOT ENOUGH MEMORY (beta.100): a big mode (1600x1200 needs about 16 MB)
+  that does not fit falls back to the biggest smaller mode that does, with
+  a message; the screen is never switched before the memory is there.
+  IF MIDPLAY CRASHES (beta.100): the text screen comes back and MIDPLAY
+  writes CRASH.TXT next to MIDPLAY.EXE (the error, the CPU registers, the
+  screen mode, 3D look/theme/player and the last 50 keys/actions). Please
+  send that file with your report.
   The 3D view draws at most one frame per screen refresh and almost nothing
   while paused or stopped. F4 there switches to half resolution if your PC
   shows few frames (it tells you).

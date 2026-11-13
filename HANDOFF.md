@@ -1,4 +1,24 @@
 
+## beta.100 (2026-11-13): MIDPLAY 3D made stable (crash catcher, ASan sweep, low-memory fallback)
+- Crash catcher (tools/midplay.c, crash_handler): SIGSEGV/SIGFPE/SIGILL/SIGABRT/SIGNOFP -> text mode 3, CRASH.TXT in
+  MIDPLAY's folder (signal, CPU exception number, registers from __djgpp_exception_state_ptr, text/3D mode, look/theme/
+  player, song, last 50 UI actions from ui_log: keys, 3D on/off/mode, songs), silence, _exit(3). EIP is from the stripped
+  exe: rebuild the same source without -s and use addr2line. Test build: `-DCRASHKEY` makes '!' do a GPF.
+- Host sanitizer test: `sh sc55-pack/tests/m3host/run.sh [quick|crash]` (needs gcc-13-multilib). Builds the whole
+  midplay.c 32-bit against a fake DJGPP (tests/m3host/inc/dosstub.h: fake DOS memory, fake VBE BIOS with 44 modes
+  320x200..1600x1200 incl. 321x201, 1366x768, 1599x1199 in 8/15/16/24/32 bit, fake LFB/bank window that aborts on any
+  write past the screen), ASan+UBSan+float-cast-overflow. Covers every look x theme x player, F4 half, pause, mode
+  switches, styles, long clock, long titles, OOM limits. ~4100 frames, 0 findings now.
+- Found/fixed: m3_tri_raster float->int overflow near the camera (U/V/light/fog 16.16 and ys/xs) -> m3_fi() clamps
+  (m3core.h, so MENU 3D, CDGUI, GAMETEST, SBSET too). Textures (MIDPLAY panel/keys/face, m3 floor) are static now.
+- Out of memory: mp3_buffers(w,h) allocates BEFORE the mode is set (frees old first); mp3_try_smaller picks the
+  biggest smaller mode (same depth first), message "Not enough memory..."; the OOM mode is not saved as last good.
+- QEMU (FreeDOS, std-vga, HDPMI32I, MIDPLAY /X): 1600x1200x32 + 130 random V/C/J/F4/SPACE/seek/S keys, no crash;
+  -m 12 -> fell back to 1280x800; CRASHKEY build wrote C:\CRASH.TXT (page fault, registers, actions). MENU 3D styles OK.
+- Zip: MIDPLAY, SC55MENU, SBEMU (version), GAMETEST, CDSET/CDGUI.EXE, README.TXT swapped. SBSET.EXE NOT swapped (zip's
+  copy is 130 KB smaller than a fresh build - built differently; it gets the m3_fi fix next time it is rebuilt).
+- Real hardware still to test: MIDPLAY 3D on the D810 and the P5PE-VM (big modes, CRASH.TXT if anything happens).
+
 ## SSF2T demo investigation (2026-11-10, unfinished, no release)
 - **Cause 1, found and fixed (not shipped yet):** the pack's HDPMI32I (crazii fork, based on HDPMI 3.20) gives a GPF when Borland 32RTM runs `mov cr0,eax` in ring 3. HDPMI 3.21+ (Baron) emulates it. The exception text is invisible (direct video output), so HDPMI just waits for 'c'/'s' → it looks like a hang at MAKESWP.
   - Patch: `sc55-pack/third_party/hdpmi32fix/mov-cr0.diff` (against crazii/HX 43182b4).

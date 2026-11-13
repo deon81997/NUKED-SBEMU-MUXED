@@ -62,63 +62,99 @@ static const char* mp3_mode_name(int i, char* b, size_t n)
                   m3_modes[i].lfb ? "" : " (banked)");
     return b;
 }
-static int mp3_buffers(void)
+/* the textures: static, so a big screen mode can never leave them unallocated */
+static void mp3_surfs(void)
 {
-    static int have;
-    int need = M3W * M3H;
-    if (need > have || !m3_fb || !m3_zb)
+    static uint32_t panel[512 * 128], keys[512 * 64], face[512 * 128];
+    if (!mp3_panel.p) { mp3_panel.w = 512; mp3_panel.h = 128; mp3_panel.p = panel; }
+    if (!mp3_keys.p) { mp3_keys.w = 512; mp3_keys.h = 64; mp3_keys.p = keys; }
+    if (!mp3_face.p) { mp3_face.w = 512; mp3_face.h = 128; mp3_face.p = face; }
+}
+/* the frame and depth buffers for a w x h picture, BEFORE the mode is set (out of memory: the screen stays as it is).
+ * Growing frees the old buffers first (no old + new peak); every frame is drawn whole, so nothing is lost. */
+static int mp3_have;                                          /* pixels the buffers hold */
+static int mp3_oom;                                           /* the last mp3_try failed for lack of memory */
+static int mp3_buffers(int w, int h)
+{
+    int need = w * h;
+    if (need > mp3_have || !m3_fb || !m3_zb)
     {
-        uint32_t* f = (uint32_t*)realloc(m3_fb, (size_t)need * 4); float* z;
-        if (!f) return 0;
-        m3_fb = f; z = (float*)realloc(m3_zb, (size_t)need * sizeof(float));
-        if (!z) return 0;
-        m3_zb = z; have = need;
+        free(m3_fb); free(m3_zb); m3_fb = NULL; m3_zb = NULL; mp3_have = 0;
+        m3_fb = (uint32_t*)malloc((size_t)need * 4); m3_zb = (float*)malloc((size_t)need * sizeof(float));
+        if (!m3_fb || !m3_zb) { free(m3_fb); free(m3_zb); m3_fb = NULL; m3_zb = NULL; return 0; }
+        memset(m3_fb, 0, (size_t)need * 4); memset(m3_zb, 0, (size_t)need * sizeof(float));
+        mp3_have = need;
     }
-    m3_scr.w = M3W; m3_scr.h = M3H; m3_scr.p = m3_fb;
     return 1;
 }
 
 /* buffers and textures, made before the music starts (switching to 3D later then costs only the mode set) */
 static void mp3_prepare(void)
 {
-    m3_W = 640; m3_H = 480;
-    if (!mp3_buffers()) return;
+    mp3_surfs();
+    if (!mp3_buffers(640, 480)) return;
     m3_theme_sync();
-    if (!mp3_panel.p) mp3_panel = m3_surf(512, 128);
-    if (!mp3_keys.p) mp3_keys = m3_surf(512, 64);
     if (m3_tsc_us == 0) m3_time_init();
 }
 static void mp3_make_panel(const char* title, double frac, int paused);
 static int mp3_try(int i, int hz)
 {
+    mp3_oom = 0;
     if (i < 0 || i >= m3_nmodes) return 0;
+    if (!mp3_buffers(m3_modes[i].w, m3_modes[i].h)) { mp3_oom = 1; return 0; }
     if (!m3_open_mode(&m3_modes[i], hz)) return 0;
-    if (!mp3_buffers()) { m3_vbe_close(); return 0; }
+    m3_scr.w = M3W; m3_scr.h = M3H; m3_scr.p = m3_fb;
     mp3_cur = i;
     return 1;
 }
+/* out of memory for mode i: the biggest smaller mode that fits (same colours first) */
+static int mp3_try_smaller(int i)
+{
+    long below = (long)m3_modes[i].w * m3_modes[i].h; int pass;
+    for (pass = 0; pass < 2; pass++)
+    {
+        long lim = below;
+        for (;;)
+        {
+            int k, best = -1; long bp = 0;
+            for (k = 0; k < m3_nmodes; k++)
+            {
+                long px = (long)m3_modes[k].w * m3_modes[k].h;
+                if (px >= lim || px <= bp || (!pass && m3_modes[k].bpp != m3_modes[i].bpp)) continue;
+                if (mp3_win && m3_modes[k].mode != 0x13) continue;
+                best = k; bp = px;
+            }
+            if (best < 0) break;
+            if (mp3_try(best, 0)) return 1;
+            lim = bp;                                         /* next: smaller still */
+        }
+    }
+    return 0;
+}
 static int mp3_enter(void)
 {
-    int want, ok = 0;
+    int want, ok = 0, oom = 0;
     if (mp3_on) return 1;
     m3_vbe_probe();
-    if (!mp3_panel.p) mp3_panel = m3_surf(512, 128);
-    if (!mp3_keys.p) mp3_keys = m3_surf(512, 64);
-    if (!mp3_panel.p || !mp3_keys.p) return 0;
+    mp3_surfs();
     want = mp3_want_w ? mp3_find(mp3_want_w, mp3_want_h, mp3_want_b) : -1;
     if (want < 0) want = mp3_auto();
     ok = mp3_try(want, mp3_hz);
+    if (!ok && mp3_oom) { oom = 1; ok = mp3_try_smaller(want); if (ok) mp3_ask = 0; }
     if (!ok && mp3_ok_w) { ok = mp3_try(mp3_find(mp3_ok_w, mp3_ok_h, mp3_ok_b), mp3_ok_hz); if (ok) mp3_ask = 0; }
     if (!ok) { ok = mp3_try(mp3_auto(), 0); if (ok) mp3_ask = 0; }
     if (!ok) { ok = mp3_try(0, 0); if (ok) mp3_ask = 0; }
-    if (!ok) { m3_W = 640; m3_H = 480; return 0; }
+    if (!ok) { m3_W = 640; m3_H = 480; m3_rw = 640; m3_rh = 480; return 0; }
+    ui_log("3D mode %dx%d %d%s", M3W, M3H, m3_bpp, oom ? " (low memory)" : "");
+    if (oom && mp3_cur != want)
+        msg("Not enough memory for the 3D view at %dx%d: %dx%d instead.", m3_modes[want].w, m3_modes[want].h, M3W, M3H);
     m3_theme_sync();
     if (m3_tsc_us == 0) m3_time_init();
     mp3_slow = 0; mp3_on = 1; mp3_last_frame = 0; mp3_force = 1;
     if (!mp3_win && !m3_refresh) m3_refresh_seen = m3_measure_refresh();   /* (a Windows DOS box fakes the retrace) */
     if (mp3_win && m3_modes[mp3_cur].mode != 0x13 && !mp3_win_ok) mp3_ask = 1;   /* may be black: ask */
     mp3_ask_until = mp3_ask ? m3_now() + 10 : 0;
-    if (!mp3_ask) { mp3_ok_w = m3_modes[mp3_cur].w; mp3_ok_h = m3_modes[mp3_cur].h; mp3_ok_b = m3_modes[mp3_cur].bpp; mp3_ok_hz = m3_refresh; }
+    if (!mp3_ask && !oom) { mp3_ok_w = m3_modes[mp3_cur].w; mp3_ok_h = m3_modes[mp3_cur].h; mp3_ok_b = m3_modes[mp3_cur].bpp; mp3_ok_hz = m3_refresh; }
     mp3_ask = 0;
     return 1;
 }
@@ -155,7 +191,7 @@ static void mp3_make_panel(const char* title, double frac, int paused)
     if (!mp3_face.p || mp3_facegen != mp3_themegen)
     {
         M3SURF* f; int lum = ((mp3_facec >> 16 & 255) + (mp3_facec >> 8 & 255) + (mp3_facec & 255)) / 3; uint32_t tx = lum > 128 ? 0x202024 : 0xE8E8F0;
-        if (!mp3_face.p) mp3_face = m3_surf(512, 128);
+        mp3_surfs();
         f = &mp3_face; mp3_facegen = mp3_themegen;
         for (y = 0; y < 128; y++) for (x = 0; x < 512; x++)
         { int v = ((x * 7 + y * 13) % 5) + ((y & 1) ? 2 : 0) - 3; f->p[y * 512 + x] = m3_rgb((mp3_facec >> 16 & 255) + v, (mp3_facec >> 8 & 255) + v, (mp3_facec & 255) + v); }
