@@ -44,12 +44,16 @@ Stopped by the user mid-task. Tree builds; tests/m3host/menurun.sh and run.sh pa
   - New QEMU rig: testrig/menuq.py (MS-DOS 7.1 or FreeDOS disk, pack installed by its own SETUP.BAT, SoundFont, OHCI USB
     kbd/mouse; text screen via pmemsave) + testrig/menuwalk.py (starts every entry, gets back). MS-DOS 7.1 boot + MENU +
     Start SC-55 (SoundFont, USB kbd/mouse on OHCI) + return: OK (testrig/menuq/msdos71-menu.png). Full walk was running.
-- NOT done: menuwalk full run (MS-DOS 7.1 and FreeDOS), 3D styles in QEMU, Win98 DOS box (needs a QI Win98 VM), OHCI 3D GPF
-  re-check (testrig/usb3d soak), 86Box PII-450 before/after (SBDIAG load, SC55LOG speed; MENU changes are UI-only, no
-  runtime cost expected), "MENU matrix" quick set (no such section exists yet - define it from menuwalk + menurun quick),
-  release beta.108 (zip: SC55MENU.EXE + others using tui.h: GAMETEST, MIDPLAY, SBSET, CDGUI... rebuild/swap all), README news.
-- Next 3 steps: 1) `python3 sc55-pack/testrig/menuwalk.py DIR` on msdos + freedos disks, fix what sticks; 2) usb3d soak 10 min
-  + Win98 DOS box (QI ISO -> testrig/w98vm/README.md); 3) 86Box perf numbers, then release beta.108 per Release recipe.
+- Session 2 (f3a7f28+): menuwalk fixed (menuq.text() decoded CP437 00-1F as control chars, so ► never matched; print
+  format bug) and run on MS-DOS 7.1 + FreeDOS: every entry OK; grey ones show their reason; JEMM/QEMM/Auto setup OK
+  from a fresh boot. Fixed: BUGREP.BAT without MEM/FIND ("Bad command"): finds them on PATH/C:\DOS/WINDOWS\COMMAND/
+  FDOS, else notes it. USBTEST: after it a BIOS-driven USB kbd/mouse is dead until restart (user stuck in MENU's
+  USBTEST.TXT view) -> on exit with a USB kbd/mouse it asks "Restart the PC now? Y/N" (Y: SMARTDRV commit, KBC reset;
+  QEMU: back in MENU, keys work). usb3d soak 600 s with new MENU/MIDPLAY/SBEMU: 23 clean exits, no CRASH.
+- NOT done: Win98 DOS box (QI VM installs fine from win98qi stock ISO; first boot from disk sat >10 min on the splash
+  - retry without -usb, alone on the CPU; /home/claude/w98vm qi0.img = fresh install), 86Box PII-450 perf, release
+  beta.108 (zip: SC55MENU, USBTEST, BUGREP.BAT + tui.h users), README news (BUGREP, USBTEST restart, MENU fixes).
+- Next 3 steps: 1) Win98 DOS box: D:\SC55\SC55MENU text/3D/browser; 2) 86Box perf numbers; 3) release beta.108.
 - Resume: DJGPP + build per docs/SESSION-2026-11-13-DOS.md; `sh sc55-pack/tests/m3host/menurun.sh quick`;
   `apt-get install qemu-system-x86`; unzip release zip to /home/claude/rel; MS-DOS files: see Test downloads;
   `python3 -I sc55-pack/testrig/menuq.py /home/claude/mq/ms build msdos`, then `from menuq import Q; Q(dir).start(usb='ohci')`.
