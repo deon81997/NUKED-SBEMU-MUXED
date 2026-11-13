@@ -1,4 +1,4 @@
-/* MIDPLAY - plays Standard MIDI Files (.MID .MIDI .RMI .KAR, format 0 and 1) through the MPU-401 at port 330h,
+/* MIDPLAY - plays Standard MIDI Files (.MID .MIDI .RMI .KAR, format 0 and 1), Doom .MUS, HMI .HMP and Miles .XMI through the MPU-401 at port 330h,
  * i.e. through the running SBEMU + SC-55 (or MT-32 / SoundFont) emulation. SBEMU must be loaded (SC55.BAT).
  *
  *   MIDPLAY [options] [file.mid ...]     (wildcards work: MIDPLAY *.MID; no files = the last playlist, or every
@@ -26,6 +26,8 @@
 #include <ctype.h>
 
 #ifdef HOSTTEST
+#include <strings.h>
+#define stricmp strcasecmp
 /* host build: virtual clock, MIDI bytes are printed with their time instead of sent */
 static uint64_t g_now_us;
 static void out_byte(unsigned char b) { printf("%llu %02X\n", (unsigned long long)g_now_us, b); }
@@ -142,6 +144,7 @@ static __attribute__((unused)) void sleep_ms(int ms) { uint64_t t = now_us() + (
 #define K_CO     0x0F      /* Ctrl+O */
 #define K_CA     0x01      /* Ctrl+A */
 #define K_CP     0x10      /* Ctrl+P */
+#define K_CF     0x06      /* Ctrl+F */
 static int key_pressed(void) { return _farpeekw(_dos_ds, 0x41A) != _farpeekw(_dos_ds, 0x41C); }
 static int key_read(void)
 {
@@ -197,6 +200,7 @@ typedef struct
     int format, ntrks, division;
     uint32_t last_tick;
     char title[48];
+    const char* kind;   /* "MIDI", "RMI", "MUS", "HMP", "XMI" */
 } Song;
 
 static int add_event(Song* s, uint32_t tick, int kind, uint32_t arg, int len, int lead)
@@ -233,14 +237,50 @@ static int varlen(const unsigned char** p, const unsigned char* end, uint32_t* o
     return 0;
 }
 
-static int parse_track(Song* s, const unsigned char* p, const unsigned char* end)
+/* HMP delta times / lengths: 7-bit groups, LOW group first, the LAST byte has bit 7 set */
+static int varlen_hmp(const unsigned char** p, const unsigned char* end, uint32_t* out)
+{
+    uint32_t v = 0; int i;
+    for (i = 0; i < 4; i++)
+    {
+        if (*p >= end) return 0;
+        v |= (uint32_t)(**p & 0x7F) << (7 * i);
+        if (*(*p)++ & 0x80) { *out = v; return 1; }
+    }
+    return 0;
+}
+/* a track name that is not the song's title (karaoke files name their tracks like this) */
+static int name_is_title(const unsigned char* p, uint32_t l)
+{
+    return !(l == 12 && !memcmp(p, "Soft Karaoke", 12)) && !(l == 5 && !memcmp(p, "Words", 5));
+}
+static void set_title(char* t, size_t n, const unsigned char* p, uint32_t l)
+{
+    uint32_t k, m = 0;
+    while (l && *p == ' ') { p++; l--; }
+    for (k = 0; k < l && m < n - 1; k++) t[m++] = (p[k] >= 32 && p[k] < 127) ? (char)p[k] : ' ';
+    while (m && t[m - 1] == ' ') m--;
+    t[m] = 0;
+}
+/* the title from a meta event: 03 track name, or a karaoke "@T" line */
+static void meta_title(char* t, size_t n, int type, const unsigned char* p, uint32_t l)
+{
+    if (t[0] || !l) return;
+    if (type == 0x03 && name_is_title(p, l)) set_title(t, n, p, l);
+    else if (type == 0x01 && l > 2 && p[0] == '@' && p[1] == 'T') set_title(t, n, p + 2, l - 2);
+}
+
+#define PT_HMP   1   /* HMP: delta times and lengths in HMP's own variable-length code */
+#define PT_NOXCC 2   /* drop the controllers 110..119 (HMI / Miles AIL loop and lock marks, not GM) */
+static int parse_track(Song* s, const unsigned char* p, const unsigned char* end, int flags)
 {
     uint32_t tick = 0, d, l;
     int running = 0;
+    int (*vl)(const unsigned char**, const unsigned char*, uint32_t*) = (flags & PT_HMP) ? varlen_hmp : varlen;
     while (p < end)
     {
         int st;
-        if (!varlen(&p, end, &d)) return 1;     /* truncated: keep what we have */
+        if (!vl(&p, end, &d)) return 1;     /* truncated: keep what we have */
         tick += d;
         if (p >= end) return 1;
         st = *p;
@@ -256,24 +296,18 @@ static int parse_track(Song* s, const unsigned char* p, const unsigned char* end
                 int type;
                 if (p >= end) return 1;
                 type = *p++;
-                if (!varlen(&p, end, &l) || p + l > end) return 1;
+                if (type == 0x2F) return 1;
+                if (!vl(&p, end, &l) || l > (uint32_t)(end - p)) return 1;
                 if (type == 0x51 && l == 3)
                 {
                     if (!add_event(s, tick, EV_TEMPO, ((uint32_t)p[0] << 16) | (p[1] << 8) | p[2], 0, 0)) return 0;
                 }
-                else if (type == 0x03 && !s->title[0] && l > 0)
-                {
-                    uint32_t k, n = 0;
-                    for (k = 0; k < l && n < sizeof(s->title) - 1; k++)
-                        s->title[n++] = (p[k] >= 32 && p[k] < 127) ? (char)p[k] : ' ';
-                    s->title[n] = 0;
-                }
-                else if (type == 0x2F) return 1;
+                meta_title(s->title, sizeof s->title, type, p, l);
                 p += l;
             }
             else if (st == 0xF0 || st == 0xF7)
             {
-                if (!varlen(&p, end, &l) || p + l > end) return 1;
+                if (!vl(&p, end, &l) || l > (uint32_t)(end - p)) return 1;
                 /* F0: the stored data already ends with F7. F7: raw continuation / escape bytes. */
                 if (!add_event(s, tick, EV_SYSEX, (uint32_t)(p - s->data), (int)(l > 65535 ? 65535 : l), st == 0xF0 ? 0xF0 : 0)) return 0;
                 p += l;
@@ -288,10 +322,150 @@ static int parse_track(Song* s, const unsigned char* p, const unsigned char* end
             a |= (uint32_t)(p[0] & 0x7F) << 8;
             if (n == 2) a |= (uint32_t)(p[1] & 0x7F) << 16;
             p += n;
+            if ((flags & PT_NOXCC) && (st & 0xF0) == 0xB0 && (a >> 8 & 0x7F) >= 110 && (a >> 8 & 0x7F) <= 119) continue;
             if (!add_event(s, tick, EV_SHORT, a, n + 1, 0)) return 0;
         }
     }
     return 1;
+}
+
+static uint32_t le32(const unsigned char* p) { return p[0] | (p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24); }
+static int le16(const unsigned char* p) { return p[0] | (p[1] << 8); }
+
+/* ---- other song formats, read straight into events (SysEx offsets point into the file as for .MID) ---- */
+/* Doom MUS: 140 ticks a second; MUS channel 15 = drums (MIDI 10); the others get MIDI channels in the order they are
+   first used (skipping 10), each with an "all notes off" first (as Doom's own mus2mid does) */
+static int load_mus(Song* s, char* err, size_t errsz)
+{
+    static const unsigned char ctl[10] = { 0, 0, 1, 7, 10, 11, 91, 93, 64, 67 };
+    static const unsigned char sysctl[5] = { 120, 123, 126, 127, 121 };
+    const unsigned char* d = s->data; const unsigned char* p; const unsigned char* end = d + s->size;
+    int map[16], vel[16], next = 0, i; uint32_t tick = 0, start = (uint32_t)le16(d + 6);
+    if (start >= (uint32_t)s->size) { snprintf(err, errsz, "bad MUS header"); return 0; }
+    for (i = 0; i < 16; i++) { map[i] = -1; vel[i] = 127; }
+    s->format = 0; s->ntrks = 1; s->division = 70; s->kind = "MUS";   /* 70 per quarter at 120 BPM = 140 Hz */
+    p = d + start;
+    while (p < end)
+    {
+        int b = *p++, type = (b >> 4) & 7, mc = b & 15, ch, d1 = 0, d2 = 0;
+        if (type == 6) break;                                            /* score end */
+        if (map[mc] < 0)
+        {
+            if (mc == 15) map[mc] = 9;
+            else { if (next == 9) next++; map[mc] = next < 16 ? next++ : 15; }
+            if (!add_event(s, tick, EV_SHORT, (uint32_t)(0xB0 | map[mc]) | (123u << 8), 3, 0)) return 0;
+        }
+        ch = map[mc];
+        switch (type)
+        {
+        case 0: if (p >= end) { goto done; } d1 = *p++ & 0x7F;
+            if (!add_event(s, tick, EV_SHORT, (uint32_t)(0x80 | ch) | (uint32_t)d1 << 8 | 64u << 16, 3, 0)) return 0;
+            break;
+        case 1: if (p >= end) { goto done; } d1 = *p++;
+            if (d1 & 0x80) { if (p >= end) goto done; vel[mc] = *p++ & 0x7F; }
+            if (!add_event(s, tick, EV_SHORT, (uint32_t)(0x90 | ch) | (uint32_t)(d1 & 0x7F) << 8 | (uint32_t)vel[mc] << 16, 3, 0)) return 0;
+            break;
+        case 2: if (p >= end) { goto done; } d1 = *p++ * 64;
+            if (!add_event(s, tick, EV_SHORT, (uint32_t)(0xE0 | ch) | (uint32_t)(d1 & 0x7F) << 8 | (uint32_t)(d1 >> 7) << 16, 3, 0)) return 0;
+            break;
+        case 3: if (p >= end) { goto done; } d1 = *p++;
+            if (d1 >= 10 && d1 <= 14 && !add_event(s, tick, EV_SHORT, (uint32_t)(0xB0 | ch) | (uint32_t)sysctl[d1 - 10] << 8, 3, 0)) return 0;
+            break;
+        case 4: if (end - p < 2) { goto done; } d1 = *p++; d2 = *p++ & 0x7F;
+            if (d1 == 0) { if (!add_event(s, tick, EV_SHORT, (uint32_t)(0xC0 | ch) | (uint32_t)d2 << 8, 2, 0)) return 0; }
+            else if (d1 < 10 && !add_event(s, tick, EV_SHORT, (uint32_t)(0xB0 | ch) | (uint32_t)ctl[d1] << 8 | (uint32_t)d2 << 16, 3, 0)) return 0;
+            break;
+        case 5: break;                                                    /* end of measure */
+        default: goto done;                                               /* 7: unknown, stop here */
+        }
+        if (b & 0x80) { uint32_t dt; if (!varlen(&p, end, &dt)) break; tick += dt; }
+    }
+done:
+    return 1;
+}
+/* HMP (HMI "Sound Operating System", Descent etc.): tracks with their own delta code; division at 38h, one
+   quarter = 1 s (the layout as in ZMusic's HMI reader) */
+static int load_hmp(Song* s, char* err, size_t errsz)
+{
+    const unsigned char* d = s->data; uint64_t off; uint32_t ntr, i, div;
+    if (s->size < 0x308 + 12) { snprintf(err, errsz, "bad HMP header"); return 0; }
+    if (d[8] == 0) off = 0x308; else if (!memcmp(d + 8, "013195", 6)) off = 0x388;
+    else { snprintf(err, errsz, "unknown HMP version"); return 0; }
+    ntr = le32(d + 0x30); div = le32(d + 0x38);
+    s->format = 1; s->ntrks = (int)(ntr > 999 ? 999 : ntr); s->division = div && div < 0x8000 ? (int)div : 60; s->kind = "HMP";
+    if (!add_event(s, 0, EV_TEMPO, 1000000, 0, 0)) return 0;
+    for (i = 0; i < ntr && off + 12 <= (uint64_t)s->size; i++)
+    {
+        uint32_t tl = le32(d + off + 4); uint64_t te = off + tl;
+        if (tl < 12) break;
+        if (te > (uint64_t)s->size) te = (uint64_t)s->size;
+        if (!parse_track(s, d + off + 12, d + te, PT_HMP | PT_NOXCC)) { snprintf(err, errsz, "out of memory"); return 0; }
+        off += tl;
+    }
+    return 1;
+}
+/* XMI (Miles AIL XMIDI): IFF; the first sequence's EVNT chunk. Delays are summed bytes < 80h, a note-on carries its
+   length (no note-offs), 120 ticks a second, tempo events are not used */
+static const unsigned char* iff_find(const unsigned char* p, const unsigned char* end, const char* want, uint32_t* len, int depth)
+{
+    while (end - p >= 8)
+    {
+        uint32_t l = be32(p + 4); const unsigned char* body = p + 8;
+        if (l > (uint32_t)(end - body)) l = (uint32_t)(end - body);
+        if (!memcmp(p, want, 4)) { *len = l; return body; }
+        if (depth < 6 && l >= 4 && (!memcmp(p, "FORM", 4) || !memcmp(p, "CAT ", 4)))
+        {
+            const unsigned char* r = iff_find(body + 4, body + l, want, len, depth + 1);
+            if (r) return r;
+        }
+        p = body + l; if ((l & 1) && p < end) p++;
+    }
+    return NULL;
+}
+static int load_xmi(Song* s, char* err, size_t errsz)
+{
+    uint32_t len, tick = 0, l; const unsigned char* p = iff_find(s->data, s->data + s->size, "EVNT", &len, 0); const unsigned char* end;
+    if (!p) { snprintf(err, errsz, "no XMI sequence"); return 0; }
+    end = p + len;
+    s->format = 0; s->ntrks = 1; s->division = 60; s->kind = "XMI";
+    while (p < end)
+    {
+        int st = *p++;
+        if (st < 0x80) { tick += (uint32_t)st; continue; }
+        if (st == 0xFF)
+        {
+            int type; if (p >= end) break; type = *p++;
+            if (type == 0x2F) break;
+            if (!varlen(&p, end, &l) || l > (uint32_t)(end - p)) break;
+            meta_title(s->title, sizeof s->title, type, p, l);
+            p += l;
+        }
+        else if (st == 0xF0 || st == 0xF7)
+        {
+            if (!varlen(&p, end, &l) || l > (uint32_t)(end - p)) break;
+            if (!add_event(s, tick, EV_SYSEX, (uint32_t)(p - s->data), (int)(l > 65535 ? 65535 : l), st == 0xF0 ? 0xF0 : 0)) goto oom;
+            p += l;
+        }
+        else if (st > 0xF0) break;
+        else
+        {
+            int hi = st & 0xF0, n = (hi == 0xC0 || hi == 0xD0) ? 1 : 2; uint32_t a = (uint32_t)st, dur;
+            if (end - p < n) break;
+            a |= (uint32_t)(p[0] & 0x7F) << 8; if (n == 2) a |= (uint32_t)(p[1] & 0x7F) << 16;
+            p += n;
+            if (hi == 0x90)
+            {
+                if (!varlen(&p, end, &dur)) break;
+                if (!add_event(s, tick, EV_SHORT, a, 3, 0)) goto oom;
+                if ((a >> 16) && !add_event(s, tick + (dur ? dur : 1), EV_SHORT, (a & 0xFF00) | (uint32_t)(0x80 | (st & 15)) | 64u << 16, 3, 0)) goto oom;
+            }
+            else if (hi == 0xB0 && (a >> 8 & 0x7F) >= 110 && (a >> 8 & 0x7F) <= 119) ;   /* AIL loop / lock marks */
+            else if (!add_event(s, tick, EV_SHORT, a, n + 1, 0)) goto oom;
+        }
+    }
+    return 1;
+oom:
+    snprintf(err, errsz, "out of memory"); return 0;
 }
 
 static int rank(const Event* e)
@@ -343,6 +517,21 @@ static void schedule(Song* s)
 
 static void song_free(Song* s) { free(s->data); free(s->ev); memset(s, 0, sizeof *s); }
 
+/* RIFF MIDI (.RMI): the "data" chunk holds a normal MIDI file (other chunks - LIST, DISP - may come first) */
+static const unsigned char* riff_midi(const unsigned char* p, const unsigned char** end)
+{
+    const unsigned char* q = p + 12;
+    if (*end - p < 20 || memcmp(p, "RIFF", 4) || memcmp(p + 8, "RMID", 4)) return p;
+    while (*end - q >= 8)
+    {
+        uint32_t l = le32(q + 4);
+        if (l > (uint32_t)(*end - q - 8)) l = (uint32_t)(*end - q - 8);
+        if (!memcmp(q, "data", 4)) { *end = q + 8 + l; return q + 8; }
+        q += 8 + l + (l & 1);
+    }
+    return p;
+}
+
 static int song_load(Song* s, const char* name, char* err, size_t errsz)
 {
     FILE* f = fopen(name, "rb");
@@ -358,12 +547,15 @@ static int song_load(Song* s, const char* name, char* err, size_t errsz)
     fclose(f);
     if (got != s->size) { song_free(s); snprintf(err, errsz, "read error"); return 0; }
     p = s->data; end = s->data + s->size;
-    if (!memcmp(p, "RIFF", 4) && s->size > 20 && !memcmp(p + 8, "RMID", 4) && !memcmp(p + 12, "data", 4))
-        p += 20;                                /* RIFF MIDI wrapper */
+    s->kind = "MIDI";
+    if (!memcmp(p, "MUS\x1A", 4)) { if (!load_mus(s, err, errsz)) { song_free(s); return 0; } goto parsed; }
+    if (!memcmp(p, "HMIMIDIP", 8)) { if (!load_hmp(s, err, errsz)) { song_free(s); return 0; } goto parsed; }
+    if (!memcmp(p, "FORM", 4) || !memcmp(p, "CAT ", 4)) { if (!load_xmi(s, err, errsz)) { song_free(s); return 0; } goto parsed; }
+    if (!memcmp(p, "RIFF", 4)) { p = riff_midi(p, &end); if (p != s->data) s->kind = "RMI"; }
     if (end - p < 14 || memcmp(p, "MThd", 4)) { song_free(s); snprintf(err, errsz, "not a MIDI file"); return 0; }
     {
         uint32_t hl = be32(p + 4);
-        if (hl < 6 || p + 8 + hl > end) { song_free(s); snprintf(err, errsz, "bad header"); return 0; }
+        if (hl < 6 || hl > (uint32_t)(end - p - 8)) { song_free(s); snprintf(err, errsz, "bad header"); return 0; }
         s->format = be16(p + 8); s->ntrks = be16(p + 10); s->division = be16(p + 12);
         p += 8 + hl;
     }
@@ -374,15 +566,15 @@ static int song_load(Song* s, const char* name, char* err, size_t errsz)
         const unsigned char* body = p + 8;
         if ((uint64_t)len > (uint64_t)(end - body)) len = (uint32_t)(end - body);
         if (!memcmp(p, "MTrk", 4))
-            if (!parse_track(s, body, body + len)) { song_free(s); snprintf(err, errsz, "out of memory"); return 0; }
+            if (!parse_track(s, body, body + len, 0)) { song_free(s); snprintf(err, errsz, "out of memory"); return 0; }
         p = body + len;
     }
+parsed:
     if (!s->nev) { song_free(s); snprintf(err, errsz, "no events"); return 0; }
     qsort(s->ev, (size_t)s->nev, sizeof(Event), ev_cmp);
     schedule(s);
     return 1;
 }
-
 
 /* ------------------------------------------------------------------ channel / note activity (the visualizer's data) */
 static const char* const gm_names[128] = {
@@ -498,11 +690,21 @@ static int song_info(const char* path, SongInfo* si)
     if ((long)fread(d, 1, (size_t)n, f) != n) { fclose(f); free(d); return 0; }
     fclose(f);
     p = d; end = d + n;
-    if (!memcmp(p, "RIFF", 4) && n > 20 && !memcmp(p + 8, "RMID", 4) && !memcmp(p + 12, "data", 4)) p += 20;
+    if (!memcmp(p, "MUS\x1A", 4) || !memcmp(p, "HMIMIDIP", 8) || !memcmp(p, "FORM", 4) || !memcmp(p, "CAT ", 4))
+    {   /* MUS / HMP / XMI: small game files, the whole loader is quick enough */
+        Song t; char e[64];
+        free(d);
+        if (!song_load(&t, path, e, sizeof e)) return 0;
+        si->ms = (long)(t.ev[t.nev - 1].us / 1000); si->fmt = t.format; si->trk = t.ntrks;
+        snprintf(si->title, sizeof si->title, "%s", t.title);
+        song_free(&t); si->ok = 1;
+        return 1;
+    }
+    p = riff_midi(p, &end);
     if (end - p < 14 || memcmp(p, "MThd", 4)) { free(d); return 0; }
     {
         uint32_t hl = be32(p + 4);
-        if (hl < 6 || p + 8 + hl > end) { free(d); return 0; }
+        if (hl < 6 || hl > (uint32_t)(end - p - 8)) { free(d); return 0; }
         si->fmt = be16(p + 8); si->trk = be16(p + 10); division = be16(p + 12);
         p += 8 + hl;
     }
@@ -528,25 +730,20 @@ static int song_info(const char* path, SongInfo* si)
                     int type;
                     if (q >= te) break;
                     type = *q++;
-                    if (!varlen(&q, te, &l) || q + l > te) break;
+                    if (!varlen(&q, te, &l) || l > (uint32_t)(te - q)) break;
                     if (type == 0x2F) break;
                     if (type == 0x51 && l == 3)
                     {
                         if (ntp == ctp) { TempoPt* t2 = (TempoPt*)realloc(tp, (size_t)(ctp = ctp ? ctp * 2 : 16) * sizeof *tp); if (!t2) break; tp = t2; }
                         tp[ntp].tick = tick; tp[ntp].tempo = ((uint32_t)q[0] << 16) | (q[1] << 8) | q[2]; ntp++;
                     }
-                    else if (type == 0x03 && !si->title[0] && l > 0)
-                    {
-                        uint32_t k, m = 0;
-                        for (k = 0; k < l && m < sizeof si->title - 1; k++) si->title[m++] = (q[k] >= 32 && q[k] < 127) ? (char)q[k] : ' ';
-                        si->title[m] = 0;
-                    }
+                    else meta_title(si->title, sizeof si->title, type, q, l);
                     q += l;
                     if (tick > maxtick) maxtick = tick;
                 }
                 else if (st == 0xF0 || st == 0xF7)
                 {
-                    if (!varlen(&q, te, &l) || q + l > te) break;
+                    if (!varlen(&q, te, &l) || l > (uint32_t)(te - q)) break;
                     q += l;
                     if (tick > maxtick) maxtick = tick;
                 }
@@ -588,10 +785,14 @@ static int song_info(const char* path, SongInfo* si)
 static uint16_t g_mute, g_solo;          /* channel bits: muted / solo (solo wins) */
 static int audible(int ch) { return g_solo ? (g_solo >> ch) & 1 : !((g_mute >> ch) & 1); }
 
+static int g_pitch;                      /* transpose in semitones, -12..+12 (not the drum channel 10) */
+static unsigned char g_tmap[16][128];    /* note held -> the note that was sent for it + 1 (so a key change while it
+                                            sounds still ends the right note) */
 static void silence(void)
 {
     int ch;
     { int c, n; for (c = 0; c < 16; c++) { g_viz.count[c] = 0; for (n = 0; n < 128; n++) g_viz.on[c][n] = 0; } }
+    memset(g_tmap, 0, sizeof g_tmap);
     for (ch = 0; ch < 16; ch++)
     {
         out_byte((unsigned char)(0xB0 | ch)); out_byte(64); out_byte(0);   /* sustain off */
@@ -610,14 +811,32 @@ static void send_event(const Song* s, const Event* e)
     int i;
     if (e->kind == EV_SHORT)
     {
-        int st = (int)(e->arg & 0xFF);
-        if ((st & 0xF0) == 0x90 && ((e->arg >> 16) & 0x7F) && !audible(st & 15)) return;   /* muted: no note-on */
+        int st = (int)(e->arg & 0xFF), hi = st & 0xF0, ch = st & 15, d1 = (int)((e->arg >> 8) & 0x7F), d2 = (int)((e->arg >> 16) & 0x7F);
+        int on = hi == 0x90 && d2;
+        if (on && !audible(ch)) return;                                  /* muted: no note-on */
+        if ((hi == 0x80 || hi == 0x90 || hi == 0xA0) && ch != 9 && (g_pitch || g_tmap[ch][d1]))
+        {   /* transposed: a note-on remembers what it sent, its note-off / aftertouch use that */
+            int m = g_tmap[ch][d1] ? g_tmap[ch][d1] - 1 : d1 + g_pitch;
+            if (on)
+            {
+                if (g_tmap[ch][d1] && g_tmap[ch][d1] - 1 != d1 + g_pitch)
+                {   /* the same key again after a key change: end the old one first */
+                    out_byte((unsigned char)(0x80 | ch)); out_byte((unsigned char)(g_tmap[ch][d1] - 1)); out_byte(64);
+                }
+                m = d1 + g_pitch;
+                if (m < 0 || m > 127) { g_tmap[ch][d1] = 0; return; }
+                g_tmap[ch][d1] = (unsigned char)(m + 1);
+            }
+            else if (hi != 0xA0) g_tmap[ch][d1] = 0;
+            if (m < 0 || m > 127) return;
+            d1 = m;
+        }
 #ifndef HOSTTEST
-        if ((st & 0xF0) == 0x90 && ((e->arg >> 16) & 0x7F)) g_notes_out++;
+        if (on) g_notes_out++;
 #endif
         out_byte((unsigned char)st);
-        if (e->len > 1) out_byte((unsigned char)((e->arg >> 8) & 0x7F));
-        if (e->len > 2) out_byte((unsigned char)((e->arg >> 16) & 0x7F));
+        if (e->len > 1) out_byte((unsigned char)d1);
+        if (e->len > 2) out_byte((unsigned char)d2);
     }
     else if (e->kind == EV_SYSEX)
     {
@@ -626,6 +845,7 @@ static void send_event(const Song* s, const Event* e)
     }
 }
 
+static void pitch_set(int p) { g_pitch = p < -12 ? -12 : p > 12 ? 12 : p; }
 static void send_reset_bytes(int mode)
 {
     static const unsigned char gs[] = {0xF0, 0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7F, 0x00, 0x41, 0xF7};
@@ -672,6 +892,11 @@ static struct
     int paused, ending, speed, busy;
 } P = { .speed = 100 };
 
+/* A-B loop: A pressed once = start mark, twice = end mark, the part between repeats; a third time ends it */
+static int g_ab;                          /* 0 off, 1 A set, 2 looping A..B */
+static uint64_t g_ab_a, g_ab_b;
+static unsigned long g_ab_loops;
+
 static uint64_t song_time(void)
 {
     uint64_t t;
@@ -699,6 +924,7 @@ static void mp_pump(void)
     while (P.i < P.s.nev && P.s.ev[P.i].us <= t)
     {
         const Event* e = &P.s.ev[P.i];
+        if (g_ab == 2 && e->us >= g_ab_b) break;                     /* A-B loop: the main loop jumps back to A */
         /* the synth's queue is full (MPU "DRR busy": a slow PC cannot render as fast as the song plays): send the
            rest later instead of waiting here. Waiting per byte (up to 1 s each) froze the whole player - no screen,
            no keys - on slow PCs; dropping bytes would lose notes. The song lags; nothing is lost. */
@@ -766,6 +992,7 @@ static int mp_start(const char* path, int reset_mode, char* err, size_t errsz)
     if (!song_load(&P.s, path, err, errsz)) return 0;
     P.loaded = 1; P.i = 0; P.paused = 0; P.ending = 0;
     P.total = P.s.ev[P.s.nev - 1].us;
+    g_ab = 0;
     viz_reset();
     send_reset_bytes(reset_mode);
     P.base_song = 0; P.base_real = now_us() + (reset_mode == 2 ? 0 : 250000);
@@ -773,6 +1000,45 @@ static int mp_start(const char* path, int reset_mode, char* err, size_t errsz)
 }
 /* 1 when the song has finished (and its last notes have rung out) */
 static int mp_finished(void) { return P.loaded && P.ending && now_us() >= P.tail_until; }
+/* A key: mark A, then B (at least 1 s later), then off */
+static const char* ab_key(void)
+{
+    uint64_t t = song_time();
+    if (!P.loaded) return "A-B loop: nothing is playing";
+    if (g_ab == 0) { g_ab_a = t; g_ab = 1; return "A-B loop: A set - press A again at the end of the part"; }
+    if (g_ab == 1)
+    {
+        if (t < g_ab_a + 1000000) { g_ab_a = t; return "A-B loop: B must come at least 1 s after A - A moved here"; }
+        g_ab_b = t; g_ab = 2; g_ab_loops = 0; return "A-B loop on: the part repeats (A again: off)";
+    }
+    g_ab = 0; return "A-B loop off";
+}
+/* from the main loop: at B, back to A */
+static void ab_check(void)
+{
+    if (g_ab == 2 && P.loaded && !P.paused && song_time() >= g_ab_b) { mp_seek(g_ab_a); g_ab_loops++; }
+}
+
+/* ---- sleep timer: Z steps through off, end of this song, 15..120 minutes; then the music pauses (SPACE goes on) */
+static const int sleep_min[8] = { 0, -1, 15, 30, 45, 60, 90, 120 };
+static int g_sleep; static uint64_t g_sleep_at;
+static const char* sleep_key(void)
+{
+    static char b[64];
+    g_sleep = (g_sleep + 1) % 8;
+    if (sleep_min[g_sleep] > 0) g_sleep_at = now_us() + (uint64_t)sleep_min[g_sleep] * 60000000ULL;
+    if (!g_sleep) return "Sleep timer off";
+    if (g_sleep == 1) return "Sleep timer: stop after this song";
+    snprintf(b, sizeof b, "Sleep timer: the music stops in %d minutes", sleep_min[g_sleep]);
+    return b;
+}
+/* 1 when the sleep timer has run out (the caller stops the music) */
+static int sleep_due(void) { return g_sleep > 1 && now_us() >= g_sleep_at; }
+static void sleep_stop(void)
+{
+    g_sleep = 0;
+    if (P.loaded && !P.ending) mp_pause(1); else mp_unload();
+}
 
 
 #ifdef HOSTTEST
@@ -812,9 +1078,10 @@ static int is_midi_name(const char* n)
 {
     const char* e = strrchr(n, '.');
     if (!e) return 0;
-    return !stricmp(e, ".mid") || !stricmp(e, ".midi") || !stricmp(e, ".rmi") || !stricmp(e, ".kar");
+    return !stricmp(e, ".mid") || !stricmp(e, ".midi") || !stricmp(e, ".rmi") || !stricmp(e, ".kar") || !stricmp(e, ".smf")
+        || !stricmp(e, ".mus") || !stricmp(e, ".hmp") || !stricmp(e, ".xmi");
 }
-static int is_m3u_name(const char* n) { const char* e = strrchr(n, '.'); return e && (!stricmp(e, ".m3u") || !stricmp(e, ".lst")); }
+static int is_m3u_name(const char* n) { const char* e = strrchr(n, '.'); return e && (!stricmp(e, ".m3u") || !stricmp(e, ".m3u8") || !stricmp(e, ".lst")); }
 static void q_added(int i); static void q_removed(int i); static void q_reset(void);
 static void pl_add(const char* p)
 {
@@ -1053,6 +1320,8 @@ static int pl_load_m3u(const char* file)
         size_t l = strlen(line);
         if (l == sizeof line - 1 && line[l - 1] != '\n') { int c; while ((c = fgetc(f)) != EOF && c != '\n') ; }   /* rest of a too long line */
         line[strcspn(line, "\r\n")] = 0;
+        if (!n && !memcmp(line, "\xEF\xBB\xBF", 3)) memmove(line, line + 3, strlen(line + 3) + 1);   /* UTF-8 BOM (.M3U8, Windows tools) */
+        { size_t k = strlen(line); while (k && (line[k - 1] == ' ' || line[k - 1] == '\t')) line[--k] = 0; }
         if (!line[0] || line[0] == '#') continue;
         if (line[1] == ':' || line[0] == '\\' || line[0] == '/') snprintf(p, sizeof p, "%s", line);
         else snprintf(p, sizeof p, "%s%s", dir, line);
@@ -1114,6 +1383,7 @@ static void cfg_load(void)
         else if (!strcmp(line, "START")) g_startlast = n != 0;
         else if (!strcmp(line, "GAP")) g_gap = n >= 0 && n <= 10 ? n : 0;
         else if (!strcmp(line, "SPEED")) P.speed = n >= 25 && n <= 400 ? n : 100;
+        else if (!strcmp(line, "PITCH")) pitch_set(n);
         else if (!strcmp(line, "DIR")) snprintf(g_lastdir, sizeof g_lastdir, "%s", v);
         else if (!strcmp(line, "LAST")) g_last_index = atol(v);
         else if (!strcmp(line, "POS")) g_last_pos = atol(v);
@@ -1137,8 +1407,8 @@ static void cfg_save(void)
                 g_m3cfg[1][0], g_m3cfg[1][1], g_m3cfg[1][2], g_m3cfg[1][3]);
     }
     fprintf(f, "SCENE3D=%d\nTHEME3D=%d\nPLAYER3D=%d\n", g_scene, g_ctheme, g_model);
-    fprintf(f, "VIEW=%d\nREPEAT=%d\nSHUFFLE=%d\nRESET=%d\nSTART=%d\nGAP=%d\nSPEED=%d\nDIR=%s\nLAST=%d\nPOS=%lu\n",
-            g_view, g_rep, g_shuf, g_reset, g_startlast, g_gap, P.speed, g_lastdir, g_cur,
+    fprintf(f, "VIEW=%d\nREPEAT=%d\nSHUFFLE=%d\nRESET=%d\nSTART=%d\nGAP=%d\nSPEED=%d\nPITCH=%d\nDIR=%s\nLAST=%d\nPOS=%lu\n",
+            g_view, g_rep, g_shuf, g_reset, g_startlast, g_gap, P.speed, g_pitch, g_lastdir, g_cur,
             P.loaded ? (unsigned long)(song_time() / 1000000ULL) : 0UL);
     fclose(f);
 }
@@ -1349,16 +1619,23 @@ static void now_playing(void)
     if (P.loaded)
     {
         char fn[16]; snprintf(fn, sizeof fn, "%.12s", base_of(g_pl[g_cur >= 0 ? g_cur : 0].path)); dosify(fn);
-        snprintf(b, sizeof b, "%s \xFA Format %d \xFA %d track%s \xFA %ld BPM%s", fn, P.s.format,
-                 P.s.ntrks, P.s.ntrks == 1 ? "" : "s", g_viz.bpm10 / 10, "");
-        tui_putw(4, 3, 50, 0x13, g_cur >= 0 ? b : "");
+        snprintf(b, sizeof b, "%s \xFA %s %d \xFA %d trk \xFA %ld BPM", fn, P.s.kind ? P.s.kind : "MIDI", P.s.format,
+                 P.s.ntrks, g_viz.bpm10 / 10);
+        tui_putw(4, 3, 42, 0x13, g_cur >= 0 ? b : "");
     }
-    x = 55;
-    snprintf(b, sizeof b, "%s", g_rep == 1 ? "\x1D all" : g_rep == 2 ? "\x1D one" : "");
-    if (b[0]) { tui_put(x, 3, 0x1B, b); }
-    if (g_shuf) tui_put(62, 3, 0x1B, g_shuf == 2 ? "\x1A shuf dir" : "\x1A shuf");
-    if (P.speed != 100) { snprintf(b, sizeof b, "%d%%", P.speed); tui_put(69, 3, 0x1E, b); }
-    if (g_mute || g_solo) tui_put(75, 3, 0x1C, g_solo ? "SOLO" : "MUTE");
+    {   /* the modes that are on, right-aligned: repeat, shuffle, speed, key, A-B, sleep, mute/solo */
+        char f[80] = ""; size_t l;
+        if (g_rep) strcat(f, g_rep == 1 ? " \x1D""all" : " \x1D""one");
+        if (g_shuf) strcat(f, g_shuf == 2 ? " \x1A""dir" : " \x1A""shuf");
+        if (P.speed != 100) sprintf(f + strlen(f), " %d%%", P.speed);
+        if (g_pitch) sprintf(f + strlen(f), " key%+d", g_pitch);
+        if (g_ab) strcat(f, g_ab == 1 ? " A-" : " A-B");
+        if (g_sleep == 1) strcat(f, " Zz:end");
+        else if (g_sleep > 1) { uint64_t t = now_us(); sprintf(f + strlen(f), " Zz%um", (unsigned)((g_sleep_at > t ? g_sleep_at - t + 59999999 : 0) / 60000000)); }
+        if (g_mute || g_solo) strcat(f, g_solo ? " SOLO" : " MUTE");
+        l = strlen(f); x = 80 - (int)l; if (x < 47) x = 47;
+        tui_putw(x, 3, 80 - x, 0x1E, f);
+    }
     /* progress: time, a bar with half-cell steps, length, time left */
     {
         uint64_t el = P.loaded ? song_time() : 0, tot = P.loaded ? P.total : 0;
@@ -1373,6 +1650,11 @@ static void now_playing(void)
             if (fill >= 2) tui_cell(9 + i, 4, 0x1A, 0xDB);
             else if (fill == 1) tui_cell(9 + i, 4, 0x8A, 0xDD);   /* left half lit on a slate cell */
             else tui_cell(9 + i, 4, 0x18, 0xC4);
+        }
+        if (g_ab && tot)
+        {   /* A and B over the bar */
+            tui_cell(9 + (int)(g_ab_a * (uint64_t)w / tot), 4, 0x1E, 'A');
+            if (g_ab == 2) tui_cell(9 + (int)((g_ab_b * (uint64_t)w / tot) < (uint64_t)w ? g_ab_b * (uint64_t)w / tot : (uint64_t)(w - 1)), 4, 0x1E, 'B');
         }
         tui_put(68, 4, 0x17, t2);
         tui_put(74, 4, 0x18, t3);
@@ -1485,9 +1767,20 @@ static int find_key(int k, int n, const char* (*nm1)(int), const char* (*nm2)(in
     if (i < n) { *sel = i; list_keep(sel, top, n); }
     return 1;
 }
+/* Ctrl+F search (Playlist / Files): words anywhere in the name or title; Ctrl+F or F6 = next match */
+static char g_srch[32]; static int g_srch_on, g_srch_n, g_srch_k;
 static void find_line(void)
 {
     tui_fill(1, 23, 80, 1, 0x10, ' ');
+    if (g_srch_on)
+    {
+        char b[64];
+        tui_put(2, 23, 0x1B, "Search:"); tui_put(10, 23, 0x1E, g_srch); tui_cell(10 + (int)strlen(g_srch), 23, 0x1E, '_');
+        if (g_srch[0]) { if (g_srch_n) snprintf(b, sizeof b, "%d of %d  ^F next  ENTER play  ESC close", g_srch_k, g_srch_n); else snprintf(b, sizeof b, "not found  ESC close"); }
+        else snprintf(b, sizeof b, "type part of a name or title  ESC close");
+        tui_putw(80 - (int)strlen(b), 23, (int)strlen(b), g_srch[0] && !g_srch_n ? 0x1C : 0x17, b);
+        return;
+    }
     if (find_active()) { tui_put(2, 23, 0x1B, "Find:"); tui_put(8, 23, 0x1E, g_find); tui_cell(8 + (int)strlen(g_find), 23, 0x1E, '_'); }
 }
 
@@ -1896,13 +2189,15 @@ static void page_help(void)
         "  N P   next / previous   R  repeat off/all/one    H  shuffle off/all/folder",
         "  \x18 \x19   choose a channel (or the SC-55 part)  M mute it  O solo it  U all on",
         "  [ ]   slower / faster, BACKSPACE = 100%     B  the files     Q  quit",
+        "  { }   key down / up a semitone (\\ = as written)   A  A-B loop: mark A, mark B, off",
+        "  Z     sleep timer: off, after this song, 15-120 min     F  search the playlist",
         "  S     channels \x1A SC-55 front panel \x1A 3D   (F4 in 3D: full / half resolution)",
         "  3D:   V look (solid / vector / voxel)   C colours   J player (module, boombox, jukebox, turntable)",
         "~PLAYLIST~   (type a name to jump to it)",
         "  ENTER play   DEL remove   ^\x18 ^\x19 move   F5 sort: name, title, length, shuffle",
-        "  ^S save it as .M3U   ^O open a .M3U   INS add songs",
+        "  ^S save it as .M3U   ^O open a .M3U   INS add songs   ^F search (^F: next match)",
         "~FILES~      (type a name to jump to it)",
-        "  ENTER play the song now, or open the folder, drive or .M3U   BACKSPACE up",
+        "  ENTER play the song now, or open the folder, drive or .M3U   BACKSPACE up   ^F search",
         "  INS mark songs (ENTER adds them)   ^A add this folder   ^P play this folder",
         "~MOUSE~  click: choose, click again: play or open. Wheel scrolls. Click the time",
         "  bar to seek. Right click: back. The playlist, song and time are remembered.",
@@ -1917,6 +2212,36 @@ static void page_help(void)
     }
     hintline("The music goes to SBEMU's MPU-401: SC-55, MT-32 or SoundFont, as set in SETTINGS.");
     keybar("~ESC~ Back  ~F2~ Options  ~TAB~ Next page");
+}
+
+/* ---- Ctrl+F search */
+static int srch_hit(int i)
+{
+    if (g_page == PG_LIST) return ci_contains(pl_nm_file(i), g_srch) || ci_contains(pl_nm_title(i), g_srch);
+    return ci_contains(fl_nm(i), g_srch);
+}
+/* the next match from `from` (wrapping), selected; counts the matches and which one it is */
+static void srch_go(int from)
+{
+    int n = g_page == PG_LIST ? g_npl : fl_n, *sel = g_page == PG_LIST ? &pl_sel : &fl_sel, *top = g_page == PG_LIST ? &pl_top : &fl_top, i, f = -1;
+    g_srch_n = g_srch_k = 0;
+    if (!g_srch[0] || n <= 0) return;
+    for (i = 0; i < n; i++) { int j = ((from < 0 ? 0 : from) + i) % n; if (srch_hit(j)) { f = j; break; } }
+    if (f < 0) return;
+    for (i = 0; i < n; i++) if (srch_hit(i)) { g_srch_n++; if (i <= f) g_srch_k++; }
+    *sel = f; list_keep(sel, top, n);
+}
+static void srch_open(void) { g_srch_on = 1; g_srch[0] = 0; g_srch_n = g_srch_k = 0; g_find[0] = 0; }
+/* 1 when the key was the search's */
+static int srch_key(int k)
+{
+    size_t l = strlen(g_srch); int cur = g_page == PG_LIST ? pl_sel : fl_sel;
+    if (k == K_ESC) { g_srch_on = 0; return 1; }
+    if (k == K_CF || k == K_F6) { srch_go(cur + 1); return 1; }
+    if (k == K_BKSP) { if (l) g_srch[l - 1] = 0; srch_go(cur); return 1; }
+    if (k >= 32 && k < 127) { if (l < sizeof g_srch - 1) { g_srch[l] = (char)tolower(k); g_srch[l + 1] = 0; } srch_go(cur); return 1; }
+    if (k == K_ENTER) g_srch_on = 0;            /* and the page plays / opens the match */
+    return 0;
 }
 
 /* ================================================================== the 3D view, frames, keys, main */
@@ -1962,7 +2287,7 @@ static void draw_player(void)
     if (g_view == 1) sc55_panel(); else channel_table();
     keyboard();
     hintline(g_view == 1 ? "\x18\x19 part shown. SC-55: the module's real display, live from SBEMU."
-                         : "\x18\x19 channel: M mute, O solo, U all on   [ ] speed   R repeat   H shuffle");
+                         : "\x18\x19 channel: M mute, O solo, U all on  [ ] speed  { } key  A A-B loop  Z sleep");
     keybar("~F1~ Help ~F2~ Options ~SPACE~ Pause ~\x1B\x1A~ Seek ~N P~ Song ~S~ View ~TAB~ Lists ~ESC~ Quit");
 }
 /* one frame, if it is time: paced so drawing takes at most ~25% of the time (text) */
@@ -2005,7 +2330,7 @@ static void go_page(int p)
     }
     if (p == PG_LIST && g_cur >= 0) { pl_sel = g_cur; list_keep(&pl_sel, &pl_top, g_npl); }
     if ((p == PG_OPTIONS || p == PG_HELP) && g_page != PG_OPTIONS && g_page != PG_HELP) g_back = g_page;
-    g_page = p; g_find[0] = 0; g_next_frame = 0;
+    g_page = p; g_find[0] = 0; g_srch_on = 0; g_next_frame = 0;
 }
 static void key_player(int k)
 {
@@ -2031,6 +2356,12 @@ static void key_player(int k)
     case '[': set_speed(P.speed - 5); msg("Speed %d%%", P.speed); break;
     case ']': set_speed(P.speed + 5); msg("Speed %d%%", P.speed); break;
     case K_BKSP: set_speed(100); msg("Speed 100%%"); break;
+    case '{': pitch_set(g_pitch - 1); cfg_save(); msg("Key %+d semitones (drums stay)", g_pitch); break;
+    case '}': pitch_set(g_pitch + 1); cfg_save(); msg("Key %+d semitones (drums stay)", g_pitch); break;
+    case '\\': pitch_set(0); cfg_save(); msg("Key: as written"); break;
+    case 'a': case 'A': msg("%s", ab_key()); break;
+    case 'z': case 'Z': msg("%s", sleep_key()); break;
+    case 'f': case 'F': case K_CF: go_page(PG_LIST); srch_open(); break;
     case 'r': case 'R': g_rep = (g_rep + 1) % 3; msg("Repeat %s", (const char*[]){"off", "all songs", "one song"}[g_rep]); break;
     case 'l': case 'L': g_rep = g_rep ? 0 : 1; msg("Repeat %s", g_rep ? "all songs" : "off"); break;
     case 'h': case 'H': g_shuf = (g_shuf + 1) % 3; msg("Shuffle %s", (const char*[]){"off", "on: all songs", "on: this folder only"}[g_shuf]); break;
@@ -2139,6 +2470,11 @@ static void handle_key(int k)
     if (k == '!') *(volatile int*)0xFFFFFFF0 = 1;                       /* test build only: a GPF for the crash catcher */
 #endif
     if (mp3_on && mp3_ask_until) { mp3_answer(k == 'y' || k == 'Y'); mp3_force = 1; cfg_save(); return; }   /* "keep this mode?" */
+    if (g_page == PG_LIST || g_page == PG_FILES)
+    {
+        if (!g_srch_on && k == K_CF) { srch_open(); return; }
+        if (g_srch_on && srch_key(k)) return;
+    }
     /* everywhere */
     if (k == K_F1) { if (g_page == PG_HELP) go_page(g_back); else go_page(PG_HELP); return; }
     if (k == K_F2) { if (g_page == PG_OPTIONS) go_page(g_back); else go_page(PG_OPTIONS); return; }
@@ -2325,6 +2661,13 @@ int main(int argc, char** argv)
         int k;
         mp_pump();
         if (g_quit_s && P.loaded && song_time() > (uint64_t)g_quit_s * 1000000ULL) break;
+        ab_check();
+        if (sleep_due())
+        {
+            sleep_stop(); cfg_save();
+            msg("Sleep timer: the music stopped. SPACE plays on.");
+            if (!g_ui) break;
+        }
         /* keys first: an N pressed just as a song ends must skip the ending song, not the one that already started
            in its place (that skipped two) */
         k = get_input();
@@ -2335,6 +2678,10 @@ int main(int argc, char** argv)
             else if (k == ' ') mp_pause(!P.paused);
             else if (k == 'n' || k == 'N') g_act = 1;
             else if (k == 'p' || k == 'P') g_act = 3;
+            else if (k == 'a' || k == 'A') printf("\n%s\n", ab_key());
+            else if (k == 'z' || k == 'Z') printf("\n%s\n", sleep_key());
+            else if (k == '{' || k == '}') { pitch_set(g_pitch + (k == '}' ? 1 : -1)); printf("\nKey %+d\n", g_pitch); }
+            else if (k == '[' || k == ']') { set_speed(P.speed + (k == ']' ? 5 : -5)); printf("\nSpeed %d%%\n", P.speed); }
         }
         if (g_act)
         {
@@ -2353,8 +2700,9 @@ int main(int argc, char** argv)
         finished = 0;
         if (P.loaded && mp_finished())
         {
-            int n = next_index(1);
-            if (n < 0) { mp_unload(); msg("End of the playlist"); if (!g_ui) break; }
+            int n = g_sleep == 1 ? -1 : next_index(1);
+            if (g_sleep == 1) { g_sleep = 0; mp_unload(); msg("Sleep timer: stopped after the song"); if (!g_ui) break; }
+            else if (n < 0) { mp_unload(); msg("End of the playlist"); if (!g_ui) break; }
             else if (g_gap) { mp_unload(); gap_until = now_us() + (uint64_t)g_gap * 1000000ULL; gap_next = n; }
             else { start_index(n); if (!g_ui && P.loaded) printf("\n%s\n", g_pl[g_cur].path); }
             finished = 1;
@@ -2443,13 +2791,42 @@ static int queue_test(void)
     printf(qt_fail ? "queue test: %d FAILED\n" : "queue test: all passed\n", qt_fail);
     return qt_fail != 0;
 }
+/* host play: MPHOST file [speed] [--pitch n] [--ab a_ms b_ms loops] [--sleep s] [--info]; every byte with
+   its time on stdout (info / A-B / sleep lines start with '#') */
 int main(int argc, char** argv)
 {
-    char err[64];
+    char err[64]; int i, loops = 0, npat = 0, pat_v[8]; long sleep_s = -1; uint64_t ab_a = 0, ab_b = 0, pat_t[8];
     if (argc > 1 && !strcmp(argv[1], "--queue")) return queue_test();
     if (argc < 2 || !mp_start(argv[1], 2, err, sizeof err)) { fprintf(stderr, "load failed: %s\n", argc < 2 ? "usage" : err); return 1; }
-    if (argc > 2) set_speed(atoi(argv[2]));
-    while (!mp_finished()) { mp_pump(); g_now_us += 500; }
+    for (i = 2; i < argc; i++)
+    {
+        if (!strcmp(argv[i], "--pitch") && i + 1 < argc) pitch_set(atoi(argv[++i]));
+        else if (!strcmp(argv[i], "--ab") && i + 3 < argc) { ab_a = strtoull(argv[i + 1], 0, 10) * 1000; ab_b = strtoull(argv[i + 2], 0, 10) * 1000; loops = atoi(argv[i + 3]); i += 3; }
+        else if (!strcmp(argv[i], "--sleep") && i + 1 < argc) sleep_s = atol(argv[++i]);
+        else if (!strcmp(argv[i], "--pitchat") && i + 2 < argc && npat < 8) { pat_t[npat] = strtoull(argv[i + 1], 0, 10) * 1000; pat_v[npat++] = atoi(argv[i + 2]); i += 2; }
+        else if (!strcmp(argv[i], "--info"))
+        {
+            SongInfo si; song_info(argv[1], &si);
+            printf("# kind %s format %d tracks %d events %ld title '%s' total_ms %llu info_ok %d info_ms %ld info_title '%s'\n",
+                   P.s.kind, P.s.format, P.s.ntrks, P.s.nev, P.s.title, (unsigned long long)(P.total / 1000), si.ok, si.ms, si.title);
+        }
+        else set_speed(atoi(argv[i]));
+    }
+    if (sleep_s >= 0) { g_sleep = 2; g_sleep_at = (uint64_t)sleep_s * 1000000ULL; }
+    while (!mp_finished() && P.loaded)
+    {
+        mp_pump();
+        { int k; for (k = 0; k < npat; k++) if (pat_t[k] && song_time() >= pat_t[k]) { pitch_set(pat_v[k]); pat_t[k] = 0; } }
+        if (loops)
+        {   /* the keys A, A at the given times; after `loops` loops A once more (off) */
+            if (g_ab == 0 && song_time() >= ab_a && !g_ab_loops) ab_key();
+            if (g_ab == 1 && song_time() >= ab_b) printf("# %s\n", ab_key());
+            ab_check();
+            if (g_ab == 2 && g_ab_loops >= (unsigned long)loops) printf("# %s after %lu loops\n", ab_key(), g_ab_loops);
+        }
+        if (sleep_due()) { printf("# sleep timer at %llu\n", (unsigned long long)g_now_us); sleep_stop(); if (P.paused) break; }
+        g_now_us += 500;
+    }
     mp_unload();
     return 0;
 }
