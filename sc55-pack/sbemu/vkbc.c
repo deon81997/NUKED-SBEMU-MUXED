@@ -346,6 +346,15 @@ void VKBC_Tick(void)
     if (Rep && t >= RepT && Kh == Kt) { usage_key(Rep, 1, 1); RepT = t + ms2c(33); }
     if (PadRep && t >= PadRepT && Kh == Kt) { put_key(PadRep, 1); PadRepT = t + ms2c(33); }
     USBPAD_SetLeds(VKBC_Leds());
+}
+
+/* beta.100: the byte goes into the controller at the very end of the sound interrupt, with interrupts off, no
+ * longer from VKBC_Tick (interrupts on there): IRQ 1 / IRQ 12 then come when the CPU is back in the program, as
+ * with a PS/2 keyboard, instead of running the program's keyboard / mouse handlers (and the BIOS's, the mouse
+ * driver's) nested inside SBEMU's interrupt on SBEMU's stacks. With a USB keyboard / mouse on the P5PE-VM's NEC
+ * OHCI, MENU 3D (GPF) and MIDPLAY 3D (Stack Fault) crashed at harmless instructions on key presses. */
+void VKBC_Deliver(void)
+{
     inject();
 }
 

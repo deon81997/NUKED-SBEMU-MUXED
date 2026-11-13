@@ -2429,6 +2429,7 @@ static void MAIN_InterruptPM()
         DIAG_IsrEnd(MAIN_DiagFrames);
         MAIN_TimerReplay(DIAG_Tsc() - isr_t0);
         MAIN_CDService();
+        if(MAIN_JOY_On) VKBC_Deliver();   /* interrupts off: IRQ 1/12 come once back in the program (see VKBC_Deliver) */
         MAIN_FPU_LEAVE();
     }
     #if !MAIN_ISR_CHAINED
@@ -2469,6 +2470,7 @@ static void MAIN_InterruptRM()
         DIAG_IsrEnd(MAIN_DiagFrames);
         MAIN_TimerReplay(DIAG_Tsc() - isr_t0);
         MAIN_CDService();
+        if(MAIN_JOY_On) VKBC_Deliver();   /* interrupts off: IRQ 1/12 come once back in the program (see VKBC_Deliver) */
         MAIN_FPU_LEAVE();
     }
     #if !MAIN_ISR_CHAINED

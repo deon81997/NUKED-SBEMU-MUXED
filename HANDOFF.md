@@ -1,4 +1,25 @@
 
+## beta.102 (2026-11-13, DOS session): USB keyboard/mouse bytes enter the 8042 at the END of the sound interrupt (vkbc.c, main.c)
+- Was "Known issue": P5PE-VM, Logitech Unifying 046d:c52b on the NEC card's OHCI ("ED rewrite per transfer" mode): MENU 3D GPF
+  on F2/F3, MIDPLAY 3D "Stack Fault", both at harmless instructions; PS/2 keyboard fine.
+- NOT reproduced in QEMU: testrig/usb3d (pci-ohci, and NEC-like EHCI + 2 OHCI companions with SBEMU built -DOSLOWFORCE),
+  30 min each cycling every look/theme/player and MENU style (on beta.99 sources + this fix), 71 normal program exits each,
+  no crash (also none before the fix). 5 min again on beta.101 sources: fine.
+- Audit: every async entry already keeps the program's FPU (sound IRQ PM/RM: MAIN_FPU_ENTER; PM traps hdpmipt.c; RM traps
+  qemm.c); no x87 before those saves (objdump of non-LTO objects). Stack (gcc -fcallgraph-info=su): sound IRQ ~7.8 KB of 32 KB
+  (go32 wrapper / RMCB stacks), trap handlers < 2.5 KB of 16 KB. Instrumented run (counters at 0040:00E0-00FF): no nested PM
+  trap, IF never 1 inside PM/RM trap handlers. Note: our HDPMI32I keeps a trapped frame in ONE host buffer (?USE_HOST_MEM=1
+  in I2FHDPMI.ASM), so a nested PM trap would return to the wrong CS:EIP/SS:ESP - exactly this crash pattern; not seen here.
+- Change: VKBC_Tick (inside MAIN_Interrupt, interrupts ON) no longer puts the byte into the 8042; VKBC_Deliver() does, at the
+  end of MAIN_InterruptPM/RM after EOI + CD service with interrupts off. IRQ 1/12 now come when the CPU is back in the
+  program (like a PS/2 keyboard) instead of running the program's/BIOS's/mouse driver's handlers nested inside SBEMU.
+  Keys/mouse checked over USB in QEMU (trace usb_ohci_td_pkt_short shows the reports).
+- Release: beta.101 zip with SBEMU.EXE and SC55MENU.EXE (version) swapped. Personal pack not rebuilt (user's personal zip
+  not in this session).
+- Needs the real P5PE-VM: Unifying receiver on the NEC OHCI, MENU 3D F2/F3 and MIDPLAY 3D V/C/J (MIDPLAY's beta.100 crash
+  catcher writes CRASH.TXT). If it still crashes: CRASH.TXT / the HDPMI exception dump (CS:EIP, SS:ESP, error code) and the
+  SBEMU log; next step would be an HDPMI32I with ?USE_HOST_MEM=0.
+
 ## beta.101 (2026-11-13): MIDPLAY - MUS/HMP/XMI, transpose, A-B loop, sleep timer, Ctrl+F search
 User asked for: karaoke lyrics (DROPPED by the user mid-task - not needed), mute/solo, tempo + pitch, A-B loop,
 MUS/HMP/XMI/RMI, M3U, search, sleep timer. Already there before: mute/solo (M/O/U), tempo ([ ]), M3U load/save,
@@ -115,17 +136,9 @@ Review for 2,000-10,000 files, deep folders, long names. No fixed-size song arra
 - Tested in QEMU (FreeDOS, std-vga, SBEMU, a generated 90 s song with drums): every look x player x several themes, 640x480
   32-bit and 320x200 256 colours. Not tested on real hardware yet (speed of voxel on the Celeron).
 - Ideas left: .KAR lyrics in 3D, a showcase mode (player/theme/look change per song), pitch bend in the river, camera
-  choice, per-player LCD layouts. Open items: USB keyboard on the NEC OHCI crash (see below), 2-partition stick after
+  choice, per-player LCD layouts. Open items: USB keyboard on the NEC OHCI crash (beta.102, real-PC test), 2-partition stick after
   Win98 MS-DOS mode on the real PC (beta.98 moves blocked letters), stale screenshots (GAMETEST, TIMETEST, 3D menus),
   rendertest branch to delete, a plain-HTTP mirror for Win98 downloads, modules (docs/MODULES.md not written yet).
-
-## Known issue (2026-11-13, not fixed): crashes in 3D programs with a USB keyboard/mouse on the NEC OHCI
-- P5PE-VM, Logitech Unifying receiver (046d:c52b) on the NEC card's OHCI (log: "OHCI 2 lost a TD: ED rewrite per
-  transfer from now"): MENU 3D GPF on F2/F3 (all styles), MIDPLAY 3D "Stack Fault" - both at harmless instructions
-  (fault really during an interrupt). PS/2 keyboard: fine. Keys arrive correctly (F1-F12 = 3A-45, no media mode).
-- QEMU (UHCI, usb-kbd + usb-mouse, beta.98): 3.5 min of F2/F3/F4/F6/arrows + mouse in all 3D styles, no crash.
-- Workaround: keyboard/mouse on the motherboard's USB, NEC card for sticks (its EHCI). Not pursued further (can't
-  test the NEC quirk here). Idea if it comes back: keep HID off the NEC OHCI, or save the FPU in the RMCB callbacks.
 
 ## beta.98 (2026-11-12): USB letters refused after Win98 "Restart in MS-DOS mode"
 - Symptom (user's P5PE-VM, NEC EHCI): D: E: "Invalid function", stub 0 calls, INT 21h 7302h CF ax 000Fh, 36h FFFF.
