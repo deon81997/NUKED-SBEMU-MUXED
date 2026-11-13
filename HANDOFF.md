@@ -21,12 +21,21 @@
   - tools/usbdrv.c: rows for redir type 3, state 3; re-reads the note after asking.
 - Not measured yet: 86Box PII-450 SBDIAG load / SC55LOG speed (src at /tmp/dl/86box, not built). SC55LOG needs the
   user's SC-55 ROMs (none here). Changes run only at install / mount / medium check (expected 0% at runtime).
-- Next 3 steps: 1) implement xHCI bulk (Msd rings in XHC mem: XO_SIZE +0x1000, Configure Endpoint type 2/6, Normal
-  TRBs split at 64 KB, events by slot/dci in x_events, msd_clear = Reset EP + Set TR Dequeue) and drop the "not yet";
-  2) run all.sh (J=1 for sound) for fd+71 x j32/x32/j16 x 5 HCs x before/after, fix, fill a results table here;
-  3) 86Box PII-450 before/after (SBDIAG idle + STRESS.MID), then release beta.106 per the Release recipe.
+- 2026-11-13 later (same branch): (c) xHCI bulk DONE (usbpad.c x_disk_eps/x_bulk, XO_MSD rings, msd_clear = stop +
+  drop/add; light polls drain xHCI events only if it has pipes - disk-only xHCI made the SoundFont silent in QEMU,
+  cause not understood). (b) plug-after VERIFIED, (e) state-3 text VERIFIED. Rig: xhci p2=8,p3=0 (QEMU usb-storage
+  went to a USB 3 port), SBEMULOG + SBDIAG.TXT kept, audiodev timer-period=2000 (else ~8 IRQ/s), PASS = 7 PLAY OK
+  (loud = info), FreeDOS x32 uses HimemX ($HX, MS HIMEM hangs FreeDOS), HASISO.COM (MS-DOS 7.1 Abort/Retry/Fail on
+  empty spare letters = normal DOS, rig skips them). Matrix: logs/matrix-2026-11-13.txt = 36 runs ALL PASS
+  (fd j32/x32/j16 x 5 HCs except fd j16 xhci; 71 j32 uhci/ohci/ehci; 71 j32 xhci before passed by hand).
+- Next steps: 1) finish matrix: `DOSES=71 J=2 all.sh` (+ fd j16 xhci; rerun fd j32/x32 xhci rows on current code);
+  2) 86Box PII-450 before/after: VM ready to rebuild in /home/claude/86vm/p (c/PERF.BAT A|B = beta.105 / new SBEMU:
+  SBDIAG 30 s idle -> IDLEx.TXT, MIDPLAY STRESS.MID /Q:30 -> MIDx.TXT + MPx.TXT; cfg = p2bls-uhci.cfg with
+  cpu_speed 450000000, multi 4.5; 86Box built per testrig/86box/README.md); 3) README.TXT USB disks paragraph (xHCI,
+  later plugs incl. 2nd partition/exFAT/NTFS, CD images on USB letters), HWTEST.TXT lines, release beta.106.
 - Resume: clone; DJGPP + apt (qemu-system-x86 socat mtools exfatprogs exfat-fuse ntfs-3g gdisk fdisk dosfstools
-  genisoimage nasm); testrig/rufus/res/freedos + rufus/src -> rufus checkout; unzip release zip to /tmp/rel;
+  genisoimage nasm); HimemX: clone Baron-von-Riedesel/HimemX + JWasm (make -f GccUnix.mak),
+  `jwasm -mz -Fo/tmp/dl/HIMEMX.EXE HimemX.asm`; FULL.866 via `isoinfo -J -x /osroots/1/FULL.866`; testrig/rufus/res/freedos + rufus/src -> rufus checkout; unzip release zip to /tmp/rel;
   QuickInstall: mercy.py FULL.866 -> /tmp/dl/w98qi/x (IO.SYS MSDOS.SYS COMMAND.COM WINDOWS\HIMEM.SYS);
   `make -j2; sh tools/ucdd/mkcdset.sh; bash testrig/menumatrix/mkstick.sh /home/claude/vm/st` (root);
   `testrig/menumatrix/run.sh fd j32 ehci before`; `J=1 testrig/menumatrix/all.sh`.
