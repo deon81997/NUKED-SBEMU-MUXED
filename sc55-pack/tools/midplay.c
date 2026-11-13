@@ -45,6 +45,7 @@ static __attribute__((unused)) void sleep_ms(int ms) { g_now_us += (uint64_t)ms 
 #include "mpuport.h"
 
 static int base = 0x330;
+static int g_mpuport, p_arg;                /* Options: MPU-401 port chosen (0 = auto: saved /P, BLASTER P=, then a search) */
 static int g_dry;               /* /X: no MPU (timing tests): nothing is sent */
 
 /* ---- clock: the CPU's time stamp counter. Its rate is measured against the BIOS tick (54.9254 ms) over
@@ -1378,6 +1379,7 @@ static void cfg_load(void)
         else if (!strcmp(line, "THEME3D")) g_ctheme = n >= 0 && n <= 10 ? n : 0;
         else if (!strcmp(line, "PLAYER3D")) g_model = n >= 0 && n <= 3 ? n : 0;
         else if (!strcmp(line, "REPEAT")) g_rep = n >= 0 && n <= 2 ? n : 0;
+        else if (!strcmp(line, "MPU")) g_mpuport = (int)strtol(v, NULL, 16);
         else if (!strcmp(line, "SHUFFLE")) g_shuf = n >= 0 && n <= 2 ? n : 0;
         else if (!strcmp(line, "RESET")) g_reset = n >= 0 && n <= 2 ? n : 0;
         else if (!strcmp(line, "START")) g_startlast = n != 0;
@@ -1406,7 +1408,7 @@ static void cfg_save(void)
         fprintf(f, "MODE3D=%d %d %d\nHZ3D=%d\nMODE3DW=%d %d %d\nHZ3DW=%d\n", g_m3cfg[0][0], g_m3cfg[0][1], g_m3cfg[0][2], g_m3cfg[0][3],
                 g_m3cfg[1][0], g_m3cfg[1][1], g_m3cfg[1][2], g_m3cfg[1][3]);
     }
-    fprintf(f, "SCENE3D=%d\nTHEME3D=%d\nPLAYER3D=%d\n", g_scene, g_ctheme, g_model);
+    fprintf(f, "SCENE3D=%d\nTHEME3D=%d\nPLAYER3D=%d\nMPU=%X\n", g_scene, g_ctheme, g_model, g_mpuport);
     fprintf(f, "VIEW=%d\nREPEAT=%d\nSHUFFLE=%d\nRESET=%d\nSTART=%d\nGAP=%d\nSPEED=%d\nPITCH=%d\nDIR=%s\nLAST=%d\nPOS=%lu\n",
             g_view, g_rep, g_shuf, g_reset, g_startlast, g_gap, P.speed, g_pitch, g_lastdir, g_cur,
             P.loaded ? (unsigned long)(song_time() / 1000000ULL) : 0UL);
@@ -2071,7 +2073,7 @@ static void key_files(int k)
 
 /* ---- Options */
 static const char* const opt_name[] = { "Player view", "Repeat", "Shuffle", "Reset before each song", "Speed",
-                                        "Pause between songs", "Started without files", "Display mode", "Style", "Letters", "3D screen mode", "3D refresh rate" };
+                                        "Pause between songs", "Started without files", "Display mode", "Style", "Letters", "3D screen mode", "3D refresh rate", "MPU-401 port" };
 static const char* const opt_help[] = {
     "S on the Player page switches it too. 3D: the screen mode is chosen below.",
     "R on the Player page. One = the same song again and again.",
@@ -2084,10 +2086,12 @@ static const char* const opt_help[] = {
     "The colours (F3 anywhere); shared with MENU and the other programs.",
     "The font of the text (F7 anywhere); shared with MENU and the other programs.",
     "The 3D view's resolution and colours (the modes this graphics card offers). Bigger = sharper but slower. A new mode asks: Y keeps it, any other key or 10 s goes back. In a Windows DOS box only 320x200 VGA shows in a window.",
-    "Needs a VBE 3.0 graphics card. Only rates your monitor can show! A new rate asks: Y keeps it, any other key or 10 s goes back." };
+    "Needs a VBE 3.0 graphics card. Only rates your monitor can show! A new rate asks: Y keeps it, any other key or 10 s goes back.",
+    "Where the music goes. Auto finds SBEMU's MPU-401 (BLASTER P=, then a search). Pick a port for another or a real MPU-401; a port that does not answer is not kept." };
+static const int mpu_list[] = { 0, 0x300, 0x310, 0x320, 0x330, 0x332, 0x334, 0x336, 0x340, 0x350, 0x360 };
 static const int hz_list[] = { 0, 60, 70, 72, 75, 85, 100 };
 static int op_sel;
-#define OP_N 12
+#define OP_N 13
 static void opt_value(int i, char* b, size_t n)
 {
     switch (i)
@@ -2111,6 +2115,7 @@ static void opt_value(int i, char* b, size_t n)
         else if (!mp3_hz) snprintf(b, n, "BIOS default");
         else snprintf(b, n, "%d Hz", mp3_hz);
         break;
+    case 12: if (g_mpuport) snprintf(b, n, "%Xh", g_mpuport); else snprintf(b, n, "Auto (now %Xh)", base); break;
     }
 }
 static void page_options(void)
@@ -2164,6 +2169,28 @@ static void opt_change(int i, int d)
         }
         else msg("Refresh rates need a VBE 3.0 graphics card (this one: VBE %d.%d).", m3_vbever >> 4, m3_vbever & 15);
         break;
+    case 12:
+    {   /* the next port in the list that answers (Auto always counts); silence the old one, switch over */
+        int k, nl = (int)(sizeof mpu_list / sizeof mpu_list[0]), old = base, tries, want = 0;
+        for (k = 0; k < nl && mpu_list[k] != g_mpuport; k++) ;
+        if (k >= nl) k = 0;
+        for (tries = 0; tries < nl; tries++)
+        {
+            k = (k + d + nl) % nl;
+            if (g_dry) { g_mpuport = mpu_list[k]; break; }
+            want = mpu_list[k] ? mpu_list[k] : mpu_find(0);
+            if (!want) continue;
+            if (want != old && !mpu_probe(want)) continue;          /* quick: an empty port answers 0xFF at once */
+            if (want != old) base = want;
+            g_mpuport = mpu_list[k];
+            break;
+        }
+        if (g_dry) break;
+        if (base != old) { int nb = base; base = old; silence(); base = nb; mpu_uart(); }
+        else { mpu_detect(); mpu_uart(); }
+        msg(g_mpuport ? "Music goes to the MPU-401 at %Xh." : "Auto: SBEMU's MPU-401 at %Xh.", base);
+        break;
+    }
     }
     cfg_save();
 }
@@ -2590,7 +2617,7 @@ int main(int argc, char** argv)
     for (i = 1; i < argc; i++)
     {
         const char* a = argv[i];
-        if (!strncasecmp(a, "/P:", 3)) base = (int)strtol(a + 3, NULL, 16);
+        if (!strncasecmp(a, "/P:", 3)) { base = (int)strtol(a + 3, NULL, 16); p_arg = 1; }
         else if (!strncasecmp(a, "/D:", 3)) snprintf(dir_arg, sizeof dir_arg, "%s", a + 3);
         else if (!strcasecmp(a, "/L")) g_rep = 1;
         else if (!strcasecmp(a, "/R1")) g_rep = 2;
@@ -2621,6 +2648,7 @@ int main(int argc, char** argv)
     if (g_tsc) { m3_tsc_us = CK.per_us; m3_t0 = rdtsc64(); }
     mp3_win = g_win;
     { int* m = g_m3cfg[g_win != 0]; mp3_want_w = m[0]; mp3_want_h = m[1]; mp3_want_b = m[2]; mp3_hz = m[3]; }
+    if (g_mpuport && !p_arg) base = g_mpuport;
     { int p = g_dry ? 0 : mpu_find(base); if (p) base = p; }
     if (!g_dry)
     {

@@ -746,7 +746,8 @@ CONTENTS
   sent before each song (GS, GM or none), speed, pause between songs, what
   to play at start (the last playlist, from the song and spot where you
   quit, or the MIDI files next to MIDPLAY), screen mode, style, font, 3D
-  screen mode and 3D refresh rate.
+  screen mode, 3D refresh rate and the MPU-401 port (Auto finds SBEMU's;
+  pick another for a second or a real MPU-401 - only ports that answer).
   The key ({ }) is kept too. When you quit, the playlist is kept in
   MIDPLAY.M3U.
 

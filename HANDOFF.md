@@ -1,3 +1,10 @@
+## beta.105 (2026-11-13, DOS session): MIDPLAY Options > "MPU-401 port"
+- tools/midplay.c: g_mpuport (0 = Auto: mpu_find = /P, BLASTER P=, search), Options row 13 cycles Auto / 300..360,
+  only ports that answer (mpu_probe from mpuport.h, instant on an empty port) - silent ones are skipped, wraps to Auto.
+  Switch is live: silence() on the old port, UART on the new. Saved as MPU=<hex> in MIDPLAY.CFG; /P: on the command
+  line still wins for that run. 86Box: SBEMU at 330 -> Right = 330h (300-320 skipped), Right = Auto, Left = 330h.
+- Zip = beta.104 zip + FILES/SC55/MIDPLAY.EXE + README.TXT.
+
 ## beta.104 (2026-11-13, DOS session): emulator-coverable "NOT tested" items closed; HWTEST.TXT for the real PCs
 - exFAT / NTFS through the release build (beta.103 SBEMU, FreeDOS, QEMU EHCI, testrig/qemu-usbdrive.sh + new testrig/mkxn.sh
   images): stick 1 MBR NTFS + exFAT (F: G:), stick 2 GPT exFAT (H:); DIR, long-name aliases, nested TYPE, 40-entry dir,
