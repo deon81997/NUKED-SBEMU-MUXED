@@ -283,7 +283,7 @@ CONTENTS
 
   C:\SC55\MIDPLAY.EXE [/B] [/D:dir] [/L] [/R1] [/H] [/S] [/GM | /N] [file.mid ...]
       Full-screen MIDI player with visualizer, playlist, file explorer
-      and options (section 8). With no file names it plays the MIDI files
+      and options (section 8). Also plays .MUS, .HMP and .XMI game music. With no file names it plays the MIDI files
       next to it (or, if set in Options, resumes where you quit).
 
   C:\SC55\CPUMHZ.EXE [/LOAD]
@@ -654,6 +654,17 @@ CONTENTS
      U            all channels on again (muting only stops new notes on that
                   channel; the song's timing does not change)
      [ and ]      speed -5% / +5% (25% to 400%), BACKSPACE back to 100%
+     { and }      key (transpose) a semitone down / up, -12 to +12; \ back
+                  to the written key. The drum channel (10) is not moved;
+                  notes already sounding end cleanly. Kept in MIDPLAY.CFG.
+                  (beta.101)
+     A            A-B loop: press at the start of a part (A), again at its
+                  end (B) - that part repeats until you press A a third
+                  time. A and B show on the time bar. (beta.101)
+     Z            sleep timer: off > after this song > 15, 30, 45, 60, 90,
+                  120 minutes. When it runs out the music pauses (SPACE
+                  plays on); the top line shows the minutes left. (beta.101)
+     F or CTRL+F  search the playlist (see below)
      R            repeat: off, all, one  L repeat all
      H            shuffle: off > all songs > this folder only (beta.96)
      S            view: channel table > SC-55 front panel > 3D view
@@ -663,8 +674,9 @@ CONTENTS
      J            3D player: NUKED module, boombox, jukebox, turntable
                   (remembered in MIDPLAY.CFG)
      B            file explorer        Q or ESC   quit
-  The top shows the song's title (from the file), its format, the repeat /
-  shuffle / speed / mute state and the time left.
+  The top shows the song's title (from the file), its kind and format, the
+  repeat / shuffle / speed / key / A-B / sleep / mute state and the time
+  left.
   CHANNEL TABLE: level meter, pan, note, instrument keys and reverb of all
   16 channels, plus a keyboard at the bottom lighting up the notes.
   SC-55 FRONT PANEL: with SBEMU beta.34 and later it is the emulated
@@ -703,6 +715,10 @@ CONTENTS
   the list as an .M3U, CTRL+O opens one, INS adds files. The title and
   length of every song are read in the background while the music plays.
   Click a song to pick it, click it again to play it.
+  SEARCH (beta.101): CTRL+F, then type part of a file name or title (any
+  place in it). The first match is picked and "n of m" is shown; CTRL+F
+  (or F6) again goes to the next match, ENTER plays it, ESC closes the
+  search. The Files page has the same CTRL+F search.
 
   Files page: opens in the folder of the song that plays. ENTER plays a
   file or opens a folder or .M3U, INS marks files (ENTER then adds the
@@ -710,6 +726,15 @@ CONTENTS
   folder, BACKSPACE goes up, type letters to jump. The drives are listed
   at the end ("C:  drive"). The panel on the right shows the title,
   length, format and tracks of the file under the cursor.
+
+  SONG FORMATS (beta.101): .MID / .MIDI / .SMF (format 0 and 1), .KAR,
+  .RMI (also with extra chunks before the music), and game music straight
+  from the game files: Doom .MUS (Doom, Heretic, Hexen, Strife), HMI .HMP
+  (Descent and other HMI SOS games, both versions of the format)
+  and Miles .XMI (Ultima, Dune II, Lands of Lore and other AIL games; the
+  first song in the file). The kind is told by the file's contents, so a
+  renamed file plays too. Playlists: .M3U, .M3U8 and .LST (a UTF-8 BOM at
+  the start, as Windows tools write it, is skipped).
 
   SHUFFLE (beta.96): a real random order - every song plays once before any
   song comes again; P goes back through the order; a new round never starts
@@ -722,7 +747,8 @@ CONTENTS
   to play at start (the last playlist, from the song and spot where you
   quit, or the MIDI files next to MIDPLAY), screen mode, style, font, 3D
   screen mode and 3D refresh rate.
-  When you quit, the playlist is kept in MIDPLAY.M3U.
+  The key ({ }) is kept too. When you quit, the playlist is kept in
+  MIDPLAY.M3U.
 
   Smoother on slow PCs: the music is sent even while the screen is being
   drawn, the graphics modes only redraw what changed, and the timing uses

@@ -1,4 +1,34 @@
 
+## beta.101 (2026-11-13): MIDPLAY - MUS/HMP/XMI, transpose, A-B loop, sleep timer, Ctrl+F search
+User asked for: karaoke lyrics (DROPPED by the user mid-task - not needed), mute/solo, tempo + pitch, A-B loop,
+MUS/HMP/XMI/RMI, M3U, search, sleep timer. Already there before: mute/solo (M/O/U), tempo ([ ]), M3U load/save,
+type-to-jump. Files: tools/midplay.c only (+ pack/README.TXT section 8, testrig/midplay/fmtcheck.py, hostsweep.sh).
+- Formats (song_load sniffs the contents, not the name): MUS (load_mus: 140 Hz = div 70 @ 500000; MUS ch 15 -> 10,
+  others in order of first use skipping 10, CC123 on first use like Doom's mus2mid), HMP (load_hmp: tracks at 308h /
+  388h for "013195", count at 30h, division at 38h, quarter = 1 s, HMP varlen = low group first, last byte bit 7 set,
+  also for meta/SysEx lengths - layout as ZMusic midisource_hmi.cpp), XMI (load_xmi: first EVNT via iff_find, delays =
+  summed bytes < 80h, note-on + VLQ length -> generated note-off (min 1 tick), div 60 @ 500000 = 120 Hz, tempo meta
+  ignored), RMI (riff_midi walks the chunks to "data"). CC 110-119 (AIL/HMI loop+lock marks) dropped for HMP/XMI.
+  song_info uses song_load for MUS/HMP/XMI. Extensions .smf .mus .hmp .xmi added; .m3u8; M3U skips a UTF-8 BOM and
+  trailing blanks. KAR titles: "@T" text, track names "Soft Karaoke"/"Words" no longer become the title (meta_title).
+  NOT supported: HMI ("HMI-MIDISONG"), XMI files with several songs (first only), MIDI format 2.
+- Transpose: g_pitch -12..+12 ({ } \, PITCH= in MIDPLAY.CFG), channel 10 untouched; g_tmap[ch][note] remembers the note
+  sent so a key change while notes sound ends the right ones (silence() clears it).
+- A-B loop (A key, ab_key/ab_check): mp_pump sends nothing at/after B; the main loop seeks to A. Cleared by a new song.
+- Sleep timer (Z, sleep_key): off, end of song (next_index not taken), 15/30/45/60/90/120 min -> mp_pause (SPACE plays on;
+  /S quits). Shown as "Zz:end" / "Zz14m" in the right-aligned mode flags on row 3 (with key+n, A-B, speed...).
+- Search: Ctrl+F on Playlist / Files (F or Ctrl+F on the Player page opens the Playlist search): substring of file name
+  or title, "k of n", Ctrl+F / F6 next, ENTER plays, ESC closes (srch_key runs first in handle_key, so SPACE types).
+- Tests: testrig/midplay/hostsweep.sh [FUZZ] = ASan+UBSan host build: --queue, fmtcheck.py (one tune as MID/KAR/RMI/
+  MUS/HMP v1+v2/XMI -> identical note-on/off lists and times; transpose incl. changes mid-song = no stuck notes; A-B
+  counts; sleep), busy genmid song with options, FUZZ damaged copies of every format (0 problems in 2400). Host main
+  takes --pitch n --pitchat ms n --ab a b loops --sleep s --info. Also run: tests/m3host/run.sh (4101 frames, 0
+  failures) and notetest.sh "/VSF:C:\SC55\GM.SF2 /VSFVOICES:24" on all formats + busy song: 0 bytes dropped (note:
+  plain /VSF without a path = SC-55 without ROMs = everything "dropped").
+- Not tested: the new keys interactively in QEMU/86Box (only through the host build), real game files (made-up test
+  files only - try Doom .MUS, Descent .HMP, Ultima/Dune II .XMI), real hardware (D810, P5PE).
+- Zip = beta.100 zip + FILES/SC55/MIDPLAY.EXE + README.TXT.
+
 ## beta.100 (2026-11-13): MIDPLAY 3D made stable (crash catcher, ASan sweep, low-memory fallback)
 - Crash catcher (tools/midplay.c, crash_handler): SIGSEGV/SIGFPE/SIGILL/SIGABRT/SIGNOFP -> text mode 3, CRASH.TXT in
   MIDPLAY's folder (signal, CPU exception number, registers from __djgpp_exception_state_ptr, text/3D mode, look/theme/
