@@ -1,3 +1,41 @@
+## MENU bug hunt (2026-11-13, DOS session) - IN PROGRESS, on main, NOT released (on top of beta.107; next DOS release = beta.108)
+Stopped by the user mid-task. Tree builds; tests/m3host/menurun.sh and run.sh pass.
+- Done (tools/sc55menu.c, menu3d.h, tui.h):
+  - New host test tests/m3host/menuasan.c + menurun.sh [quick|fit|ed|shots|seed N]: whole MENU on the fake DJGPP (fake disk
+    /tmp/menufs/C = C:\, fake MPU-401 for "SBEMU loaded", scripted keys + INT 33h mouse, DUMP/SHOT keys), ASan+UBSan:
+    every entry x text/Panels/Carousel/Module x SBEMU off/on (MENUGO.BAT checked), game editor + browser, first start,
+    MENUVIEW, safe mode, no VESA, no mouse, every F4 mode + F7 fonts, 60 random key/mouse runs. dosstub.h: HS_HOOKS.
+  - Bugs fixed: (1) file browser had no Home/End; (2) Tab drive from A:/B: computed a bad letter; (3) game editor showed
+    only 14 of up to 24 games (scrolls now, "full (24 games)"); (4) tui_yesno/tui_message sized lines by length, so word
+    wrap cut text ("..."), e.g. the first-start question - now tui_wrap_lines; (5) 3D: descriptions cut (Carousel/Module 3
+    lines, Panels 4): now 4 / 5 lines, CD images + game texts shortened (menurun.sh "fit" checks every item); (6) 3D: grey
+    items gave no reason (text menu does) - m3_reason (overlay / in the Panels row); (7) 3D had no F1 help / F5 MIDPLAY;
+    (8) 3D start without a VESA mode: no message, MENU3D.CFG kept; (9) 3D MENUGO.BAT write error silent (g_goerr);
+    (10) Module LCD cache stale after the game editor (g_menugen). Proof: sc55-pack/testrig/menuq/3d-reasons-4lines.png.
+  - New QEMU rig: testrig/menuq.py (MS-DOS 7.1 or FreeDOS disk, pack installed by its own SETUP.BAT, SoundFont, OHCI USB
+    kbd/mouse; text screen via pmemsave) + testrig/menuwalk.py (starts every entry, gets back). MS-DOS 7.1 boot + MENU +
+    Start SC-55 (SoundFont, USB kbd/mouse on OHCI) + return: OK (testrig/menuq/msdos71-menu.png). Full walk was running.
+- NOT done: menuwalk full run (MS-DOS 7.1 and FreeDOS), 3D styles in QEMU, Win98 DOS box (needs a QI Win98 VM), OHCI 3D GPF
+  re-check (testrig/usb3d soak), 86Box PII-450 before/after (SBDIAG load, SC55LOG speed; MENU changes are UI-only, no
+  runtime cost expected), "MENU matrix" quick set (no such section exists yet - define it from menuwalk + menurun quick),
+  release beta.108 (zip: SC55MENU.EXE + others using tui.h: GAMETEST, MIDPLAY, SBSET, CDGUI... rebuild/swap all), README news.
+- Next 3 steps: 1) `python3 sc55-pack/testrig/menuwalk.py DIR` on msdos + freedos disks, fix what sticks; 2) usb3d soak 10 min
+  + Win98 DOS box (QI ISO -> testrig/w98vm/README.md); 3) 86Box perf numbers, then release beta.108 per Release recipe.
+- Resume: DJGPP + build per docs/SESSION-2026-11-13-DOS.md; `sh sc55-pack/tests/m3host/menurun.sh quick`;
+  `apt-get install qemu-system-x86`; unzip release zip to /home/claude/rel; MS-DOS files: see Test downloads;
+  `python3 -I sc55-pack/testrig/menuq.py /home/claude/mq/ms build msdos`, then `from menuq import Q; Q(dir).start(usb='ohci')`.
+- Open: none confirmed beyond the list above; Win98 DOS box untested (LFN: menu sets LFN=n, browser uses 8.3 names).
+
+### Test downloads (kept outside the repo, /tmp/dl/<name>)
+- Windows 98 QuickInstall v1.1.0 `win98qi_v1.1.0_stock.iso`: https://github.com/oerg866/win98-quickinstall/releases/download/v1.1.0/win98qi_v1.1.0_stock.iso
+  (curl works; gh release download is blocked). MS-DOS 7.1: `isols.py ISO OSROOTS/1/FULL.866 FULL.866`, then
+  `mercy.py FULL.866 ms71 IO.SYS MSDOS.SYS COMMAND.COM` (menuq.py writes its own MSDOS.SYS, BootGUI=0).
+- TimGM6mb.sf2 (GPL, 6 MB test SoundFont): https://raw.githubusercontent.com/craffel/pretty-midi/main/pretty_midi/TimGM6mb.sf2
+- FreeDOS KERNEL.SYS/COMMAND.COM: git clone --depth 1 https://github.com/pbatard/rufus (res/freedos) -> /home/claude/fd
+- DJGPP gcc 12.2: andrewwutw/build-djgpp v3.4; 86Box @0935207 + 86Box/roms (built OK with testrig/86box/README.md cmake line).
+- User uploads this session (not redistributable, not in repo): sc55.sf2, SC-55.sf2, CT2MGM/CT4MGM/CT8MGM, DOGOS2, Pipalun,
+  Saron, Tabla .SF2 - for SoundFont tests in the next session.
+
 ## beta.107 (2026-11-13, DOS session): Win98 DOS box + MS-DOS 7.1 USB letters tested; 320x200 3D title fix
 - Source of Win98 / MS-DOS 7.1: public QuickInstall reference ISO (github.com/oerg866/win98-quickinstall releases v1.1.0,
   win98qi_v1.1.0_ALL.iso, 1.3 GB; OSROOTS/1/FULL.866 -> testrig/padkeys/isols.py + mercy.py for IO.SYS/MSDOS.SYS/COMMAND.COM).

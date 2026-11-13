@@ -52,6 +52,21 @@ static void m3_cards_build(int cat)
     m3_cards_cat = cat;
 }
 
+#define M3_KEYS "Arrows  Enter go  F1 help  F3 style  F5 MIDI  F6 colours  F8 text  Esc"
+/* why a grey item cannot run now (the text menu says it under the description) */
+static const char* m3_reason_text(const ITEM* it)
+{
+    return it->needs_sbemu == 2 ? "program not found" : it->needs_sbemu > 0 ? "start the SC-55 first" : "restart the PC first";
+}
+static void m3_reason(const ITEM* it, int x, int y)
+{
+    const char* r = m3_reason_text(it);
+    if (usable(it)) return;
+    if (x + 8 * (int)strlen(r) > M3W - 16) x = M3W - 16 - 8 * (int)strlen(r);
+    m3_rect(&m3_scr, x - 4, y - 2, 8 * (int)strlen(r) + 8, 20, 0x401000, 200);
+    m3_text(&m3_scr, x, y, 0, r, 0xFFB040, 256);
+}
+
 /* the 2D layer shared by the 3D styles: category tabs, description, keys */
 static void m3_overlay(int cat, int sel, int sb)
 {
@@ -80,12 +95,14 @@ static void m3_overlay(int cat, int sel, int sb)
         if (x + 300 > M3W - 40) break;
     }
     /* description box: title, 3 lines, then the keys on their own line (they used to share the last line) */
-    m3_rect(&m3_scr, 10, 354, M3W - 20, 118, 0x000010, 170);
-    m3_bevel(&m3_scr, 10, 354, M3W - 20, 118, 2, 1, 120);
-    m3_text_glow(&m3_scr, 22, 360, 1, it->label, m3_mul(m3_catcol[it->cat], 400), m3_catcol[it->cat]);
-    m3_wrap(&m3_scr, 22, 384, M3W - 44, 3, 0, it->desc, 0xD0D8E8, 0);
+    /* 4 lines of description (3 cut most of them short); 2 rows less of the scene, which ends at 340 anyway */
+    m3_rect(&m3_scr, 10, 340, M3W - 20, 132, 0x000010, 170);
+    m3_bevel(&m3_scr, 10, 340, M3W - 20, 132, 2, 1, 120);
+    m3_text_glow(&m3_scr, 22, 346, 1, it->label, m3_mul(m3_catcol[it->cat], 400), m3_catcol[it->cat]);
+    m3_wrap(&m3_scr, 22, 370, M3W - 44, 4, 0, it->desc, 0xD0D8E8, 0);
+    m3_reason(it, 22 + (int)strlen(it->label) * 10 + 16, 350);
     m3_rect(&m3_scr, 18, 449, M3W - 36, 1, 0x7080A0, 90);
-    m3_text(&m3_scr, 22, 452, 0, "Arrows choose  Enter go  F3 style  F6 colours  F8 text  Esc quit", 0x7080A0, 256);
+    m3_text(&m3_scr, 22, 452, 0, M3_KEYS, 0x7080A0, 256);
 }
 
 /* ------------------------------------------------------------------------------------------- styles */
@@ -162,6 +179,7 @@ static void m3_draw_panels(int cat, int sel, float selanim)
             if (on && ok) m3_text_glow(&m3_scr, 224 + on, yy + 7 + on, 1, t2->label, 0xFFFFFF, m3_glowc);
             else m3_text_sh(&m3_scr, 224 + on, yy + 7 + on, 1, t2->label, ok ? 0xFFFFFF : 0x8890A0);
             m3_hit(188, yy, M3W - 212, 36, on ? 3 : 2, k[i]);
+            if (on && !ok) m3_reason(t2, M3W - 32 - 8 * (int)strlen(m3_reason_text(t2)), yy + 9);
         }
         {   /* small arrows in the right margin when items are hidden above or below */
             int r2;
@@ -170,11 +188,11 @@ static void m3_draw_panels(int cat, int sel, float selanim)
         }
     }
     /* description */
-    m3_shadow(&m3_scr, 12, 366, M3W - 24, 104, 6);
-    m3_rect(&m3_scr, 12, 366, M3W - 24, 104, 0x0A0F1C, 235);
-    m3_bevel(&m3_scr, 12, 366, M3W - 24, 104, 2, 1, 200);
-    m3_wrap(&m3_scr, 24, 374, M3W - 48, 4, 0, it->desc, 0xD8E0F0, 0);
-    m3_text(&m3_scr, 24, 450, 0, "Arrows choose  Enter go  F3 style  F6 colours  F8 text  Esc quit", 0x8090B0, 256);
+    m3_shadow(&m3_scr, 12, 362, M3W - 24, 114, 6);
+    m3_rect(&m3_scr, 12, 362, M3W - 24, 114, 0x0A0F1C, 235);
+    m3_bevel(&m3_scr, 12, 362, M3W - 24, 114, 2, 1, 200);
+    m3_wrap(&m3_scr, 24, 368, M3W - 48, 5, 0, it->desc, 0xD8E0F0, 0);
+    m3_text(&m3_scr, 24, 458, 0, M3_KEYS, 0x8090B0, 256);
 }
 
 
@@ -240,13 +258,13 @@ static void m3_make_panel(int cat, int sel, double t)
 {
     M3SURF* s = &m3_panel; const ITEM* it = &g_it[sel]; int i, k[80], n = cat_items(cat, k), si = 0;
     char line[48];
-    static int kcat = -1, ksel = -1, koff = -1, krun = -1;
+    static int kcat = -1, ksel = -1, koff = -1, krun = -1, kgen = -1;
     if (!s->p) *s = m3_surf(512, 128);
     for (i = 0; i < n; i++) if (k[i] == sel) si = i;
     {   /* drawn again only when something on it changed (it was 1/5 of a frame on a Pentium) */
         int len = (int)strlen(it->desc), off = len > 28 ? (int)(t * 6) % (len + 8) : 0;
-        if (cat == kcat && sel == ksel && off == koff && g_running == krun) return;
-        kcat = cat; ksel = sel; koff = off; krun = g_running;
+        if (cat == kcat && sel == ksel && off == koff && g_running == krun && g_menugen == kgen) return;
+        kcat = cat; ksel = sel; koff = off; krun = g_running; kgen = g_menugen;
     }
     {   /* brushed metal: horizontal streaks (a brightness per row plus fine grain), lighter towards the top */
         int y, x;
@@ -454,6 +472,20 @@ static int m3_main(void)
                 m3_cfg_save(); m3_note_until = m3_now() + 5;
                 continue;
             }
+            if (c == K_F1 || c == 0x13F)                                /* F1 help, F5 MIDI player (as in the text menu) */
+            {
+                int q;
+                for (q = 0; q < g_n; q++) if (!strncmp(g_it[q].cmd, "MIDPLAY", 7)) break;
+                if (c == 0x13F && q < g_n && usable(&g_it[q]))
+                { save_sel(&g_it[g_sel]); m3_vbe_close(); if (write_go(&g_it[q], 0)) return 0; g_goerr = 1; return 1; }
+                m3_vbe_close(); tui_init();
+                if (c == K_F1) help();
+                else tui_message("MIDI player", "Start the SC-55 (or SoundFont) first: Sound > Start SC-55 / SoundFont.");
+                tui_done();
+                if (!m3_vbe_open()) return 2;
+                m3_mouse_setup(); last = m3_now();
+                continue;
+            }
             if (c == 0x1F2) { if (m3_mval != g_cat) { g_cat = m3_mval; g_sel = first_in(g_cat); } }       /* mouse: a menu */
             else if (c == 0x1F3) g_sel = m3_mval;                                                   /* mouse: an item */
             else if (c == K_UP) g_sel = move_in(g_cat, g_sel, -1);
@@ -491,7 +523,7 @@ static int m3_main(void)
                 if (it->kind == IT_M3D) continue;
                 m3_vbe_close();
                 if (write_go(it, c == K_F2)) return 0;
-                return 1;
+                g_goerr = 1; return 1;
             }
             if (g_cat != oc) { m3_catanim = 1; m3_btnpress[g_cat] = 1; m3_cards_cat = -1; m3_ring = 0; selanim = 0; }
         }

@@ -46,17 +46,23 @@ static inline int __dpmi_free_ldt_descriptor(int s) { (void)s; return 0; }
 static inline int __dpmi_set_segment_base_address(int s, unsigned long a) { (void)s; (void)a; return 0; }
 static inline int __dpmi_set_segment_limit(int s, unsigned long l) { (void)s; (void)l; return 0; }
 static inline void __dpmi_yield(void) {}
+#ifdef HS_HOOKS   /* tests/m3host/menuasan.c: scripted keys, MPU-401, a fake disk */
+unsigned char inportb(unsigned short p); void outportb(unsigned short p, unsigned char v);
+int kbhit(void); int getch(void);
+struct ffblk; int findfirst(const char* p, struct ffblk* f, int a); int findnext(struct ffblk* f);
+#else
 static inline unsigned char inportb(unsigned short p) { static unsigned char t; if (p == 0x3DA) return (unsigned char)((t ^= 8) | 0); return 0xFF; }
-static inline unsigned short inportw(unsigned short p) { (void)p; return 0xFFFF; }
 static inline void outportb(unsigned short p, unsigned char v) { (void)p; (void)v; }
+static inline int kbhit(void) { return 0; }
+static inline int getch(void) { return 27; }
+#endif
+static inline unsigned short inportw(unsigned short p) { (void)p; return 0xFFFF; }
 static inline void outportw(unsigned short p, unsigned short v) { (void)p; (void)v; }
 /* conio / dos / dir */
 #define _NOCURSOR 0
 #define _SOLIDCURSOR 1
 #define _NORMALCURSOR 2
 static inline void _setcursortype(int t) { (void)t; }
-static inline int kbhit(void) { return 0; }
-static inline int getch(void) { return 27; }
 #define stricmp strcasecmp
 #define strnicmp strncasecmp
 typedef long long uclock_t;
@@ -76,6 +82,11 @@ static inline void delay(unsigned ms) { (void)ms; }
 #define FA_ARCH 32
 struct ffblk { char lfn_magic[6]; short lfn_handle; unsigned short lfn_ctime, lfn_cdate, lfn_atime, lfn_adate;
                char ff_reserved[5]; unsigned char ff_attrib; unsigned short ff_ftime, ff_fdate; unsigned long ff_fsize; char ff_name[260]; };
+#ifndef HS_HOOKS
 static inline int findfirst(const char* p, struct ffblk* f, int a) { (void)p; (void)f; (void)a; return -1; }
 static inline int findnext(struct ffblk* f) { (void)f; return -1; }
+#endif
+#ifndef D_OK
+#define D_OK 0x10
+#endif
 #endif

@@ -291,8 +291,8 @@ static void add_games(void)
         if (!have)
             snprintf(desc, sizeof desc, "%s is not there (moved or on another drive?). Change it in \"Add / edit games\".", g->exe);
         else if (slot >= 0 && g_best[slot][0])
-            snprintf(desc, sizeof desc, "Starts %s%s%s with the SBEMU settings that gave it the best music timing in GAMETEST"
-                     " (music clock %d.%d%%): %s.%s SBEMU goes back to your saved settings afterwards. F2: your saved settings only.",
+            snprintf(desc, sizeof desc, "Starts %s%s%s with GAMETEST's best SBEMU settings for it (music clock %d.%d%%): %s.%s"
+                     " Your saved settings come back afterwards. F2: saved settings only.",
                      g->exe, g->args[0] ? " " : "", g->args, g_bestclk[slot] / 10, g_bestclk[slot] % 10, g_best[slot], extra);
         else
             snprintf(desc, sizeof desc, "Starts %s%s%s and brings you back here when you quit it.%s Start the SC-55 first for"
@@ -310,10 +310,12 @@ static void add_games(void)
         " another ROM set or sample rate) and a CD image to mount before it starts. Saved in GAMES.CFG.", IT_EDIT, "", 0, 0, NULL);
 }
 
+static int g_menugen;                   /* +1 each time the items are made again (3D caches) */
+static int g_goerr;                     /* the 3D menu could not write MENUGO.BAT: say so in the text menu */
 static void build_menu(void)
 {
     char c[300];
-    g_n = 0;
+    g_n = 0; g_menugen++;
     /* Sound */
     snprintf(c, sizeof c, "CALL %s\\SC55.BAT", g_home);
     add(C_SOUND, "Start SC-55 / SoundFont", "Loads SBEMU with your saved settings: a Sound Blaster plus an MPU-401 (port 330 unless changed in Settings) played by the"
@@ -398,9 +400,9 @@ static void build_menu(void)
           " be loaded from CONFIG.SYS (BOOTCFG.BAT does that) - see DOSMODE\\CDROM-D810.TXT.", IT_BAT, c, 0, 1, NULL); }
     if (access("C:\\CDSET\\GUI.BAT", R_OK) == 0)
     { snprintf(c, sizeof c, "CALL C:\\CDSET\\GUI.BAT %s", g_home);
-      add(C_CD, "CD images", "Mount .CUE/.BIN, .ISO or .MDM disc images from any folder on any drive (D: next drive, F2 home folder) as drive M:. Shows each image's"
-          " tracks and size, fixes CUE files that name a long BIN file name DOS cannot open (F), and tells you if the"
-          " mount worked. CD-audio tracks play through SBEMU - start games with HYBRID.BAT for that.", IT_BAT, c, 0, 0, NULL); }
+      add(C_CD, "CD images", "Mount .CUE/.BIN, .ISO or .MDM disc images from any folder on any drive as drive M: (D: next drive, F2 home"
+          " folder). Shows tracks and size, fixes CUE files that name a BIN with a long name (F) and says if the mount"
+          " worked. CD audio plays through SBEMU: start games with HYBRID.BAT for that.", IT_BAT, c, 0, 0, NULL); }
     add(C_CD, "USB drives", "USB sticks and card readers with a DOS drive letter (Settings > Joystick > USB sticks"
         " = On, then restart): letter, stick, file system, size and free space. R refreshes (a stick just plugged in"
         " gets one of the spare letters).", IT_BAT, "USBDRV.EXE", 1, 0, NULL);
@@ -666,6 +668,8 @@ static int pick_file(char* out, size_t sz, int cd)
             else if (c == K_DOWN && sel + 1 < n) sel++;
             else if (c == K_PGUP) { sel -= 15; if (sel < 0) sel = 0; }
             else if (c == K_PGDN) { sel += 15; if (sel >= n) sel = n ? n - 1 : 0; }
+            else if (c == K_HOME) sel = 0;
+            else if (c == K_END) sel = n ? n - 1 : 0;
             else if (!cd && (c == 't' || c == 'T'))
             {
                 char t[80]; snprintf(t, sizeof t, "%s", out);
@@ -678,6 +682,7 @@ static int pick_file(char* out, size_t sz, int cd)
             else if (c == K_TAB)
             {   /* next drive that can be read (C: and up, floppies skipped) */
                 int d = toupper((unsigned char)dir[0]), k;
+                if (d < 'C' || d > 'Z') d = 'C' - 1 + 24;                  /* from A: / B: (or junk): start at C: */
                 for (k = 1; k <= 24; k++)
                 {
                     char nd[8]; int dl = 'C' + (d - 'C' + k) % 24;
@@ -721,20 +726,24 @@ static void game_editor(void)
         " Needs SBEMU loaded. Empty = your saved settings (plus GAMETEST's best, if any).",
         "A disc image mounted on drive M: before the game starts (games that check for their CD, or have CD music)."
         " Enter picks one on any drive; N in there = none." };
-    int sel = 0, fld = -1, c, i, dirty = 0;
+    int sel = 0, fld = -1, c, i, dirty = 0, etop = 0;
     for (;;)
     {
         GAMEP* g = sel < g_ngp ? &g_gp[sel] : NULL;
         tui_clear(1 << 4);
         draw_header(); draw_status();
         tui_panel(2, 7, 28, 17, 3, 0x3F, "Games");
-        for (i = 0; i <= g_ngp && i < 14; i++)
+        if (sel < etop) etop = sel;
+        if (sel >= etop + 14) etop = sel - 13;
+        for (i = etop; i <= g_ngp && i < MAXGP && i < etop + 14; i++)
         {
             char b[32];
             int on = i == sel, a = on ? (fld < 0 ? (TUI_FANCY ? 0x5F : 0x1F) : 0x1B) : 0x30;
             if (i < g_ngp) snprintf(b, sizeof b, " %.24s", g_gp[i].name); else snprintf(b, sizeof b, " + new game");
-            tui_putw(3, 9 + i, 26, i < g_ngp ? a : (on ? a : 0x3E), b);
+            tui_putw(3, 9 + i - etop, 26, i < g_ngp ? a : (on ? a : 0x3E), b);
         }
+        if (etop) tui_cell(28, 8, 0x3F, 0x18);
+        if (etop + 14 < (g_ngp < MAXGP ? g_ngp + 1 : MAXGP)) tui_cell(28, 23, 0x3F, 0x19);
         tui_panel(31, 7, 49, 17, 7, 0x1F, g ? g->name : "New game");
         if (g)
         {
@@ -759,7 +768,7 @@ static void game_editor(void)
         {
             if (c == K_ESC) break;
             if (c == K_UP && sel > 0) sel--;
-            else if (c == K_DOWN && sel < g_ngp && sel < 13) sel++;
+            else if (c == K_DOWN && sel < g_ngp && sel < MAXGP - 1) sel++;
             else if ((c == 0x153 || c == 'd' || c == 'D') && g)
             {
                 char q[80]; snprintf(q, sizeof q, "Remove %s from the list? (Its files stay.)", g->name);
@@ -768,7 +777,7 @@ static void game_editor(void)
             else if (c == K_ENTER || c == K_RIGHT)
             {
                 if (g) { fld = 0; continue; }
-                if (g_ngp >= MAXGP || sel >= 14) { tui_message("Games", "The list is full (14 games)."); continue; }
+                if (g_ngp >= MAXGP) { tui_message("Games", "The list is full (24 games)."); continue; }
                 {
                     GAMEP n; char* bs;
                     memset(&n, 0, sizeof n);
@@ -820,7 +829,8 @@ static void help(void)
         "F7               letters: Terminus, Terminus bold or the VGA font",
         "F4               display mode: 80x25 ... 80x60, VESA modes",
         "F5               MIDI player (MIDPLAY) from anywhere in the menu",
-        "F8               3D menu (F8 there comes back here)",
+        "F8               3D menu (F8 there comes back here; F3 there = 3D style,",
+        "                 F6 = colours, F4 = full / half resolution)",
         "Esc              back to DOS (type MENU to come back)",
         "",
         "Nothing runs by itself: the menu writes your choice to MENUGO.BAT,",
@@ -970,7 +980,7 @@ static int jump_letter(int sel, int c)
 
 int main(int argc, char** argv)
 {
-    int c, firstrun;
+    int c, firstrun, m3_start_r = 1;
     char* s; const char* v;
     if (argc > 1) snprintf(g_home, sizeof g_home, "%s", argv[1]);
     else
@@ -999,6 +1009,8 @@ int main(int argc, char** argv)
     {
         int r = m3_main();
         if (r == 0) return 0;
+        if (r == 2) { char p[300]; home_path(p, "MENU3D.CFG"); remove(p); }
+        m3_start_r = r;
     }
     tui_theme_load(g_home);
     tui_init();
@@ -1023,6 +1035,8 @@ int main(int argc, char** argv)
                       "Reset them to the plain 80x25 screen for good?"))
         { char p[300]; home_path(p, "THEME.CFG"); remove(p); tui_theme_save(g_home); }
     }
+    if (m3_start_r == 2) tui_message("3D menu", "This PC's video BIOS has no 640x480 VESA mode with 15/16/24/32-bit colour, so the 3D menu cannot be shown.");
+    if (g_goerr) { g_goerr = 0; tui_message("Error", "Cannot write MENUGO.BAT in the SC55 folder (disk full or write-protected?)."); }
     v = getenv("MENUVIEW");
     if (v && *v) view(v);
 
@@ -1069,6 +1083,7 @@ int main(int argc, char** argv)
             if (r == 2) { char p[300]; home_path(p, "MENU3D.CFG"); remove(p); }
             tui_init();
             if (r == 2) tui_message("3D menu", "This PC's video BIOS has no 640x480 VESA mode with 15/16/24/32-bit colour, so the 3D menu cannot be shown.");
+            if (g_goerr) { g_goerr = 0; tui_message("Error", "Cannot write MENUGO.BAT in the SC55 folder (disk full or write-protected?)."); }
             continue;
         }
         else if (c == 0x13E) tui_pick_mode(g_home);                           /* F4 */

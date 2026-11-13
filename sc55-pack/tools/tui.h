@@ -462,6 +462,19 @@ TUI_FN int tui_wrap(int x, int y, int w, int h, int attr, const char* s)
     }
     return line;
 }
+/* lines tui_wrap needs for s at width w (dialogs size themselves with it; a guess from the length cut words off) */
+TUI_FN int tui_wrap_lines(int w, const char* s)
+{
+    int line = 0;
+    while (*s)
+    {
+        int n = (int)strlen(s), cut = n;
+        if (n > w) { cut = w; while (cut > w / 2 && s[cut] != ' ') --cut; if (s[cut] != ' ') cut = w; }
+        s += cut; while (*s == ' ') ++s;
+        ++line;
+    }
+    return line;
+}
 /* single-line box; double = 1 for a double-line frame */
 TUI_FN void tui_box(int x, int y, int w, int h, int attr, int dbl)
 {
@@ -723,7 +736,7 @@ TUI_FN int tui_yesno(const char* q)
     uint16_t save[TUI_H][TUI_W];
     if (w < 34) w = 34;
     if (w > 76) w = 76;
-    lines = ((int)strlen(q) + w - 7) / (w - 6); if (lines < 1) lines = 1; if (lines > 4) lines = 4;
+    lines = tui_wrap_lines(w - 6, q); if (lines < 1) lines = 1; if (lines > 4) lines = 4;
     h = 5 + lines;
     x = (TUI_W - w) / 2 + 1;
     memcpy(save, tui_scr, sizeof save);
@@ -752,7 +765,7 @@ TUI_FN void tui_message(const char* title, const char* msg)
     uint16_t save[TUI_H][TUI_W];
     if (w < 34) w = 34;
     if (w > 76) w = 76;
-    lines = ((int)strlen(msg) + w - 7) / (w - 6); if (lines < 1) lines = 1; if (lines > 6) lines = 6;
+    lines = tui_wrap_lines(w - 6, msg); if (lines < 1) lines = 1; if (lines > 6) lines = 6;
     x = (TUI_W - w) / 2 + 1;
     memcpy(save, tui_scr, sizeof save);
     tui_zoom(x, 9, w, 4 + lines, 0x1F);
