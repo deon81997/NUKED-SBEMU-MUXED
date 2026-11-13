@@ -259,8 +259,8 @@ static void mp3_bar(const char* name, const char* title, uint64_t el_us, uint64_
     if (paused) m3_text_sh(&m3_scr, M3W / 2 - 28, M3H - (M3H >= 400 ? 64 : 40), 0, "PAUSED", 0xFFC040);
     else if (done) m3_text_sh(&m3_scr, M3W / 2 - 20, M3H - (M3H >= 400 ? 64 : 40), 0, "DONE", 0x60FF60);
     if (mp3_slow) m3_text_sh(&m3_scr, 8, 28, 0, M3W >= 640 ? "Few frames on this PC: F4 half resolution (faster), S text views." : "Slow: F4 half resolution", 0xFFC040);
-    if (M3H >= 400) m3_text(&m3_scr, 10, M3H - 22, 0, M3W >= 720 ? "SPACE pause  N/P song  <> seek  TAB lists  S view  F4 resolution  F2 screen mode  ESC quit"
-                                    : M3W >= 640 ? "SPACE pause  N/P song  <> seek  TAB lists  S view  F4 resolution  F1 help  ESC quit"
+    if (M3H >= 400) m3_text(&m3_scr, 10, M3H - 22, 0, M3W >= 720 ? "SPACE pause  N/P song  <> seek  S view  V look  C colours  J player  F4 resolution  F1 help  ESC quit"
+                                    : M3W >= 640 ? "SPACE pause  N/P song  S view  V look  C colours  J player  F1 help  ESC quit"
                                     : "SPACE pause  N/P song  S view  TAB lists  ESC quit", 0xA0A0B8, 256);
     if (mp3_ask_until)
     {   /* a new screen mode: keep it? (if the screen is black, any key or 10 s brings the last one back) */
@@ -442,6 +442,7 @@ static float mp3_keyx(int n, int* black)
 /* ---- voxel: falling note blocks */
 typedef struct { float x, y, v; uint32_t c; int on; } MP3DROP;
 static MP3DROP mp3_drop[48];
+static int mp3_lod;                    /* voxel on a slow PC: half as many blocks (set from the frame time) */
 static unsigned char mp3_nlast[128];
 
 static void mp3_cube(float x, float y, float z, float h, uint32_t c, float glow) { m3_box(m3_v(x, y, z), h, h, h, 0, NULL, c, glow, 256); }
@@ -566,7 +567,7 @@ static void mp3_scene_rest(const Song* s, const char* name, double frac, int pau
             if (m->kind == 1)
             {   /* the screen as big pixels: the LCD texture sampled into blocks, the lit ones stand out */
                 int gx = (int)(m->hx * 2 / (q * 2)), gy = (int)(m->hy * 2 / (q * 2)), x, y;
-                if (gx > 36) gx = 36; if (gy > 12) gy = 12;
+                if (gx > 36) gx = 36; if (gy > 12) gy = 12; if (mp3_lod) { gx = (gx + 1) / 2; gy = (gy + 1) / 2; }
                 if (g_model == 0) m3_box(m3_v(m->x, m->y, m->z), m->hx, m->hy, m->hz, 0, NULL, mp3_body, 0, 256);
                 for (y = 0; y < gy; y++)
                 {
@@ -582,13 +583,13 @@ static void mp3_scene_rest(const Song* s, const char* name, double frac, int pau
             }
             else if (m->kind == 2)
             {   /* a disc of blocks */
-                int r = (int)(m->hx / q), x, y;
+                int r = (int)(m->hx / (mp3_lod ? q * 2 : q)), x, y; float qq = mp3_lod ? q * 2 : q;
                 for (y = -r; y <= r; y++) for (x = -r; x <= r; x++)
                     if (x * x + y * y <= r * r)
                     {
                         int ring = (x * x + y * y) * 4 / (r * r + 1);
                         float pump = ring == 0 ? 0.04f * (g_viz.level[9] / 127.0f) : 0;
-                        mp3_cube(m->x + x * q, m->y + y * q, m->z - pump, q * 0.48f, m3_mul(m->col, 140 + ring * 40), 0);
+                        mp3_cube(m->x + x * qq, m->y + y * qq, m->z - pump, qq * 0.48f, m3_mul(m->col, 140 + ring * 40), 0);
                     }
             }
             else if (m->kind == 3)
@@ -736,5 +737,6 @@ bar:
     /* always full resolution (sharp): the music no longer waits for frames, so a slow PC only gets fewer of
      * them (F4 still switches to half resolution by hand). A note when it is down to ~2 frames a second. */
     mp3_slow = mp3_frame_ms > 200;
+    if (g_scene == 2) { if (mp3_frame_ms > 90) mp3_lod = 1; else if (mp3_frame_ms < 35) mp3_lod = 0; }   /* voxel: fewer blocks when slow */
 }
 #endif

@@ -657,6 +657,10 @@ CONTENTS
      R            repeat: off, all, one  L repeat all
      H            shuffle: off > all songs > this folder only (beta.96)
      S            view: channel table > SC-55 front panel > 3D view
+     V            3D look: solid > vector (glowing lines) > voxel (blocks)
+     C            3D colours: classic, neon, amber CRT, green phosphor, sunset,
+                  ice, synthwave, SC-55 / SC-88 / MT-32 / CM-32L style
+     J            3D player: NUKED module, boombox, jukebox, turntable
                   (remembered in MIDPLAY.CFG)
      B            file explorer        Q or ESC   quit
   The top shows the song's title (from the file), its format, the repeat /

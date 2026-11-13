@@ -97,6 +97,8 @@
 
 <picture><img src="docs/90s/vox-sec-tv.gif" width="140" align="right" alt=""></picture>
 
+<picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/13/2026: beta.99.** **MIDPLAY's 3D view gets looks, themes and players!!** Press **V** for the look (solid, glowing **vector** lines with an afterglow, or **voxel** blocks with notes falling onto the keys), **C** for 11 colour themes (neon, amber CRT, green phosphor, synthwave... and SC-55, SC-88, MT-32 and CM-32L hardware styles: the module, its LCD and the whole scene in those colours), and **J** for the player: the NUKED module, a boombox, a jukebox or a turntable. Every note now slides over the floor like a piano roll, drums give a little pulse, and the loudest instruments float their names over their columns. Calm palettes made for leaving it on for hours; voxel mode thins its blocks by itself on slow PCs.
+
 <picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/12/2026: beta.98.** **USB sticks after "Restart in MS-DOS mode"!!** Windows 98 keeps the letters it gave your USB stick and DOS then refuses them ("Invalid function"). SBEMU now checks every USB letter and moves any refused one to the next free letter, so both partitions of a stick read again (MENU > CD-ROM > USB drives shows where they went). Tested in QEMU with Win98 SE: stick used in Windows, then MS-DOS mode.
 
 <picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/12/2026: beta.97.** **USB sticks, the easy way!!** Turn them on in MENU > Settings > Joystick > USB sticks (no more typing /USBDISK:1), restart, and MENU > CD-ROM > **USB drives** shows every stick: its letter, name, FAT12/16/32, exFAT or NTFS, size and free space. Plugged a stick in later? It gets one of two spare letters (press R there, or just use the letter). exFAT and NTFS sticks now get read-only letters too, and a stick pulled out mid-copy just says "not ready". Tested in QEMU on FreeDOS: FAT16 at start plus a FAT32 stick plugged in afterwards, both read and written.
@@ -105,10 +107,10 @@
 
 <picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/11/2026: beta.95.** **USB drives stay put!!** With two USB sticks in, unplugging the first one no longer moves the second stick's files to the wrong drive letter: each drive follows its own stick. Swap the card in a card reader and DOS sees the new card after 2 seconds. Also checked: going from Windows 98 (with SweetLow's USB 2.0 drivers from QuickInstall) to MS-DOS mode, our USB driver takes the controllers back and the stick and keyboard work again, but a USB-only keyboard stays dead until the SC-55 starts, so start it from DOSSTART.BAT.
 
-<picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/11/2026: beta.94.** **USB sticks get a DOS drive letter!!** Start SBEMU with /USBDISK:1 (and LASTDRIVE=Z in CONFIG.SYS) and the USB sticks and card readers plugged in get the next free drive letters: FAT12/16 everywhere, FAT32 on MS-DOS 7.1 and FreeDOS, read AND write, USB 2.0 speed on USB 2.0 ports. Copy your CD images or game files onto a stick and use them straight from DOS. Tested in QEMU and 86Box: reading on FreeDOS, MS-DOS 7.1 and 6.22, writing on FreeDOS (2.7 MB copies byte-exact, write-protect switch honoured). Experimental and off by default: please try it on your PCs. exFAT / NTFS sticks come next.
-
 <details>
 <summary><b>&gt;&gt; Older news &lt;&lt;</b></summary>
+
+<picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/11/2026: beta.94.** **USB sticks get a DOS drive letter!!** Start SBEMU with /USBDISK:1 (and LASTDRIVE=Z in CONFIG.SYS) and the USB sticks and card readers plugged in get the next free drive letters: FAT12/16 everywhere, FAT32 on MS-DOS 7.1 and FreeDOS, read AND write, USB 2.0 speed on USB 2.0 ports. Copy your CD images or game files onto a stick and use them straight from DOS. Tested in QEMU and 86Box: reading on FreeDOS, MS-DOS 7.1 and 6.22, writing on FreeDOS (2.7 MB copies byte-exact, write-protect switch honoured). Experimental and off by default: please try it on your PCs. exFAT / NTFS sticks come next.
 
 <picture><img src="docs/90s/new.gif" alt="NEW!"></picture> **11/11/2026: beta.93.** **USB sticks, first step!!** USBTEST now finds USB sticks and card readers: name, size, the start of the disk and a 1 MB read test. On USB 2.0 ports they run at full USB 2.0 speed (the NEC card tested: about 680 KB/s with small reads, more now), and pads, keyboards and mice on the same ports still go to the USB 1.1 side as before. Test only for now: the drive letter in DOS comes next. SBEMU itself works as in beta.92.
 
@@ -672,6 +674,8 @@ works for some people.
 
 <picture><img src="docs/shots/midplay-3d.png" width="640" alt="MIDPLAY's 3D view: a sound module, a lit keyboard and channel columns"></picture>
 
+<picture><img src="docs/shots/midplay-3d-looks.png" width="720" alt="MIDPLAY 3D looks and themes: SC-55, MT-32, CM-32L styles, neon, vector and voxel"></picture>
+
 <table>
 <tr>
 <td align="center"><picture><img src="docs/shots/midplay-channels.png" width="420"></picture><br><sub>Player: levels, pan, notes and keys of all 16 channels</sub></td>
@@ -798,7 +802,7 @@ history, November 4 - 12, 2026, at beta.98):
 | | |
 |---|---|
 | <picture><img src="docs/90s/icon-claude.gif" width="44" alt="Claude"></picture> **commits co-written by Claude** | **224 of 230** |
-| <picture><img src="docs/90s/icon-crate.gif" width="44" alt="crate"></picture> **releases** | **66** |
+| <picture><img src="docs/90s/icon-crate.gif" width="44" alt="crate"></picture> **releases** | **67** |
 | <picture><img src="docs/90s/icon-scroll.gif" width="44" alt="scroll"></picture> **new code** | **about 32,000 lines**: DOS programs, SBEMU additions, Windows 98 drivers, test rigs |
 | <picture><img src="docs/90s/icon-book.gif" width="44" alt="book"></picture> **docs** | a 1,420-line manual (README.TXT) and a 1,260-line dev diary (HANDOFF.md) |
 | <picture><img src="docs/90s/icon-palette.gif" width="44" alt="palette"></picture> **art** | Port 220 and every animated GIF on this page |

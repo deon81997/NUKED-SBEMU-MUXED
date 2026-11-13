@@ -48,6 +48,22 @@ Review for 2,000-10,000 files, deep folders, long names. No fixed-size song arra
 - Note: our HDPMI is built from crazii HEAD, not the exact old v0.1-beta4fix2 binary (38646 bytes). Watch for regressions.
 - Still open: SSF2T MAKESWP hangs on exit with SBEMU resident (see the SSF2T section).
 
+## beta.99 (2026-11-13): MIDPLAY 3D looks, themes, players (midplay3d.h)
+- Keys in the 3D view: V look (g_scene: 0 solid, 1 vector, 2 voxel), C theme (g_ctheme 0..10), J player (g_model 0..3);
+  saved in MIDPLAY.CFG (SCENE3D, THEME3D, PLAYER3D). Themes table T[] in mp3_theme_apply: hue range, sky, grid, and the
+  module colours (body, face, LCD, ink, accent); 7..10 = SC-55 / SC-88 / MT-32 / CM-32L styles (colours only, no logos).
+- Players are box lists (mp3_model: kind 1 screen = LCD texture, 2 speaker/knob, 3 light strip, 4 platter); drawn solid
+  (m3_box), as lines (mp3_wbox, Wu lines, afterglow = fb * 5/8 each frame, always full resolution) or as blocks.
+- Shared: mp3_notes_scan (new notes from g_viz.nl jumps) -> note river (mp3_river), voxel drops, drum pulse
+  (mp3_drum: camera nudge, vector grid); mp3_labels: the 3 loudest instruments (640+ wide only). Voxel: mp3_lod halves
+  the block count when a frame takes > 90 ms.
+- Tested in QEMU (FreeDOS, std-vga, SBEMU, a generated 90 s song with drums): every look x player x several themes, 640x480
+  32-bit and 320x200 256 colours. Not tested on real hardware yet (speed of voxel on the Celeron).
+- Ideas left: .KAR lyrics in 3D, a showcase mode (player/theme/look change per song), pitch bend in the river, camera
+  choice, per-player LCD layouts. Open items: USB keyboard on the NEC OHCI crash (see below), 2-partition stick after
+  Win98 MS-DOS mode on the real PC (beta.98 moves blocked letters), stale screenshots (GAMETEST, TIMETEST, 3D menus),
+  rendertest branch to delete, a plain-HTTP mirror for Win98 downloads, modules (docs/MODULES.md not written yet).
+
 ## Known issue (2026-11-13, not fixed): crashes in 3D programs with a USB keyboard/mouse on the NEC OHCI
 - P5PE-VM, Logitech Unifying receiver (046d:c52b) on the NEC card's OHCI (log: "OHCI 2 lost a TD: ED rewrite per
   transfer from now"): MENU 3D GPF on F2/F3 (all styles), MIDPLAY 3D "Stack Fault" - both at harmless instructions
