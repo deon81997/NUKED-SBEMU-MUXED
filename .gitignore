@@ -1,1 +1,4 @@
 __pycache__/
+
+# host test builds (make -f tests/Makefile.host)
+sc55-pack/out/

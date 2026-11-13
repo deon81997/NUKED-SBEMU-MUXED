@@ -52,7 +52,7 @@
 
 <table>
 <tr>
-<td align="center"><b>Release counter:</b><br><picture><img src="docs/90s/counter.gif" width="200" alt="000098"></picture><br><sub>betas and counting!</sub></td>
+<td align="center"><b>Release counter:</b><br><picture><img src="docs/90s/counter.gif" width="200" alt="000109"></picture><br><sub>betas and counting!</sub></td>
 <td align="center"><picture><img src="docs/90s/jukebox.gif" width="300" alt="MIDI player: now playing PORT220_THEME.MID"></picture><br><sub>(the music is in your head... or on your SC-55!!)</sub></td>
 <td align="center"><picture><img src="docs/90s/award.gif" width="96" alt="Cool DOS Site of the Day award"></picture></td>
 </tr>
@@ -368,7 +368,7 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 
 <table>
 <tr><td><picture><img src="docs/90s/icon-speaker.gif" width="56" alt="speaker"></picture></td><td><b>Sound Blaster 1.x / 2.0 / Pro / 16 + OPL3 FM</b> in pure DOS, on your PCI sound chip</td></tr>
-<tr><td><picture><img src="docs/90s/icon-sc55.gif" width="56" alt="sound module"></picture></td><td><b>Roland SC-55 and SC-55mkII</b>: the real firmware, from your ROMs</td></tr>
+<tr><td><picture><img src="docs/90s/icon-sc55.gif" width="56" alt="sound module"></picture></td><td><b>Roland SC-55, SC-55mkII, SC-55ST, SC-155 and CM-300</b>: the real firmware, from your ROMs, with a clean low-pass at any output rate</td></tr>
 <tr><td><picture><img src="docs/90s/icon-mt32.gif" width="56" alt="synth module"></picture></td><td><b>Roland MT-32 / CM-32L</b> (Munt), or any <code>.SF2</code> SoundFont</td></tr>
 <tr><td><picture><img src="docs/90s/icon-disc.gif" width="56" alt="CD"></picture></td><td><b>Virtual CD drive M:</b> that works like a real disc: ISO, CUE/BIN, multi-disc, CD music played by the drive and mixed in. Pick images from any folder on any drive, with a home folder</td></tr>
 <tr><td><picture><img src="docs/90s/icon-usbstick.gif" width="56" alt="USB stick"></picture></td><td><b>USB sticks as DOS drive letters</b>: FAT12/16/32 read and write, exFAT and NTFS read-only, plugged in any time; MENU &gt; CD-ROM &gt; USB drives lists them</td></tr>
@@ -376,7 +376,8 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 <tr><td><picture><img src="docs/90s/icon-joystick.gif" width="56" alt="joystick"></picture></td><td><b>The pad presses each game's own keys</b>: jump, fire, pogo, menu, for over 3500 DOS games, in DOS and Windows 98</td></tr>
 <tr><td><picture><img src="docs/90s/icon-win98.gif" width="56" alt="Windows 98 PC"></picture></td><td><b>Windows 98</b>: SB / OPL3 / MPU for DOS boxes, a "NUKED SB-EMU" MIDI device, a joystick + game port for every game, and barely any CPU while idle</td></tr>
 <tr><td><picture><img src="docs/90s/icon-menu.gif" width="56" alt="menu screen"></picture></td><td><b>Menus for everything</b>: seven colour styles, 3D screens (menu, settings, CD images, GAMETEST, MIDI player), game profiles, tests</td></tr>
-<tr><td><picture><img src="docs/90s/icon-note.gif" width="56" alt="music note"></picture></td><td><b>MIDPLAY</b>: a full-screen MIDI player with playlist, file browser, options, a live SC-55 front panel and a smooth 3D view</td></tr>
+<tr><td><picture><img src="docs/90s/icon-note.gif" width="56" alt="music note"></picture></td><td><b>MIDPLAY</b>: a full-screen MIDI player with playlist, search, file browser, a live SC-55 front panel and a smooth 3D view. Plays game music straight from the game files (Doom .MUS, HMI .HMP, Miles .XMI), with key change, A-B loop and a sleep timer</td></tr>
+<tr><td><picture><img src="docs/90s/icon-sc55.gif" width="56" alt="sound module"></picture></td><td><b>Your real synth over USB</b>: class-compliant USB MIDI cables and keyboards play the MPU-401 music</td></tr>
 <tr><td><picture><img src="docs/90s/icon-bug.gif" width="56" alt="bug"></picture></td><td><b>One-key bug report</b>, start-up logs and a live load meter</td></tr>
 </table>
 
@@ -395,14 +396,16 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 <details>
 <summary><b>&gt;&gt; MIDI: SC-55, MT-32, CM-32L, SoundFont &lt;&lt;</b></summary>
 
-- <picture><img src="docs/90s/ball-gold.gif" width="14" alt="o"></picture> **SC-55** (mk1 v1.00 – v2.00) and **SC-55mkII** (v1.01), ROM sets found by content, the best one picked for you
+- <picture><img src="docs/90s/ball-gold.gif" width="14" alt="o"></picture> **SC-55** (mk1 v1.00 – v2.00), **SC-55mkII** (v1.01), **SC-55ST**, **SC-155 / SC-155mkII** and **CM-300**: ROM sets found by content, the best one picked for you
+- <picture><img src="docs/90s/ball-blue.gif" width="14" alt="o"></picture> **Clean at any output rate**: a low-pass filter before the SC-55's 64-66 kHz sound is converted to your card's rate, so nothing whistles at 11025 or 22050 Hz (`/VSCLPF`, on by default)
 - <picture><img src="docs/90s/ball-red.gif" width="14" alt="o"></picture> **MT-32** and **CM-32L / LAPC-I** with Munt 2.8.5
 - <picture><img src="docs/90s/ball-blue.gif" width="14" alt="o"></picture> **SoundFont** (`.SF2`) with reverb and chorus, for slower PCs
 - <picture><img src="docs/90s/ball-green.gif" width="14" alt="o"></picture> MPU-401 on any port (330, 300, 310, 320, 332, 334)
 - <picture><img src="docs/90s/ball-gold.gif" width="14" alt="o"></picture> Render-ahead buffer and automatic speed control keep the music smooth while games run
 - <picture><img src="docs/90s/ball-red.gif" width="14" alt="o"></picture> **Automatic setup** measures each ROM set on your CPU and picks the best one it can handle
 - <picture><img src="docs/90s/ball-blue.gif" width="14" alt="o"></picture> **Front panel in games**: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>F12</kbd> shows the SC-55 / MT-32 display over the game
-- <picture><img src="docs/90s/ball-green.gif" width="14" alt="o"></picture> `MIDPLAY`: MIDI player with five pages (player, playlist, files, options, help): titles and lengths read in the background, type-to-find, sorting, .M3U lists, speed 25-400%, mute/solo per channel, resume where you quit, a live SC-55 front panel and a sharp 640×480 3D view, in every text and VESA mode
+- <picture><img src="docs/90s/ball-green.gif" width="14" alt="o"></picture> `MIDPLAY`: MIDI player with five pages (player, playlist, files, options, help): .MID, .KAR, .RMI and game music (Doom **.MUS**, HMI **.HMP**, Miles **.XMI**), titles and lengths read in the background, **Ctrl+F search**, sorting, .M3U / .M3U8 lists, speed 25-400%, **key change** ±12 semitones, **A-B loop**, **sleep timer**, mute/solo per channel, resume where you quit, a live SC-55 front panel and a 3D view in every VESA mode
+- <picture><img src="docs/90s/ball-red.gif" width="14" alt="o"></picture> **USB MIDI out**: a class-compliant USB MIDI cable or keyboard (M-Audio Uno, Roland UM-ONE ...) plays the music on your real synth (`/MUSB`)
 - <picture><img src="docs/90s/ball-gold.gif" width="14" alt="o"></picture> `SC55WAV` / `SC55LOG`: render an SC-55 demo to WAV and see how fast your PC runs each ROM set
 </details>
 
@@ -472,6 +475,8 @@ CMOV (Pentium Pro / II or newer).
 | **mk1** | Pentium III / Celeron ≈ 1 GHz, Pentium M ≈ 900 MHz, Athlon XP 1200+ | **Pentium M ≈ 1.2 GHz, Pentium 4 ≈ 2.0 GHz, Athlon XP 1600+** |
 | **mkII** (≈1.6–1.9× heavier) | Pentium M ≈ 1.5 GHz, Pentium 4 ≈ 2.4 GHz | Pentium M ≈ 2 GHz, Pentium 4 ≈ 3 GHz, Athlon 64 and up |
 
+The SC-55ST and SC-155mkII weigh about as much as the mkII, the CM-300 less than the mk1 (measured side by side in QEMU).
+
 Too slow? Pick a **SoundFont** instead. It runs on a Pentium II no problem.
 (Turning reverb/chorus off only helps a little: most of the work is the
 emulated CPU, and that always runs at full speed.)
@@ -493,7 +498,8 @@ emulated CPU, and that always runs at full speed.)
 
 <picture><img src="docs/90s/vox-sec-tower.gif" width="140" align="right" alt=""></picture>
 
-Every release gets tried on real iron here, plus a whole fleet of emulated PCs:
+Every release runs on a whole fleet of emulated PCs, and on the real iron here (each release's
+HANDOFF note says what still waits for the real PCs):
 
 <table>
 <tr>
@@ -524,6 +530,9 @@ Every release gets tried on real iron here, plus a whole fleet of emulated PCs:
 
 **Emulated:** 86Box (Celeron 366 for "how slow can it go?", Pentium II with Windows 98 SE) and QEMU, with custom
 add-ons: a fake USB Xbox 360 pad, a joystick driven from a file and scripted keys and screenshots.
+**And on the bench:** every ROM set at every output rate through a dropped-note test and a sound recorder (beats on time,
+no gaps, no clipping, the right ROM set really loaded), memory checkers (AddressSanitizer / UBSan) over MIDPLAY's player,
+file formats and 3D view, thousands of deliberately damaged music files, and an offline SC-55 renderer to judge the sound.
 
 <div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
 
@@ -690,7 +699,7 @@ works for some people.
 </tr>
 </table>
 
-<b>MIDPLAY</b>, the MIDI player, live off the SC-55 (five pages, 3D up to 1024x768 in 256 colours to 32-bit):
+<b>MIDPLAY</b>, the MIDI and game-music player, live off the SC-55 (five pages, 3D up to 1600x1200 in 256 colours to 32-bit):
 
 <picture><img src="docs/shots/midplay-3d.png" width="640" alt="MIDPLAY's 3D view: a sound module, a lit keyboard and channel columns"></picture>
 
@@ -793,9 +802,10 @@ Stuff this little pack pulled off that I'm REALLY proud of:
 - <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **Our own Windows 98 drivers**: a virtual Sound Blaster / OPL3 / MPU-401 for DOS boxes, a MIDI driver, a joystick driver and a virtual game port, **idling at 0.25% of the CPU**. Game sound grows its own buffer when Windows gets busy (Blood's gaps went from 56% of the time to 1%), and MIDPLAY shows the SC-55's live display in a DOS box, just like in DOS
 - <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **A virtual CD drive that acts like a real one**: rebuilt from source with our own CD-audio part, first in line for games, and CD music from CUE/BIN images mixed into the game's sound
 - <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **3D menus drawn by the CPU** at 640×480, with no 3D card, that still run on a 366 MHz Celeron, with a floor drawn row by row for 3x more frames, styles up to a third faster, and neon glow in your colour style (<kbd>F6</kbd>)
-- <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **A MIDI player that never makes the music late**: MIDPLAY sends the notes from inside its own drawing code, so even the 3D view keeps the music within a few milliseconds (it was a quarter of a second), and it browses and plays folders with thousands of MIDI files
+- <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **A MIDI player that never makes the music late**: MIDPLAY sends the notes from inside its own drawing code, so even the 3D view keeps the music within a few milliseconds (it was a quarter of a second), and it browses and plays folders with thousands of MIDI files. It also plays Doom, Descent and Ultima game music straight from the game files: every format sends exactly the same notes, checked note for note
 - <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **Found and fixed a hidden freeze in the DOS extender itself**: an EMPTY virtual CD drive made HDPMI32I (under every 32-bit program in the pack) crash with an error it could not show, so the PC just hung. Tracked down with a register dump in an emulated PC, fixed in HDPMI's own source, plus a second fix so Borland's DOS extender (Super Street Fighter II Turbo) gets past its start-up
 - <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **Found and fixed an FPU bug as old as SBEMU itself**: its sound interrupt and port handlers used the math unit without saving the game's values, which could garble 3D games; tracked down from a few black lines in MIDPLAY's 3D view
+- <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **Every ROM set at every output rate**: 12 SC-55-family ROM sets, MT-32, CM-32L and a SoundFont, each at 11025 to 48000 Hz, recorded and checked for lost notes, beats on time and gaps (and on the way, a new low-pass filter for a cleaner SC-55 at every rate)
 - <picture><img src="docs/90s/icon-trophy.gif" width="36" alt="trophy"></picture> **Tested like crazy** on emulated PCs: custom 86Box builds with a fake USB pad, a file-driven joystick and a strict keyboard controller, QEMU with a fake Xbox 360 pad, and real games driven by scripts
 
 <div align="right"><a href="#top"><img src="docs/90s/btn-top.gif" width="88" alt="back to top"></a></div>
@@ -815,16 +825,16 @@ MPXPlay drivers, **Japheth**'s HX and Jemm, **vorvek**'s uCDD and everyone in [T
 
 Everything new on top of them was written by **Claude**, Anthropic's AI: the code, the bug hunting, the emulated
 test PCs, the docs and Port 220. My part was the ideas, the direction and the testing on my own PCs. The numbers (from this repo's
-history, November 4 - 12, 2026, at beta.98):
+history, November 4 - 13, 2026, at beta.109):
 
 <div align="center">
 
 | | |
 |---|---|
-| <picture><img src="docs/90s/icon-claude.gif" width="44" alt="Claude"></picture> **commits co-written by Claude** | **224 of 230** |
-| <picture><img src="docs/90s/icon-crate.gif" width="44" alt="crate"></picture> **releases** | **67** |
-| <picture><img src="docs/90s/icon-scroll.gif" width="44" alt="scroll"></picture> **new code** | **about 32,000 lines**: DOS programs, SBEMU additions, Windows 98 drivers, test rigs |
-| <picture><img src="docs/90s/icon-book.gif" width="44" alt="book"></picture> **docs** | a 1,420-line manual (README.TXT) and a 1,260-line dev diary (HANDOFF.md) |
+| <picture><img src="docs/90s/icon-claude.gif" width="44" alt="Claude"></picture> **commits co-written by Claude** | **258 of 265** |
+| <picture><img src="docs/90s/icon-crate.gif" width="44" alt="crate"></picture> **releases** | **76** |
+| <picture><img src="docs/90s/icon-scroll.gif" width="44" alt="scroll"></picture> **new code** | **about 37,000 lines**: DOS programs, SBEMU additions, Windows 98 drivers, test rigs |
+| <picture><img src="docs/90s/icon-book.gif" width="44" alt="book"></picture> **docs** | a 1,550-line manual (README.TXT) and 1,840 lines of dev diaries (HANDOFF.md) |
 | <picture><img src="docs/90s/icon-palette.gif" width="44" alt="palette"></picture> **art** | Port 220 and every animated GIF on this page |
 
 </div>
@@ -854,6 +864,7 @@ Want to use our drivers in your own project? See [Take Our Drivers!!](#-take-our
 |---|---|
 | SC-55 / MT-32 / SoundFont MIDI | the synths behind the virtual MPU-401, with render-ahead and automatic speed control. **Based on** Nuked-SC55, Munt and TinySoundFont; the SoundFont MPU-401 started from Cacodemon345's VSBHDASF |
 | SC-55 engine speed-ups | a bit-exact faster core and faster start-up: **changes to** Nuked-SC55 (nukeykt) and J.C. Moyer's backend fork |
+| SC-55 low-pass (`/VSCLPF`) | a 6th-order filter before the rate conversion, integer maths so it stays light on old CPUs |
 | CD link | CD music from the virtual drive mixed into the sound card's output, **through** uCDD (vorvek) |
 | USB host (`usbpad.c`) | pads, keyboards and mice in plain DOS, on every USB controller type. **Based on** crazii's USBDDOS (UHCI / OHCI), Yeo Kheng Meng's xhci98 (xHCI start-up) and Linux `xpad.c` (the pad's protocol) |
 | Virtual keyboard controller (`vkbc.c`) | USB keyboard, USB mouse (with or without JEMM) and pad keys typed like a PS/2 keyboard |
@@ -870,7 +881,7 @@ Want to use our drivers in your own project? See [Take Our Drivers!!](#-take-our
 | `MENU` | the main menu: sound, settings, games, CD-ROM, tests, files; seven styles + 3D |
 | `SETTINGS` (`SBSET`) | every option, automatic setup that measures your CPU, text + 3D |
 | `CD images` (`CDGUI`) | mount, eject, fix, install and look inside disc images, text + 3D |
-| `MIDPLAY` | MIDI player: playlist, file browser, options, a live SC-55 front panel and a 3D view |
+| `MIDPLAY` | MIDI and game-music player (.MID .KAR .RMI .MUS .HMP .XMI): playlist, search, file browser, key change, A-B loop, sleep timer, a live SC-55 front panel and a 3D view |
 | `GAMETEST` | runs games by itself and finds each game's best settings, text + 3D |
 | `SBDIAG` | what SBEMU found and how hard it's working |
 | `TIMETEST` | do games lose timer ticks while the music plays? |
@@ -900,6 +911,8 @@ Want to use our drivers in your own project? See [Take Our Drivers!!](#-take-our
 |---|---|
 | 86Box test rig | custom 86Box builds: fake USB pad, joystick from a file, strict keyboard controller, scripted keys and screenshots |
 | QEMU test rig | disk builder, VM driver and a fake Xbox 360 pad over USB redirection |
+| MIDPLAY test kit (`testrig/midplay`) | `notetest.sh` (dropped notes per synth, sound recording, which ROM set really loaded), `wavcheck.py` (beats, gaps, clipping), `fmtcheck.py` + `hostsweep.sh` (every file format, key change, A-B loop, sleep timer and damaged files under memory checkers) |
+| `sc55render`, `m3host` | the SC-55 rendered offline through SBEMU's own sound path; MIDPLAY's 3D view under memory checkers |
 | Windows 98 test VM | scripts that install and drive Windows 98 for the driver tests |
 | Host benchmark | runs the SC-55 core on a normal PC to make it faster without changing its sound |
 | `k2j.py` | reads DOSBox Pure's button layouts |
@@ -993,7 +1006,7 @@ the same GPL.
 
 | What | For | Where to get it | Goes in |
 |---|---|---|---|
-| **Roland SC-55 / SC-55mkII ROMs** | the SC-55 | Copyrighted: **dump them from a unit you own**. Not needed with a SoundFont | `FILES\ROMS` |
+| **Roland SC-55 / SC-55mkII ROMs** (or SC-55ST, SC-155, CM-300) | the SC-55 | Copyrighted: **dump them from a unit you own**. Not needed with a SoundFont | `FILES\ROMS` |
 | **Roland MT-32 / CM-32L ROMs** | the MT-32 (optional) | Dump them from a unit you own | `FILES\ROMS` |
 | **A SoundFont** (`.SF2`) | the SoundFont synth (optional) | Any General MIDI SoundFont; lots are free | `C:\SC55\SF2` |
 | **MSCDEX.EXE** (Microsoft) | a real CD-ROM drive (optional) | Comes with Windows 98: SETUP finds it by itself | automatic |
@@ -1102,8 +1115,8 @@ sc55-pack/
 ├── win98/                Windows 98 part: vxd/, helper/, mididrv/, compat/
 ├── pack/                 the pack's batch files and guides
 ├── scripts/              release helpers (incl. the uCDD unmount fix)
-├── testrig/              QEMU / 86Box test machines (disk builder, VM driver, fake USB pad)
-└── tests/                host-side engine tests
+├── testrig/              QEMU / 86Box test machines (disk builder, VM driver, fake USB pad, MIDPLAY test kit)
+└── tests/                host-side tests: SC-55 engine + low-pass, ROM finder, sc55render, m3host (3D)
 ```
 
 Build it:
@@ -1117,7 +1130,7 @@ make -j2                               # -> output/
 `make VSC55=0` builds plain SBEMU. The Windows 98 part (`win98/build98.sh`)
 needs MinGW-w64 i686, Open Watcom 2 and JWasm; see
 [`win98/SOURCES.TXT`](sc55-pack/win98/SOURCES.TXT).
-[`HANDOFF.md`](sc55-pack/HANDOFF.md) is the dev diary: what changed, how it was
+[`HANDOFF.md`](HANDOFF.md) (newest) and [`sc55-pack/HANDOFF.md`](sc55-pack/HANDOFF.md) are the dev diary: what changed, how it was
 tested, what still needs real hardware. The 90s graphics on this page are
 drawn by [`docs/90s/make90s.py`](docs/90s/make90s.py).
 
