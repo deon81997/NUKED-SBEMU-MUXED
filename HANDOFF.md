@@ -1,3 +1,17 @@
+## WIP beta.120 (2026-11-14, DOS session, force-stopped): P5PE-VM freeze = ICH5 SATA "Enhanced" mode (user)
+- User: the P5PE-VM froze with SC55 in any case while the BIOS had SATA on "Enhanced"; "Compatible" fixed it.
+- Likely mechanism: Enhanced = SATA in native PCI mode (PCI IRQ shared with the Audigy/USB). The EMU10K irq_routine
+  (snd_emu_10kx_isr / snd_p16v_isr) returned non-zero for ANY IPR bit (MIDI bits nearly always set), so SBEMU
+  claimed every shared IRQ, sent EOI and never chained -> the BIOS disk wait hung.
+- Done on wip/sata-shared-irq-2026-11-14 (built, NOT tested): sc_sbliv.c both ISRs ack/return only
+  IPR_INTERVALTIMER|IPR_SAMPLERATETRACKER (the INTE bits SBEMU enables); main.c MAIN_ScanDiskIrqs + SBDETAIL disk
+  controller lines + yellow warning when a native-mode IDE/SATA controller shares the card IRQ; makefile beta.120.
+- Next 3 steps: 1) QEMU pm.img (testrig/menustat/mkimg.sh) plain and with `-- -device ich9-ahci`: SBDETAIL
+  "disk controller" line, warning when shared, MPUTEST + DIR still work; menustat matrix. 2) README.TXT troubleshooting
+  (SATA Compatible mode, warning text) + README.md news; rezip.py beta.119 zip -> beta.120, release. 3) Ask the user to
+  retest Enhanced mode on beta.120 (should no longer freeze) and send SBDETAIL.TXT.
+- Resume: git pull; git checkout wip/sata-shared-irq-2026-11-14; DJGPP: curl build-djgpp v3.4 linux64 gcc1220 to
+  /tmp/dl; sh testrig/common/restore.sh dos71; make in sc55-pack.
 ## WCSET write-combining (2026-11-14, DOS session, STOPPED mid-task, no release): faster DOS graphics via MTRR WC on the VESA LFB
 - Done (main, unreleased): tools/wcset.h (shared: CPUID/MTRRcap/phys-width checks, real-mode stub via DPMI 0301h for
   RDMSR/WRMSR/CR0/WBINVD = real mode under HDPMI raw, V86 under JEMM (Jemm EMU.ASM emulates them); EMM386/QEMM V86 and

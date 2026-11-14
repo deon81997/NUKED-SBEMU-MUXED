@@ -888,10 +888,15 @@ static void snd_emu10kx_clear_cache(struct emu10k1_card *card)
 }
 
 #ifdef SBEMU
+/* beta.120: only the interrupts SBEMU enables (INTE: interval timer, sample rate tracker) count as "ours".
+ * Before, any IPR bit (MIDI UART ones are nearly always set) made SBEMU claim the IRQ, send EOI and not chain:
+ * on a shared IRQ (P5PE-VM: ICH5 SATA in BIOS "Enhanced" mode = native PCI IRQ, USB) the disk interrupt was
+ * swallowed and the BIOS disk wait hung the PC. */
+#define EMU_SBEMU_IPR (IPR_INTERVALTIMER|IPR_SAMPLERATETRACKER)
 static int snd_emu_10kx_isr(struct emu10k1_card *card)
 {
-  int interrupts = emu10k1_readfn0(card, IPR);
-  emu10k1_writefn0(card, IPR, interrupts);
+  int interrupts = emu10k1_readfn0(card, IPR) & EMU_SBEMU_IPR;
+  if(interrupts) emu10k1_writefn0(card, IPR, interrupts);
   return interrupts;
 }
 #endif
@@ -1085,11 +1090,9 @@ static void snd_p16v_mixer_write(struct emu10k1_card *card,unsigned int reg,unsi
 #ifdef SBEMU
 static int snd_p16v_isr(struct emu10k1_card *card)
 {
-  int interrupts = emu10k1_readfn0(card, IPR);
-  emu10k1_writefn0(card, IPR, interrupts);
-  int interrupts2 = emu10k1_readfn0(card, IPR2);
-  emu10k1_writefn0(card, IPR2, interrupts2);
-  return interrupts | interrupts2;
+  int interrupts = emu10k1_readfn0(card, IPR) & EMU_SBEMU_IPR;   /* see snd_emu_10kx_isr (IPR2: none enabled) */
+  if(interrupts) emu10k1_writefn0(card, IPR, interrupts);
+  return interrupts;
 }
 #endif
 
