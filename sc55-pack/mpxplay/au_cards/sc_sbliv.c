@@ -892,7 +892,7 @@ static void snd_emu10kx_clear_cache(struct emu10k1_card *card)
  * Before, any IPR bit (MIDI UART ones are nearly always set) made SBEMU claim the IRQ, send EOI and not chain:
  * on a shared IRQ (P5PE-VM: ICH5 SATA in BIOS "Enhanced" mode = native PCI IRQ, USB) the disk interrupt was
  * swallowed and the BIOS disk wait hung the PC. */
-#define EMU_SBEMU_IPR (IPR_INTERVALTIMER|IPR_SAMPLERATETRACKER)
+#define EMU_SBEMU_IPR (IPR_INTERVALTIMER|IPR_SAMPLERATETRACKER|IPR_FXDSP)   /* + FX DSP: INTE_FXDSPENABLE is set at start */
 static int snd_emu_10kx_isr(struct emu10k1_card *card)
 {
   int interrupts = emu10k1_readfn0(card, IPR) & EMU_SBEMU_IPR;
