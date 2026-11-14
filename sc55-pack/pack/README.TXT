@@ -832,7 +832,8 @@ CONTENTS
       program gets "not ready", as with a real empty drive.
   The driver is uCDD 0.9.5-a3 (source: third_party/ucdd in the project, our
   additions in src/sbemulink.asm) and SHSUCDX 3.09 with one added option,
-  /P:M (M: first). Games that look for a CD drive by trying the letters
+  /P:M (M: first), that checks for a disc change after 0.1 s instead of
+  7 s idle (a Ctrl+Alt+PgDn disc swap shows at once). Games that look for a CD drive by trying the letters
   A: to Z: one after another still find the real drive D: first: for such
   a game, unload the real drive's driver (restart without BOOTCFG).
 

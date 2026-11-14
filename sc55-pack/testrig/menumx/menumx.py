@@ -19,7 +19,7 @@ Per case, on a fresh pair of disks (C: FreeDOS + the release zip, D: the images)
   cdmusic   (CUE discs) CDPLAY M: 2 at the prompt: the audio track must come out of the sound card
   unmount   CD images > U, drive M: empty
   disc2     mount the Raptor disc, DIR, I runs Apogee's INSTALL.EXE -> C:\\RAPTOR, MENU game profile, sound
-  swap      (MDM) Ctrl+Alt+PgDn: drive M: shows disc 2
+  swap      (MDM) after GAMES.MDM, RAP.CUE, GAMES.MDM: DIR, Ctrl+Alt+PgDn, DIR shows the other disc, twice
 Writes DIR/<case>-<mode>/result.json, step screenshots and the text screens of failed steps.
 """
 import argparse, json, os, re, shutil, subprocess, sys, time
@@ -370,9 +370,9 @@ class Run:
             labels.append('RAPTOR_CD' if 'RAPTOR_CD' in t else 'GOT_CD' if 'GOT_CD' in t else '?')
             self.v.key('ctrl-alt-pgdn', 300); self.dos('C:\\T\\WAIT1', 1500)
         ok = sorted(labels) == ['GOT_CD', 'RAPTOR_CD']
-        # OPEN (uCDD, HANDOFF "MENU matrix"): after a single image and the set were mounted again, the hotkey does
-        # not switch any more in the rig; the first swap after mounting the set (step disc2) works every time
-        self.log(step, True if ok else None, 'Ctrl+Alt+PgDn: %s -> %s%s' % (tuple(labels) + ('' if ok else ' (OPEN: hotkey after a re-mount)',)))
+        # beta.117: this failed (GOT, GOT) because SHSUCDX checked for a media change only after 7 s without an
+        # access; the second DIR came ~5 s after the first. Now 0.1 s. Fast QEMU check: hotkey.py
+        self.log(step, ok, 'Ctrl+Alt+PgDn: %s -> %s' % tuple(labels))
 
     def all(self, steps):
         for name, fn in steps:

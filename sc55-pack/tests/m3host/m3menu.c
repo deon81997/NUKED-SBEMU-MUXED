@@ -118,6 +118,44 @@ int main(int argc, char** argv)
     for (i = 0; i < 9; i++) { m3_style = i % 3; m3_look = i / 3; frame(); click_all(); }
     CHECK(enter_mode(320, 200, 8, 0) && M3W == 320 && m3_bpp == 8, "320x200"); m3_mouse_setup(); sweep(1);
     for (i = 0; i < 9; i++) { m3_style = i % 3; m3_look = i / 3; frame(); click_all(); }
+    /* 1b: Panels at 640x480, a grey chosen item with a long label: the reason box must not cover the label's end
+     * (beta.117). M3SHOT=file.ppm writes the frame. */
+    {
+        int gi = -1, x, y, lit = 0, box = 0;
+        for (i = 0; i < g_n; i++) if (g_it[i].needs_sbemu > 0) { gi = i; break; }
+        CHECK(gi >= 0, "an item that needs SBEMU");
+        if (gi >= 0)
+        {
+            ITEM sv = g_it[gi]; int sr = g_running, ss = g_sel, sc = g_cat;
+            snprintf(g_it[gi].label, sizeof g_it[gi].label, "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW");
+            g_running = 0; g_sel = gi; g_cat = g_it[gi].cat; m3_style = 0; m3_look = 0; m3_ctheme = 0;
+            CHECK(enter_mode(640, 480, 32, 0), "640x480 for the reason row"); frame(); frame();
+            if (getenv("M3SHOT"))
+            {
+                FILE* f = fopen(getenv("M3SHOT"), "wb");
+                fprintf(f, "P6 %d %d 255\n", m3_scr.w, m3_scr.h);
+                for (y = 0; y < m3_scr.h; y++) for (x = 0; x < m3_scr.w; x++)
+                { uint32_t c = m3_scr.p[y * m3_scr.w + x]; fputc(c >> 16 & 255, f); fputc(c >> 8 & 255, f); fputc(c & 255, f); }
+                fclose(f);
+            }
+            /* the reason text is orange (FFB040); the label text grey (8890A0): on the reason row the last label pixel
+             * must end 4 px before the box (ro - 4) */
+            for (y = 0; y < m3_scr.h; y++)
+            {
+                int ro = 9999, lr = -1;
+                for (x = 0; x < m3_scr.w; x++)
+                {
+                    uint32_t c = m3_scr.p[y * m3_scr.w + x] & 0xFFFFFF;
+                    if (c == 0xFFB040 && x < ro) ro = x;
+                    if (c == 0x8890A0) lr = x;
+                }
+                if (ro < 9999) { box++; if (lr >= ro - 8) lit++; }   /* box from ro - 4, 4 px gap */
+            }
+            CHECK(box > 0, "the reason shows on the grey row");
+            CHECK(lit == 0, "label under the reason box on %d lines", lit);
+            g_it[gi] = sv; g_running = sr; g_sel = ss; g_cat = sc;
+        }
+    }
     /* 2: every mode the fake card offers, with a refresh rate now and then */
     for (i = 0; i < m3_nmodes; i++)
     {

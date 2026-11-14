@@ -39,7 +39,7 @@
 ;	 SHSUCDX does not attempt to read the CD ROM until an access request
 ;	 is made.  Thus, the CD drive does not have to be ready when the
 ;	 redirector is loaded.	If more than 7 seconds elapse between access
-;	 requests a media check is made.  The buffers and cache are flushed
+;	 requests (NUKED SB-EMU: 2 ticks, ~0.1 s) a media check is made.  The buffers and cache are flushed
 ;	 and the CD is re-read only if the driver reports a media change.
 ;	 This reduces network traffic but can result in missing a "fast"
 ;	 media change on a local drive.
@@ -174,7 +174,7 @@ NoRedir 	equ	0ffh		; equate required for table terminator
 CopyrightMsg
 dln "SHSUCDX by Jason Hood <jadoxa@yahoo.com.au>. | Derived from v1.4b by"
 dln "Version 3.09 (2 September, 2022). Freeware.  | John H. McCoy, October 2000,"
-dln "ALTERED VERSION for NUKED SB-EMU (/P:x = x: is the first CD drive)."
+dln "ALTERED VERSION for NUKED SB-EMU (/P:x = x: is the first CD drive, media check after 0.1 s idle)."
 dlz "http://shsucdx.adoxa.vze.com/                | Sam Houston State University."
 		db	26
 
@@ -695,7 +695,8 @@ ForUs	uses	bx,si,di
 	; Force re-init if it's been a while and the media has changed.
 	call	GetTicks
 	sub	ax, [bx+DrvEnt.LastAccess]
-	if ax ,ae, 128			; approx. 7 seconds
+	if ax ,ae, 2			; NUKED SB-EMU: 2 ticks (was 128, ~7 s: a uCDD
+					; disc hotkey went unseen until 7 s idle)
 	 save	es,bx
 	  ld	es, ds
 	  mov	bx, rh_io

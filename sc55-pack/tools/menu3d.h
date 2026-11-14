@@ -329,7 +329,10 @@ static void m3_draw_panels(int cat, int sel, float selanim)
             if (!ok) { a = 0x3A3F4A; b = 0x22252C; }
             m3_box2d(rx + on, yy + on, rw, rh, a, b, on, 3);
             if (i < 9) { char num[4]; snprintf(num, sizeof num, "%d", i + 1); m3_text(&m3_scr, rx + (L.sm ? 2 : 10) + on, ty, L.sm ? 0 : L.f, num, 0xC0D0F0, 256); }
-            m3_fit(lb, sizeof lb, t2->label, rw - numw - (L.sm ? 6 : 16), L.f);
+            {   /* a grey chosen row shows its reason at the right: the label stops before that box */
+                int rsn = on && !ok && rw > 300 ? 8 * (int)strlen(m3_reason_text(t2)) + 20 : 0;
+                m3_fit(lb, sizeof lb, t2->label, rw - numw - (L.sm ? 6 : 16) - rsn, L.f);
+            }
             if (on && ok) m3_text_glow(&m3_scr, rx + numw + (L.sm ? 4 : 10) + on, ty, L.f, lb, 0xFFFFFF, m3_glowc);
             else m3_text_sh(&m3_scr, rx + numw + (L.sm ? 4 : 10) + on, ty, L.f, lb, ok ? 0xFFFFFF : 0x8890A0);
             if (t2->kind == IT_GAME && t2->best[0] && rw > 200) m3_text(&m3_scr, rx + rw - 14, ty, 0, "\x04", 0xFFE060, 256);

@@ -1,3 +1,20 @@
+## beta.117 (2026-11-14, DOS session): uCDD disc hotkey "stopped after a re-mount" = SHSUCDX 7 s media check; MENU Panels reason box
+- Root cause of the beta.115 OPEN item: not uCDD and not the mount order. SHSUCDX asked the driver for a media change
+  only after 128 ticks (~7 s) without an access to M:; the matrix swap step did DIR, Ctrl+Alt+PgDn, DIR within ~5 s,
+  so the second DIR showed the old disc (the disc2 step had a longer gap and passed). uCDD had switched (cur 2 in a
+  memory dump). Fix: third_party/shsucdx/shsucdx.nsm threshold 2 ticks (~0.1 s); README.TXT note. Real effect for
+  users: a game's "insert disc 2" prompt answered right after the hotkey read the old disc.
+- New fast rig sc55-pack/testrig/menumx/hotkey.py (QEMU, no MENU, ~40 s): GAMES.MDM -> hotkey -> RAP.CUE -> GAMES.MDM
+  -> hotkey x2 -> GOT.CUE -> GAMES.MDM -> hotkey; DIR after each. Old SHSUCDX: every swap FAIL; new: PASS (HIMEMX and
+  JEMMEX). QEMU needs `-global i8042.kbd-throttle=on` (else QEMU pops port 60h on read and a peeking INT 9 hook such
+  as uCDD's sees every other scancode). menumx.py swap step is a real PASS/FAIL now (matrix case).
+- MENU 3D Panels: a grey chosen row fits its label before the reason box (menu3d.h); tests/m3host m3menu.c 1b checks
+  it at 640x480 (fails on the old code, M3SHOT=x.ppm dumps the frame).
+- Not run: 86Box matrix (the store-86rig 86Box has no automation socket; rebuild per testrig/86box/README.md).
+  SBEMU unchanged -> no speed measurement needed. Zip = beta.116 zip, rezip.py + SHSUCDX.COM swapped.
+- Real hardware: on the D810, mount an .MDM in MENU, DIR M:, Ctrl+Alt+PgDn, DIR M: at once -> disc 2 shows.
+- Test downloads: DJGPP v3.4 (/tmp/dl), HIMEMX from store-freedos (ibiblio blocked), rufus (testrig/rufus).
+
 ## beta.116 (2026-11-14, DOS session): /VER in every EXE (ported from wip/release-rc-2026-11-13)
 - sc55-pack/tools/packver.c: a constructor in every EXE answers `NAME /VER` ("NAME.EXE: NUKED SB-EMU <VERSION>") and
   exits before main(); the makefile links output/packver.o into SBEMU and all 15 tools (packver.h/NSBVER stays for
@@ -25,7 +42,7 @@
   play (sound level from 86Box), CD music, unmount, disc 2, disc swap. Table below. `python3 menumx.py all --jobs 2`.
 - Findings that are not pack bugs: Apogee INSTALL.EXE renames RAPSW12.SHR -> .EXE in its own folder (fails from any
   read-only CD; the test disc ships the .EXE). uCDD applies a disc hotkey only while DOS is idle (fine in games).
-- OPEN: uCDD MDM hotkey stops switching after a single image and the set were mounted again (rig repro: mount
+- FIXED beta.117 (SHSUCDX 7 s media check): uCDD MDM hotkey stops switching after a single image and the set were mounted again (rig repro: mount
   GAMES.MDM, mount RAP.CUE, mount GAMES.MDM, Ctrl+Alt+PgDn + WAIT1 -> still disc 1). First swap after a mount works.
 - Real hardware to check: CD music in a CUE game started from MENU (D810, P5PE-VM); SBTRACE.TXT "was stuck" lines.
 - Matrix result (86Box, release candidate = beta.114 zip + these files; logs /home/claude/mx/all, not kept):
