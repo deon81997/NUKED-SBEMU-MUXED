@@ -1,17 +1,20 @@
-## WIP beta.120 (2026-11-14, DOS session, force-stopped): P5PE-VM freeze = ICH5 SATA "Enhanced" mode (user)
-- User: the P5PE-VM froze with SC55 in any case while the BIOS had SATA on "Enhanced"; "Compatible" fixed it.
-- Likely mechanism: Enhanced = SATA in native PCI mode (PCI IRQ shared with the Audigy/USB). The EMU10K irq_routine
-  (snd_emu_10kx_isr / snd_p16v_isr) returned non-zero for ANY IPR bit (MIDI bits nearly always set), so SBEMU
-  claimed every shared IRQ, sent EOI and never chained -> the BIOS disk wait hung.
-- Done on wip/sata-shared-irq-2026-11-14 (built, NOT tested): sc_sbliv.c both ISRs ack/return only
-  IPR_INTERVALTIMER|IPR_SAMPLERATETRACKER (the INTE bits SBEMU enables); main.c MAIN_ScanDiskIrqs + SBDETAIL disk
-  controller lines + yellow warning when a native-mode IDE/SATA controller shares the card IRQ; makefile beta.120.
-- Next 3 steps: 1) QEMU pm.img (testrig/menustat/mkimg.sh) plain and with `-- -device ich9-ahci`: SBDETAIL
-  "disk controller" line, warning when shared, MPUTEST + DIR still work; menustat matrix. 2) README.TXT troubleshooting
-  (SATA Compatible mode, warning text) + README.md news; rezip.py beta.119 zip -> beta.120, release. 3) Ask the user to
-  retest Enhanced mode on beta.120 (should no longer freeze) and send SBDETAIL.TXT.
-- Resume: git pull; git checkout wip/sata-shared-irq-2026-11-14; DJGPP: curl build-djgpp v3.4 linux64 gcc1220 to
-  /tmp/dl; sh testrig/common/restore.sh dos71; make in sc55-pack.
+## beta.120 (2026-11-14, DOS session): P5PE-VM froze with ICH5 SATA "Enhanced" (user; "Compatible" fine)
+- Cause (likely): Enhanced = SATA in native PCI mode, IRQ shared with the Audigy. EMU10K irq_routine returned
+  non-zero for ANY IPR bit (MIDI bits nearly always set) -> SBEMU claimed the shared IRQ, EOI, no chain -> disk wait hung.
+- Fix: sc_sbliv.c snd_emu_10kx_isr/snd_p16v_isr ack + return only IPR_INTERVALTIMER|SAMPLERATETRACKER|FXDSP (the
+  INTE bits SBEMU sets). main.c: SBDETAIL "disk controller ... native PCI mode/legacy ... IRQ line" per IDE/SATA
+  controller, WARNING + yellow screen warning when one shares the card IRQ. README.TXT troubleshooting, README news.
+- Tested: testrig/sata/run.sh ZIP (QEMU, plain + ich9-ahci addr 6-9): warning exactly when AHCI shares IRQ 11 with
+  AC97, MPUTEST + DIR OK; menustat matrix 5/5 PASS. Not testable here: the EMU10K ISR itself (no Audigy in QEMU/86Box),
+  so the real check is the P5PE-VM. Runtime cost: none for other cards (startup PCI scan only), so no 86Box speed run.
+- The beta.120 zip was built from b2ab800 (wip, WITHOUT the WCSET commit d25ca9c): WCSET defaults to AUTO and its
+  MTRR write path is unverified, so it stays out of the pack until its own task finishes (see WCSET section).
+  Yellow warning goes to the console (conio), not into redirected SC55 output.
+- Hardware ask (P5PE-VM): SATA back to Enhanced, beta.120 SC55 -> freeze or not, SBDETAIL.TXT ("disk controller",
+  "WARNING" lines). If it still freezes: P5TEST 1-4 logs.
+- Next 3 steps: 1) P5PE-VM result above; 2) if still frozen, check the other P5PE-VM drivers that may claim foreign
+  bits (USB host ISRs on the same IRQ); 3) continue the WCSET section's steps (86Box WC path, then pack it).
+
 ## WCSET write-combining (2026-11-14, DOS session, STOPPED mid-task, no release): faster DOS graphics via MTRR WC on the VESA LFB
 - Done (main, unreleased): tools/wcset.h (shared: CPUID/MTRRcap/phys-width checks, real-mode stub via DPMI 0301h for
   RDMSR/WRMSR/CR0/WBINVD = real mode under HDPMI raw, V86 under JEMM (Jemm EMU.ASM emulates them); EMM386/QEMM V86 and
