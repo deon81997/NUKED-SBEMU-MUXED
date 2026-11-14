@@ -1,3 +1,11 @@
+## Personal pack beta.112 (2026-11-13): NUKED-SB-EMU-1.0.0-beta.112-usb-personal.zip
+- Public beta.112 zip (sha256 1bfa7af2.. = release asset) + VM store store-personal files at the paths SETUP.BAT copies from:
+  FILES\ROMS\* (41 ROMs + ROMHASH.CAC), FILES\XCDROM\MSCDEX.EXE, FILES\VIDECD\VIDE-CDD.SYS+VIDECD.TXT, FILES\GSCDROM\*,
+  FILES\MOUSE\MOUSE.COM+MSMOUSE.TXT. Nothing else changed. Copy: priavte branch store-personal-1.0.0-beta.112-usb (not public).
+- Test: fresh FreeDOS (mkdisk.py, KERNEL/COMMAND from store-qemu c.img), SETUP C, CONFIG JEMMEX NOEMS + VIDE-CDD /D:MSCD001,
+  testrig/common/personal.bat via run.sh -r (+ -cdrom): CDROM.BAT -> D: lists the ISO; SC55.BAT: 41 ROMs hashed, set mk1-v2.00
+  boots; SBDIAG: Synth SC-55, MIDI 19 B/s, 0 dropped (QEMU output 0 Hz = audiodev none quirk). No code change: no perf run.
+
 ## beta.112 (2026-11-13, DOS session): USB disks on xHCI, plug-after letters, UCDD from exFAT/NTFS letters (menumatrix)
 - Built from branch wip/menumatrix-2026-11-13 (rebased on beta.111). Zip = beta.111 zip + 17 EXEs rebuilt (beta.112) +
   README.TXT HWTEST.TXT CDSET\UCDD.EXE CDSET\UCDDSRC.ZIP (mdm_helper.asm) (testrig/rc/mkzip.py with src = beta.111).
@@ -169,6 +177,7 @@ Stopped by the user mid-task. Tree builds; tests/m3host/menurun.sh and run.sh pa
 - Open: none confirmed beyond the list above; Win98 DOS box untested (LFN: menu sets LFN=n, browser uses 8.3 names).
 
 ### Test downloads (kept outside the repo, /tmp/dl/<name>)
+- rufus `src/ms-sys/inc` (mkdisk.py boot records): `git clone --depth 1 --filter=blob:none --sparse https://github.com/pbatard/rufus /tmp/dl/rufus` + `sparse-checkout set src/ms-sys/inc`, symlink testrig/rufus.
 - Windows 98 QuickInstall v1.1.0 `win98qi_v1.1.0_stock.iso`: https://github.com/oerg866/win98-quickinstall/releases/download/v1.1.0/win98qi_v1.1.0_stock.iso
   (curl works; gh release download is blocked). MS-DOS 7.1: `isols.py ISO OSROOTS/1/FULL.866 FULL.866`, then
   `mercy.py FULL.866 ms71 IO.SYS MSDOS.SYS COMMAND.COM` (menuq.py writes its own MSDOS.SYS, BootGUI=0).

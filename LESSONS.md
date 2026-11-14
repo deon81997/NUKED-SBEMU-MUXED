@@ -4,6 +4,8 @@ Read this first; add 1-3 lines at the top of the right group before you stop. Ke
 Hardware facts, open ideas and the user's test machines: HARVEST.md.
 
 ## Token savers
+- Personal pack: public zip + store-personal files at SETUP.BAT's source paths; test with testrig/common/personal.bat (FreeDOS needs JEMMEX NOEMS for XMS, else SBEMU "Failed allocating XMS").
+- run.sh needs the word PASS/FAIL as the log's last line (DONE-PF timed out); SBDIAG reports only after SBDIAG START + some MIDI (MPUTEST).
 - DOS/Win98 test runs: use sc55-pack/testrig/common (restore.sh, run.sh IMAGE BATCH, shot.sh only when needed) instead of hand-driving QEMU/86Box; read the PASS/FAIL log, not screenshots.
 - Restore VMs from the VM store (deon81997/priavte, store-<name> branches) instead of building them.
 - Grep HANDOFF.md for your section; never read it whole. Keep command output to head/grep/tail.
