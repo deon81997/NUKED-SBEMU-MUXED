@@ -1,3 +1,35 @@
+## beta.111 (2026-11-13, DOS session): release candidate - menu walk, SETUP/UNINSTAL/CLEANUP, Win98 test, USB review
+- Branch wip/release-rc-2026-11-13 rebased on beta.110 (its own /VER packver.c + BUGREP block dropped: main's packver.h +
+  SBDIAG DOCTOR already do it). Zip = beta.110 zip + all 17 EXEs rebuilt (VERSION beta.111) + SETUP UNINSTAL CLEANUP
+  SC55RUN README.TXT (testrig/rc/mkzip.py; rig: testrig/rc/t86.py v un.py cl.py, menuwalk-2026-11-13.log).
+- Tested: 86Box FreeDOS: every MENU entry with and without SBEMU (all launch + return; USBTEST and Automatic setup
+  greyed while SBEMU is loaded, by design), CD image mount M:, SETUP; UNINSTAL K and D (D = disk identical to before
+  SETUP), CLEANUP with planted leftovers and with none. Win98 (QEMU QuickInstall): DOS-box SETUP/CDINST/MENU (Start
+  refuses: "Windows is running"), SETUP98 + restart, SC55W tray + MPUTEST answers at 330h in a DOS box, Restart in
+  MS-DOS mode + SC55 (SBEMU runs, no false Windows message; QEMU's ISA SB16 = "no supported soundcard", expected).
+  beta.111 zip smoke test in 86Box: SETUP, SC55, MENU header beta.111.
+- Fixes: UNINSTAL D left C:\HDPMI\HDPMI16.TXT + C:\GSCDROM\README.TXT; K saves C:\SC55\*.SF2; CLEANUP "nothing to
+  delete" + TYPE|FIND (no header noise); SETUP MSCDEX copy guarded; SC55RUN no CTMOUSE when %windir% is set (Win98 box).
+- Known issues (not fixed): UNINSTAL / CLEANUP need MS-DOS's MOVE FC ATTRIB FIND CHOICE (a bare FreeDOS boot without
+  them stops at once, "NOTHING was removed"); Sound > JEMM / QEMM entries without JEMM/QEMM loaded from CONFIG.SYS only
+  show SBEMU's "QEMM or QPIEMU not installed" line; Win98 binaries (SC55W*) carry no pack version; one QEMU hang at
+  "C:\>" on SETUP98's restart (a DOS box was open; did not repeat - watch on real PCs); README counter.gif still 000109.
+- Rig lesson: never mcopy into a disk image while Windows runs on it (Windows reused the clusters: the BAT became
+  IOS.LOG text, "Bad command or file name" x20). Copy with the VM off.
+- USB code review (beta.108 + beta.110, usbpad.c; not changed here - owned by the USB sessions):
+  1) hc_quiesce UHCI: "stop (HCHalted)" timeout now SKIPS the controller. UHCI spec: USBSTS default 0000h and HCHalted
+     is only set after Run/Stop goes 1->0, so a UHCI the BIOS never started can read HCH=0 while stopped -> its ports
+     dropped (beta.109 went on). QEMU sets HCH at reset, so usbmulti.py cannot show it. Linux only warns here.
+     Suggest: fail only if USBCMD.RS still reads 1, else log and go on.
+  2) A /USBSKIP'd or failed EHCI keeps whatever CONFIGFLAG the BIOS left (usually 1 = all ports on the EHCI), so its
+     companions see no devices; only the "[usb]" line says why. Worth a sentence in README.TXT /USBSKIP.
+  3) OHCI phase 1 only turns interrupts off; one left running by a BIOS (IR=0, HCFS operational) keeps running its
+     schedule until phase 2 resets it (same as before beta.110).
+  4) pci_d0: D3hot->D0 without No_Soft_Reset may clear the BARs; mem_bar() is read after it, so a lost BAR shows as
+     an unusable controller rather than a hang - fine, maybe log it.
+  5) USB MIDI packer (USBPAD_MidiByte): running status, SysEx CIN 4/5/6/7, system common CIN 2/3/5, real time CIN F
+     all per USB-MIDI 1.0. Minor: SysEx cut by a status byte right after a full 3-byte piece sends no end packet.
+
 ## Fast test harness (sc55-pack/testrig/common, 2026-11-13)
 - `restore.sh NAME` pulls store-NAME from deon81997/priavte and unpacks it (qemu -> /tmp/mq, 86rig -> /home/claude/86rig
   + 86box; win98 = both halves; skips if already restored, -f forces). Needs `apt-get install zstd qemu-system-x86 mtools

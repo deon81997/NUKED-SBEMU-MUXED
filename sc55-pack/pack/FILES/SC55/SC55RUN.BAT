@@ -18,6 +18,8 @@ SBEMU.EXE /VMPU /VSCROM:ROMS @SBOPTS.BAT %1 %2 %3 %4
 IF "%SBEMULOG%"=="" GOTO MOUSE
 IF EXIST %SBEMULOG% TYPE %SBEMULOG%
 :MOUSE
+REM not in a Windows DOS box (SBEMU did not load there; Windows has its own mouse)
+IF NOT "%windir%"=="" GOTO END
 REM the DOS mouse driver goes after SBEMU (for a USB mouse); MOUSE\MOUSE.BAT says which
 IF EXIST MOUSE\MOUSE.BAT CALL MOUSE\MOUSE.BAT
 :END

@@ -1,0 +1,4 @@
+#!/bin/bash
+# v 'python statements'  (attached to running VM)
+ATTACH=1 python3 -c "exec(open('/home/claude/scripts/t86.py').read())
+$1"

@@ -1,0 +1,7 @@
+exec(open('/home/claude/scripts/t86.py').read())
+vm.boot(); K(ENTER,1500); K(ENTER,2000)
+vm.run('SET PATH=C:\\;C:\\DOSX',800)
+vm.run('CD \\SC55',500); vm.run('C:\\NUKEDSB\\CLEANUP',8000); print(scr(14))
+vm.type('Y',20000); print('--'); print(scr(8))
+vm.run('C:\\NUKEDSB\\CLEANUP',8000); print('--2'); print(scr(8))
+vm.stop()

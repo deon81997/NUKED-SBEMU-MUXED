@@ -106,8 +106,8 @@ CONTENTS
          SETUP D          install to drive D: instead
 
        It copies files only:
-         C:\SC55            SBEMU.EXE, SBSET.EXE, SC55WAV/SC55LOG/MPUTEST/
-                            MIDPLAY/CPUMHZ.EXE, BOOTCFG.BAT, CLEANUP.BAT
+         C:\SC55            SBEMU.EXE, the menu and all the tools (list in
+                            section 16), BOOTCFG.BAT, CLEANUP.BAT, UNINSTAL.BAT
          C:\SC55\ROMS       the ROM sets that were in the pack's FILES\ROMS
                             (SC-55 v1.21 = M1_*, SC-55mkII = M2_*)
          C:\SC55\SF2        empty folder for your SoundFonts
@@ -693,7 +693,7 @@ CONTENTS
   left.
   CHANNEL TABLE: level meter, pan, note, instrument keys and reverb of all
   16 channels, plus a keyboard at the bottom lighting up the notes.
-  SC-55 FRONT PANEL: with SBEMU beta.34 and later it is the emulated
+  SC-55 FRONT PANEL: with SBEMU loaded it is the emulated
   module's REAL display, read from SBEMU 10 times a second (with the MT-32:
   its 20-character LCD); otherwise it is worked out from the MIDI file.
   3D VIEW: a module with the synth's live display, a keyboard lighting up
@@ -771,15 +771,10 @@ CONTENTS
   or open a page.
 
   Seeking replays instruments and controllers, so the sound stays right.
-  Format 0 and 1 files and RMI are supported (.MID .MIDI .RMI .KAR).
 
   SC55.BAT (and SC55JEM / SC55QMM) save everything SBEMU prints to
   C:\SC55\SBLOG.TXT and then show it on screen. The file is rewritten on every
   run, so to report a problem, send that file (or a photo of the screen).
-  To use this, run SETUP.BAT again so the launchers are regenerated.
-
-  Note: MIDI/FM music used to run slow only while a game also played digital
-  sound (SFX); SBEMU now keeps the synthesizers in real time in that case.
 
   MPUTEST.EXE plays a built-in tune. TEST.BAT checks the ROMs and speed
   without needing SBEMU at all.
@@ -1140,13 +1135,11 @@ CONTENTS
        Since beta.108 it also finds USB MIDI devices and plays a test note.
        Since beta.67 USBTEST will not start while SBEMU is loaded: both
        driving the same USB controllers crashed a PC (EMM386 error 06).
-       Since beta.93 USBTEST also finds USB sticks and card readers (USB
-       disks): name, size, the start of block 0 and a 1 MB read test. A
-       USB 2.0 port reads them at high speed, the pads and keyboards on
-       the same ports are handed to the USB 1.1 side as before. Test only
-       for now: SBEMU does not give them a drive letter yet. NEC uPD720101
-       USB cards: USB 2.0 sticks work; a USB 1.1-only stick is not used on
-       that card (its USB 1.1 side froze a PC with one).
+       USBTEST also finds USB sticks and card readers (USB disks): name,
+       size, the start of block 0 and a 1 MB read test. To use them as
+       drives, turn on USB sticks in Settings (/USBDISK, see above). NEC
+       uPD720101 USB cards: USB 2.0 sticks work; a USB 1.1-only stick is
+       not used on that card (its USB 1.1 side froze a PC with one).
 
   USB MIDI (beta.108): a class-compliant USB MIDI interface or keyboard
   (M-Audio Uno, Roland UM-ONE, most USB keyboards with "MIDI" on the box)
@@ -1443,7 +1436,8 @@ CONTENTS
     full SBDIAG report of every test).
   - If a test locks up the PC, restart, run SC55 and GAMETEST again: it
     notes which test it was in GAMETEST.TXT and offers to carry on.
-  Set each game to General MIDI (330) and Sound Blaster 220/7/1 first.
+  Games other than Doom-engine and Apogee / Build ones: set them to General
+  MIDI and the Sound Blaster port / IRQ / DMA GAMETEST shows first.
 
   Sound plays too slowly (about 90-95%)
      * Look at the "AC97 clock check" line SBEMU prints at start. It says if
@@ -1504,11 +1498,20 @@ CONTENTS
      CDINST.BAT       installs the virtual CD drive and disc menu
      CLEANUP.BAT      removes leftovers of old installs
      UNINSTAL.BAT     removes the whole pack, restores the boot files
+     SETUP98.BAT      the Windows 98 part (README98.TXT, FILES\WIN98)
      README.TXT       this guide
+     HWTEST.TXT       checklist for testing a new version on a real PC
+     DOWNLOADS.TXT    where to get the optional files the pack cannot ship
      FILES\SC55       SBEMU.EXE, SBSET.EXE, SC55WAV.EXE, SC55LOG.EXE,
                       MPUTEST.EXE, MIDPLAY.EXE, CPUMHZ.EXE, SC55MENU.EXE,
                       SBDIAG.EXE, GAMETEST.EXE, TIMETEST.EXE, JOYTEST.EXE,
-                      USBTEST.EXE, KMTEST.EXE, USBDRV.EXE, SBEMU16.COM, PADCONV.EXE
+                      USBTEST.EXE, KMTEST.EXE, USBDRV.EXE, SBEMU16.COM, PADCONV.EXE,
+                      BUGREP.BAT
+                      Every EXE carries the pack version; BUGREP.BAT lists
+                      them all on top (SBDIAG DOCTOR). SBEMU25.EXE is the
+                      old SBEMU beta.25 on purpose, only for SC55OLD.BAT
+                      (a comparison test); everything else is the new one.
+     FILES\MOUSE      CuteMouse (CTMOUSE.EXE), a DOS mouse driver
      FILES\PADMAP     for your keyb2joypad.cpp (pad layouts, DOWNLOADS.TXT)
      FILES\ROMS       ROM dumps (yours)
      FILES\HDPMI      HDPMI32I.EXE, HDPMI16I.EXE (16-bit, section 11b)
