@@ -977,8 +977,14 @@ CONTENTS
   port runs them at USB 2.0 speed (your pads, keyboards and mice there
   are handed to the USB 1.1 side). Sticks with a write-protect switch say
   "write protected". exFAT and NTFS sticks plugged in when SBEMU starts
-  get read-only letters too (after the FAT ones). NEC uPD720101 cards:
-  USB 2.0 sticks only.
+  get read-only letters too (after the FAT ones), and two more wait for
+  exFAT/NTFS sticks plugged in later. A stick plugged in later with two
+  FAT partitions fills both waiting letters. USB 3 ports (xHCI) work too
+  (the stick runs at USB 2.0 speed there). CD images (.ISO/.CUE) on any
+  USB letter, exFAT and NTFS included, mount in MENU > CD-ROM. An empty
+  waiting letter answers like an empty floppy drive (MS-DOS: "Not ready
+  ..., Abort, Retry, Fail?" - plug the stick in, then R). NEC uPD720101
+  cards: USB 2.0 sticks only.
 
   Test without a game:  MENU > Tests > Joystick test (JOYTEST), or run
   JOYTEST.EXE. Move the sticks: about 24 = left/up, 575 = centre and 1124

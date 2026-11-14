@@ -1,53 +1,32 @@
-## MENU matrix part 2 (2026-11-13, DOS session) - UNFINISHED, branch wip/menumatrix-2026-11-13, no release
-- No "MENU matrix" section existed; built new from beta.104's stick test: sc55-pack/testrig/menumatrix/
-  (mkstick.sh = stick images, run.sh DOS MODE HC PLUG = one QEMU run, all.sh = whole matrix, dos/*.BAT, wavrms.py).
-  Per ISO on each USB letter: UCDD mount from the stick, install (COPY to C:, host byte check), play (MPUTEST through
-  SBEMU /VSF TimGM6mb, QEMU AC97 -> WAV), unmount; then s1 swapped for s3 on the same port, again. DOS -> host via COM1.
-  Modes: j32 (JEMMEX+SBEMU), x32 (HIMEM only), j16 (JEMMEX+QPIEMU+HDPMI16I+SBEMU16). HC: uhci ohci ehci ehcic
-  (full-speed hub -> companion UHCI) xhci. MS-DOS 6.22: not run (no disks; assumed skip, stays in HWTEST.TXT).
-- Results before fixes (logs/matrix-pre.txt, FreeDOS j32 only, 10 of 60 runs): "before" PASS on uhci/ohci/ehci/ehcic
-  once UCDD fix 1 is in; FAILS: (a) release UCDD refuses images on exFAT/NTFS letters ("Use an image on a local hard
-  disk", 4409h says network) - FIXED + verified (fd j32 ehci before: all 7 cases PASS, bytes OK); (b) plug-after:
-  only partition 1 of a 2-partition stick gets a spare letter, exFAT/NTFS sticks get none - FIX WRITTEN, UNTESTED;
-  (c) xHCI: no disks at all ("disk on xHCI: not yet", usbpad.c ~2830) - NOT FIXED; (d) "loud" WAV check flaky in
-  QEMU with 2 VMs at once (same case 4.8 s / 0.0 s) - rig issue, try J=1; (e) USBDRV after a swap to a 1-partition
-  stick showed the old 2nd letter as "no FAT partition (exFAT/NTFS: later)" - new state 3 text, untested.
-- Code changes (all build; only the UCDD + SBUR part tested):
-  - third_party/ucdd/src/mdm_helper.asm: mdm_local_path accepts a network drive whose CDS +49h = "SBUR" (sbemu_usb_drive).
-  - sbemu/usbredir.c: CDS +49h = "SBUR"; 2 spare exFAT/NTFS letters always (UR_SPARE), spare_adopt/owners/note,
-    USBDRV note types 3 (waiting) / 4 (stick out). NOTE: adds 2 network letters + INT 2Fh hook for every /USBDISK:1 user.
-  - sbemu/usbdisk.c: spare FAT letters adopt per partition (spare_adopt: new stick first, then the next FAT partition
-    of a stick with fewer letters); nparts + info bytes [2]=part, [3]=nparts, state 3.
-  - tools/usbdrv.c: rows for redir type 3, state 3; re-reads the note after asking.
-- Not measured yet: 86Box PII-450 SBDIAG load / SC55LOG speed (src at /tmp/dl/86box, not built). SC55LOG needs the
-  user's SC-55 ROMs (none here). Changes run only at install / mount / medium check (expected 0% at runtime).
-- 2026-11-13 later (same branch): (c) xHCI bulk DONE (usbpad.c x_disk_eps/x_bulk, XO_MSD rings, msd_clear = stop +
-  drop/add; light polls drain xHCI events only if it has pipes - disk-only xHCI made the SoundFont silent in QEMU,
-  cause not understood). (b) plug-after VERIFIED, (e) state-3 text VERIFIED. Rig: xhci p2=8,p3=0 (QEMU usb-storage
-  went to a USB 3 port), SBEMULOG + SBDIAG.TXT kept, audiodev timer-period=2000 (else ~8 IRQ/s), PASS = 7 PLAY OK
-  (loud = info), FreeDOS x32 uses HimemX ($HX, MS HIMEM hangs FreeDOS), HASISO.COM (MS-DOS 7.1 Abort/Retry/Fail on
-  empty spare letters = normal DOS, rig skips them). Matrix: logs/matrix-2026-11-13.txt = 36 runs ALL PASS
-  (fd j32/x32/j16 x 5 HCs except fd j16 xhci; 71 j32 uhci/ohci/ehci; 71 j32 xhci before passed by hand).
-- Next steps: 1) finish matrix: `DOSES=71 J=2 all.sh` (+ fd j16 xhci; rerun fd j32/x32 xhci rows on current code);
-  2) 86Box PII-450 before/after: VM ready to rebuild in /home/claude/86vm/p (c/PERF.BAT A|B = beta.105 / new SBEMU:
-  SBDIAG 30 s idle -> IDLEx.TXT, MIDPLAY STRESS.MID /Q:30 -> MIDx.TXT + MPx.TXT; cfg = p2bls-uhci.cfg with
-  cpu_speed 450000000, multi 4.5; 86Box built per testrig/86box/README.md); 3) README.TXT USB disks paragraph (xHCI,
-  later plugs incl. 2nd partition/exFAT/NTFS, CD images on USB letters), HWTEST.TXT lines, release beta.106.
-- Resume: clone; DJGPP + apt (qemu-system-x86 socat mtools exfatprogs exfat-fuse ntfs-3g gdisk fdisk dosfstools
-  genisoimage nasm); HimemX: clone Baron-von-Riedesel/HimemX + JWasm (make -f GccUnix.mak),
-  `jwasm -mz -Fo/tmp/dl/HIMEMX.EXE HimemX.asm`; FULL.866 via `isoinfo -J -x /osroots/1/FULL.866`; testrig/rufus/res/freedos + rufus/src -> rufus checkout; unzip release zip to /tmp/rel;
-  QuickInstall: mercy.py FULL.866 -> /tmp/dl/w98qi/x (IO.SYS MSDOS.SYS COMMAND.COM WINDOWS\HIMEM.SYS);
-  `make -j2; sh tools/ucdd/mkcdset.sh; bash testrig/menumatrix/mkstick.sh /home/claude/vm/st` (root);
-  `testrig/menumatrix/run.sh fd j32 ehci before`; `J=1 testrig/menumatrix/all.sh`.
-- Open bugs / repro: xHCI sticks never appear (run.sh fd j32 xhci before -> USBDRV D:/E: "(no stick)",
-  logs/fd-j32-xhci-before-*); plug-after letters (run.sh fd j32 uhci after on the release-era code -> only DISC 1,
-  logs/fd-j32-uhci-after-UT.txt). SB.TXT stays empty with "> C:\SB.TXT" (SBEMU writes the screen directly): set SBEMULOG.
-- Test downloads (keep out of repo/zips): Windows 98 QuickInstall v1.1.0 win98qi_v1.1.0_ALL.iso
-  (github.com/oerg866/win98-quickinstall/releases/download/v1.1.0/win98qi_v1.1.0_ALL.iso; gh release download is blocked,
-  plain curl of that URL works) -> /tmp/dl/w98qi; rufus (github.com/pbatard/rufus, depth 1) -> /tmp/dl/rufus;
-  TimGM6mb.sf2 (Ubuntu timgm6mb-soundfont 1.3-5, apt-get download) -> /tmp/dl/timgm6mb; 86Box @0935207 +
-  github.com/86Box/roms -> /tmp/dl/86box; DJGPP build-djgpp v3.4 gcc 12.2.0. No "VM store" section exists in HANDOFF:
-  nothing big uploaded (stick images are rebuilt by mkstick.sh).
+## beta.112 (2026-11-13, DOS session): USB disks on xHCI, plug-after letters, UCDD from exFAT/NTFS letters (menumatrix)
+- Built from branch wip/menumatrix-2026-11-13 (rebased on beta.111). Zip = beta.111 zip + 17 EXEs rebuilt (beta.112) +
+  README.TXT HWTEST.TXT CDSET\UCDD.EXE CDSET\UCDDSRC.ZIP (mdm_helper.asm) (testrig/rc/mkzip.py with src = beta.111).
+- Code: usbpad.c xHCI bulk (x_disk_eps: OUT/IN rings per disk at XO_MSD, one Configure Endpoint; x_bulk: Normal TRBs
+  split at 64 KB, IN ISP, IOC last, events matched to the TRBs pushed; msd_clear = Stop EP + drop/add = new ring +
+  DATA0; XEvBusy guard; light polls drain xHCI events only when that HC has pipes). usbdisk.c / usbredir.c: spare
+  letters adopted per partition, 2 exFAT/NTFS spare letters (network, CDS +49h "SBUR"), USBDRV states 3/4.
+  UCDD mdm_helper.asm: images on "SBUR" network letters allowed.
+- Tested: testrig/menumatrix (QEMU; FreeDOS + MS-DOS 7.1 x JEMMEX / HIMEM only / 16-bit x UHCI OHCI EHCI EHCI+companion
+  xHCI x sticks before/after SBEMU): logs/matrix-2026-11-13.txt 60/60 PASS (per ISO: mount from stick, install, bytes,
+  MPUTEST play, unmount; stick swap). 86Box P2B-LS PII-450, /VSF TimGM6mb /JOY:1 /USBDISK:1, beta.110 vs beta.112:
+  idle 345 IRQ/s avg 0.02 ms both; STRESS.MID ISR avg 1.77 ms / longest 4.73 vs 4.74, render 237 vs 238%, 0 lost ticks.
+- OPEN (pre-existing, not from this work): QEMU xHCI with USB sticks attached, even /USBDISK:0: the SoundFont often
+  never renders (SBDIAG "Synth: SC-55, output 0 Hz", MIDI arrives, AC97 runs). Comes and goes with code layout
+  (a debug build with counters in main.c/vmpu.c always played): smells like a stray write. No sticks = plays.
+  Repro: `SBX=/USBDISK:0 testrig/menumatrix/run.sh fd j32 xhci before` (WAV loud 0.0). Real xHCI PCs untested.
+- Rig notes: xhci p2=8,p3=0 (QEMU usb-storage otherwise lands on a USB 3 port that SBEMU leaves off); audiodev
+  timer-period=2000 (else ~8 IRQ/s); PASS = 7x PLAY OK, loud = info; FreeDOS x32 = HimemX (MS HIMEM hangs the FreeDOS
+  kernel; build: Baron-von-Riedesel/HimemX + JWasm `make -f GccUnix.mak`, `jwasm -mz HimemX.asm`); HASISO.COM skips
+  empty letters (MS-DOS 7.1 asks Abort/Retry/Fail there - normal DOS, documented in README.TXT).
+- Resume rig: DJGPP + apt (qemu-system-x86 socat mtools exfatprogs exfat-fuse ntfs-3g gdisk fdisk dosfstools
+  genisoimage nasm); FULL.866 = `isoinfo -J -i win98qi_v1.1.0_ALL.iso -x /osroots/1/FULL.866` (github.com/oerg866/
+  win98-quickinstall v1.1.0), mercy.py -> /tmp/dl/w98qi/x (IO.SYS MSDOS.SYS COMMAND.COM WINDOWS\HIMEM.SYS);
+  testrig/rufus/res/freedos + src from github.com/pbatard/rufus; TimGM6mb (apt-get download timgm6mb-soundfont)
+  -> /tmp/dl/timgm6mb; release zip -> /tmp/rel; `make; sh tools/ucdd/mkcdset.sh; mkstick.sh /home/claude/vm/st`;
+  `J=2 testrig/menumatrix/all.sh OUT`. 86Box perf: 86Box @0935207 + 86box-xpad.diff, VM = mkdisk build of
+  KERNEL/COMMAND/JEMM/HDPMI + SC55\A|B\SBEMU.EXE + PERF.BAT (SBDIAG 3x DELAY idle, MIDPLAY STRESS.MID /S /Q:30),
+  cfg p2bls-uhci.cfg with cpu_speed 450000000 / multi 4.5, F1 at the CMOS message.
+- Real-PC checks: HWTEST.TXT beta.112 lines (plug-after partitions + exFAT/NTFS, CD image on such a stick, USB 3 port).
 
 ## beta.111 (2026-11-13, DOS session): release candidate - menu walk, SETUP/UNINSTAL/CLEANUP, Win98 test, USB review
 - Branch wip/release-rc-2026-11-13 rebased on beta.110 (its own /VER packver.c + BUGREP block dropped: main's packver.h +

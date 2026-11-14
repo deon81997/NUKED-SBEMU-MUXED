@@ -49,3 +49,9 @@ BOTH
 [ ] MIDPLAY in a Windows 98 DOS box: windowed (Alt+Enter) and full screen,
     text, panel and 3D views.
 [ ] SBEMU unload (if used) and back to the prompt without a hang.
+[ ] beta.112 sticks plugged in AFTER SBEMU (/USBDISK:1): a stick with two
+    FAT partitions gets both waiting letters; an exFAT or NTFS stick gets
+    its read-only letter; USBDRV shows them. A CD image on that exFAT/NTFS
+    stick mounts in MENU > CD-ROM and the game starts from it.
+[ ] Any PC with USB 3 ports (if you have one): a stick on a USB 3 port with
+    /USBDISK:1 - DIR, COPY a big file both ways, a game; music keeps playing.

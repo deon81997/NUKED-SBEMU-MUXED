@@ -1,9 +1,33 @@
+71  j16  ehci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=51.2s PASS
+71  j16  ehci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=46.3s PASS
+71  j16  ehcic  after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=38.6s PASS
+71  j16  ehcic  before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=38.2s PASS
+71  j16  ohci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=39.3s PASS
+71  j16  ohci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=42.8s PASS
+71  j16  uhci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=39.5s PASS
+71  j16  uhci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=44.3s PASS
+71  j16  xhci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=37.8s PASS
+71  j16  xhci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=45.5s PASS
 71  j32  ehci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=30.7s PASS
 71  j32  ehci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=27.3s PASS
+71  j32  ehcic  after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=33.2s PASS
+71  j32  ehcic  before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=33.0s PASS
 71  j32  ohci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=31.0s PASS
 71  j32  ohci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=15.2s PASS
 71  j32  uhci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=32.8s PASS
 71  j32  uhci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=32.6s PASS
+71  j32  xhci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=0.0s PASS
+71  j32  xhci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=0.0s PASS
+71  x32  ehci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=44.7s PASS
+71  x32  ehci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=33.6s PASS
+71  x32  ehcic  after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=34.8s PASS (rerun)
+71  x32  ehcic  before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=34.8s PASS (rerun)
+71  x32  ohci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=43.5s PASS
+71  x32  ohci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=33.5s PASS
+71  x32  uhci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=39.8s PASS
+71  x32  uhci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=39.9s PASS
+71  x32  xhci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=46.1s PASS
+71  x32  xhci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=51.5s PASS
 fd  j16  ehci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=37.2s PASS
 fd  j16  ehci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=39.2s PASS
 fd  j16  ehcic  after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=41.7s PASS
@@ -12,8 +36,8 @@ fd  j16  ohci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=20.8s PASS
 fd  j16  ohci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=31.4s PASS
 fd  j16  uhci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=43.2s PASS
 fd  j16  uhci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=38.5s PASS
-fd  j16  xhci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=39.5s PASS
-fd  j16  xhci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=40.4s PASS
+fd  j16  xhci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=0.0s PASS
+fd  j16  xhci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=26.1s PASS
 fd  j32  ehci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=41.3s PASS
 fd  j32  ehci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=39.8s PASS
 fd  j32  ehcic  after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=37.4s PASS
@@ -23,7 +47,7 @@ fd  j32  ohci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=23.5s PASS
 fd  j32  uhci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=38.5s PASS
 fd  j32  uhci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=36.4s PASS
 fd  j32  xhci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=0.0s PASS
-fd  j32  xhci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=25.7s PASS
+fd  j32  xhci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=8.3s PASS
 fd  x32  ehci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=31.1s PASS
 fd  x32  ehci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=28.3s PASS
 fd  x32  ehcic  after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=33.4s PASS
@@ -32,5 +56,5 @@ fd  x32  ohci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=27.7s PASS
 fd  x32  ohci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=15.3s PASS
 fd  x32  uhci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=33.3s PASS
 fd  x32  uhci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=33.0s PASS
-fd  x32  xhci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=0.0s PASS
+fd  x32  xhci   after   A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=4.9s PASS
 fd  x32  xhci   before  A=1,2,3,4,  B=3,4,5,  badbytes=0 plays=7 loud=0.0s PASS
