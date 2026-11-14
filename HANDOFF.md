@@ -129,7 +129,10 @@ Stopped by the user mid-task. Tree builds; tests/m3host/menurun.sh and run.sh pa
 - NOT done: Win98 DOS box (QI VM installs fine from win98qi stock ISO; first boot from disk sat >10 min on the splash
   - retry without -usb, alone on the CPU; /home/claude/w98vm qi0.img = fresh install), 86Box PII-450 perf, release
   beta.108 (zip: SC55MENU, USBTEST, BUGREP.BAT + tui.h users), README news (BUGREP, USBTEST restart, MENU fixes).
-- Next 3 steps: 1) Win98 DOS box: D:\SC55\SC55MENU text/3D/browser; 2) 86Box perf numbers; 3) release beta.108.
+- Closed (session 3): all of the above shipped in beta.110/111; beta.111 did the Win98 DOS-box MENU test and the
+  full walk. Re-checked on beta.110's USB init: USBTEST restart prompt still works (QEMU, Y -> MENU, keys OK). No perf
+  run needed (SBEMU runtime untouched). Win98 QI VM note: a mkdisk FAT16 D: disk at first boot hangs IO.SYS (black
+  cursor) - attach D: only after hardware setup; the 2nd boot after setup also sat at "continuing to load Windows".
 - Resume: DJGPP + build per docs/SESSION-2026-11-13-DOS.md; `sh sc55-pack/tests/m3host/menurun.sh quick`;
   `apt-get install qemu-system-x86`; unzip release zip to /home/claude/rel; MS-DOS files: see Test downloads;
   `python3 -I sc55-pack/testrig/menuq.py /home/claude/mq/ms build msdos`, then `from menuq import Q; Q(dir).start(usb='ohci')`.
