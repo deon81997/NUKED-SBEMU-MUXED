@@ -1,3 +1,14 @@
+## Fast test harness (sc55-pack/testrig/common, 2026-11-13)
+- `restore.sh NAME` pulls store-NAME from deon81997/priavte and unpacks it (qemu -> /tmp/mq, 86rig -> /home/claude/86rig
+  + 86box; win98 = both halves; skips if already restored, -f forces). Needs `apt-get install zstd qemu-system-x86 mtools
+  xvfb librtmidi6 imagemagick`.
+- `run.sh [-e qemu|86box] [-t SEC] [-r] [-p FILE] [-s OUT.png] IMAGE BATCH` copies IMAGE (original untouched), hooks
+  BATCH into AUTOEXEC.BAT (-r: AUTOEXEC = only the batch), boots headless, waits for C:\RESULT.LOG with a PASS/FAIL
+  line LAST, prints only that log, kills the VM. Exit 0 PASS / 1 FAIL / 124 timeout. `shot.sh OUT.png` = screenshot,
+  only when asked (also `run.sh -s`).
+- Tested: FreeDOS /tmp/mq/c.img and MS-DOS 7.1 /home/claude/86rig/dos.img, PASS and FAIL batches: QEMU ~4-5 s,
+  86Box (Celeron 366, 86rig cfg; disk geometry set from the image size) ~13 s.
+
 ## beta.110 (2026-11-13, DOS session): freeze with two USB 2.0 hosts (P5PE-VM: ICH5 + NEC uPD720101 card)
 - Report: hard freeze while SC55.BAT starts SBEMU's USB with the ICH5 (4 UHCI + EHCI 24DD) and a Belkin F5U219 (NEC
   EHCI 1033:00E0 + 2 OHCI 1033:0035, no option ROM) both on; Win98 fine; board alone worked; card alone untested.
