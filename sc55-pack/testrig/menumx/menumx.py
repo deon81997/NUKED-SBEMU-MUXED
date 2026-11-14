@@ -85,7 +85,10 @@ class Run:
     def menu(self):
         if not self.has('F1 help F2 saved'):
             self.dos('MENU', 0)
-            if not self.wait('F1 help F2 saved', 30000): raise Fail('MENU did not open')
+            if not self.wait('F1 help F2 saved', 15000):
+                rows = [r.rstrip() for r in self.v.screen()[0] if r.strip()]
+                if rows and rows[-1].upper().endswith('>MENU'): self.v.key('ret', 0)   # the Enter got lost
+                if not self.wait('F1 help F2 saved', 30000): raise Fail('MENU did not open')
         self.v.sleep(500)
 
     def cat(self, name):
@@ -161,7 +164,9 @@ class Run:
             self.v.key('ret', 800)
         self.sel(img)
         self.v.key('ret', 0)
-        ok = self.wait(r'is in drive M:', 30000)
+        ok = self.wait(r'is in drive M:', 12000)
+        if not ok and self.has('Empty') and self.has('Enter mount'):   # Enter got lost (emulator under load)
+            self.sel(img); self.v.key('ret', 0); ok = self.wait(r'is in drive M:', 30000)
         info = self.scr()
         self.dismiss()
         return ok, img, info
@@ -179,7 +184,7 @@ class Run:
     def step_mount(self, game, step):
         ok, img, info = self.mount(game)
         if ok and self.kind == 'mdm' and game == 'RAP':     # an MDM set mounts disc 1 (GOT): Raptor is disc 2
-            self.leave_menu(); self.v.key('ctrl-alt-pgdn', 1500); img += ' + Ctrl+Alt+PgDn'
+            self.leave_menu(); self.v.key('ctrl-alt-pgdn', 300); self.dos('C:\\T\\WAIT1', 1500); img += ' + Ctrl+Alt+PgDn'
         self.shot(step)
         self.log(step, ok, img + ('' if ok else ': ' + info.strip().split('\n')[-3][:70]))
         return ok
@@ -225,6 +230,13 @@ class Run:
             else: v.key('ret', 300)
         return self.has('has finished')
 
+    def type_checked(self, text):
+        """type into a MENU input line and check it on screen (a slow emulator drops keys: RAP.EXE became RAP.XE)"""
+        for i in range(3):
+            self.v.type(text)
+            if text.upper() in self.scr().upper() or i == 2: return
+            for _ in range(len(text) + 4): self.v.key('bksp', 40)
+
     def add_profile(self, game, exe):
         """MENU > Games > Add / edit games > Enter: program, name, CD image"""
         self.menu(); self.cat('Games')
@@ -250,7 +262,7 @@ class Run:
         self.v.key('t', 1000)
         if not self.has('Full path of the program'): raise Fail('program picker: T did not ask for a path')
         for _ in range(40): self.v.key('bksp', 40)
-        self.v.type(path); self.v.key('ret', 1500)
+        self.type_checked(path); self.v.key('ret', 1500)
 
     def picker_sel(self, name):
         """select a row in the menu's file picker (selected row: attribute 5Fh)"""
@@ -300,7 +312,8 @@ class Run:
             self.quit_game(game)
         except Fail as e:                       # the harness could not quit the game: not a pack bug
             self.res[step][1] += ' (could not quit it: rebooted)'
-            self.restart(game)
+            try: self.restart(game)
+            except Fail as e2: self.res[step][1] += ' (after the reboot: %s)' % e2
 
     def restart(self, game):
         """reboot the VM and mount the game's disc again, so the next steps start from MENU as usual"""
@@ -348,13 +361,14 @@ class Run:
 
     def step_swap(self, step):
         if self.kind != 'mdm': return self.log(step, None, 'not an MDM case')
+        self.mount('GOT')                       # the Raptor install mounted RAP.CUE in place of the set
         self.leave_menu()
         labels = []
         for _ in range(2):                      # the set has 2 discs: each Ctrl+Alt+PgDn goes to the other one
             self.dos('CLS', 500); self.dos('DIR M:\\', 2500)
             t = self.scr().upper()
             labels.append('RAPTOR_CD' if 'RAPTOR_CD' in t else 'GOT_CD' if 'GOT_CD' in t else '?')
-            self.v.key('ctrl-alt-pgdn', 1500)
+            self.v.key('ctrl-alt-pgdn', 300); self.dos('C:\\T\\WAIT1', 1500)
         self.log(step, sorted(labels) == ['GOT_CD', 'RAPTOR_CD'], 'Ctrl+Alt+PgDn: %s -> %s' % tuple(labels))
 
     def all(self, steps):

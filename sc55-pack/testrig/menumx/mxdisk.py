@@ -119,6 +119,9 @@ def build_c(case, mode, work, img):
     shutil.copy(os.path.join(r, 'NUKEDSB', 'FILES', 'JEMM', 'JEMMEX.EXE'), os.path.join(r, 'JEMMEX.EXE'))
     shutil.copy(HIMEMX, os.path.join(r, 'HIMEMX.EXE'))
     os.makedirs(os.path.join(r, 'T'))
+    # WAIT1.COM (probes/wait1.asm): ~1 s busy wait outside DOS - uCDD applies a disc hotkey from its timer only
+    # while DOS is idle, which it never is at the prompt (COMMAND waits inside DOS); a game does not wait in DOS
+    open(os.path.join(r, 'T', 'WAIT1.COM'), 'wb').write(bytes.fromhex('31c08ec0b9120026a16c04263b066c0474f9e2f3cd20'))
     for f in os.listdir(HERE):
         if f.upper().endswith('.BAT'): shutil.copy(os.path.join(HERE, f), os.path.join(r, 'T', f.upper()))
     mm = 'DEVICE=C:\\JEMMEX.EXE X2MAX=8192 NOEMS' if mode == 'rm' else 'DEVICE=C:\\HIMEMX.EXE'
