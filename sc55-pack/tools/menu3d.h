@@ -272,7 +272,7 @@ static void m3_draw_panels(int cat, int sel, float selanim)
     /* title bar */
     if (L.sm)
     {
-        const char* st = g_running ? "SBEMU on" : "SBEMU off";
+        const char* st = g_running ? "SBEMU on" : g_sbc.state == SBC_UNKNOWN ? "SBEMU ?" : "SBEMU off";
         m3_box2d(mg, 2, W - 2 * mg, 22, m3_mul(m3_lerpc(m3_sky1, m3_accent[0], 90), 330), m3_mul(m3_sky1, 160), 0, 3);
         m3_text_glow(&m3_scr, mg + 6, 5, 0, "NUKED SB-EMU", 0xFFFFFF, m3_glowc);
         m3_text(&m3_scr, W - mg - 6 - 8 * (int)strlen(st), 5, 0, st, g_running ? 0x80FF90 : 0xFFC060, 256);
@@ -282,7 +282,7 @@ static void m3_draw_panels(int cat, int sel, float selanim)
         char b[48];
         m3_box2d(12, 10, W - 24, 46, m3_mul(m3_lerpc(m3_sky1, m3_accent[0], 90), 330), m3_mul(m3_sky1, 160), 0, 6);
         m3_text_glow(&m3_scr, 28, 18, 3, "NUKED SB-EMU", 0xFFFFFF, m3_glowc);
-        m3_text(&m3_scr, 250, 26, 0, g_running ? "SBEMU is loaded" : "SBEMU is not loaded", g_running ? 0x80FF90 : 0xFFC060, 256);
+        m3_text(&m3_scr, 250, 26, 0, g_running ? "SBEMU is loaded" : g_sbc.state == SBC_UNKNOWN ? "SBEMU state unknown" : "SBEMU is not loaded", g_running ? 0x80FF90 : 0xFFC060, 256);
         snprintf(b, sizeof b, "Panels, %s", m3_lookname[m3_look % 3]);
         if (W >= 760) m3_text(&m3_scr, W - 24 - 8 * (int)strlen(b), 26, 0, b, 0xA0B8E0, 256);
     }
@@ -374,7 +374,7 @@ static void m3_overlay(int cat, int sel, int sb)
         int x, total = 0, k[80], tf = L.big ? 1 : 0, th = L.big ? 28 : 22;
         m3_vgrad(&m3_scr, 0, 0, W, 40, 0x000000, 0x000000, 150);
         m3_text_glow(&m3_scr, 12, 6, 2, "NUKED SB-EMU", 0xFFFFFF, m3_glowc);
-        m3_text(&m3_scr, 172, 12, 0, sb ? "SBEMU loaded" : "SBEMU not loaded", sb ? 0x60FF80 : 0xFFB040, 256);
+        m3_text(&m3_scr, 172, 12, 0, sb ? "SBEMU loaded" : g_sbc.state == SBC_UNKNOWN ? "SBEMU unknown" : "SBEMU not loaded", sb ? 0x60FF80 : 0xFFB040, 256);
         if (m3_now() < m3_note_until)
             snprintf(b, sizeof b, "%s %s %s  %dx%d %s %.0f fps", m3_stylename[m3_style], m3_lookname[m3_look % 3], m3_theme_names[m3_ctheme % 11], W, H,
                      m3_quality == 1 ? "full" : m3_quality == 2 ? "half" : m3_half ? "auto: half" : "auto: full", m3_fps);

@@ -1,0 +1,40 @@
+@ECHO OFF
+REM MSTAT CASE: MENU's SBEMU status (SC55MENU /STATUS) after the pack's launchers. Runs SETUP C first.
+REM CASE: none (nothing loaded: expect Not loaded), pm (SC55.BAT), pmhand (SC55.BAT, MENU by hand without MENU.BAT's
+REM HDPMI line), rm (SC55JEM.BAT, real+protected; needs rm.img), rmonly (SC55JEM.BAT /PM0: SBEMU traps no
+REM protected-mode port, so only AMIS can see it; the beta.116 MENU said Not loaded). Last line PASS/FAIL.
+C:
+CD \NUKEDSB
+CALL SETUP C > NUL
+ECHO == case %1 > C:\RESULT.LOG
+IF "%1"=="none" GOTO MENU
+IF "%1"=="rm" GOTO RM
+IF "%1"=="rmonly" GOTO RMONLY
+CALL C:\SC55\SC55.BAT > C:\SBOUT.TXT
+GOTO LOADED
+:RM
+CALL C:\SC55\SC55JEM.BAT > C:\SBOUT.TXT
+GOTO LOADED
+:RMONLY
+CALL C:\SC55\SC55JEM.BAT /PM0 > C:\SBOUT.TXT
+:LOADED
+C:
+CD \SC55
+IF "%1"=="pmhand" GOTO HAND
+:MENU
+C:\HDPMI\HDPMI32I.EXE -r -x > NUL
+:HAND
+C:\SC55\SC55MENU.EXE C:\SC55 /STATUS >> C:\RESULT.LOG
+IF "%1"=="none" GOTO EXPNOT
+IF ERRORLEVEL 1 GOTO BAD
+ECHO PASS >> C:\RESULT.LOG
+GOTO END
+:EXPNOT
+IF ERRORLEVEL 2 GOTO BAD
+IF NOT ERRORLEVEL 1 GOTO BAD
+ECHO PASS >> C:\RESULT.LOG
+GOTO END
+:BAD
+TYPE C:\SBOUT.TXT >> C:\RESULT.LOG
+ECHO FAIL >> C:\RESULT.LOG
+:END

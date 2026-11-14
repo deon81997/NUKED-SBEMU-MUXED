@@ -24,6 +24,7 @@
 #include "tui.h"
 #include "safewr.h"
 #include "mpuport.h"
+#include "sbemuchk.h"
 #include "crit24.h"
 #include <stdarg.h>
 #include <time.h>
@@ -32,7 +33,8 @@ static int MPU = 0x330;          /* the MPU-401 port from the saved settings (/P
 #define NGAMES 4
 
 static char g_home[200];
-static int  g_running;          /* SBEMU answers at its MPU-401 port */
+static int  g_running;          /* SBEMU is loaded (AMIS signature or its MPU-401 answers) */
+static SBCHK g_sbc;             /* how it was found: state (loaded / not / unknown), version, mode, MPU port */
 static char g_lasterr[80];      /* why SBEMU last refused to load (SBLOG.TXT), "" = no error */
 static char g_opts[300];        /* saved settings (SBOPTS.TXT / SBOPTS.BAT) */
 static char g_optfile[16];      /* "@SBOPTS.TXT" or "@SBOPTS.BAT" or "" */
@@ -75,11 +77,15 @@ static void ui_log(const char* fmt, ...)
 /* ---------------------------------------------------------------- helpers */
 static int sbemu_present(void)
 {
-    /* wherever SBEMU's MPU-401 is: the saved /P first, then BLASTER's P, then the other usual ports */
-    int p = mpu_find(MPU);
-    if (p) MPU = p;
-    return p != 0;
+    /* SBEMU's AMIS signature (needs no port trap: beta.116 and older MENUs said "Not loaded" whenever the MPU probe
+     * did not reach SBEMU's trap), then its MPU-401: the saved /P first, then BLASTER's P, then the usual ports */
+    sbemu_check(&g_sbc, MPU, g_win);
+    if (g_sbc.mpu) MPU = g_sbc.mpu;
+    ui_log("sbemu %s amis=%d mpu=%X %s", g_sbc.state == SBC_LOADED ? "loaded" : g_sbc.state == SBC_UNKNOWN ? "unknown" : "not", g_sbc.amis, g_sbc.mpu, g_sbc.info);
+    return g_sbc.state == SBC_LOADED;
 }
+/* the status word for the screens: "Loaded", "Not loaded", "Unknown" */
+static const char* sbemu_word(void) { return g_sbc.state == SBC_LOADED ? "Loaded" : g_sbc.state == SBC_UNKNOWN ? "Unknown" : "Not loaded"; }
 /* SC-55 / SoundFont render load from SBEMU (MPU command 0xB0, beta.34+), permille; -1 = not known */
 static int g_load = -1;
 static unsigned long g_load_tick;
@@ -87,7 +93,7 @@ static void sbemu_load(void)
 {
     unsigned char b[150]; int i;
     unsigned long t = _farpeekl(_dos_ds, 0x46C);
-    if (!g_running || (g_load_tick && t - g_load_tick < 18)) return;   /* once a second */
+    if (!g_running || !g_sbc.mpu || (g_load_tick && t - g_load_tick < 18)) return;   /* once a second */
     g_load_tick = t ? t : 1;
     outportb(MPU + 1, 0xB0);
     for (i = 0; i < 150; i++) b[i] = (unsigned char)inportb(MPU);       /* the whole report, so nothing is left over */
@@ -498,11 +504,12 @@ static void draw_status(void)
     if (g_running)
     {
         tui_put(61, 2, 0x0A, "\xFE Loaded");
+        if (!g_sbc.mpu) tui_put(70, 2, 0x0E, "MPU ?");   /* found by AMIS only: its MPU-401 does not answer here */
         sbemu_load();
         if (g_load >= 0)
             tui_printf(70, 2, g_load < 500 ? 0x0A : g_load < 800 ? 0x0E : 0x0C, "CPU %3d%%", (g_load + 5) / 10 > 999 ? 999 : (g_load + 5) / 10);
     }
-    else tui_put(61, 2, 0x0C, "\xFE Not loaded");
+    else tui_put(61, 2, g_sbc.state == SBC_UNKNOWN ? 0x0E : 0x0C, g_sbc.state == SBC_UNKNOWN ? "\xFE Unknown" : "\xFE Not loaded");
     const char* mt = opt_val("/VMT32", "");
     if (!strcmp(opt_val("/MUSB", "0"), "1")) tui_printf(61, 3, 0x07, "USB MIDI device");
     else if (mt[0] && strcmp(mt, "0") && strcasecmp(mt, "OFF")) tui_printf(61, 3, 0x07, "%s (Munt)", !strcasecmp(mt, "CM32L") ? "CM-32L" : "MT-32");
@@ -1121,6 +1128,8 @@ int main(int argc, char** argv)
 {
     int c, firstrun, m3_start_r = 1;
     char* s; const char* v;
+    int status_only = 0;
+    if (argc > 1 && !strcasecmp(argv[argc - 1], "/STATUS")) { status_only = 1; argc--; }   /* SC55MENU [home] /STATUS: the SBEMU line, no menu */
     if (argc > 1) snprintf(g_home, sizeof g_home, "%s", argv[1]);
     else
     {
@@ -1130,7 +1139,7 @@ int main(int argc, char** argv)
     }
     for (s = g_home; *s; ++s) { if (*s == '/') *s = '\\'; *s = (char)toupper((unsigned char)*s); }
     if (strlen(g_home) > 3 && g_home[strlen(g_home) - 1] == '\\') g_home[strlen(g_home) - 1] = 0;
-    { char p[300]; home_path(p, "MENUGO.BAT"); remove(p); }
+    if (!status_only) { char p[300]; home_path(p, "MENUGO.BAT"); remove(p); }   /* BUGREP may run from MENUGO.BAT */
 
     putenv("LFN=n");                       /* 8.3 names: the menu writes them into batch files for plain DOS */
     crash_install();
@@ -1143,6 +1152,13 @@ int main(int argc, char** argv)
     read_sbopts();
     { const char* pv = opt_val("/P", "330"); long v = strtol(pv, NULL, 16); if (v >= 0x200 && v <= 0x3FF) MPU = (int)v; }
     g_running = sbemu_present();
+    if (status_only)
+    {   /* for BUGREP and the test rigs: what the menu's status panel shows, and why */
+        printf("MENU SBEMU: %s%s (AMIS %s, MPU-401 %s%X)%s%s\n", sbemu_word(), g_win ? " [Windows DOS box]" : "",
+            g_sbc.amis > 0 ? "found" : g_sbc.amis < 0 ? "failed" : "none", g_sbc.mpu ? "at " : "no answer, tried ", g_sbc.mpu ? g_sbc.mpu : MPU,
+            g_sbc.info[0] ? " " : "", g_sbc.info);
+        return g_sbc.state == SBC_LOADED ? 0 : g_sbc.state == SBC_UNKNOWN ? 2 : 1;
+    }
     if (!g_running) read_lasterr();
     read_gametest_summary();
     build_menu();

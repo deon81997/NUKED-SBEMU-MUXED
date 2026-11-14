@@ -3146,6 +3146,23 @@ static void MAIN_TSR_Interrupt()
             MAIN_TSRREG.w.flags &= ~CPU_CFLAG;
         }
         return;
+        case 0x04: //status for MENU/SBDIAG (beta.117+): one text line into EBX, at most ECX bytes; works when no port trap reaches the caller
+        {
+            char t[160];
+            int n = snprintf(t, sizeof t, "VER=%s MODE=%s%s%s MPU=%X TRAP=%s%s%s SB=%X",
+                MAIN_SBEMU_VER, MAIN_Options[OPT_RM].value ? "RM" : "", MAIN_Options[OPT_RM].value && MAIN_Options[OPT_PM].value ? "+" : "",
+                MAIN_Options[OPT_PM].value ? "PM" : "", (unsigned)MAIN_Options[OPT_MPUADDR].value,
+                MPURMInstalled ? "RM" : "", MPURMInstalled && MPUPMInstalled ? "+" : "", MPUPMInstalled ? "PM" : (MPURMInstalled ? "" : "none"),
+                (unsigned)MAIN_Options[OPT_ADDR].value);
+            if(n > (int)sizeof t - 1) n = sizeof t - 1;
+            if(MAIN_TSRREG.d.ecx < (uint32_t)n + 1) n = MAIN_TSRREG.d.ecx ? (int)MAIN_TSRREG.d.ecx - 1 : 0;
+            t[n] = 0;
+            if(MAIN_TSRREG.d.ecx) DPMI_LMemcpy(MAIN_TSRREG.d.ebx, DPMI_PTR2L(t), n + 1);
+            MAIN_TSRREG.d.ecx = n;
+            MAIN_TSRREG.h.al = 0;                       /* an older SBEMU leaves AL as it was */
+            MAIN_TSRREG.w.flags &= ~CPU_CFLAG;
+        }
+        return;
         case 0x01: //query
         {
             if(MAIN_TSRREG.d.ecx != sizeof(MAIN_Options)) //different version of SBEMU?

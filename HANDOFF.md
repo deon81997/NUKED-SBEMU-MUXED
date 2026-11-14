@@ -1,3 +1,18 @@
+## beta.118 (2026-11-14, DOS session): MENU said "Not loaded" with SBEMU loaded (user, beta.116 personal pack, P5PE-VM)
+- Cause class: MENU knew SBEMU only by an MPU-401 reset probe, which answers only when SBEMU's port trap reaches the
+  MENU process (HDPMI trap for PM, QPIEMU for RM). Any setup where it doesn't (Protected mode off = /PM0, a different
+  DPMI host, a port/trap problem on the real board) showed "Not loaded". Reproduced: SC55JEM /PM0 -> MPU no answer.
+  NOT reproduced on the P5PE-VM's own path (MS-DOS 7.1 HIMEM only + SC55.BAT): QEMU AC97 answers at 330. Root cause on
+  that board still open: get BUGREP.TXT "MENU status" line from it. beta.113-116 changes (uCDD -install, INT 1Ch
+  watchdog, /VCDA, 3D menus) checked: none touch the MPU trap or the probe.
+- Fix: SBEMU AMIS (INT 2Dh) function 04h = "VER= MODE=RM+PM MPU= TRAP= SB=" (main.c); tools/sbemuchk.h: AMIS
+  signature + 04h, then the MPU probe; Loaded if either, "Unknown" if the AMIS scan failed or a Windows DOS box,
+  else Not loaded. MENU text + 3D status, "MPU ?" when found by AMIS only, `SC55MENU [home] /STATUS` (exit 0/1/2),
+  BUGREP.BAT "MENU status" block, README.TXT note. No runtime cost (AMIS handler runs only when called).
+- Matrix: sc55-pack/testrig/menustat/run.sh ZIP [EXE..] (QEMU, store-dos71): none / pm / pmhand / rm / rmonly, all
+  PASS on the beta.118 zip. Not run: Win98 DOS box (store-w98qi-qemu has no automation for a DOS box yet), FreeDOS.
+- Real hardware: P5PE-VM + D810: SC55 then MENU -> status panel "Loaded"; run BUGREP, send the "MENU status" line.
+
 ## beta.117 (2026-11-14, DOS session): uCDD disc hotkey "stopped after a re-mount" = SHSUCDX 7 s media check; MENU Panels reason box
 - Root cause of the beta.115 OPEN item: not uCDD and not the mount order. SHSUCDX asked the driver for a media change
   only after 128 ticks (~7 s) without an access to M:; the matrix swap step did DIR, Ctrl+Alt+PgDn, DIR within ~5 s,

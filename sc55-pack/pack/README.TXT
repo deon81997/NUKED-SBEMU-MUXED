@@ -1415,6 +1415,11 @@ CONTENTS
 
   SBEMU SAYS "Not loaded" IN THE MENU: the line under the logo shows
   the first error from SBLOG.TXT.
+  Since beta.118 MENU also asks the loaded SBEMU directly (AMIS, INT 2Dh),
+  so it says "Loaded" even when SBEMU's MPU-401 does not answer MENU (for
+  example Protected mode off in SETTINGS). "MPU ?" next to Loaded = that
+  case; "Unknown" = MENU could not tell (Windows DOS box). SC55MENU /STATUS
+  prints what MENU found (BUGREP.TXT has it under "MENU status").
 
   3D GAMES WITH GLITCHES ONLY WHILE SBEMU RUNS (stray lines or polygons,
   objects jumping, rare crashes in FPU-heavy games): fixed in beta.84. Before,
