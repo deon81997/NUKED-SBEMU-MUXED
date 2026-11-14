@@ -58,8 +58,15 @@ class Base:
         return False
 
     def cmd(self, line, ms=1500):
-        """a DOS command at the prompt"""
-        self.type(line + '\n'); self.sleep(ms)
+        """a DOS command at the prompt; the typed line is checked on screen before Enter (an emulator under load
+        drops keys: MENU arrived as MNU), and retyped after Esc (clears the input line) up to 3 times"""
+        for i in range(3):
+            self.type(line)
+            rows = self.screen()[0]
+            tail = ''.join(r for r in rows if r.strip())[-(len(line) + 90):].rstrip()   # a long line wraps
+            if not rows or tail.upper().endswith(line.upper()) or i == 2: break
+            self.key('esc', 300)
+        self.key('ret', 60); self.sleep(ms)
 
     def find(self, s):
         """(row, col) of the first match of s on the text screen, or None"""

@@ -108,16 +108,21 @@ class Run:
         self.v.sleep(800)
 
     def sel(self, name):
-        """select a row of the CD images list (the selected row has the arrow in column 1)"""
+        """select a row of the CD images list (the selected row has the arrow in column 1). Steers toward the
+        row (up or down) instead of counting key presses: a slow emulator auto-repeats a held arrow key"""
         self.v.key('home', 300)
-        last = None
+        seen_bottom = False; last = None
         for _ in range(60):
             rows = self.v.screen()[0]
-            cur = [r for r in rows if len(r) > 1 and r[1] == '\x10']
-            if cur and name.upper() in cur[0].upper(): return
-            if cur and cur[0] == last: break
+            cur = [i for i, r in enumerate(rows) if len(r) > 1 and r[1] == '\x10']
+            tgt = [i for i, r in enumerate(rows) if re.search(r'[\s\x00-\x1f]' + re.escape(name.upper()) + r'\b', r.upper())
+                   and 5 < i < 23]
+            if cur and tgt and cur[0] == tgt[0]: return
+            if cur and tgt: self.v.key('down' if tgt[0] > cur[0] else 'up', 250); continue
+            if cur and cur[0] == last: seen_bottom = True     # not on this page: scroll on
             last = cur[0] if cur else None
-            self.v.key('down', 250)
+            self.v.key('pgdn' if seen_bottom else 'down', 250)
+            if seen_bottom and last is not None and cur and cur[0] == last: break
         raise Fail('%s not in the list' % name)
 
     def cd_folder(self):
