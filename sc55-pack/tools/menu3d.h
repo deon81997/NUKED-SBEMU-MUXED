@@ -19,6 +19,7 @@
  * Styles (F3): 0 Panels (flat 3D buttons, lightest), 1 Carousel (cards on a turning ring), 2 Module (a rack module).
  */
 #define M3_DYNAMIC_RES               /* any VESA mode (m3core.h), not only 640x480 */
+#define M3_WHO "MENU 3D"
 #include "m3core.h"
 #include "m3looks.h"
 /* ------------------------------------------------------------------------------------------- scene data */
@@ -979,7 +980,7 @@ static void m3_pointer(void)
 }
 
 /* ------------------------------------------------------------------------------------------- frame and keys */
-static double m3_last, m3_fps_t; static int m3_frames;
+static double m3_last, m3_fps_t, m3_quit_t; static int m3_frames;
 static double m3_frame_ms;
 static void m3_frame(void)
 {
@@ -1150,9 +1151,11 @@ static int m3_main(void)
     m3_last = m3_fps_t = m3_now(); m3_frames = 0;
     m3_cards_cat = -1; m3_catanim = 1;
     m3_mouse_setup();
+    { const char* q = getenv("M3SECS"); m3_quit_t = q && *q ? m3_now() + atof(q) : 0; }   /* test rigs: leave after N s */
     for (;;)
     {
         m3_frame();
+        if (m3_quit_t > 0 && m3_now() > m3_quit_t) { g_in3d = 0; m3_free_all(); return 0; }
         while ((c = m3_key()) != 0 || (c = m3_mouse_key()) != 0)
         {
             r = m3_handle(c);

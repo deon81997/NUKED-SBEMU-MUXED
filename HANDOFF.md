@@ -1,3 +1,27 @@
+## WCSET write-combining (2026-11-14, DOS session, STOPPED mid-task, no release): faster DOS graphics via MTRR WC on the VESA LFB
+- Done (main, unreleased): tools/wcset.h (shared: CPUID/MTRRcap/phys-width checks, real-mode stub via DPMI 0301h for
+  RDMSR/WRMSR/CR0/WBINVD = real mode under HDPMI raw, V86 under JEMM (Jemm EMU.ASM emulates them); EMM386/QEMM V86 and
+  Windows/NT/OS2 boxes refused; free variable MTRR only, any overlap with a set MTRR = left alone; SBDETAIL "[wc]" line,
+  no duplicates). tools/wcset.c = WCSET.EXE LIST|ON|OFF|AUTO|/BENCH|/ASK (WCSET.CFG, env WCSET overrides; /BENCH =
+  stosd/stosb/movsd MB/s WC off vs on at 640x480 LFB, appended to WCBENCH.TXT). Hooks: MENU main (wc_startup "MENU"),
+  MIDPLAY main after clock_init, m3core.h after each LFB map (M3_WHO). AUTO = restore at exit (atexit); ON = kept.
+  menu3d.h: env M3SECS=N leaves the 3D menu after N s (test rigs, with M3PROF). makefile: output/wcset.exe.
+- Tested (testrig/wcset/run.sh ZIP pm rm, QEMU pentium3): PASS both; pm = "real mode", rm = "V86 (JEMM)"; SeaBIOS sets
+  default WB + UC MTRR 80000000-FFFFFFFF, so WC is refused there (correct by the rule); bench/MENU 3D/MIDPLAY fps
+  equal off vs auto (nothing changed). QEMU numbers: stosd ~1600-2100 MB/s, MENU 3D ~82 fps, MIDPLAY 3D ~19 fps.
+- NOT done: 86Box PII-450 run (needs apt-get install librtmidi6 xvfb; Award P3B-F BIOS should allow the WC write path,
+  never exercised yet), pack integration (WCSET.EXE into pack/FILES/SC55 + zip, MENU Settings item "Fast video
+  (WCSET /ASK)", Tests item "Video speed (WCSET /BENCH)", README/CHANGELOG), SBDIAG/SC55LOG no-slowdown check (SBEMU
+  untouched), release beta.120, D810/P5PE-VM test steps.
+- Open risk: boards whose BIOS uses default WB + a UC MTRR over the PCI hole (like SeaBIOS) get no WC; the fix would be
+  PAT (PIII+ only) - idea, not started. WC write path (op 3 in the stub) unverified on any emulator so far.
+- Next 3 steps: (1) 86Box: EMU="-e 86box -c /home/claude/vms/dos71/86box/86box.cfg" TMO=900 sh testrig/wcset/run.sh
+  ../release/NUKED-SB-EMU-1.0.0-beta.119-usb.zip pm rm - check "ON (MTRR n" lines and that LIST shows the slot free
+  again after MENU/MIDPLAY exit; (2) pack + menu items + docs; (3) release beta.120 with hardware steps (WCSET /BENCH,
+  MENU 3D fps via M3PROF) for D810 (Radeon X300) and P5PE-VM (GeForce 6800).
+- Resume: export PATH=/tmp/dl/djgpp/djgpp/bin:$PATH (curl build-djgpp v3.4); cd sc55-pack; make -j16; restore.sh dos71.
+- Test downloads: DJGPP v3.4 (/tmp/dl/djgpp), LordOfMice/Tools msr.zip (reference), Baron-von-Riedesel/Jemm + HX sources (/tmp/dl).
+
 ## beta.119 (2026-11-14, DOS session): beta.118 froze the ASUS P5PE-VM + Audigy (Win98 -> MS-DOS mode); beta.112 fine
 - Suspect: beta.115 MAIN_CardWatchdog (main.c) calls aui.card_handler->irq_routine from SB port traps and INT 1Ch,
   outside the interrupt, for every card; proven only on ES1371 (86Box). Not reproducible here (no emulator has an

@@ -2124,6 +2124,7 @@ static void key_files(int k)
     }
 }
 
+#define M3_WHO "MIDPLAY 3D"
 #define M3_DYNAMIC_RES               /* the 3D view in any VESA mode (m3core.h), not only 640x480 */
 #include "midplay3d.h"
 
@@ -2701,6 +2702,7 @@ int main(int argc, char** argv)
         else { pl_add(a); files++; }
     }
     clock_init();
+    if (!g_win && !g_dry) { wc_set_home(g_home); wc_startup("MIDPLAY", 0); }    /* VESA write-combining by WCSET.CFG (AUTO) */
     /* the 3D view uses MIDPLAY's clock (m3core's own 3-tick calibration is wrong in a Windows DOS box, where the BIOS
        tick comes late and in bursts); its mode choice is the one for here (DOS or Windows) */
     if (g_tsc) { m3_tsc_us = CK.per_us; m3_t0 = rdtsc64(); }

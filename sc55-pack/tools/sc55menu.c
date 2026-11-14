@@ -1159,6 +1159,7 @@ int main(int argc, char** argv)
             g_sbc.info[0] ? " " : "", g_sbc.info);
         return g_sbc.state == SBC_LOADED ? 0 : g_sbc.state == SBC_UNKNOWN ? 2 : 1;
     }
+    if (!g_win) { wc_set_home(g_home); wc_startup("MENU", 0); }             /* VESA write-combining by WCSET.CFG (AUTO) */
     if (!g_running) read_lasterr();
     read_gametest_summary();
     build_menu();

@@ -17,6 +17,10 @@
 #include <sys/movedata.h>
 #include <sys/nearptr.h>
 #include "fontdata.h"
+#include "wcset.h"
+#ifndef M3_WHO
+#define M3_WHO "3D"
+#endif
 static unsigned long m3_ticks(void) { return _farpeekl(_dos_ds, 0x46C); }   /* BIOS clock, 18.2 a second */
 
 #ifdef M3_DYNAMIC_RES
@@ -160,6 +164,7 @@ static int m3_vbe_open(void)
                 __dpmi_set_segment_base_address(m3_sel, m3_lin);
                 __dpmi_set_segment_limit(m3_sel, ((unsigned long)m3_pitch * M3H - 1) | 0xFFF);
                 m3_lfb = 1;
+                wc_startup(M3_WHO, phys);                                  /* write-combining (WCSET.CFG) */
             }
             else { __dpmi_free_physical_address_mapping(&m3_map); m3_sel = 0; }
         }
@@ -268,6 +273,7 @@ static int m3_open_mode(const M3MODE* m, int hz)
                     __dpmi_set_segment_base_address(m3_sel, m3_lin);
                     __dpmi_set_segment_limit(m3_sel, ((unsigned long)m3_pitch * m->h - 1) | 0xFFF);
                     m3_lfb = 1;
+                    wc_startup(M3_WHO, phys);                              /* write-combining (WCSET.CFG) */
                 }
                 else { __dpmi_free_physical_address_mapping(&m3_map); m3_sel = 0; }
             }
