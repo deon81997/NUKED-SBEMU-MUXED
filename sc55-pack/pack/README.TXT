@@ -1415,6 +1415,15 @@ CONTENTS
   "[step]" line shows where. At the end a table shows how long each
   step took (since beta.73). SET SBEMUDETAIL=OFF turns it off.
 
+  PC FREEZES WITH SATA "ENHANCED" MODE (seen: ASUS P5PE-VM, ICH5):
+  in Enhanced (native) mode the SATA/IDE controller uses a PCI IRQ that
+  can be the same as the sound card's. Before beta.120 the Audigy/Live
+  driver took every interrupt on that IRQ, so the disk's was lost and the
+  PC hung. beta.120 takes only its own. If SC55 still shows the yellow
+  "hard disk controller ... shares IRQ" warning and the PC freezes, set
+  SATA/IDE to Compatible (Legacy) mode in the BIOS. SBDETAIL.TXT lists
+  each disk controller ("disk controller ... native PCI mode ... IRQ").
+
   PC FREEZES AFTER SC55 SINCE beta.115 (seen: ASUS P5PE-VM + Audigy):
   beta.115-118 ran a sound card interrupt watchdog for every card; since
   beta.119 it runs only on the card it was proven on (Ensoniq/SBPCI
