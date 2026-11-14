@@ -1155,6 +1155,7 @@ static void MAIN_PutStr(const char* t) { if(MAIN_LogOn) { for(; *t; ++t) if(*t !
  * Plain lines are now only handed to DOS; the commit happens at every "[step]" line (before the step's
  * risky work runs) and for every USB trace line, which is where hangs were seen. */
 static FILE* MAIN_Det;
+static unsigned MAIN_DiskIrqs;   /* IRQs of IDE/SATA controllers in native PCI mode (MAIN_DetSystem) */
 static const char* MAIN_DetStage = "start";
 static void MAIN_D(const char* fmt, ...)
 {
@@ -1198,6 +1199,23 @@ static uint32_t MAIN_PCIRead(int bus, int dev, int fn, int reg)
 {
     outportl(0xCF8, 0x80000000UL | ((uint32_t)bus << 16) | ((uint32_t)dev << 11) | ((uint32_t)fn << 8) | (reg & 0xFC));
     return inportl(0xCFC);
+}
+/* IRQs of IDE/SATA controllers in native PCI mode, also without a detail log (bus 0-7, like MAIN_DetSystem) */
+static unsigned MAIN_ScanDiskIrqs(void)
+{
+    unsigned m = 0; int bus, dev, fn;
+    for(bus = 0; bus < 8; ++bus)
+    for(dev = 0; dev < 32; ++dev)
+    for(fn = 0; fn < 8; ++fn)
+    {
+        uint32_t id = MAIN_PCIRead(bus, dev, fn, 0), cls, irq;
+        if(id == 0xFFFFFFFFUL || id == 0) { if(fn == 0) break; continue; }
+        cls = MAIN_PCIRead(bus, dev, fn, 8);
+        irq = MAIN_PCIRead(bus, dev, fn, 0x3C) & 0xFF;
+        if(((cls >> 16) == 0x0106 || ((cls >> 16) == 0x0101 && ((cls >> 8) & 0x05))) && irq > 0 && irq < 16) m |= 1u << irq;
+        if(fn == 0 && !(MAIN_PCIRead(bus, dev, fn, 0x0C) & 0x00800000UL)) break;
+    }
+    return m;
 }
 static void MAIN_DetSystem(int argc, char* argv[])
 {
@@ -1259,6 +1277,16 @@ static void MAIN_DetSystem(int argc, char* argv[])
                     irq & 0xFF, ((irq >> 8) & 0xFF) ? 'A' - 1 + (char)((irq >> 8) & 0xFF) : '-', cmd & 0xFFFF,
                     MAIN_PCIRead(bus, dev, fn, 0x10), MAIN_PCIRead(bus, dev, fn, 0x14));
                 ++n;
+            }
+            if((cls >> 16) == 0x0101 || (cls >> 16) == 0x0106)   /* IDE / SATA (AHCI) disk controllers */
+            {   /* native PCI mode (IDE prog-if bit 0/2, or AHCI; ICH5 "Enhanced" SATA): the disk uses a PCI IRQ
+                 * that may be shared with the sound card (see MAIN_DiskIrqs) */
+                uint32_t irq = MAIN_PCIRead(bus, dev, fn, 0x3C);
+                int native = (cls >> 16) == 0x0106 || ((cls >> 8) & 0x05);
+                MAIN_D("PCI %02x:%02x.%d  %04lx:%04lx  disk controller class %02lx.%02lx prog-if %02lx (%s)  IRQ line %lu\n",
+                    bus, dev, fn, id & 0xFFFF, id >> 16, cls >> 24, (cls >> 16) & 0xFF, (cls >> 8) & 0xFF,
+                    native ? "native PCI mode" : "legacy IRQ 14/15", irq & 0xFF);
+                if(native && (irq & 0xFF) > 0 && (irq & 0xFF) < 16) MAIN_DiskIrqs |= 1u << (irq & 0xFF);
             }
             if(fn == 0 && !(hdr & 0x00800000UL)) break;   /* not multi-function */
         }
@@ -1894,6 +1922,13 @@ int main(int argc, char* argv[])
         MAIN_CPrintf(LIGHTGREEN, "%d", aui.card_irq);
         printf(".\n");
         MAIN_D("PCI BIOS routed IRQ %d to the sound card\n", aui.card_irq);
+    }
+    MAIN_DiskIrqs |= MAIN_ScanDiskIrqs();
+    if(aui.card_irq < 16 && (MAIN_DiskIrqs & (1u << aui.card_irq)))
+    {   /* beta.120: P5PE-VM froze with the ICH5 SATA in BIOS "Enhanced" mode, fine in "Compatible" */
+        MAIN_D("WARNING: an IDE/SATA controller in native PCI mode shares IRQ %d with the sound card\n", aui.card_irq);
+        MAIN_CPrintf(YELLOW, "Warning: the hard disk controller (SATA/IDE in native mode) shares IRQ %d with the sound card.\n", aui.card_irq);
+        printf("If the PC freezes, set SATA/IDE to Compatible (Legacy) mode in the BIOS.\n");
     }
     if(aui.card_irq == MAIN_Options[OPT_IRQ].value)
     {
