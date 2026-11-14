@@ -469,11 +469,18 @@ static uint32_t MAIN_SB_MixerData(uint32_t port, uint32_t val, uint32_t out)
  * When a game talks to the SB and no card interrupt has come for 250 ms, SBEMU acknowledges the card's pending
  * interrupt itself: the line drops, the next buffer interrupt is a fresh edge and sound goes on. While the card
  * interrupt runs normally this costs one counter compare per trapped SB port access. */
+/* beta.119: only for cards whose irq_routine is a plain status read + acknowledge that is safe to call outside
+ * the interrupt (audit in HANDOFF beta.119). ES1371: proven (86Box). The Audigy/Live (EMU10K IPR: acks every bit,
+ * MIDI ones included, and nearly always reports "pending"), AC'97/ICH (advances LVI), CMI (reads the MPU data
+ * port, rewrites HLDCLR), HDA (acks RIRB under a running codec verb) are not; a P5PE-VM with an Audigy froze on
+ * beta.118. /CARDWD:1 forces it on, /CARDWD:0 off; off also leaves INT 1Ch unhooked. */
+static BOOL MAIN_WdOn;
 static uint32_t MAIN_WdIrqs, MAIN_WdKicks;
 static uint64_t MAIN_WdT;
 static void MAIN_CardWatchdog(void)
 {
     uint64_t now, cps;
+    if(!MAIN_WdOn) return;
     if(MAIN_CardIrqs != MAIN_WdIrqs || MAIN_InINT) { MAIN_WdIrqs = MAIN_CardIrqs; MAIN_WdT = 0; return; }
     now = DIAG_Tsc();
     if(!MAIN_WdT) { MAIN_WdT = now; return; }
@@ -821,6 +828,7 @@ struct MAIN_OPT
 #endif
 #endif
     "/VCDA", "CD-Audio from uCDD (--sbemu-link) mounted CUE/BIN images: output gain in percent (0=off, 100=unity, 1-400)", 0, MAIN_SETCMD_BASE10,
+    "/CARDWD", "Sound card interrupt watchdog: 0=off, 1=on, 2=auto (on only for cards it was proven safe on: Ensoniq/SBPCI ES1371)", 2, MAIN_SETCMD_BASE10,
     "/VSBVOL", "Sound effects (digital Sound Blaster) volume in percent (0-100), on top of the game's own mixer", 100, MAIN_SETCMD_BASE10,
     "/VOPLVOL", "FM (OPL / AdLib) music volume in percent (0-100), on top of the game's own mixer", 100, MAIN_SETCMD_BASE10,
     "/VMIDIVOL", "General MIDI music volume in percent (0-400; SC-55: multiplies /VSCGAIN; SoundFont: its master volume)", 100, MAIN_SETCMD_BASE10,
@@ -896,6 +904,7 @@ enum EOption
 #endif
 #endif
     OPT_VCDA,
+    OPT_CARDWD,
     OPT_VSBVOL,
     OPT_VOPLVOL,
     OPT_VMIDIVOL,
@@ -1700,6 +1709,11 @@ int main(int argc, char* argv[])
         MAIN_CPrintf(RED, "Error: Invalid CD-Audio gain (/VCDA 0-400 percent).\n");
         return 1;
     }
+    if(MAIN_Options[OPT_CARDWD].value < 0 || MAIN_Options[OPT_CARDWD].value > 2)
+    {
+        MAIN_CPrintf(RED, "Error: Invalid /CARDWD (0=off, 1=on, 2=auto).\n");
+        return 1;
+    }
 
 #if SBEMU_VMPU
 
@@ -2204,6 +2218,7 @@ int main(int argc, char* argv[])
     HDPMIPT_LockIRQRouting(TRUE);
     PIC_UnmaskIRQ(aui.card_irq);
 
+    MAIN_Step("sound card start (calibrate, AU_prestart, AU_start)");
     DIAG_Calibrate();
     MAIN_TCps = DIAG_CyclesPerSec();
     AU_prestart(&aui);
@@ -2211,6 +2226,7 @@ int main(int argc, char* argv[])
 
     if(MAIN_Options[OPT_VCDA].value)
     {
+        MAIN_Step("CD-Audio: uCDD link + INT 28h hook (/VCDA)");
         if(CDLINK_Init(MAIN_Options[OPT_VCDA].value))
         {
             MAIN_CdlOn = TRUE;
@@ -2225,11 +2241,25 @@ int main(int argc, char* argv[])
     }
     /* flight recorder: SBTRACE.TXT is written from INT 28h while DOS waits at the prompt */
     /* the watchdog also needs a clock of its own: a game waiting for its SB interrupt touches no port */
-    MAIN_Int1COn = DPMI_InstallRealModeISR(0x1C, MAIN_Int1C, &MAIN_Int1CREG, &MAIN_Int1CHandle, FALSE) == 0;
-    MAIN_D("Sound card watchdog (INT 1Ch): %s\n", MAIN_Int1COn ? "on" : "FAILED");
+    {
+        int wd = MAIN_Options[OPT_CARDWD].value;
+        const char* cn = (aui.card_handler && aui.card_handler->shortname) ? aui.card_handler->shortname : "?";
+        BOOL safe = !strcmp(cn, "Ensoniq/SBPCI");
+        if(wd == 1 || (wd == 2 && safe))
+        {
+            MAIN_Step("sound card watchdog: INT 1Ch hook");
+            MAIN_Int1COn = DPMI_InstallRealModeISR(0x1C, MAIN_Int1C, &MAIN_Int1CREG, &MAIN_Int1CHandle, FALSE) == 0;
+            MAIN_WdOn = TRUE;
+        }
+        MAIN_D("Sound card watchdog: %s (card %s, /CARDWD:%d%s)%s\n", MAIN_WdOn ? "ACTIVE" : "off", cn, wd,
+            wd == 2 ? (safe ? " auto: proven card" : " auto: card not proven safe") : "",
+            MAIN_WdOn ? (MAIN_Int1COn ? ", INT 1Ch hooked" : ", INT 1Ch hook FAILED (port traps only)") : "");
+        TRACE_Event(TR_INFO, "sound card watchdog %s (/CARDWD:%d, %s)", MAIN_WdOn ? "active" : "off", wd, cn);
+    }
     {
         const char* tp = getenv("SBEMUTRACE");
         if(tp && *tp) { if(!stricmp(tp, "OFF")) MAIN_TracePath[0] = 0; else if(strlen(tp) < sizeof(MAIN_TracePath)) strcpy(MAIN_TracePath, tp); }
+        MAIN_Step("flight recorder (SBTRACE)");
         if(MAIN_TracePath[0] && TRACE_Init(MAIN_TracePath))
         {
             if(!MAIN_Int28On) MAIN_Int28On = DPMI_InstallRealModeISR(0x28, MAIN_Int28, &MAIN_Int28REG, &MAIN_Int28Handle, FALSE) == 0;

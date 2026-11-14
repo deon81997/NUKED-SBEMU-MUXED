@@ -10,6 +10,8 @@ REM memory when SBEMU starts (a drive turned on later from MENU had silent CD mu
 REM So uCDD is loaded first (no drive letter yet - CDON.BAT gives M: when a disc is mounted) and CD music
 REM is on at 100%; SETTINGS > CD audio volume "Off" writes /VCDA:0 into SBOPTS.TXT, which comes later.
 SET SBCDA=
+REM SET SBNOCDA=1 skips uCDD and CD music (beta.112 start-up; P5TEST.BAT uses it to bisect a freeze).
+IF "%SBNOCDA%"=="1" GOTO RUN
 IF NOT EXIST C:\CDSET\UCDD.EXE GOTO RUN
 C:\CDSET\UCDD.EXE -install > NUL
 SET SBCDA=/VCDA:100

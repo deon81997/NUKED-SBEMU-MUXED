@@ -1,3 +1,30 @@
+## beta.119 (2026-11-14, DOS session): beta.118 froze the ASUS P5PE-VM + Audigy (Win98 -> MS-DOS mode); beta.112 fine
+- Suspect: beta.115 MAIN_CardWatchdog (main.c) calls aui.card_handler->irq_routine from SB port traps and INT 1Ch,
+  outside the interrupt, for every card; proven only on ES1371 (86Box). Not reproducible here (no emulator has an
+  EMU10K); root cause on the board unconfirmed until P5TEST results come back.
+- irq_routine audit (outside the ISR, called with CLIS, MAIN_InINT guard): ES1371 safe (status read + toggle of the
+  DAC int enable). ES1370/VIA82xx: ack-only, probably safe, unproven. EMU10K Live/Audigy (snd_emu_10kx_isr /
+  snd_p16v_isr): acks ALL IPR/IPR2 bits incl. MIDI/UART and returns non-zero for any -> "pending" almost always, can
+  eat the channel-loop IRQ the ISR then sees as foreign. ICH AC'97: advances LVI (DMA state). CMI: reads the MPU data
+  port (eats MIDI IN) and rewrites HLDCLR. HDA: acks RIRBSTS under a running codec verb. -> unsafe.
+- Fix: /CARDWD:0|1|2 (default 2 = auto: on only for "Ensoniq/SBPCI"); off = no trap work and NO INT 1Ch hook (the
+  beta.115 RM->PM callback from IRQ0 was the other new start-up/IRQ-time change). SBDETAIL: "Sound card watchdog:
+  ACTIVE/off (card X, /CARDWD:n ...)", trace event. New [step] lines: card start, CD-Audio link + INT 28h, flight
+  recorder, watchdog INT 1Ch hook (finer start-up step log, each fsync'd).
+- Other beta.113-118 SBEMU start-up/IRQ changes checked: uCDD -install + /VCDA:100 by default (beta.115: CDLINK,
+  INT 28h hook, MAIN_CDService after every card IRQ) = suspect 2; SC55RUN.BAT honours SET SBNOCDA=1 to skip it.
+  beta.114 USB-MIDI watchdog runs only with a USB MIDI device; beta.116 packver constructor (argv scan) and beta.118
+  AMIS fn 04h run only when asked: not suspects. beta.113 = MENU only.
+- Bisect kit in the zip: C:\SC55\P5TEST.BAT 1-4 (1 shipped/auto, 2 /CARDWD:1, 3 /CARDWD:1 + SBNOCDA, 4 /CARDWD:0 +
+  SBNOCDA = beta.112 start-up); saves SBDETAIL+SBTRACE of the previous run to P5T<N>.LOG.
+- Tested (QEMU store-dos71 HIMEM-only, AC97): menustat matrix none/pm/pmhand/rm/rmonly PASS (both SBEMU modes);
+  default -> "off (ICH AC97, auto: not proven)", /CARDWD:1 -> ACTIVE + INT 1Ch, /CARDWD:0 off; P5TEST 2/3 logs OK.
+  Not run: 86Box ES1371 (auto ACTIVE path; same code as beta.118 there) and the PII-450 speed check (change only
+  removes work). testrig/common/rezip.py now also swaps/adds pack/FILES/SC55 files.
+- OPEN: P5PE-VM results of P5TEST 1-4 (where it froze, P5T*.LOG). If 1 still freezes -> not the watchdog: check
+  SBNOCDA (test 4), then MENU (beta.113).
+- Test downloads: DJGPP v3.4 gcc12.2 (/tmp/dl/djgpp).
+
 ## beta.118 (2026-11-14, DOS session): MENU said "Not loaded" with SBEMU loaded (user, beta.116 personal pack, P5PE-VM)
 - Cause class: MENU knew SBEMU only by an MPU-401 reset probe, which answers only when SBEMU's port trap reaches the
   MENU process (HDPMI trap for PM, QPIEMU for RM). Any setup where it doesn't (Protected mode off = /PM0, a different

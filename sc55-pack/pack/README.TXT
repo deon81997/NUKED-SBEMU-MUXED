@@ -606,6 +606,8 @@ CONTENTS
   CD-Audio
      /VCDA:pct             mix CD-Audio from the virtual CD (uCDD link):
                            0 off, 100 unity, 1-400 (section 10)
+     /CARDWD:0|1|2         sound card interrupt watchdog: 0 off, 1 on,
+                           2 auto (default: on only for the ES1371)
 
   Joystick (section 10b)
      /JOY:0|1              USB Xbox 360 pad as the gameport joystick at port
@@ -1412,6 +1414,14 @@ CONTENTS
   saved at once, so if the PC hangs while SBEMU starts, the last
   "[step]" line shows where. At the end a table shows how long each
   step took (since beta.73). SET SBEMUDETAIL=OFF turns it off.
+
+  PC FREEZES AFTER SC55 SINCE beta.115 (seen: ASUS P5PE-VM + Audigy):
+  beta.115-118 ran a sound card interrupt watchdog for every card; since
+  beta.119 it runs only on the card it was proven on (Ensoniq/SBPCI
+  ES1371). SC55 /CARDWD:0 turns it off, /CARDWD:1 forces it on; SBDETAIL.TXT
+  says "Sound card watchdog: ACTIVE" or "off". To find a freeze, run
+  P5TEST 1, then (after a reboot) P5TEST 2, 3 and 4 in C:\SC55 and send
+  the P5T*.LOG files it saves (SET SBNOCDA=1 = SC55 without uCDD/CD music).
 
   SBEMU SAYS "Not loaded" IN THE MENU: the line under the logo shows
   the first error from SBLOG.TXT.
