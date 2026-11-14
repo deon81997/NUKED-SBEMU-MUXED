@@ -41,6 +41,10 @@ jobs:
       - name: Rebuild the ticker
         id: build
         run: |
+          set -o pipefail
+          # The README heading is now "## <picture>star.gif</picture> What's NEW!! <picture>...": put it back to the
+          # "## ★ What's NEW!! ★" form ticker_news.py looks for (runner's checkout only, never committed).
+          sed -i "s|^## .*What's NEW!!.*\$|## ★ What's NEW!! ★|" README.md
           python3 docs/90s/ticker_news.py "$RUNNER_TEMP/t" | tee "$RUNNER_TEMP/out.txt"
           if grep -q '^unchanged' "$RUNNER_TEMP/out.txt"; then echo "changed=0" >> "$GITHUB_OUTPUT"; else echo "changed=1" >> "$GITHUB_OUTPUT"; fi
       - name: Upload it
