@@ -6,7 +6,7 @@ REM (@SBOPTS.TXT), not through the small DOS environment, so they can be as long
 IF "%SBEMULOG%"=="" ECHO Starting SBEMU ...
 IF NOT "%SBEMULOG%"=="" ECHO Starting SBEMU - its messages are saved to %SBEMULOG% and shown below ...
 REM CD-Audio of mounted disc images: SBEMU links to the virtual CD drive only if uCDD is already in
-REM memory when SBEMU starts (a drive turned on later from MENU had silent CD music before beta.111).
+REM memory when SBEMU starts (a drive turned on later from MENU had silent CD music before beta.115).
 REM So uCDD is loaded first (no drive letter yet - CDON.BAT gives M: when a disc is mounted) and CD music
 REM is on at 100%; SETTINGS > CD audio volume "Off" writes /VCDA:0 into SBOPTS.TXT, which comes later.
 SET SBCDA=

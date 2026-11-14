@@ -917,7 +917,7 @@ CONTENTS
   sectors from the BIN file, converts 44.1 kHz to the card's rate and mixes
   them with the SC-55 and the game's sound. No memory manager is needed.
 
-  This is on by itself (since beta.113): SC55.BAT / SC55JEM.BAT load the
+  This is on by itself (since beta.115): SC55.BAT / SC55JEM.BAT load the
   virtual CD driver before SBEMU when CDINST was run, and CD music plays at
   100% (SETTINGS > CD audio volume; "Off" turns it off). Before, only
   C:\CDSET\HYBRID.BAT did it, and a disc mounted later from MENU was silent.
