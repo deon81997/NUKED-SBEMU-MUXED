@@ -7,9 +7,10 @@ V=/tmp/perf-$1; rm -rf $V; mkdir -p $V/c/SC55
 cp $TR/rufus/res/freedos/KERNEL.SYS $TR/rufus/res/freedos/COMMAND.COM $V/c/
 cp $R/JEMM/JEMMEX.EXE $R/HDPMI/HDPMI32I.EXE $V/c/SC55/
 cp $P/output/sbdiag.exe $V/c/SC55/SBDIAG.EXE; cp $P/output/midplay.exe $V/c/SC55/MIDPLAY.EXE; cp $2 $V/c/SC55/SBEMU.EXE
+for f in ${PREFILES:-}; do cp $f $V/c/SC55/; done        # PREFILES="a b": extra files into C:\SC55
 python3 $TR/midplay/genmid.py $V/c/T.MID 60 2 > /dev/null
 printf 'DEVICE=C:\\SC55\\JEMMEX.EXE NOEMS\r\nSHELL=C:\\COMMAND.COM C:\\ /E:1024 /P\r\n' > $V/c/CONFIG.SYS
-printf "@ECHO OFF\r\nC:\\SC55\\HDPMI32I -r\r\nCD \\SC55\r\nSBEMU $3 > C:\\SB.TXT\r\nSBDIAG START > NUL\r\nMIDPLAY /S /Q:${4:-40} C:\\T.MID > NUL\r\nSBDIAG > C:\\DIAG.TXT\r\nECHO DONE > C:\\DONE.TXT\r\n" > $V/c/AUTOEXEC.BAT
+printf "@ECHO OFF\r\nC:\\SC55\\HDPMI32I -r\r\nCD \\SC55\r\n${PRECMD:-REM}\r\nSBEMU $3 > C:\\SB.TXT\r\nSBDIAG START > NUL\r\nMIDPLAY /S /Q:${4:-40} C:\\T.MID > NUL\r\nSBDIAG > C:\\DIAG.TXT\r\nECHO DONE > C:\\DONE.TXT\r\n" > $V/c/AUTOEXEC.BAT
 python3 $TR/mkdisk.py build $V/c $V/hd.img 100 > /dev/null
 sed -e 's/^cpu_speed = .*/cpu_speed = 450000000/' -e 's/^cpu_multi = .*/cpu_multi = 4.5/' $TR/86box/p2bls-uhci.cfg > $V/86box.cfg
 bash $TR/86box/run.sh $V > /dev/null

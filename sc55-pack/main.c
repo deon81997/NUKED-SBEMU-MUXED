@@ -151,6 +151,10 @@ static DPMI_ISR_HANDLE MAIN_Int28Handle;   /* DOS idle (prompt, keyboard waits):
 static DPMI_REG MAIN_Int28REG;
 static BOOL MAIN_Int28On;
 static void MAIN_Int28();
+static DPMI_ISR_HANDLE MAIN_Int1CHandle;   /* BIOS user timer tick (18.2 Hz): sound card interrupt watchdog */
+static DPMI_REG MAIN_Int1CREG;
+static BOOL MAIN_Int1COn;
+static void MAIN_Int1C();
 static BOOL MAIN_CdlOn;                     /* CD-Audio link up: INT 28h also serves it */
 static char MAIN_TracePath[260];            /* SBTRACE.TXT (flight recorder), next to SBEMULOG; empty = off */
 static void MAIN_CDService();
@@ -458,8 +462,38 @@ static uint32_t MAIN_SB_MixerData(uint32_t port, uint32_t val, uint32_t out)
 {
     return out ? (SBEMU_Mixer_Write(port, val), val) : (val &=~0xFF, val |= SBEMU_Mixer_Read(port));
 }
+/* Sound card interrupt watchdog. PCI cards raise their IRQ on a level line, but the PIC works on edges: if one
+ * card interrupt is missed (seen in 86Box with the ES1371 about one boot in five, right when a real-mode program
+ * reset the DSP), the card's interrupt status stays set, the line never drops, no new edge comes and SBEMU is
+ * silent until the next reboot - digital sound, SB IRQs (games: "no Sound Blaster found") and MIDI all stop.
+ * When a game talks to the SB and no card interrupt has come for 250 ms, SBEMU acknowledges the card's pending
+ * interrupt itself: the line drops, the next buffer interrupt is a fresh edge and sound goes on. While the card
+ * interrupt runs normally this costs one counter compare per trapped SB port access. */
+static uint32_t MAIN_WdIrqs, MAIN_WdKicks;
+static uint64_t MAIN_WdT;
+static void MAIN_CardWatchdog(void)
+{
+    uint64_t now, cps;
+    if(MAIN_CardIrqs != MAIN_WdIrqs || MAIN_InINT) { MAIN_WdIrqs = MAIN_CardIrqs; MAIN_WdT = 0; return; }
+    now = DIAG_Tsc();
+    if(!MAIN_WdT) { MAIN_WdT = now; return; }
+    cps = DIAG_CyclesPerSec();
+    if(!cps || now - MAIN_WdT < cps / 4) return;
+    MAIN_WdT = now;
+    if(!aui.card_handler || !aui.card_handler->irq_routine) return;
+    {
+        int pending;
+        CLIS();
+        pending = aui.card_handler->irq_routine(&aui);
+        STIL();
+        if(pending)
+            TRACE_Event(TR_IRQ, "sound card interrupt was stuck (no IRQ %d for 250 ms): cleared it (%lu)", aui.card_irq, (unsigned long)++MAIN_WdKicks);
+    }
+}
+
 static uint32_t MAIN_SB_DSP_Reset(uint32_t port, uint32_t val, uint32_t out)
 {
+    MAIN_CardWatchdog();
     return out ? (SBEMU_DSP_Reset(port, val), val) : val;
 }
 static uint32_t MAIN_SB_DSP_Read(uint32_t port, uint32_t val, uint32_t out)
@@ -468,10 +502,12 @@ static uint32_t MAIN_SB_DSP_Read(uint32_t port, uint32_t val, uint32_t out)
 }
 static uint32_t MAIN_SB_DSP_Write(uint32_t port, uint32_t val, uint32_t out)
 {
+    MAIN_CardWatchdog();
     return out ? (SBEMU_DSP_Write(port, val), val) : SBEMU_DSP_WriteStatus(port);
 }
 static uint32_t MAIN_SB_DSP_ReadStatus(uint32_t port, uint32_t val, uint32_t out)
 {
+    MAIN_CardWatchdog();
     return out ? val : (val &=~0xFF, val |= SBEMU_DSP_ReadStatus(port));
 }
 static uint32_t MAIN_SB_DSP_ReadINT16BitACK(uint32_t port, uint32_t val, uint32_t out)
@@ -1339,6 +1375,7 @@ static void MAIN_Cleanup()
         HDPMIPT_InstallIRQRoutedHandlerH(9, &OldRoutedHandle9);
 
     if(MAIN_Int28On) { DPMI_UninstallISR(&MAIN_Int28Handle); MAIN_Int28On = FALSE; }
+    if(MAIN_Int1COn) { DPMI_UninstallISR(&MAIN_Int1CHandle); MAIN_Int1COn = FALSE; }
     CDLINK_Shutdown();
     AU_stop(&aui);
     AU_close(&aui, &fm_aui, &mpu401_aui);
@@ -2187,6 +2224,9 @@ int main(int argc, char* argv[])
             MAIN_CPrintf(YELLOW, "CD-Audio: the uCDD driver (built with --sbemu-link) is not loaded, /VCDA ignored.\n");
     }
     /* flight recorder: SBTRACE.TXT is written from INT 28h while DOS waits at the prompt */
+    /* the watchdog also needs a clock of its own: a game waiting for its SB interrupt touches no port */
+    MAIN_Int1COn = DPMI_InstallRealModeISR(0x1C, MAIN_Int1C, &MAIN_Int1CREG, &MAIN_Int1CHandle, FALSE) == 0;
+    MAIN_D("Sound card watchdog (INT 1Ch): %s\n", MAIN_Int1COn ? "on" : "FAILED");
     {
         const char* tp = getenv("SBEMUTRACE");
         if(tp && *tp) { if(!stricmp(tp, "OFF")) MAIN_TracePath[0] = 0; else if(strlen(tp) < sizeof(MAIN_TracePath)) strcpy(MAIN_TracePath, tp); }
@@ -2561,6 +2601,12 @@ static void MAIN_CDService()
     RESETIF();
     PIC_UnmaskIRQ(aui.card_irq);
     busy = 0;
+}
+
+static void MAIN_Int1C()
+{
+    MAIN_CardWatchdog();
+    DPMI_CallRealModeOldISR(&MAIN_Int1CHandle, &MAIN_Int1CREG);
 }
 
 static void MAIN_Int28()

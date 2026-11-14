@@ -646,7 +646,7 @@ static void details(const IMG* m)
             else if (!m->bin_ok)
                 tui_wrap(x, y, w, h, 0x0C, "\xFE Its BIN is not in this folder. Copy it next to the CUE.");
             else if (m->audio)
-                tui_wrap(x, y, w, h, 0x07, "CD music: start the game with HYBRID.BAT.");
+                tui_wrap(x, y, w, h, 0x07, "CD music plays through SBEMU (SETTINGS > CD audio volume).");
         }
         else if (m->type == T_ISO) tui_wrap(x, y, w, h, 0x07, "Data only. For CD music use a CUE/BIN copy of the disc.");
         else if (m->type == T_BIN) tui_wrap(x, y, w, h, 0x07, "No CUE: data only. Put the disc's .CUE next to it for music.");
@@ -758,7 +758,7 @@ static void c3_details(const IMG* m, char* o, size_t n)
         if (m->files > 1) C3P("Several BIN files: uCDD needs one. Join them with binmerge.");
         else if (!m->bin_ok && m->fixbin[0]) C3P("DOS cannot open the long BIN name. F writes a copy of the CUE that uses %s.", m->fixbin);
         else if (!m->bin_ok) C3P("Its BIN is not in this folder. Copy it next to the CUE.");
-        else if (m->audio) C3P("CD music: start the game with HYBRID.BAT.");
+        else if (m->audio) C3P("CD music plays through SBEMU (SETTINGS > CD audio volume).");
     }
     else if (m->type == T_ISO) C3P("Data only. For CD music use a CUE/BIN copy of the disc.");
     else if (m->type == T_BIN) C3P("No CUE: data only. Put the disc's .CUE next to it for music.");
@@ -818,7 +818,7 @@ static void help(void)
         "F3 style  F4 screen  F6 animation  F7 font",
         "Esc         back to the menu",
         "",
-        "\x0E = CD music (start the game with HYBRID.BAT)",
+        "\x0E = CD music (plays through SBEMU)",
         "! = needs attention    I = has an installer",
         "M: = in the drive now" };
     int n = (int)(sizeof lines / sizeof lines[0]), i, x = 13, w = 56, h = n + 4, y = 5;

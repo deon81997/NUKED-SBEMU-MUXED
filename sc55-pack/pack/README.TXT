@@ -917,8 +917,10 @@ CONTENTS
   sectors from the BIN file, converts 44.1 kHz to the card's rate and mixes
   them with the SC-55 and the game's sound. No memory manager is needed.
 
-  Start with   C:\CDSET\HYBRID.BAT   instead of SC55.BAT. It loads the
-  virtual CD first, then HDPMI and SBEMU with /VCDA:100.
+  This is on by itself (since beta.113): SC55.BAT / SC55JEM.BAT load the
+  virtual CD driver before SBEMU when CDINST was run, and CD music plays at
+  100% (SETTINGS > CD audio volume; "Off" turns it off). Before, only
+  C:\CDSET\HYBRID.BAT did it, and a disc mounted later from MENU was silent.
 
   Test without a game:
          CDIMG TEST.CUE
@@ -928,7 +930,7 @@ CONTENTS
   Limits: audio plays only from .CUE images with one BIN file (PREGAP lines
   are fine since beta.82); mount with CDIMG or GUI (they pass a full path). While DOS itself
   is busy the track keeps playing from a 1.5-second buffer. If the PC hangs
-  when a track starts, remove /VCDA from HYBRID.BAT.
+  when a track starts, set SETTINGS > CD audio volume to Off.
   Since beta.58 the BIN file is read outside the sound card's interrupt
   (before, a PC whose card uses IRQ 9-11 could hang when a track started)
   and also while DOS waits at the prompt, so CDPLAY works there too.
