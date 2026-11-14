@@ -55,6 +55,7 @@ start:
   loop .r
 .rd: mov dx,22Ah
   in al,dx
+  mov [rst],al
   mov al,0D1h
   call dspw
   mov al,40h
@@ -105,6 +106,7 @@ start:
   div dword [cpms]
   cmp eax,2000
   jb .wt
+  call prst
   mov dx,msgno
   mov ah,9
   int 21h
@@ -116,6 +118,7 @@ start:
   sbb edx,[t0+4]
   div dword [cpms]
   call pdec
+  call prst
   mov dx,msgms
   mov ah,9
   int 21h
@@ -172,6 +175,31 @@ pdec:          ; eax decimal
   loop .b
   ret
 
+prst: push ax
+  mov dl,'['
+  mov ah,2
+  int 21h
+  mov bl,[rst]
+  mov al,bl
+  shr al,4
+  call hx
+  mov al,bl
+  and al,0Fh
+  call hx
+  mov dl,']'
+  mov ah,2
+  int 21h
+  pop ax
+  ret
+hx: add al,'0'
+  cmp al,'9'
+  jbe .o
+  add al,7
+.o: mov dl,al
+  mov ah,2
+  int 21h
+  ret
+rst db 0
 msgno db 'no IRQ in 2000 ms',13,10,'$'
 msgms db ' ms to IRQ 7',13,10,'$'
 flag db 0

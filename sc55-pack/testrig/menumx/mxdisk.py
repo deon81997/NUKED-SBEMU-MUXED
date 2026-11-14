@@ -54,6 +54,10 @@ def disc_tree(work, name):
             'ECHO Done.', '']))
     else:
         zipfile.ZipFile(os.path.join(GAMES, '1rap12.zip')).extractall(t)
+        # Apogee's INSTALL.EXE renames RAPSW12.SHR -> .EXE in its own folder, runs it and renames it back:
+        # on a read-only CD (a real one too) that fails ("File not found on the install disk: rapsw12.exe").
+        # Shareware-on-CD compilations shipped the .EXE already renamed; so does this test disc.
+        shutil.copy(os.path.join(t, 'RAPSW12.SHR'), os.path.join(t, 'RAPSW12.EXE'))
     for f in os.listdir(t):                                   # mkcd.py wants 8.3 upper-case names
         if f != f.upper(): os.rename(os.path.join(t, f), os.path.join(t, f.upper()))
     return t

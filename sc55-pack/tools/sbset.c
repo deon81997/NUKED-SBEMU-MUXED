@@ -114,7 +114,7 @@ static Field F[NF] = {
     { "OPL core",        "/FMCORE",  { "0", "1" }, 2, 0, 0, "The accurate Nuked OPL3 core is heavier.", {0}, 0 },
     { "Output jack",     "/O",       { "1", "0" }, 2, 0, 0, "Which output the card uses (HDA / Xonar cards; AC'97 ignores it).", {0}, 0 },
     { "Sample-rate fix", "/FIXTC",   { "1", "0" }, 2, 0, 0, "Rounds games' Sound Blaster rates to 11/22/44 kHz. Off if sound effects are off-pitch.", {0}, 0 },
-    { "CD audio volume", "/VCDA",    { "0", "50", "75", "100", "125", "150", "200" }, 7, 0, 0, "CD-Audio of mounted disc images (needs CDINST's uCDD). HYBRID.BAT sets 100.", {0}, 0 },
+    { "CD audio volume", "/VCDA",    { "100", "0", "50", "75", "125", "150", "200" }, 7, 0, 0, "CD-Audio (music tracks) of mounted disc images. Needs CDINST's virtual CD drive; Off frees a little CPU.", {0}, 0 },
     { "Protected mode",  "/PM",      { "1", "0" }, 2, 0, 0, "Sound for protected-mode games (DOS4GW etc.). Keep on.", {0}, 0 },
     { "Real mode",       "/RM",      { "1", "0" }, 2, 0, 0, "Sound for real-mode games: needs JEMM+QPIEMU or QEMM (SC55JEM / SC55QMM).", {0}, 0 },
     { "Sound card",      "/SC",      CARDS, 0, 0, "Which card to play through, from SBEMU /SCL. Only if you have more than one.", {0}, 0 },
@@ -217,7 +217,7 @@ static void set_labels(void)
     F[F_FM].labels[0] = "Fast (DOSBox DBOPL)"; F[F_FM].labels[1] = "Accurate (Nuked OPL3)";
     onoff(F_OUT, "Speaker / S/PDIF (default)", "Headphone");
     onoff(F_FIXTC, "On (default)", "Off");
-    { static const char* c[7] = { "Off (default)", "50%", "75%", "100%", "125%", "150%", "200%" }; for (i = 0; i < 7; i++) F[F_VCDA].labels[i] = c[i]; }
+    { static const char* c[7] = { "100% (default)", "Off", "50%", "75%", "125%", "150%", "200%" }; for (i = 0; i < 7; i++) F[F_VCDA].labels[i] = c[i]; }
     onoff(F_JOY, "On (default)", "Off");
     F[F_JOYAX].labels[0] = "Left = A, right = B (default)"; F[F_JOYAX].labels[1] = "Left = A, right X + triggers = B";
     F[F_JOYAX].labels[2] = "Left = A, triggers + right Y = B"; F[F_JOYAX].labels[3] = "Left stick only (A)";
