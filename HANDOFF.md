@@ -1,3 +1,4 @@
+VM store (2026-11-13): ready VMs in deon81997/priavte store-dos71, store-freedos, store-w98qi-qemu, store-w98qi-86box (Win98 QI v1.1.0 /P i + /P j), store-86box-irq (440BX/VIA/SiS + SB16|AWE64 + ES1371 + CMI8738); see vms/README.md. Test downloads: FD13-LiteUSB.zip (ibiblio FreeDOS 1.3).
 ## beta.113 (DOS session, 2026-11-13): MENU 3D everywhere + MENU bug hunt fixes - RELEASED from wip/menu3d-2026-11-13
 Tests: host menurun.sh (menuasan + m3menu, ASan/UBSan) PASS; 30-min soaks (soak.py, ~3000 inputs, no CRASH.TXT):
 QEMU hd, QEMU jem, 86Box PII-450 hd, 86Box jem PASS; Win98 SE (QI stock) DOS box via D:\LOOP.BAT, soak.py w 15 min.
