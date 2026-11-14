@@ -2,6 +2,14 @@ NUKED SB-EMU - REAL HARDWARE CHECKLIST (beta.114)
 Things an emulator cannot confirm. Tick each one; for any failure keep
 C:\SC55\BUGREP.TXT (MENU > Tests > Bug report) and CRASH.TXT if there is one.
 
+[ ] beta.121 M-Audio Uno -> real SC-55, wrong notes. SC55 with SETTINGS >
+    MIDI synth = USB MIDI device and /MIDICAP:1 in SBOPTS. MENU status panel
+    shows the Uno ("Uno ... on"); MENU > Tests > USB MIDI test: scale, chord,
+    drums, "USB MIDI" on the SC-55 screen, PASS. Then Duke 3D, Doom/Heretic,
+    Descent, Monkey Island 2, a Miles game, a GS game (each a minute; game
+    start = GS reset): right instruments, no stuck/missing notes. After each:
+    SBDIAG USB > C:\SC55\USB1.TXT, SBDIAG MIDICAP C:\SC55\CAP1.BIN (2, 3..).
+
 DELL LATITUDE D810 (ICH6 UHCI + EHCI, SigmaTel AC'97, Dell keyboard controller)
 [ ] Sound: first note of a MIDI file and first sound of a game after some
     seconds of silence - no click, nothing missing.

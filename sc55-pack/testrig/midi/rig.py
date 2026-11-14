@@ -8,7 +8,9 @@
    env FAKEMIDI_*: passed to fakemidi.py (default = real Uno shape; FAKEMIDI_OLD=1 = the beta.108 fake)
    HC: uhci ohci ehcicc (EHCI + UHCI companions) ehci (no companions: needs --high) xhci
    Boot disk: FreeDOS + JEMMEX + HDPMI32I + the built programs in C:\\SC55 (output/*.exe); after SECONDS the PC is
-   stopped and C:\\OUT.TXT copied out to out-HC.txt here; fakemidi's log is fakemidi-HC.log here."""
+   stopped and C:\\OUT.TXT copied out to out-HC.txt here; fakemidi's log is fakemidi-HC.log here.
+   beta.121: --dir SRC:NAME copies folder SRC to C:\\NAME (games); --dump FILE: when SECONDS are up the guest is
+   paused and its RAM saved to FILE (SBEMU /MIDICAP:1 pages for midicap.py) before it is stopped; --mem MB."""
 import os, socket, subprocess, sys, time, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)); TR = os.path.dirname(HERE); PACK = os.path.dirname(TR)
 R = '/home/claude/rel/NUKEDSB/FILES'; FD = os.path.join(TR, 'rufus/res/freedos')
@@ -33,6 +35,10 @@ def main():
     for f in os.listdir(os.path.join(PACK, 'output')):
         if f.endswith('.exe'): shutil.copy(os.path.join(PACK, 'output', f), W + '/c/SC55/' + f.upper())
     for f in extra: shutil.copy(f, W + '/c/' + os.path.basename(f).upper())
+    dirs = [x.split(':', 1) for x in sys.argv[sys.argv.index('--dir') + 1].split(',')] if '--dir' in sys.argv else []
+    for src, name in dirs: shutil.copytree(src, W + '/c/' + name.upper())
+    dump = sys.argv[sys.argv.index('--dump') + 1] if '--dump' in sys.argv else ''
+    mem = sys.argv[sys.argv.index('--mem') + 1] if '--mem' in sys.argv else '64'
     open(W + '/c/CONFIG.SYS', 'w').write('DEVICE=C:\\SC55\\JEMMEX.EXE NOEMS\r\nSHELL=C:\\COMMAND.COM C:\\ /E:1024 /P\r\n')
     open(W + '/c/AUTOEXEC.BAT', 'w').write('@ECHO OFF\r\nC:\\SC55\\HDPMI32I -r\r\nCD \\SC55\r\n' + auto.replace('|', '\r\n') + '\r\nECHO DONE> C:\\DONE.TXT\r\n')
     dos71 = '--dos71' in sys.argv
@@ -46,7 +52,8 @@ def main():
         open(W + '/AUTOEXEC.BAT', 'w').write('@ECHO OFF\r\nPATH C:\\DOS\r\nC:\\SC55\\HDPMI32I -r\r\nCD \\SC55\r\n' + auto.replace('|', '\r\n') + '\r\nECHO DONE> C:\\DONE.TXT\r\n')
         subprocess.check_call(['mcopy', '-o', '-i', M, W + '/AUTOEXEC.BAT', '::AUTOEXEC.BAT'])
     else:
-        subprocess.check_call([sys.executable, os.path.join(TR, 'mkdisk.py'), 'build', W + '/c', W + '/c.img', '64'], stdout=subprocess.DEVNULL)
+        size = max(64, int(sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(W + '/c') for f in fs) / 1e6 * 1.3) + 16)
+        subprocess.check_call([sys.executable, os.path.join(TR, 'mkdisk.py'), 'build', W + '/c', W + '/c.img', str(size)], stdout=subprocess.DEVNULL)
     port = 5600 + ['uhci', 'ohci', 'ehcicc', 'ehci', 'xhci'].index(hc) + int(os.environ.get('RIGPORT', '0'))
     env = dict(os.environ); env.pop('FAKEMIDI_SPEED', None)
     if high: env['FAKEMIDI_SPEED'] = 'high'
@@ -58,7 +65,7 @@ def main():
                       '-device', 'ich9-usb-uhci2,masterbus=u.0,firstport=2', '-device', 'ich9-usb-uhci3,masterbus=u.0,firstport=4'],
            'ehci': ['-device', 'usb-ehci,id=u'], 'xhci': ['-device', 'qemu-xhci,id=u']}[hc]
     sock = W + '/mon.sock'
-    args = ['qemu-system-i386', '-machine', 'pc', '-cpu', 'pentium3', '-m', '64', '-drive', 'file=%s/c.img,format=raw,if=ide' % W,
+    args = ['qemu-system-i386', '-machine', 'pc', '-cpu', 'pentium3', '-m', mem, '-drive', 'file=%s/c.img,format=raw,if=ide' % W,
             '-display', 'none', '-monitor', 'unix:%s,server,nowait' % sock, '-audiodev', 'none,id=snd', '-device', 'AC97,audiodev=snd'] + ctl + \
            ['-chardev', 'socket,id=midi,host=127.0.0.1,port=%d,reconnect=1' % port, '-device', 'usb-redir,chardev=midi,id=midi,bus=u.0']
     if '--pad' in sys.argv:                 # an Xbox 360 pad next to it (testrig/fakepad.py, A held from 2 s)
@@ -73,6 +80,12 @@ def main():
         mon(sock, 'chardev-add socket,id=midi2,host=127.0.0.1,port=%d' % port)
         mon(sock, 'device_add usb-redir,chardev=midi2,id=midi2,bus=u.0')
     while time.time() - t0 < secs and q.poll() is None: time.sleep(0.5)
+    if dump and q.poll() is None:
+        mon(sock, 'stop'); mon(sock, 'pmemsave 0 %d "%s"' % (int(mem) << 20, dump))
+        for _ in range(60):
+            if os.path.exists(dump) and os.path.getsize(dump) >= int(mem) << 20: break
+            time.sleep(0.5)
+        time.sleep(1)
     q.kill(); q.wait(); fm.kill()
     if '--pad' in sys.argv: pp.kill()
     outn = os.path.join(HERE, 'out-%s%s%s.txt' % (hc, '-hs' if high else '', TAG))

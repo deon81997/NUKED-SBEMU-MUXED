@@ -25,6 +25,7 @@
 #include "form3d.h"
 #include "safewr.h"
 #include "mpuport.h"
+#include "sbemuchk.h"
 #include <unistd.h>
 #include <dir.h>
 #include <stdarg.h>
@@ -60,11 +61,20 @@ enum { F_MAGIC, F_VER, F_KHZ, F_MS, F_ISRN, F_ISRMS, F_ISRMAX, F_H1, F_H2, F_H5,
        F_GOV, F_FX, F_VOICES, F_FRMAX, F_PITFAST, F_EXPM, F_FIFOMIN, F_UNDER, F_REPLAY, F_BEXP, F_BGOT, F_COUNT };
 
 static void mpu_cmd(int c) { outportb(MPU + 1, c); }
+static SBMUSB g_mu, g_mu0; static int g_muon;   /* beta.121: SBEMU /MUSB - the games' MIDI goes to a USB MIDI cable */
 static int sbemu_present(void)
 {
     int p = mpu_find(MPU);
     if (p) MPU = p;
+    g_muon = sbemu_musb(&g_mu) && g_mu.on;
     return p != 0;
+}
+static const char* musb_short(char* b, int n)
+{
+    char l[200];
+    if (!g_muon) { b[0] = 0; return b; }
+    snprintf(b, n, "%s", musb_line(&g_mu, l, sizeof l));
+    return b;
 }
 
 /* ---------------------------------------------------------------- the game's own sound settings
@@ -427,6 +437,11 @@ static void summary_line(const RUN* r, const unsigned long* d, char* out)
     sprintf(out, "%s | %4lus %4.0fHz clock %s gave %5lu | int max %4.1f run %4.1f ms | synth %3.0f%% | silence %4.1fs drop %lu",
             lab, d[F_MS] / 1000, hz, clks, d[F_REPLAY], d[F_ISRMAX] / 1000.0, d[F_STRMAX] / 1000.0, load,
             d[F_FREQ] ? (double)d[F_UNDER] / d[F_FREQ] : 0, d[F_MIDIDROP]);
+    if (g_muon)
+    {   /* USB MIDI: what went to the cable during this test */
+        SBMUSB m; sbemu_musb(&m);
+        sprintf(out + strlen(out), " | USB MIDI %s: %lu sent, %lu lost", m.state, m.sent - g_mu0.sent, (m.drop - g_mu0.drop) + (m.err - g_mu0.err));
+    }
 }
 
 /* the "running" screen shown before each game starts */
@@ -447,6 +462,7 @@ static void draw_run(int i, int n, const RUN* r, const char* status, const char*
     tui_printf(8, 11, 0x1F, "          reverb/chorus %s, speed control %s", r->v[2] ? "on" : "off", r->v[3] ? "on" : "off");
     if (g_bestopt[r->game][0])
         tui_printf(8, 12, 0x17, "Best so far for this game: music clock %d.%d%%", g_bestclk[r->game] / 10, g_bestclk[r->game] % 10);
+    if (g_muon) { char b[100]; tui_putw(8, 13, 64, !strcmp(g_mu.state, "active") ? 0x1A : 0x1C, musb_short(b, sizeof b)); }
     tui_putw(8, 14, 64, 0x1E, status);
     if (note1) tui_putw(8, 15, 64, 0x17, note1);
     if (note2) tui_putw(8, 16, 64, 0x17, note2);
@@ -482,6 +498,7 @@ static int run_one(int i, int n)
     }
 
     appendf("GTSTATE.TXT", "START %d\n", i);
+    if (g_muon) { char b[100]; sbemu_musb(&g_mu0); appendf("GTSTATE.TXT", "STEP %s\n", musb_short(b, sizeof b)); }
     /* measure for the test length, then keep the report */
     mpu_cmd(0xA9); mpu_cmd(g_secs > 255 ? 255 : g_secs);
     send_keys(g);
@@ -750,6 +767,11 @@ static void draw_menu(int row, const int* col)
         SBVALS v = sb_values();
         snprintf(buf, sizeof buf, "Games get SB %X/%d/%d + MIDI %X automatically (Doom, Duke 3D ...).", v.a, v.i, v.d, v.p);
         tui_put(5, 22, 0x13, buf);
+        if (g_muon)
+        {   /* beta.121: the music goes to a USB MIDI cable (SBEMU /MUSB); the SC-55 options above change nothing then */
+            char b[100];
+            tui_putw(4, 23, 76, !strcmp(g_mu.state, "active") ? 0x1A : 0x1C, musb_short(b, sizeof b));
+        }
     }
 
     tui_fill(1, 24, 80, 1, 0x10, ' ');
@@ -843,6 +865,13 @@ int main(int argc, char** argv)
     s = strrchr(g_home, '\\'); if (s) *s = 0; else getcwd(g_home, sizeof g_home);
     load_cfg();
     best_load();
+    sbemu_present();                              /* beta.121: knows about USB MIDI (SBEMU /MUSB) from the start */
+    if (argc > 1 && !strcasecmp(argv[1], "/USB"))
+    {   /* GAMETEST /USB: one line for BUGREP / test rigs - where the games' MIDI goes */
+        char b[200];
+        printf("GAMETEST: %s\n", g_muon ? musb_short(b, sizeof b) : "USB MIDI off (SBEMU without /MUSB:1 or not loaded) - games play the SC-55 / SoundFont");
+        return g_muon && !strcmp(g_mu.state, "active") ? 0 : 1;
+    }
     tui_theme_load(g_home);
     tui_init();
     check_resume();

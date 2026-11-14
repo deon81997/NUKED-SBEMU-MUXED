@@ -275,6 +275,7 @@ typedef struct
     int kind, gseq;                     /* PK_*; Xbox One: sequence number of the packets sent */
     int out, olen, busy, needclr;       /* USB MIDI OUT pipe: q->ep is an OUT endpoint, olen bytes in obuf in flight */
     uint64_t ostart; int otmo, ostall, ofirst;   /* MIDI OUT watchdog (beta.114): transfer start, timeouts / stalls in a row */
+    uint64_t otime; int otok;                     /* MIDI OUT pacing (beta.121): wire bytes allowed now, when last refilled */
     volatile uint32_t* td;              /* its IN TD(s): UHCI 1, OHCI 2, EHCI 2 (used in turn) */
     uint8_t *ibuf, *obuf;
     Ring xin, xout;
@@ -2361,13 +2362,28 @@ static volatile int MidiPipe = -1;      /* the OUT pipe, -1 = no USB MIDI device
 static uint32_t MidiSent, MidiDrop, MidiErr, MidiIn;
 static uint8_t DevRaw[18], MidiRaw[18 + 400]; static int MidiRawN;   /* USBTEST M: the USB MIDI device's raw descriptors */
 int USBPAD_MidiDescriptors(const uint8_t** p) { *p = MidiRaw; return MidiRawN; }
+static void midi_name(int di, uint16_t vid, uint16_t pid);
 static USBPAD_MidiInFn MidiInFn;
+static void (*MidiTap)(uint32_t pk);    /* beta.121: every packet as it goes into an OUT transfer (SBEMU /MIDICAP) */
+void USBPAD_SetMidiTap(void (*fn)(uint32_t pk)) { MidiTap = fn; }
+/* beta.121: what MENU / MPUTEST / SBDIAG show (via SBEMU's AMIS function 05h): the device, where, state, last error */
+static char MidiName[40], MidiWhere[48], MidiLast[80];
+static uint16_t MidiVid, MidiPid;
+static int MidiState;                   /* 0 none seen, 1 in use, 2 unplugged, 3 dropped after errors */
+static uint32_t MidiBusyN, MidiBusyTmo, MidiPaced;
+static uint64_t MidiT0;
+static void midi_last(const char* why)
+{
+    unsigned long s = 0;
+    if (Cps && MidiT0) s = (unsigned long)((tsc() - MidiT0) / Cps);
+    snprintf(MidiLast, sizeof(MidiLast), "%lu s after plug-in: %s", s, why);
+}
 static struct { uint8_t rs, need, n, d[2], sx[3], sxn, insx; } Mp;   /* MidiByte's parser */
 static void midi_put(uint32_t pk)
 {
     unsigned h = MHead;
     if (MidiPipe < 0) return;                       /* nobody to send to: dropped (no stale notes on a later plug-in) */
-    if (h - MTail >= MFIFO) { ++MidiDrop; return; }
+    if (h - MTail >= MFIFO) { if (!MidiDrop++) midi_last("queue full: MIDI dropped (the game did not wait for the MPU-401's busy bit)"); return; }
     MFifo[h & (MFIFO - 1)] = pk;
     MHead = h + 1;
 }
@@ -2375,7 +2391,11 @@ static uint32_t mpk(int cin, int a, int b, int c) { return (uint32_t)cin | (uint
 void USBPAD_MidiByte(uint8_t b)
 {
     if (b >= 0xF8) { midi_put(mpk(0xF, b, 0, 0)); return; }             /* real time: anywhere, state unchanged */
-    if (b == 0xF0) { Mp.insx = 1; Mp.sx[0] = b; Mp.sxn = 1; Mp.rs = 0; return; }
+    if (b == 0xF0)
+    {   /* a new SysEx: one still open (no F7) gets its last bytes out first (beta.121: they were lost) */
+        if (Mp.insx && Mp.sxn) midi_put(mpk(4 + Mp.sxn, Mp.sx[0], Mp.sxn > 1 ? Mp.sx[1] : 0, 0));
+        Mp.insx = 1; Mp.sx[0] = b; Mp.sxn = 1; Mp.rs = 0; Mp.n = 0; return;
+    }
     if (b == 0xF7)
     {
         if (!Mp.insx) return;
@@ -2412,6 +2432,38 @@ void USBPAD_MidiByte(uint8_t b)
     else { midi_put(mpk(Mp.need + 1, Mp.rs, Mp.d[0], Mp.need > 1 ? Mp.d[1] : 0)); Mp.rs = 0; }   /* CIN 2/3: no running status */
 }
 void USBPAD_MidiReset(void) { memset(&Mp, 0, sizeof(Mp)); MTail = MHead; }
+int  USBPAD_MidiRoom(void) { return MidiPipe < 0 ? MFIFO : MFIFO - (int)(MHead - MTail); }
+static void mout_poll(int k);
+/* beta.121: the MPU-401's "busy" (DRR) bit for /MUSB: the queue is nearly full, so the game waits as it would for a
+ * real MPU-401 + a 31250-baud cable instead of losing MIDI. From the port trap (like the game port's light poll):
+ * the OUT pipe is moved on here too, so a game that polls with interrupts off still gets through. Never longer
+ * than 0.2 s in a row (a device that stopped taking MIDI cannot hang the game: the bytes are dropped then). */
+#define MBUSY_ROOM 96
+int USBPAD_MidiBusy(void)
+{
+    static uint64_t since, lastpump;
+    uint64_t t;
+    if (MidiPipe < 0 || MFIFO - (int)(MHead - MTail) >= MBUSY_ROOM) { since = 0; return 0; }
+    t = tsc();
+    if (Inited && !Busy && t - lastpump > us2c(200))
+    {
+        lastpump = t;
+        Busy = 1; Light = 1; mout_poll(MidiPipe); Busy = 0;
+        if (MidiPipe < 0 || MFIFO - (int)(MHead - MTail) >= MBUSY_ROOM) { since = 0; return 0; }
+    }
+    if (!since) { since = t; ++MidiBusyN; }
+    if (t - since > us2c(200000)) { if (!MidiBusyTmo++) midi_last("busy for 0.2 s (device not taking MIDI): game let through"); return 0; }
+    return 1;
+}
+void USBPAD_MidiInfo(USBPAD_MidiInfoT* m)
+{
+    memset(m, 0, sizeof(*m));
+    m->state = MidiState; m->vid = MidiVid; m->pid = MidiPid;
+    snprintf(m->name, sizeof(m->name), "%s", MidiName); snprintf(m->where, sizeof(m->where), "%s", MidiWhere);
+    snprintf(m->last, sizeof(m->last), "%s", MidiLast);
+    m->sent = MidiSent; m->dropped = MidiDrop; m->errors = MidiErr; m->in = MidiIn;
+    m->queued = MidiPipe < 0 ? 0 : MHead - MTail; m->busy = MidiBusyN; m->busytmo = MidiBusyTmo; m->paced = MidiPaced;
+}
 int  USBPAD_MidiPending(void) { return MidiPipe < 0 ? 0 : (int)(MHead - MTail); }
 void USBPAD_SetMidiIn(USBPAD_MidiInFn fn) { MidiInFn = fn; }
 void USBPAD_MidiStats(uint32_t* sent, uint32_t* dropped, uint32_t* errors, uint32_t* in)
@@ -2423,6 +2475,8 @@ void USBPAD_MidiStats(uint32_t* sent, uint32_t* dropped, uint32_t* errors, uint3
 }
 
 #define ILEN(q) ((q)->mps > 64 ? 64 : (q)->mps)
+#define MPACE_BPS 3125ULL               /* MIDI cable: 31250 baud, 10 bits a byte */
+#define MPACE_BURST 128
 #define MOUTB 256                       /* MIDI OUT: bytes per transfer (64 event packets; obuf = the pipe's ibuf area) */   /* IN transfer size (high-speed bulk MIDI: 512-byte packets, 64 asked for) */
 static int ArmSync;   /* arm_in: oslow rewrite right now (start_in has skipped the ED and waited already) */
 static void arm_in(int k)
@@ -2582,7 +2636,7 @@ static void pipe_stop(int k)
     q->used = 0;
     if (q->type == PT_PAD) memset((void*)&Pad[q->pad], 0, sizeof(Pad[0]));
     else if (q->type == PT_KBD) { if (KbFn) KbFn(k, none); }       /* let go of every key it held */
-    else if (q->type == PT_MOUT) { MidiPipe = -1; q->busy = 0; }
+    else if (q->type == PT_MOUT) { MidiPipe = -1; q->busy = 0; if (MidiState == 1) { MidiState = 2; midi_last("unplugged"); } }
     else if (q->type == PT_MOUSE && MsFn) MsFn(0, 0, 0, 0);
     trace("-%s ", pipe_name(q));
     snprintf(Desc, sizeof(Desc), "%s %04X:%04X unplugged", pipe_name(q), D[q->dev].vid, D[q->dev].pid);
@@ -2721,6 +2775,25 @@ static void midi_drop(int k, const char* why)
         if (P[j].used && P[j].dev == dev && (P[j].type == PT_MOUT || P[j].type == PT_MIDI)) pipe_stop(j);
     snprintf(Desc, sizeof(Desc), "USB MIDI %04X:%04X dropped: %s", D[dev].vid, D[dev].pid, why);
     MTail = MHead;
+    MidiState = 3; midi_last(why);
+}
+/* the device's product name (string descriptor iProduct, English), else a known name, else "USB MIDI device" */
+static void midi_name(int di, uint16_t vid, uint16_t pid)
+{
+    int ip = (DevRaw[8] | DevRaw[9] << 8) == vid && (DevRaw[10] | DevRaw[11] << 8) == pid ? DevRaw[15] : 0;
+    MidiName[0] = 0;
+    if (ip && control(di, 0x80, 6, (uint16_t)(0x0300 | ip), 0x0409, 64) == 0)
+    {
+        const uint8_t* b = CBuf + 16;
+        int i, n = 0, len = b[0] > 64 ? 64 : b[0];
+        if (b[1] == 3)
+            for (i = 2; i + 1 < len && n < (int)sizeof(MidiName) - 1; i += 2)
+                MidiName[n++] = (b[i] >= 32 && b[i] < 127 && !b[i + 1] && b[i] != '|') ? (char)b[i] : '?';
+        MidiName[n] = 0;
+        while (n && MidiName[n - 1] == ' ') MidiName[--n] = 0;
+    }
+    if (!MidiName[0]) snprintf(MidiName, sizeof(MidiName), "%s", vid == 0x0763 && pid == 0x0150 ? "M-Audio USB Uno" : "USB MIDI device");
+    trace("[midi] name: %s\n", MidiName);
 }
 /* USB MIDI OUT pipe: collect the transfer in flight, start the next one (never waits) */
 static void mout_poll(int k)
@@ -2732,6 +2805,7 @@ static void mout_poll(int k)
         if (Light) return;
         if (HC[q->hc].type == T_XHCI || ++q->otmo >= MOUT_DROP) { midi_drop(k, "OUT not taken by the device (NAK) 3 times for 0.5 s"); return; }
         trace("[midi] OUT transfer not taken in 0.5 s (%d in a row): taken back, dropped; CLEAR_FEATURE next\n", q->otmo);
+        midi_last("OUT not taken in 0.5 s (MIDI piece lost)");
         TRACE_Event(TR_USB, "midi: OUT not taken in 0.5 s (%d)", q->otmo);
         mout_cancel(k);
         q->busy = 0; q->needclr = 1; ++MidiErr;
@@ -2765,6 +2839,7 @@ static void mout_poll(int k)
             ++MidiErr;
             if (r == -2) { q->needclr = 1; if (++q->ostall >= MOUT_STALLS) { midi_drop(k, "OUT stalled 8 times in a row"); return; } }
             mlog(r == -2 ? "OUT stall: CLEAR_FEATURE next" : "OUT transfer error (CRC / timeout / babble): dropped");
+            midi_last(r == -2 ? "OUT stall (MIDI piece lost)" : "OUT transfer error (MIDI piece lost)");
         }
         else
         {
@@ -2786,11 +2861,32 @@ static void mout_poll(int k)
     maxn = MOUTB / 4;
     if (HC[q->hc].type == T_UHCI && (unsigned)q->mps * 16 < MOUTB) maxn = (unsigned)q->mps * 16 / 4;   /* 16 TDs at most */
     if (n > maxn) n = maxn;
+    {   /* beta.121 pacing: never more MIDI than a 31250-baud cable carries (3125 bytes/s, 10 bits a byte) plus a
+         * 128-byte burst; the Uno's own buffer is small and it is fed the way its DIN socket drains */
+        static const uint8_t cnt[16] = { 0, 0, 2, 3, 3, 1, 2, 3, 3, 3, 3, 3, 2, 2, 3, 1 };
+        uint64_t now = tsc();
+        unsigned j, w;
+        if (!q->otime || !Cps) { q->otime = now; q->otok = MPACE_BURST; }
+        else
+        {
+            uint64_t add = (now - q->otime) * MPACE_BPS / Cps;
+            if (add) { q->otime += add * Cps / MPACE_BPS; q->otok = add + (uint64_t)q->otok > MPACE_BURST ? MPACE_BURST : q->otok + (int)add; }
+        }
+        for (j = 0, w = 0; j < n; ++j)
+        {
+            unsigned b = cnt[MFifo[(t + j) & (MFIFO - 1)] & 15];
+            if ((int)(w + b) > q->otok) break;
+            w += b;
+        }
+        if (!j) { ++MidiPaced; return; }                              /* the cable is still full: next poll */
+        n = j; q->otok -= (int)w;
+    }
     for (i = 0; i < n; ++i)
     {
         uint32_t pk = MFifo[(t + i) & (MFIFO - 1)];
         q->obuf[i * 4] = (uint8_t)pk; q->obuf[i * 4 + 1] = (uint8_t)(pk >> 8);
         q->obuf[i * 4 + 2] = (uint8_t)(pk >> 16); q->obuf[i * 4 + 3] = (uint8_t)(pk >> 24);
+        if (MidiTap) MidiTap(pk);
     }
     MTail = t + n;
     q->olen = (int)n * 4;
@@ -3474,7 +3570,13 @@ static int enumerate_(int di)
         }
         q->since = tsc();
         start_in(k);
-        if (q->type == PT_MOUT) { MTail = MHead; MidiPipe = k; }
+        if (q->type == PT_MOUT)
+        {
+            MTail = MHead; MidiPipe = k;
+            MidiVid = vid; MidiPid = pid; MidiState = 1; MidiLast[0] = 0; MidiT0 = tsc();
+            snprintf(MidiWhere, sizeof(MidiWhere), "%s", where(di));
+            midi_name(di, vid, pid);
+        }
         trace("+%s ", pipe_name(q));
         if (!Desc[0]) snprintf(Desc, sizeof(Desc), "%s %04X:%04X on %s", pipe_name(q), vid, pid, where(di));
         TRACE_Event(TR_USB, "+ %s %04X:%04X on %s", pipe_name(q), vid, pid, where(di));

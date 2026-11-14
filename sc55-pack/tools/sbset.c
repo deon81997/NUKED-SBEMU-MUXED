@@ -32,6 +32,7 @@
 #include <sys/stat.h>
 #endif
 #include "safewr.h"
+#include "sbemuchk.h"
 #ifndef HOSTTEST
 #include "theme.h"
 #endif
@@ -837,7 +838,13 @@ static void draw_row(int i, int sel)
 /* a combination that is too heavy for a Pentium M class CPU, or "" */
 static const char* warning(void)
 {
-    if (F[F_SYNTH].cur == 4) return "USB MIDI: plug the cable in (any USB port); with /JOY:0 there is no USB in DOS.";
+    if (F[F_SYNTH].cur == 4)
+    {   /* beta.121: what the running SBEMU sees now (AMIS 05h), else how to get there */
+        static char w[200]; static int asked; static SBMUSB m; static int ok;
+        if (!asked) { asked = 1; ok = sbemu_musb(&m); }
+        if (ok && m.on) return musb_line(&m, w, sizeof w);
+        return "USB MIDI: plug the cable in (any USB port); with /JOY:0 there is no USB in DOS.";
+    }
     if (F[F_SYNTH].cur >= 2) return "MT-32 games: choose \"Roland MT-32 / LAPC-I\" in the game's setup, not General MIDI.";
     if (!using_sf() && F[F_RATE].cur >= 2) return "Heavy: the SC-55 at 44.1/48 kHz is too much for most laptops. Use 22050 Hz.";
     if (!using_sf() && F[F_ROMSET].cur && strstr(F[F_ROMSET].vals[F[F_ROMSET].cur], "mk2")) return "Note: the SC-55mkII ROM set is heavier than the original SC-55.";

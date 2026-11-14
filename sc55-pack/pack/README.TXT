@@ -557,6 +557,8 @@ CONTENTS
      /MUSB:1               send MIDI to a USB MIDI device instead (class
                            compliant, e.g. M-Audio Uno; section 10b). Needs
                            /JOY:1; the SC-55 is not loaded then.
+     /MIDICAP:1            record the game's MPU-401 bytes and the USB MIDI
+                           packets for SBDIAG MIDICAP (bug reports; 320 KB)
      /VMPU[:0]             virtual MPU-401 on (SC-55 or SoundFont); /VMPU=0
                            turns it off. Also switched on by /VSCROM, /VSCSET
                            or /VSF.
@@ -1213,6 +1215,26 @@ CONTENTS
    - The old M-Audio MidiSport / MidiSport Uno (0763:1010 etc., needs a
      firmware download) is not class compliant: USBTEST says so by name.
      The USB Uno (0763:0150) is the class-compliant one.
+   - beta.121 (wrong notes on a real SC-55 fixed): SBEMU now sends MIDI no
+     faster than the 31250-baud cable carries and tells the game to wait
+     (the MPU-401's busy bit) while its queue is nearly full, as a real
+     MPU-401 does - before, a game's burst at start (GS reset, set-up
+     SysEx, all channels' instruments) overflowed the queue and notes,
+     instrument changes and SysEx pieces were lost. Intelligent-mode games
+     (they never switch the MPU-401 to UART mode) get every command ACKed,
+     version/revision answered, "send data" messages and SysEx passed on
+     and command parameters kept out of the music; the MPU-401's own
+     sequencer is not emulated. A SysEx that starts before the last one
+     ended no longer loses bytes.
+   - Where to see it: MENU's status panel (device, on / plug in / out /
+     error), MENU > Tests > "USB MIDI test (MPUTEST /USB)", SETTINGS (MIDI
+     synth line), SBDIAG USB (device, port, state, counters, last error),
+     GAMETEST (screen + GAMETEST.TXT), SC55MENU /STATUS and BUGREP.TXT.
+   - For a bug report: start SBEMU with /MIDICAP:1 too (SET SBOPTS or
+     SETTINGS > SBEMU options), play the game for a minute, quit it, then
+     SBDIAG MIDICAP C:\SC55\MIDICAP.BIN: it holds what the game wrote to
+     the MPU-401 and every USB MIDI packet SBEMU sent (about 100,000 bytes
+     each; it stops when full).
 
 
 =============================================================================

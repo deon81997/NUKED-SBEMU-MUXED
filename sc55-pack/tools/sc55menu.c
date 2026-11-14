@@ -35,6 +35,8 @@ static int MPU = 0x330;          /* the MPU-401 port from the saved settings (/P
 static char g_home[200];
 static int  g_running;          /* SBEMU is loaded (AMIS signature or its MPU-401 answers) */
 static SBCHK g_sbc;             /* how it was found: state (loaded / not / unknown), version, mode, MPU port */
+static SBMUSB g_musb;           /* beta.121: SBEMU /MUSB state (AMIS 05h): device, port, active, last error */
+static int g_musb_ok;           /* SBEMU answered 05h */
 static char g_lasterr[80];      /* why SBEMU last refused to load (SBLOG.TXT), "" = no error */
 static char g_opts[300];        /* saved settings (SBOPTS.TXT / SBOPTS.BAT) */
 static char g_optfile[16];      /* "@SBOPTS.TXT" or "@SBOPTS.BAT" or "" */
@@ -81,6 +83,7 @@ static int sbemu_present(void)
      * did not reach SBEMU's trap), then its MPU-401: the saved /P first, then BLASTER's P, then the usual ports */
     sbemu_check(&g_sbc, MPU, g_win);
     if (g_sbc.mpu) MPU = g_sbc.mpu;
+    g_musb_ok = g_sbc.amis > 0 && sbemu_musb(&g_musb);
     ui_log("sbemu %s amis=%d mpu=%X %s", g_sbc.state == SBC_LOADED ? "loaded" : g_sbc.state == SBC_UNKNOWN ? "unknown" : "not", g_sbc.amis, g_sbc.mpu, g_sbc.info);
     return g_sbc.state == SBC_LOADED;
 }
@@ -393,6 +396,13 @@ static void build_menu(void)
         " SoundFont. A quick way to hear the synth without a game.", IT_BAT, "MIDPLAY.EXE /B", 1, 0, NULL);
     add(C_TESTS, "Test tune (MPUTEST)", "Plays a short tune on the MPU-401 (found on whatever port SBEMU uses). If you hear it, General MIDI works.",
         IT_BAT, "MPUTEST.EXE", 1, 0, NULL);
+    if (g_musb_ok && g_musb.on)
+    {   /* beta.121: USB MIDI (SBEMU /MUSB) */
+        static char d[400]; char l[200];
+        snprintf(d, sizeof d, "%s. Plays MPUTEST's tune, a GS reset and a SysEx through SBEMU to the USB MIDI cable and shows"
+            " what the device took (sent / dropped / errors). Your synth (e.g. an SC-55) on the cable's MIDI OUT should play it.", musb_line(&g_musb, l, sizeof l));
+        add(C_TESTS, "USB MIDI test (MPUTEST /USB)", d, IT_BAT, "MPUTEST.EXE /USB", 1, 1, NULL);
+    }
     add(C_TESTS, "Joystick test (JOYTEST)", "Shows what games see on the gameport: the four axes and four buttons, live."
         " With the USB pad on (Settings > Joystick) move the sticks and press A/B/X/Y. Esc or Q quits.",
         IT_BAT, "JOYTEST.EXE", 1, 0, NULL);
@@ -510,13 +520,25 @@ static void draw_status(void)
     {
         tui_put(61, 2, 0x0A, "\xFE Loaded");
         if (!g_sbc.mpu) tui_put(70, 2, 0x0E, "MPU ?");   /* found by AMIS only: its MPU-401 does not answer here */
+        if (!g_sbc.mpu && g_musb_ok && g_musb.on == 1) tui_put(70, 2, 0x0E, "USB  ");   /* /MUSB: the line below says */
         sbemu_load();
         if (g_load >= 0)
             tui_printf(70, 2, g_load < 500 ? 0x0A : g_load < 800 ? 0x0E : 0x0C, "CPU %3d%%", (g_load + 5) / 10 > 999 ? 999 : (g_load + 5) / 10);
     }
     else tui_put(61, 2, g_sbc.state == SBC_UNKNOWN ? 0x0E : 0x0C, g_sbc.state == SBC_UNKNOWN ? "\xFE Unknown" : "\xFE Not loaded");
     const char* mt = opt_val("/VMT32", "");
-    if (!strcmp(opt_val("/MUSB", "0"), "1")) tui_printf(61, 3, 0x07, "USB MIDI device");
+    if (g_running && g_musb_ok && g_musb.on)
+    {   /* beta.121: what the running SBEMU really does with USB MIDI (was the saved setting only) */
+        int act = !strcmp(g_musb.state, "active"), wait = !strcmp(g_musb.state, "waiting");
+        const char* nm = g_musb.name[0] ? g_musb.name : "device";
+        if (!strncasecmp(nm, "M-Audio ", 8)) nm += 8;
+        if (!strncasecmp(nm, "USB ", 4)) nm += 4;
+        if (g_musb.on == 2) tui_put(61, 3, 0x0C, "USB MIDI: USB off");
+        else if (wait) tui_put(61, 3, 0x0E, "USB MIDI: plug in");
+        else tui_printf(61, 3, act ? (g_musb.drop || g_musb.err ? 0x0E : 0x0A) : 0x0C, "%c%.11s %.5s", act ? '\xFE' : 'x', nm,
+            act ? (g_musb.last[0] ? "err" : "on") : !strcmp(g_musb.state, "unplugged") ? "out" : "error");
+    }
+    else if (!strcmp(opt_val("/MUSB", "0"), "1")) tui_printf(61, 3, 0x07, "USB MIDI device");
     else if (mt[0] && strcmp(mt, "0") && strcasecmp(mt, "OFF")) tui_printf(61, 3, 0x07, "%s (Munt)", !strcasecmp(mt, "CM32L") ? "CM-32L" : "MT-32");
     else if (sf[0]) { const char* b = strrchr(sf, '\\'); tui_printf(61, 3, 0x07, "SF %.14s", b ? b + 1 : sf); }
     else tui_printf(61, 3, 0x07, "SC-55 %.11s", opt_val("/VSCSET", "auto"));
@@ -1162,6 +1184,7 @@ int main(int argc, char** argv)
         printf("MENU SBEMU: %s%s (AMIS %s, MPU-401 %s%X)%s%s\n", sbemu_word(), g_win ? " [Windows DOS box]" : "",
             g_sbc.amis > 0 ? "found" : g_sbc.amis < 0 ? "failed" : "none", g_sbc.mpu ? "at " : "no answer, tried ", g_sbc.mpu ? g_sbc.mpu : MPU,
             g_sbc.info[0] ? " " : "", g_sbc.info);
+        if (g_musb_ok) { char l[200]; printf("MENU %s (MPU %s, %lu queued, waited %lu times)\n", musb_line(&g_musb, l, sizeof l), g_musb.mpu, g_musb.q, g_musb.busy); }
         return g_sbc.state == SBC_LOADED ? 0 : g_sbc.state == SBC_UNKNOWN ? 2 : 1;
     }
     if (!g_win) { wc_set_home(g_home); wc_startup("MENU", 0); }             /* VESA write-combining by WCSET.CFG (AUTO) */

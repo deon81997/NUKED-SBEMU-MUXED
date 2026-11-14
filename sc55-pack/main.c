@@ -530,6 +530,95 @@ static int mpu_dbg_ctr = 0;
 #endif
 
 static BOOL MAIN_MUSB;   /* /MUSB: MPU-401 data bytes also go to the USB MIDI device */
+
+/* ---- /MUSB MPU-401 front end (beta.121). Before, every data-port byte went to USB and only FFh/3Fh got an ACK:
+ * intelligent-mode commands got no ACK and their parameter bytes (tempo etc.) landed in the MIDI stream as notes,
+ * and the status port never said "busy", so a game wrote faster than a 31250-baud cable takes and the queue
+ * overflowed (lost program changes / note-offs / SysEx pieces = wrong notes). Now:
+ *  - UART mode (after 3Fh), or a game that never sent an intelligent-mode command: every data byte is MIDI;
+ *  - intelligent mode: every command ACKed (FEh), version / revision / tempo requests answered, "want to send data"
+ *    D0h-D7h = one MIDI message follows (running status kept), DFh = a SysEx follows, the parameter byte of E0h..EFh
+ *    swallowed, sequencer track data ignored (the MPU-401's own sequencer is not emulated; counted in IGN=);
+ *  - status bit 6 (busy) while the USB queue is nearly full (USBPAD_MidiBusy, bounded to 0.2 s). */
+static uint8_t MU_Uart, MU_Intel, MU_Want, MU_Rs, MU_Q[4];
+static int MU_Need, MU_Qn;
+static uint32_t MU_Ign;
+static void MU_Queue(uint8_t b) { if (MU_Qn < 4) MU_Q[MU_Qn++] = b; }
+static uint8_t MU_Pop(void) { uint8_t b; int i; if (!MU_Qn) return 0xFE; b = MU_Q[0]; for (i = 1; i < MU_Qn; i++) MU_Q[i - 1] = MU_Q[i]; MU_Qn--; return b; }
+static int MU_Len(uint8_t st) { return st >= 0xF0 ? (st == 0xF2 ? 2 : st == 0xF1 || st == 0xF3 ? 1 : 0) : (st & 0xE0) == 0xC0 ? 1 : 2; }
+static void MU_Cmd(uint8_t c)
+{
+    if (c == 0xFF) { MU_Uart = 0; MU_Intel = 0; MU_Want = 0; MU_Qn = 0; MU_Queue(0xFE); return; }
+    MU_Queue(0xFE);                                  /* SBEMU's SC-55 MPU-401 also ACKs every command, in both modes */
+    if (MU_Uart) return;
+    if (c == 0x3F) { MU_Uart = 1; MU_Want = 0; return; }
+    if (c >= 0xA0 && c <= 0xAF) { MU_Queue(c == 0xAC ? 0x15 : c == 0xAD ? 0x01 : c == 0xAF ? 100 : 0); return; }   /* requests: data after the ACK */
+    if (c >= 0xB0 && c <= 0xBF) return;            /* SBEMU's own (MENU load report): not a game */
+    MU_Intel = 1;
+    if (c >= 0xD0 && c <= 0xD7) { MU_Want = 1; MU_Need = -1; }
+    else if (c == 0xDF) MU_Want = 2;
+    else if (c >= 0xE0 && c <= 0xEF) MU_Want = 3;
+    else MU_Want = 0;
+}
+static void MU_Data(uint8_t b)
+{
+    if (MU_Uart || !MU_Intel) { USBPAD_MidiByte(b); return; }
+    switch (MU_Want)
+    {
+    case 1:                                          /* one MIDI message */
+        if (b >= 0xF8) { USBPAD_MidiByte(b); return; }
+        if (MU_Need < 0)
+        {
+            if (b >= 0x80) { MU_Want = 0; if (b >= 0xF0) { MU_Ign++; return; } MU_Rs = b; MU_Need = MU_Len(b); USBPAD_MidiByte(b); if (MU_Need) MU_Want = 1; return; }
+            if (!MU_Rs) { MU_Want = 0; MU_Ign++; return; }
+            MU_Need = MU_Len(MU_Rs); USBPAD_MidiByte(MU_Rs);   /* running status: the USB packet needs the status anyway */
+        }
+        USBPAD_MidiByte(b);
+        if (--MU_Need <= 0) MU_Want = 0;
+        return;
+    case 2: USBPAD_MidiByte(b); if (b == 0xF7) MU_Want = 0; return;   /* SysEx up to F7 */
+    case 3: MU_Want = 0; return;                     /* the command's parameter byte */
+    default: if (!MU_Ign++) TRACE_Event(TR_USB, "midi: MPU intelligent-mode sequencer data ignored"); return;
+    }
+}
+
+/* ---- /MIDICAP:1 (beta.121): what the game writes to the MPU-401 and what goes out to the USB MIDI device, in 4 KB
+ * pages that say what they are ("SBMIDCAP", kind G/U, page number), so a test rig finds them in a memory dump and
+ * SBDIAG MIDICAP reads them through AMIS function 06h. Stops when full. Off = one pointer test per MPU byte. */
+#define CAP_PG 4096
+#define CAP_HDR 20
+#define CAP_GP 48
+#define CAP_UP 32
+static uint8_t* MAIN_Cap;
+static int MAIN_CapG, MAIN_CapU;                    /* bytes used in all G / U pages so far */
+static void MAIN_CapPut(int kind, const uint8_t* d, int n)
+{
+    int* used = kind ? &MAIN_CapU : &MAIN_CapG, per = CAP_PG - CAP_HDR, pg = *used / per, off = *used % per;
+    int maxpg = kind ? CAP_UP : CAP_GP;
+    uint8_t* p;
+    if (off + n > per) { *used += per - off; pg++; off = 0; }
+    if (pg >= maxpg) return;
+    p = MAIN_Cap + (size_t)((kind ? CAP_GP : 0) + pg) * CAP_PG;
+    memcpy(p + CAP_HDR + off, d, (size_t)n);
+    *used += n;
+    { uint32_t u = (uint32_t)(off + n); memcpy(p + 16, &u, 4); }
+}
+static void MAIN_CapTap(uint32_t pk) { uint8_t b[4] = { (uint8_t)pk, (uint8_t)(pk >> 8), (uint8_t)(pk >> 16), (uint8_t)(pk >> 24) }; if (MAIN_Cap) MAIN_CapPut(1, b, 4); }
+static void MAIN_CapInit(void)
+{
+    int i;
+    uint8_t* raw = (uint8_t*)malloc((size_t)(CAP_GP + CAP_UP + 1) * CAP_PG);
+    if (!raw) return;
+    MAIN_Cap = (uint8_t*)(((uintptr_t)raw + CAP_PG - 1) & ~(uintptr_t)(CAP_PG - 1));
+    memset(MAIN_Cap, 0, (size_t)(CAP_GP + CAP_UP) * CAP_PG);
+    for (i = 0; i < CAP_GP + CAP_UP; i++)
+    {
+        uint8_t* p = MAIN_Cap + (size_t)i * CAP_PG; uint32_t n = (uint32_t)(i < CAP_GP ? i : i - CAP_GP);
+        memcpy(p, "SBMIDCAP", 8); memcpy(p + 8, &n, 4); p[12] = i < CAP_GP ? 'G' : 'U';
+    }
+    USBPAD_SetMidiTap(MAIN_CapTap);
+}
+
 static uint32_t MAIN_MPU_330(uint32_t port, uint32_t val, uint32_t out)
 {
 #if MPU_DEBUG
@@ -553,7 +642,8 @@ static uint32_t MAIN_MPU_330(uint32_t port, uint32_t val, uint32_t out)
     if (mpu401_aui.mpu401 && mpu401_aui.card_handler->card_mpu401_write)
       mpu401_aui.card_handler->card_mpu401_write(&mpu401_aui, 0, (uint8_t)(val & 0xff));
     ser_putbyte((int)(val & 0xff));
-    if (MAIN_MUSB) USBPAD_MidiByte((uint8_t)val);   /* /MUSB: queued only, sent from the next USB poll */
+    if (MAIN_Cap) { uint8_t r[2] = { 0, (uint8_t)val }; MAIN_CapPut(0, r, 2); }
+    if (MAIN_MUSB) { DIAG_Midi(0); MU_Data((uint8_t)val); }   /* /MUSB: queued only, sent from the next USB poll */
     return 0;
   } else {
     uint8_t val, hwval, hwval_valid = 0;
@@ -573,8 +663,13 @@ static uint32_t MAIN_MPU_330(uint32_t port, uint32_t val, uint32_t out)
     }
     if (hwval_valid)
       return hwval;
-    else
-      return val;
+    if (MAIN_MUSB)
+    {
+      uint8_t b;
+      if (DIAG_ReadByte(&b)) return b;              /* SBDIAG / GAMETEST reports (beta.121: they work with /MUSB too) */
+      return MU_Pop();
+    }
+    return val;
   }
 }
 static uint32_t MAIN_MPU_331(uint32_t port, uint32_t val, uint32_t out)
@@ -594,6 +689,15 @@ static uint32_t MAIN_MPU_331(uint32_t port, uint32_t val, uint32_t out)
   if (out) {
     if (mpu401_aui.mpu401 && mpu401_aui.card_handler->card_mpu401_write)
       mpu401_aui.card_handler->card_mpu401_write(&mpu401_aui, 1, (uint8_t)(val & 0xff));
+    if (MAIN_Cap) { uint8_t r[2] = { 1, (uint8_t)val }; MAIN_CapPut(0, r, 2); }
+    if (MAIN_MUSB)
+    {   /* SBEMU's measuring side channel first (as the SC-55's MPU-401 does), then the MPU-401 itself */
+      DIAG_ResetFlush((uint8_t)val);
+      /* ACh / ADh are also GAMETEST's (key script clear / Esc watch): an intelligent-mode game asking for the
+       * version / revision still gets its ACK + answer (GAMETEST reads nothing after them; the next reset clears) */
+      if (DIAG_Command((uint8_t)val) && (val & 0xFF) != 0xAC && (val & 0xFF) != 0xAD) return 0;
+      MU_Cmd((uint8_t)val);
+    }
     if (val == 0xff) { // Reset
 #if MPU_DEBUG
       mpu_dbg_ctr = 0;
@@ -612,6 +716,8 @@ static uint32_t MAIN_MPU_331(uint32_t port, uint32_t val, uint32_t out)
     if (!mpu401_aui.mpu401_softread)
       return hwval;
   }
+  if (MAIN_MUSB)
+    return (MU_Qn ? 0 : 0x80) | (USBPAD_MidiBusy() ? 0x40 : 0);
   if ((mpu_state & 3) == 0) {
     return 0x80;
   } else {
@@ -795,6 +901,7 @@ struct MAIN_OPT
     "/MCOM", "UART mode MPU-401 COM port (1=COM1, 2=COM2, 3=COM3, 4=COM4, 9:HW MPU only, otherwise base address)", 9, 0,
     "/COML", "List installed COM ports", 0, MAIN_SETCMD_HIDDEN,
     "/MUSB", "UART mode MPU-401 to a USB MIDI device (class compliant, e.g. M-Audio Uno; 1=on, 0=off; needs /JOY:1, replaces the SC-55)", 0, MAIN_SETCMD_BASE10,
+    "/MIDICAP", "Record the game's MPU-401 bytes and the USB MIDI packets for a bug report (SBDIAG MIDICAP file; 1=on)", 0, MAIN_SETCMD_BASE10,
 #if MPU_DEBUG
     "/MDBG", "Enable MPU-401 debugging (0 to disable, 1 or 2 to enable)", 0, 0,
 #endif
@@ -875,6 +982,7 @@ enum EOption
     OPT_MPUCOMPORT,
     OPT_COMPORTLIST,
     OPT_MUSB,
+    OPT_MIDICAP,
 #if MPU_DEBUG
     OPT_MDBG,
 #endif
@@ -2003,6 +2111,12 @@ int main(int argc, char* argv[])
     }
 
     MAIN_MUSB = MAIN_Options[OPT_MUSB].value && MAIN_Options[OPT_JOY].value && MAIN_Options[OPT_USB].value;
+    if(MAIN_Options[OPT_MIDICAP].value && !MAIN_Cap)
+    {
+        MAIN_CapInit();
+        printf("MIDI capture (/MIDICAP, for SBDIAG MIDICAP): ");
+        MAIN_Print_Enabled_Newline(MAIN_Cap != NULL);
+    }
     if(MAIN_Options[OPT_MPUADDR].value && 
         (MAIN_Options[OPT_MPUCOMPORT].value || VMPU_ENABLED || MAIN_MUSB)
     )
@@ -3225,6 +3339,36 @@ static void MAIN_TSR_Interrupt()
             if(MAIN_TSRREG.d.ecx) DPMI_LMemcpy(MAIN_TSRREG.d.ebx, DPMI_PTR2L(t), n + 1);
             MAIN_TSRREG.d.ecx = n;
             MAIN_TSRREG.h.al = 0;                       /* an older SBEMU leaves AL as it was */
+            MAIN_TSRREG.w.flags &= ~CPU_CFLAG;
+        }
+        return;
+        case 0x05: //USB MIDI status (beta.121), one line into EBX like 04h: "MUSB=.. STATE=.. ...|NAME=..|PORT=..|LAST=.."
+        {
+            char t[400]; USBPAD_MidiInfoT m;
+            static const char* st[] = { "waiting", "active", "unplugged", "dropped" };
+            int n;
+            USBPAD_MidiInfo(&m);
+            n = snprintf(t, sizeof t, "MUSB=%d STATE=%s ID=%04X:%04X SENT=%lu DROP=%lu ERR=%lu IN=%lu Q=%lu BUSY=%lu BTMO=%lu MPU=%s IGN=%lu CAP=%d|NAME=%s|PORT=%s|LAST=%s",
+                MAIN_MUSB ? 1 : MAIN_Options[OPT_MUSB].value ? 2 : 0, MAIN_MUSB ? st[m.state & 3] : "off", m.vid, m.pid,
+                (unsigned long)m.sent, (unsigned long)m.dropped, (unsigned long)m.errors, (unsigned long)m.in, (unsigned long)m.queued,
+                (unsigned long)m.busy, (unsigned long)m.busytmo, MU_Uart ? "uart" : MU_Intel ? "intelligent" : "reset", (unsigned long)MU_Ign,
+                MAIN_Cap ? 1 : 0, m.name, m.where, m.last);
+            if(n > (int)sizeof t - 1) n = sizeof t - 1;
+            if(MAIN_TSRREG.d.ecx < (uint32_t)n + 1) n = MAIN_TSRREG.d.ecx ? (int)MAIN_TSRREG.d.ecx - 1 : 0;
+            t[n] = 0;
+            if(MAIN_TSRREG.d.ecx) DPMI_LMemcpy(MAIN_TSRREG.d.ebx, DPMI_PTR2L(t), n + 1);
+            MAIN_TSRREG.d.ecx = n;
+            MAIN_TSRREG.h.al = 0;
+            MAIN_TSRREG.w.flags &= ~CPU_CFLAG;
+        }
+        return;
+        case 0x06: //MIDI capture page ECX (0..) -> 4096 bytes at EBX; ECX out = number of pages (beta.121, /MIDICAP:1)
+        {
+            uint32_t pg = MAIN_TSRREG.d.ecx;
+            if(!MAIN_Cap) { MAIN_TSRREG.w.flags |= CPU_CFLAG; return; }
+            if(pg < CAP_GP + CAP_UP) DPMI_LMemcpy(MAIN_TSRREG.d.ebx, DPMI_PTR2L(MAIN_Cap + pg * CAP_PG), CAP_PG);
+            MAIN_TSRREG.d.ecx = CAP_GP + CAP_UP;
+            MAIN_TSRREG.h.al = 0;
             MAIN_TSRREG.w.flags &= ~CPU_CFLAG;
         }
         return;

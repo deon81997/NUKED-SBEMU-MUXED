@@ -1,7 +1,9 @@
 /* MPUTEST - plays a short test tune through the MPU-401 at port 330h, i.e. through
  * the running SBEMU + SC-55 emulation. SBEMU must already be loaded (run SC55.BAT).
  *
- *   MPUTEST [/P:330] [/L]        /P: MPU base port in hex   /L loop until a key is pressed
+ *   MPUTEST [/P:330] [/L] [/USB]  /P: MPU base port in hex   /L loop until a key is pressed
+ *   beta.121: with SBEMU /MUSB the USB MIDI device is shown (AMIS 05h) and checked after the tune (sent / dropped /
+ *   errors); /USB adds a running-status, real-time-inside-a-message and split-SysEx check. Exit 3 = MIDI lost.
  *
  * GPL-2.0-or-later. */
 #include <stdio.h>
@@ -13,10 +15,12 @@
 #include <dos.h>
 #include "mpuport.h"
 #include "toolui.h"
+#include "sbemuchk.h"
 
 static int base = 0x330;
 static int g_ui;                    /* full-screen view (on the screen; plain text when redirected) */
 static int g_step = -1, g_found, g_stop;
+static SBMUSB g_mu0, g_mu; static int g_usb, g_usbx;   /* /MUSB state before / after, SBEMU has /MUSB on, /USB given */
 static unsigned char g_on[128];     /* notes sounding (melodic channels) */
 static unsigned char g_drum[128];   /* drum hits, fading */
 static void draw(void);
@@ -98,7 +102,25 @@ static void tune(void)
     wait_ms(800);
     msg3(0xB0, 123, 0); msg3(0xB1, 123, 0); msg3(0xB2, 123, 0); msg3(0xB9, 123, 0); /* all notes off */
     memset(g_on, 0, sizeof g_on);
+    if (g_usbx)
+    {   /* /USB: the byte forms games use that a USB MIDI cable must repack: running status, a clock byte inside a
+         * message and inside a SysEx, a SysEx written in pieces (GS "display" DT1 to the SC-55's screen) */
+        static const unsigned char rs[] = { 0x90, 60, 90, 64, 90, 0xF8, 67, 90, 60, 0, 64, 0, 67, 0 };
+        static const unsigned char sx[] = { 0xF0, 0x41, 0x10, 0x45, 0x12, 0x10, 0x00, 0x00, 'U', 'S', 0xF8, 'B', ' ', 'M', 'I', 'D', 'I', 0x43, 0xF7 };
+        for (i = 0; i < (int)sizeof rs; i++) { put(rs[i]); if (i == 4) wait_ms(400); }
+        for (i = 0; i < (int)sizeof sx; i++) { put(sx[i]); if (i == 5) wait_ms(20); }
+        wait_ms(300);
+    }
     g_step = 4;
+}
+static int usb_check(void)
+{   /* after the tune: did SBEMU send it all? 0 = yes, 3 = MIDI lost */
+    char l[200];
+    if (!g_usb) return 0;
+    { uclock_t end = uclock() + UCLOCKS_PER_SEC * 2; do sbemu_musb(&g_mu); while (g_mu.q && uclock() < end); }
+    if (!g_ui) printf("%s\n  this test: %lu packets sent, %lu dropped, %lu errors, waited %lu times for the cable\n", musb_line(&g_mu, l, sizeof l),
+        g_mu.sent - g_mu0.sent, g_mu.drop - g_mu0.drop, g_mu.err - g_mu0.err, g_mu.busy - g_mu0.busy);
+    return strcmp(g_mu.state, "active") || g_mu.drop != g_mu0.drop || g_mu.err != g_mu0.err || g_mu.sent == g_mu0.sent ? 3 : 0;
 }
 
 /* ------------------------------------------------------------------ the screen */
@@ -132,7 +154,15 @@ static void draw(void)
     snprintf(b, sizeof b, "port %Xh", base);
     tui_put(4, 5, 0x1F, b);
     tu_state(4, 7, g_found ? 1 : -1, g_found ? "answers" : "no answer");
-    tui_put(4, 9, 0x17, g_found ? "UART mode, GS reset sent" : "is SBEMU loaded?");
+    if (g_usb)
+    {
+        int act = !strcmp(g_mu.state, "active");
+        tui_printf(4, 9, act ? 0x1A : 0x1C, "USB %.22s", act ? (g_mu.name[0] ? g_mu.name : g_mu.id) : g_mu.state);
+        tui_printf(4, 10, 0x17, "%.26s", g_mu.port);
+        if (g_step >= 4) tui_printf(4, 11, g_mu.drop != g_mu0.drop || g_mu.err != g_mu0.err ? 0x1C : 0x1A, "%lu sent %lu lost", g_mu.sent - g_mu0.sent,
+            (g_mu.drop - g_mu0.drop) + (g_mu.err - g_mu0.err));
+    }
+    else tui_put(4, 9, 0x17, g_found ? "UART mode, GS reset sent" : "is SBEMU loaded?");
     tui_panel(33, 3, 46, 9, 1, 0x1E, "Test tune");
     for (i = 0; i < 4; ++i)
     {
@@ -160,8 +190,12 @@ int main(int argc, char** argv)
     {
         if (!strncmp(argv[i], "/P:", 3) || !strncmp(argv[i], "/p:", 3)) base = (int)strtol(argv[i] + 3, NULL, 16);
         else if (!strcmp(argv[i], "/L") || !strcmp(argv[i], "/l")) loop = 1;
-        else { puts("MPUTEST [/P:330] [/L]\nPlays a test tune through the MPU-401 (SBEMU + SC-55 must be loaded)."); return 2; }
+        else if (!strcasecmp(argv[i], "/USB")) g_usbx = 1;
+        else { puts("MPUTEST [/P:330] [/L] [/USB]\nPlays a test tune through the MPU-401 (SBEMU + SC-55 must be loaded).\n"
+                    "/USB: also checks the USB MIDI device of SBEMU /MUSB (running status, real time, SysEx in pieces)."); return 2; }
     }
+    g_usb = sbemu_musb(&g_mu0) && g_mu0.on; g_mu = g_mu0;
+    if (g_usbx && !g_usb) { char l[200]; printf("MPUTEST /USB: %s\n", g_mu0.on || sbemu_musb(&g_mu0) ? musb_line(&g_mu0, l, sizeof l) : "SBEMU (beta.121+) is not loaded"); }
     { int p = mpu_find(base); if (p) base = p; }   /* SBEMU's MPU-401 on whatever port it uses */
     g_ui = isatty(1);
     g_found = detect();
@@ -175,9 +209,11 @@ int main(int argc, char** argv)
             return 1;
         }
         puts("found. Playing test tune...");
+        if (g_usb) { char l[200]; printf("%s\n", musb_line(&g_mu0, l, sizeof l)); }
         outportb(base + 1, 0x3F);                       /* UART mode */
         do tune(); while (loop && !kbhit());
         if (loop && kbhit()) getch();
+        if (g_usb) { int r = usb_check(); puts(r ? "USB MIDI: FAIL (MIDI lost, see above)" : "USB MIDI: PASS (everything went out)"); if (r) return r; }
         puts("Done. No sound? Check volume, the SC55LOG.TXT result and that the card is the one SBEMU uses.");
         return 0;
     }
@@ -190,6 +226,7 @@ int main(int argc, char** argv)
             outportb(base + 1, 0x3F);                   /* UART mode */
             g_stop = 0;
             do tune(); while (loop && !g_stop);
+            usb_check();
             if (g_stop) { msg3(0xB0, 123, 0); msg3(0xB1, 123, 0); msg3(0xB2, 123, 0); msg3(0xB9, 123, 0); memset(g_on, 0, sizeof g_on); g_step = 4; }
         }
         draw();

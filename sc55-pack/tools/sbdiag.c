@@ -18,6 +18,7 @@
 #include "mpuport.h"
 #include "toolui.h"
 #include "doctor.h"
+#include "sbemuchk.h"
 
 static int g_port = 0x330;
 static FILE* g_log;
@@ -135,6 +136,36 @@ static void bar_line(int x, int y, const char* label, double v, double full, int
     tui_bar(x + 22, y, 30, (long)(v * 100), (long)(full * 100), bad ? 0x1C : 0x1A, 0x18);
     tui_put(x + 54, y, a, text);
 }
+static SBMUSB g_mu; static int g_muon;   /* beta.121: SBEMU /MUSB (AMIS 05h) */
+/* SBDIAG MIDICAP FILE: SBEMU /MIDICAP:1's pages (the game's MPU-401 bytes + the USB MIDI packets) to a file
+ * for a bug report; testrig/midi/midicap.py compares them */
+static int midicap(const char* file)
+{
+    char t[8];
+    int id = sbc_amis(t, 2), pg, n = 0, k = 0;
+    FILE* f;
+    if (id <= 0) { printf("SBDIAG MIDICAP: SBEMU (beta.121+) is not loaded.\n"); return 1; }
+    if (!file || !file[0]) file = "MIDICAP.BIN";
+    f = fopen(file, "wb");
+    if (!f) { printf("SBDIAG MIDICAP: cannot write %s\n", file); return 1; }
+    for (pg = 0; pg < 4096 && (!n || pg < n); ++pg)
+    {
+        __dpmi_regs r; static unsigned char b[4096];
+        memset(&r, 0, sizeof r); r.h.ah = (unsigned char)id; r.h.al = 0x06; r.d.ecx = (unsigned long)pg; r.d.ebx = __tb;
+        if (__dpmi_int(0x2D, &r) != 0 || r.h.al != 0 || (r.x.flags & 1))
+        {
+            if (!pg) printf("SBDIAG MIDICAP: AMIS id %02X function 06h: AL=%02X CF=%d\n", id, r.h.al, r.x.flags & 1);
+            break;
+        }
+        n = (int)r.d.ecx;
+        dosmemget(__tb, 4096, b);
+        if (b[16] | b[17]) { fwrite(b, 1, 4096, f); k++; }   /* pages with something in them */
+    }
+    fclose(f);
+    if (!n) { printf("SBDIAG MIDICAP: SBEMU was not started with /MIDICAP:1 - nothing recorded.\n"); remove(file); return 1; }
+    printf("SBDIAG MIDICAP: %d pages written to %s (send it with BUGREP.TXT).\n", k, file);
+    return 0;
+}
 static void show(const char* argv0, const SUM* m)
 {
     char t[80], r[4000];
@@ -144,8 +175,9 @@ static void show(const char* argv0, const SUM* m)
     {
         tu_head("SBDIAG", "why game music plays too slow", NULL);
         tui_panel(2, 3, 77, 4, 1, 0x1E, "Measurement");
-        snprintf(t, sizeof t, "%.0f s on a %.0f MHz CPU, synth %s", m->secs, m->mhz, m->synth == 2 ? "MT-32" : m->synth ? "SoundFont" : "SC-55");
+        snprintf(t, sizeof t, "%.0f s on a %.0f MHz CPU, synth %s", m->secs, m->mhz, g_muon ? "USB MIDI device" : m->synth == 2 ? "MT-32" : m->synth ? "SoundFont" : "SC-55");
         tui_put(4, 4, 0x1F, t);
+        if (g_muon) { char l[200]; tui_printf(30, 5, !strcmp(g_mu.state, "active") && !g_mu.drop && !g_mu.err ? 0x1A : 0x1C, "%.47s", musb_line(&g_mu, l, sizeof l) + 10); }
         snprintf(t, sizeof t, m->reasons == 1 ? "1 reason found" : "%d reasons found", m->reasons);
         tu_state(4, 5, m->reasons ? -1 : 1, m->reasons ? t : "no problem found");
         tui_panel(2, 7, 77, 8, 1, 0x1E, "The numbers");
@@ -196,8 +228,23 @@ int main(int argc, char** argv)
         printf("SBDIAG START   start measuring (run SC55 first)\n"
                "  ...play the game for a minute, quit it...\n"
                "SBDIAG         show the report (saved to SBDIAG.TXT)\n"
-               "SBDIAG STOP    stop measuring\n");
+               "SBDIAG STOP    stop measuring\n"
+               "SBDIAG USB     USB MIDI (SBEMU /MUSB): device, port, state, counters, last error\n"
+               "SBDIAG MIDICAP [file]  what SBEMU /MIDICAP:1 recorded (game MPU bytes + USB MIDI packets)\n");
         return 0;
+    }
+    if (!stricmp(cmd, "MIDICAP")) return midicap(argc > 2 ? argv[2] : NULL);
+    g_muon = sbemu_musb(&g_mu) && g_mu.on;
+    if (!stricmp(cmd, "USB"))
+    {
+        char l[200];
+        if (!sbemu_musb(&g_mu)) { printf("USB MIDI: SBEMU (beta.121+) is not loaded.\n"); return 1; }
+        printf("%s\n", musb_line(&g_mu, l, sizeof l));
+        printf("  device %s, MPU-401 mode %s, %lu packets sent, %lu dropped, %lu USB errors, %lu queued, %lu MIDI IN\n"
+               "  the game waited for the cable %lu times (%lu waits cut short at 0.2 s), %lu intelligent-mode bytes ignored%s\n",
+               g_mu.id, g_mu.mpu, g_mu.sent, g_mu.drop, g_mu.err, g_mu.q, g_mu.in, g_mu.busy, g_mu.btmo, g_mu.ign,
+               g_mu.cap ? ", recording (/MIDICAP)" : "");
+        return !strcmp(g_mu.state, "active") ? 0 : 1;
     }
     g_ui = isatty(fileno(stdout));
     if (!stricmp(cmd, "DEMO"))
@@ -266,8 +313,14 @@ report:
     traps = (double)d[F_TMPU] + d[F_TSB] + d[F_TOPL] + d[F_TPIT] + d[F_TPIC] + d[F_TOTH];
     trap_pct = 100.0 * traps * trapcost / 1e6 / secs;
 
-    out("Measured %.0f s on a %.0f MHz CPU. Synth: %s", secs, cps / 1e6, d[F_SYNTH] == 2 ? "MT-32" : d[F_SYNTH] ? "SoundFont" : "SC-55");
-    if (!d[F_SYNTH]) out(" (reverb/chorus %s, voices %s, speed-control level %lu)",
+    if (g_muon)
+    {
+        char l[200];
+        out("Measured %.0f s on a %.0f MHz CPU. Synth: USB MIDI device (SBEMU /MUSB, no synth load here)\n", secs, cps / 1e6);
+        out("%s\n  %lu dropped, %lu USB errors, the game waited for the cable %lu times", musb_line(&g_mu, l, sizeof l), g_mu.drop, g_mu.err, g_mu.busy);
+    }
+    else out("Measured %.0f s on a %.0f MHz CPU. Synth: %s", secs, cps / 1e6, d[F_SYNTH] == 2 ? "MT-32" : d[F_SYNTH] ? "SoundFont" : "SC-55");
+    if (!d[F_SYNTH] && !g_muon) out(" (reverb/chorus %s, voices %s, speed-control level %lu)",
                          d[F_FX] ? "on" : "off", d[F_VOICES] ? "limited" : "all", d[F_GOV]);
     out("\n\n");
 
