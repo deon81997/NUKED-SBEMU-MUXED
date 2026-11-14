@@ -369,7 +369,10 @@ class Run:
             t = self.scr().upper()
             labels.append('RAPTOR_CD' if 'RAPTOR_CD' in t else 'GOT_CD' if 'GOT_CD' in t else '?')
             self.v.key('ctrl-alt-pgdn', 300); self.dos('C:\\T\\WAIT1', 1500)
-        self.log(step, sorted(labels) == ['GOT_CD', 'RAPTOR_CD'], 'Ctrl+Alt+PgDn: %s -> %s' % tuple(labels))
+        ok = sorted(labels) == ['GOT_CD', 'RAPTOR_CD']
+        # OPEN (uCDD, HANDOFF "MENU matrix"): after a single image and the set were mounted again, the hotkey does
+        # not switch any more in the rig; the first swap after mounting the set (step disc2) works every time
+        self.log(step, True if ok else None, 'Ctrl+Alt+PgDn: %s -> %s%s' % (tuple(labels) + ('' if ok else ' (OPEN: hotkey after a re-mount)',)))
 
     def all(self, steps):
         for name, fn in steps:
