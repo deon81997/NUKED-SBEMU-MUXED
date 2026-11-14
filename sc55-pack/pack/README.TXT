@@ -1550,8 +1550,11 @@ CONTENTS
                       SBDIAG.EXE, GAMETEST.EXE, TIMETEST.EXE, JOYTEST.EXE,
                       USBTEST.EXE, KMTEST.EXE, USBDRV.EXE, SBEMU16.COM, PADCONV.EXE,
                       BUGREP.BAT
-                      Every EXE carries the pack version; BUGREP.BAT lists
-                      them all on top (SBDIAG DOCTOR). SBEMU25.EXE is the
+                      Every EXE answers  NAME /VER  with the pack version,
+                      e.g. "MIDPLAY.EXE: NUKED SB-EMU 1.0.0-beta.116-usb-sc55"
+                      (the same for all; BUGREP.BAT lists them, and SBDIAG
+                      DOCTOR on top). CPUMHZ.EXE is a separate tool and has
+                      no /VER. SBEMU25.EXE is the
                       old SBEMU beta.25 on purpose, only for SC55OLD.BAT
                       (a comparison test); everything else is the new one.
      FILES\MOUSE      CuteMouse (CTMOUSE.EXE), a DOS mouse driver

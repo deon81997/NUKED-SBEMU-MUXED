@@ -1,3 +1,15 @@
+## beta.116 (2026-11-14, DOS session): /VER in every EXE (ported from wip/release-rc-2026-11-13)
+- sc55-pack/tools/packver.c: a constructor in every EXE answers `NAME /VER` ("NAME.EXE: NUKED SB-EMU <VERSION>") and
+  exits before main(); the makefile links output/packver.o into SBEMU and all 15 tools (packver.h/NSBVER stays for
+  SBDIAG DOCTOR). BUGREP.BAT: "Program versions" block (each EXE /VER, CDGUI from C:\CDSET). README.TXT note.
+- Tested (QEMU, store-qemu c.img, HDPMI32I -r): all 16 EXEs print 1.0.0-beta.116-usb-sc55. No runtime cost (argv
+  scan once at start). Zip = beta.115 zip with the 16 EXEs + BUGREP.BAT + README.TXT swapped
+  (sc55-pack/testrig/common/rezip.py OLD NEW, run from the repo root after make).
+- Not ported (stale): the branch's HANDOFF/mkzip/menu-walk/UNINSTAL/CLEANUP changes. wip/release-rc-2026-11-13 and
+  wip/menumatrix-2026-11-13 deleted.
+- Real hardware: run BUGREP on the D810, check the "Program versions" block lists every EXE.
+- Test downloads: DJGPP v3.4 gcc12.2 (/tmp/dl/djgpp).
+
 ## beta.115 (2026-11-14, DOS session): MENU matrix - CD music without HYBRID, sound-card IRQ watchdog, 24-run test matrix
 - CD music: SC55RUN.BAT loads `UCDD.EXE -install` before SBEMU (no drive letter) and passes /VCDA:100 before @SBOPTS;
   SETTINGS "CD audio volume" default 100%, Off = /VCDA:0. Before, CD-Audio only worked with HYBRID.BAT; a disc mounted
