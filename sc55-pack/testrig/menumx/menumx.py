@@ -30,7 +30,7 @@ import mxdisk
 from mxvm import VM86, VMQ, cfg86
 
 SOUND_DB = -70.0          # RMS above this = sound (silence is -120; GOT's FM music idles around -52)
-GAME_SECS = 40            # how long each game runs
+GAME_SECS = 20            # how long each game runs (sound shows within ~10 s)
 GAME_KEYS = {}            # game -> {5 s slot: [keys]} to get past title screens
 GAME_QUIT = {'GOT': ['esc', 'y'], 'RAP': ['esc', 'y']}
 FSLIST = ('fat12', 'fat16', 'fat32')
@@ -189,11 +189,12 @@ class Run:
         if game == 'GOT':
             ok = self.wait('INSTALL.BAT has finished', 60000)
         else:
-            ok = self.apogee_install()
+            self.apogee_install(); ok = True    # its last screens vary; C:\RAPTOR\RAP.EXE decides below
         self.dismiss()
         exe = 'GOT\\GOT.EXE' if game == 'GOT' else 'RAPTOR\\RAP.EXE'
         self.v.key('esc', 2500)
         self.leave_menu()
+        if game == 'RAP': self.dos('COPY M:\\SETUP.INI C:\\RAPTOR > NUL', 1500)   # instead of Raptor's SETUP.EXE
         self.dos('IF EXIST C:\\%s ECHO INSTALLED-%s' % (exe, game), 1500)
         ok = ok and self.has('^INSTALLED-' + game)
         self.log(step, ok, 'C:\\' + exe)
@@ -281,9 +282,21 @@ class Run:
             for k in GAME_KEYS.get(game, {}).get(i, []): self.v.key(k, 400)
             best = max(best, self.v.level(4000)[0])
         self.shot(step)
-        self.quit_game(game)
         if expect: self.log(step, best > SOUND_DB, '%s, sound %.1f dB' % (name, best))
         else: self.log(step, None, '%s real-mode game under SC55.BAT: no sound expected (%.1f dB)' % (name, best))
+        try:
+            self.quit_game(game)
+        except Fail as e:                       # the harness could not quit the game: not a pack bug
+            self.res[step][1] += ' (could not quit it: rebooted)'
+            self.restart(game)
+
+    def restart(self, game):
+        """reboot the VM and mount the game's disc again, so the next steps start from MENU as usual"""
+        v = self.v; v.stop(); v.start(cfg86(self.cyl)) if isinstance(v, VM86) else v.start()
+        if isinstance(v, VM86) and v.wait_text('Press F1 to continue', 40000): v.key('f1', 500)
+        if not self.wait('MX READY', 240000): raise Fail('reboot did not reach MX READY')
+        self.prompt(10000)
+        self.mount(game)
 
     def quit_game(self, game):
         if game == 'GOT': self.got_quit()
@@ -352,6 +365,7 @@ def run_case(case, mode, vmkind, outroot, keep=False):
     v = VM86(work) if vmkind == '86box' else VMQ(work)
     v.start(cfg86(cyl)) if vmkind == '86box' else v.start()
     R = Run(v, out, case, mode)
+    R.cyl = cyl
     t0 = time.time()
     g1 = 'GOT_CD'
     steps = [('boot', R.boot),
@@ -396,6 +410,11 @@ def table(outroot):
         print('| %s | %s | %s |' % (c, rows[c].get('rm', '-'), rows[c].get('pm', '-')))
 
 
+def _one(t):
+    try: run_case(*t)
+    except Exception as e: print('== %s %s: harness error %s' % (t[0], t[1], e), flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser(usage=__doc__)
     ap.add_argument('what'); ap.add_argument('args', nargs='*')
@@ -403,11 +422,19 @@ def main():
     ap.add_argument('--keep', action='store_true')
     ap.add_argument('--cases', default=','.join('%s-%s' % (f, k) for f in FSLIST for k in mxdisk.KINDS))
     ap.add_argument('--modes', default='rm,pm')
+    ap.add_argument('--jobs', type=int, default=1)      # VMs at once (one per CPU core)
+    ap.add_argument('--resume', action='store_true')    # skip cases that already have result.json
     a = ap.parse_args()
     if a.what == 'run': run_case(a.args[0], a.args[1], a.vm, a.out, a.keep)
     elif a.what == 'all':
-        for c in a.cases.split(','):
-            for m in a.modes.split(','): run_case(c, m, a.vm, a.out, a.keep)
+        todo = [(c, m) for c in a.cases.split(',') for m in a.modes.split(',')
+                if not (a.resume and os.path.exists(os.path.join(a.out, '%s-%s' % (c, m), 'result.json')))]
+        if a.jobs > 1:
+            import concurrent.futures as cf     # each case in its own process (own VM dir and sockets)
+            with cf.ProcessPoolExecutor(a.jobs) as ex:
+                list(ex.map(_one, [(c, m, a.vm, a.out, a.keep) for c, m in todo]))
+        else:
+            for c, m in todo: _one((c, m, a.vm, a.out, a.keep))
         table(a.out)
     elif a.what == 'table': table(a.args[0] if a.args else a.out)
     else: sys.exit(__doc__)

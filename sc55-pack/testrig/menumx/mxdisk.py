@@ -58,6 +58,8 @@ def disc_tree(work, name):
         # on a read-only CD (a real one too) that fails ("File not found on the install disk: rapsw12.exe").
         # Shareware-on-CD compilations shipped the .EXE already renamed; so does this test disc.
         shutil.copy(os.path.join(t, 'RAPSW12.SHR'), os.path.join(t, 'RAPSW12.EXE'))
+        # Raptor's own SETUP.EXE answers (keyboard, SB music + SB FX at 220/7/1): the harness copies it to C:\RAPTOR
+        shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'RAPSETUP.INI'), os.path.join(t, 'SETUP.INI'))
     for f in os.listdir(t):                                   # mkcd.py wants 8.3 upper-case names
         if f != f.upper(): os.rename(os.path.join(t, f), os.path.join(t, f.upper()))
     return t

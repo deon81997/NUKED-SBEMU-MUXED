@@ -21,15 +21,21 @@ SC55JEM / protected SC55; GOT = real-mode game, Raptor 1.2 = DOS4GW), fix failur
   newest release zip + output/*.exe + pack BATs, SPDX lines stripped like the release). MENU fix (tools/sc55menu.c
   pick_file): header animation drew over the picker title + folder line -> tui_anim off while open; hint line shortened.
   Run fat16-cue rm: boot/mount/dir/install/unmount OK; game + disc2.. not yet re-run after the last fixes.
-- NEW OPEN BUG (86Box, SC55JEM): GOT says "SoundBlaster ... BLASTER" (its SB check fails) - flaky: works on some runs,
-  fails after a CD mount, under COMMAND /C, without CONFIG.GOT. GOT check (GOT.EXE is LZ91-packed; unpacker at
-  /tmp/got/unlz.py, code 0x5C62 in the image): 35 game ticks settle, plays 128 B @4000 Hz (DSP 14), waits 70 ticks
-  (~1 s at its 70 Hz count) for the IRQ, else D0 + message. SBIRQ.COM (testrig-style probe: same DSP/DMA, TSC timed)
-  always gets IRQ 7 in 32 ms, so SBEMU's IRQ path works; SBDIAG during a failed GOT: card IRQs 92/s, SB port traps
-  1041/s, no virtual IRQ. Not solved. DEBUG=1 build is useless here (card IRQs stop after going resident).
-- Next: 1) run `menumx.py run fat16-cue rm` (MX_ZIP) to check game/disc2/install2 (Raptor INSTALL.EXE, sound setup);
-  2) GOT bug above; 3) CD-music fix (SC55RUN.BAT: CDON first, /VCDA:100 before @SBOPTS; sbset.c /VCDA default ->
-  100 with "Off" writing /VCDA:0) with SBDIAG/SC55LOG before/after; 4) `menumx.py all`, table, release.
+- Session 3 (19:00-22:40, rebased on beta.113): ROOT CAUSE of "GOT: SoundBlaster ... BLASTER" = lost sound-card
+  IRQ edge: SBEMU's card interrupt stops for good (ES1371 STATUS FFFFFEC4: DAC1 pending, PIC IMR/ISR clean), ~1 boot
+  in 4-6 in 86Box and also between programs; every digital transfer / SB IRQ then fails until reboot. Proof chain:
+  probes/SBIRQ.COM (DSP 14, 128 B, TSC-timed IRQ), PIC.COM (IMR+ISR), ESSTAT.COM (ES1371 regs), flight-recorder TMP
+  builds (card ISR counter frozen at the program's DSP reset). FIX (main.c MAIN_CardWatchdog): when no card IRQ for
+  250 ms, ack the card's pending interrupt from SB port traps + an INT 1Ch hook; trace event "sound card interrupt was
+  stuck". Tests: 0 SBIRQ failures in 9 boots (1-3 kicks/boot) vs ~1 failing boot in 5 before. Speed PII-450
+  (midi/perf.sh): beta.112 344 int/s 0.02 ms 1% = watchdog build identical. Cause of the lost edge itself unknown
+  (86Box PCI->PIC or real) - the watchdog covers both.
+- CD music fix done: SC55RUN.BAT loads UCDD -install before SBEMU and passes /VCDA:100 before @SBOPTS; SETTINGS CD
+  audio volume default 100%, "Off" writes /VCDA:0; MENU/CDGUI/README texts no longer say HYBRID.BAT. Cost with uCDD +
+  /VCDA:100: 344 int/s 1% (= off). perf.sh got PRECMD/PREFILES.
+- Raptor "File not found on the install disk: rapsw12.exe" is NOT our bug: Apogee INSTALL.EXE renames RAPSW12.SHR to
+  .EXE in its own folder (read-only CD: fails on a real CD too). Test disc now ships RAPSW12.EXE (mxdisk.py).
+- Rule learned: per-boot flaky = loop boots (probes/loopfail*.sh style) with a TMP flight-recorder build; don't guess.
 - Rebuild: docs/SESSION-2026-11-13-DOS.md (DJGPP, apt deps, 86Box @0935207 + xpad diff, roms) + rufus clone in
   testrig/rufus. Test downloads (keep out of repo): HIMEMX.EXE from
   https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/repositories/1.3/base/himemx.zip -> /tmp/dl/himemx
