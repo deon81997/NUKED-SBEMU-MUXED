@@ -22,6 +22,7 @@ Hardware facts, open ideas and the user's test machines: HARVEST.md.
 - zstd is not preinstalled: apt-get install -y zstd.
 
 ## Build and edit
+- A CRASHKEY write to 0xFFFFFFF0 did not fault under HDPMI; force crash tests with a null write + ud2.
 - README.TXT is CRLF: detect the newline style before scripted edits (an assert failed on LF).
 - After scripted C edits, compile at once: a dropped brace gave "invalid storage class" far from the edit.
 - Watcom wasm rejects quoted symbol names; use plain identifiers ('@' is legal unquoted).
@@ -30,6 +31,8 @@ Hardware facts, open ideas and the user's test machines: HARVEST.md.
 - HTTP tools without a User-Agent get Cloudflare error 1010 (looks like a bad API key).
 
 ## Test rigs
+- MS-DOS 7 BOOTLOG "LoadFailed" for JEMMEX.EXE is false; JEMMEX after HIMEM.SYS really fails. Proof JEMM is on: JLOAD QPIEMU loads.
+- Random-key soaks in a Win98 DOS box: run the program from a LOOP.BAT (Enter on an item exits it), or keys go to Explorer.
 - 86Box has no EHCI: USB 2.0 paths only run in QEMU; Win98 86Box tests never load the EHCI driver.
 - Never mcopy into a disk image while Windows runs on it (clusters get reused).
 - MS-DOS 7.1 in QEMU reaches AUTOEXEC ~10 s after start; time events with ECHO.|TIME lines.

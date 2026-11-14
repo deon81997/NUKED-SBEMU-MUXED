@@ -1213,7 +1213,7 @@ int main(int argc, char** argv)
         if (c == K_RCLICK) continue;                                          /* right click: nothing to go back to here */
         ui_log("key %03X cat %d sel %d", c, g_cat, g_sel);
 #ifdef CRASHKEY
-        if (c == '!') *(volatile int*)0xFFFFFFF0 = 1;                       /* test build only: a GPF for the crash catcher */
+        if (c == '!') { *(volatile int*)0 = 1; __asm__ volatile("ud2"); }   /* test build only: a fault for the crash catcher (0xFFFFFFF0 did not fault) */
 #endif
         if (c == K_ESC) break;
         if (c == K_UP) g_sel = move_in(g_cat, g_sel, -1);

@@ -1,3 +1,16 @@
+## beta.113 (DOS session, 2026-11-13): MENU 3D everywhere + MENU bug hunt fixes - RELEASED from wip/menu3d-2026-11-13
+Tests: host menurun.sh (menuasan + m3menu, ASan/UBSan) PASS; 30-min soaks (soak.py, ~3000 inputs, no CRASH.TXT):
+QEMU hd, QEMU jem, 86Box PII-450 hd, 86Box jem PASS; Win98 SE (QI stock) DOS box via D:\LOOP.BAT, soak.py w 15 min.
+CRASHKEY build: '!' in the text menu -> CRASH.TXT with registers/3D state/keys PASS (0xFFFFFFF0 write did not fault;
+now null write + ud2). Bench 86Box PII-450 old (beta.110) vs new (soaked as beta.111 on beta.110; menu code unchanged in 112) fps: Carousel 19.3/19.4, Module 18.9/18.7, Panels
+11.8/13.7; SBDIAG 3% CPU / 8% render both (SBEMU unchanged - SC55LOG not re-measured, SBEMU code not touched).
+Rigs: testrig/menusoak (mkfolder.py jem = JEMMEX alone; BOOTLOG says LoadFailed for JEMMEX.EXE - false), runq.sh.
+Win98 QI VM: boot without -usb; first boot hangs with a fresh D: (LESSONS) - add D: after the desktop is up.
+Open (hardware, ask user once): 3D menu on the D810 (Radeon VESA modes/refresh list, F4 keep-mode), P5PE-VM (GeForce
+6800), Win98 DOS box full screen. Cosmetic: Panels at 640x480 puts the grey reason box over the end of a long label.
+Test downloads: DJGPP andrewwutw v3.4 gcc12.2 (/tmp/dl/djgpp), win98qi_v1.1.0_stock.iso, TimGM6mb.sf2, rufus sparse,
+86Box 0935207 + roms, apt qemu-system-x86 mtools dosfstools zstd gcc-multilib.
+
 ## Personal pack beta.112 (2026-11-13): NUKED-SB-EMU-1.0.0-beta.112-usb-personal.zip
 - Public beta.112 zip (sha256 1bfa7af2.. = release asset) + VM store store-personal files at the paths SETUP.BAT copies from:
   FILES\ROMS\* (41 ROMs + ROMHASH.CAC), FILES\XCDROM\MSCDEX.EXE, FILES\VIDECD\VIDE-CDD.SYS+VIDECD.TXT, FILES\GSCDROM\*,
