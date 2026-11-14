@@ -115,7 +115,7 @@ class Run:
         for _ in range(60):
             rows = self.v.screen()[0]
             cur = [i for i, r in enumerate(rows) if len(r) > 1 and r[1] == '\x10']
-            tgt = [i for i, r in enumerate(rows) if re.search(r'[\s\x00-\x1f]' + re.escape(name.upper()) + r'\b', r.upper())
+            tgt = [i for i, r in enumerate(rows) if re.search(r'[\s\x00-\x1f]' + re.escape(name.upper()) + r'\b', r[:48].upper())
                    and 5 < i < 23]
             if cur and tgt and cur[0] == tgt[0]: return
             if cur and tgt: self.v.key('down' if tgt[0] > cur[0] else 'up', 250); continue
@@ -128,11 +128,15 @@ class Run:
     def cd_folder(self):
         """D:, then the images folder"""
         want = mxdisk.LFN_SHORT if self.kind == 'lfn' else 'CD'
-        if re.search(r'^\s+D:\\' + want + r'\s*$', self.v.screen()[0][4], re.I): return   # already there
+        for _ in range(10):                     # the folder line appears a moment after the screen opens
+            if re.search(r'^[\s\x00-\x1f]+[A-Z]:\\', self.v.screen()[0][4]): break
+            self.v.sleep(300)
+        if re.search(r'^[\s\x00-\x1f]+D:\\' + want + r'(\s|$)', self.v.screen()[0][4], re.I): return   # already there
         for _ in range(4):
-            if re.search(r'^\s+D:\\', self.v.screen()[0][4]): break
+            if re.search(r'^[\s\x00-\x1f]+D:\\', self.v.screen()[0][4]): break
             self.v.key('d', 1500)
         else: raise Fail('drive D: not reached in CD images')
+        if re.search(r'^[\s\x00-\x1f]+D:\\' + want + r'(\s|$)', self.v.screen()[0][4], re.I): return   # D: was still in the folder
         self.sel(mxdisk.LFN_SHORT if self.kind == 'lfn' else 'CD')
         self.v.key('ret', 1500)
 
@@ -174,6 +178,8 @@ class Run:
 
     def step_mount(self, game, step):
         ok, img, info = self.mount(game)
+        if ok and self.kind == 'mdm' and game == 'RAP':     # an MDM set mounts disc 1 (GOT): Raptor is disc 2
+            self.leave_menu(); self.v.key('ctrl-alt-pgdn', 1500); img += ' + Ctrl+Alt+PgDn'
         self.shot(step)
         self.log(step, ok, img + ('' if ok else ': ' + info.strip().split('\n')[-3][:70]))
         return ok
@@ -186,7 +192,8 @@ class Run:
         self.log(step, ok, ', '.join(want) + ('' if ok else ' missing'))
 
     def step_install(self, game, step):
-        img = self.image_of(game)
+        # an .MDM set has no installer of its own in CD images (it says so): install from the game's disc image
+        img = game + '.CUE' if self.kind == 'mdm' else self.image_of(game)
         self.cdgui(); self.cd_folder(); self.sel(img)
         self.v.key('i', 1500)
         if not self.has('and run'): raise Fail('I did not offer the installer')
@@ -342,12 +349,13 @@ class Run:
     def step_swap(self, step):
         if self.kind != 'mdm': return self.log(step, None, 'not an MDM case')
         self.leave_menu()
-        self.dos('DIR M:\\', 2000)
-        a = 'GOT_CD' in self.scr().upper()
-        self.v.key('ctrl-alt-pgdn', 1500)
-        self.dos('CLS', 500); self.dos('DIR M:\\', 2500)
-        b = 'RAPTOR_CD' in self.scr().upper()
-        self.log(step, a and b, 'disc 1 GOT_CD %s, after Ctrl+Alt+PgDn RAPTOR_CD %s' % (a, b))
+        labels = []
+        for _ in range(2):                      # the set has 2 discs: each Ctrl+Alt+PgDn goes to the other one
+            self.dos('CLS', 500); self.dos('DIR M:\\', 2500)
+            t = self.scr().upper()
+            labels.append('RAPTOR_CD' if 'RAPTOR_CD' in t else 'GOT_CD' if 'GOT_CD' in t else '?')
+            self.v.key('ctrl-alt-pgdn', 1500)
+        self.log(step, sorted(labels) == ['GOT_CD', 'RAPTOR_CD'], 'Ctrl+Alt+PgDn: %s -> %s' % tuple(labels))
 
     def all(self, steps):
         for name, fn in steps:
