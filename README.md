@@ -377,14 +377,14 @@ something breaks please [sign my guestbook](#-sign-my-guestbook-) and tell me!
 <tr><td><picture><img src="docs/90s/icon-sc55.gif" width="56" alt="sound module"></picture></td><td><b>Roland SC-55, SC-55mkII, SC-55ST, SC-155 and CM-300</b>: the real firmware, from your ROMs, with a clean low-pass at any output rate</td></tr>
 <tr><td><picture><img src="docs/90s/icon-mt32.gif" width="56" alt="synth module"></picture></td><td><b>Roland MT-32 / CM-32L</b> (Munt), or any <code>.SF2</code> SoundFont</td></tr>
 <tr><td><picture><img src="docs/90s/icon-disc.gif" width="56" alt="CD"></picture></td><td><b>Virtual CD drive M:</b> that works like a real disc: ISO, CUE/BIN, multi-disc, CD music played by the drive and mixed in. Pick images from any folder on any drive, with a home folder</td></tr>
-<tr><td><picture><img src="docs/90s/icon-usbstick.gif" width="56" alt="USB stick"></picture></td><td><b>USB sticks as DOS drive letters</b>: FAT12/16/32 read and write, exFAT and NTFS read-only, plugged in any time; MENU &gt; CD-ROM &gt; USB drives lists them</td></tr>
-<tr><td><picture><img src="docs/90s/icon-gamepad.gif" width="56" alt="gamepad"></picture></td><td><b>USB game pads</b> as gameport joysticks (up to two), plus USB keyboard and a USB mouse right next to your touchpad</td></tr>
+<tr><td><picture><img src="docs/90s/icon-usbstick.gif" width="56" alt="USB stick"></picture></td><td><b>USB sticks as DOS drive letters</b>: FAT12/16/32 read and write, exFAT and NTFS read-only, on USB 1.1, 2.0 and USB 3 ports, plugged in any time (every partition gets a letter); CD images on a stick mount too; MENU &gt; CD-ROM &gt; USB drives lists them</td></tr>
+<tr><td><picture><img src="docs/90s/icon-gamepad.gif" width="56" alt="gamepad"></picture></td><td><b>USB game pads</b> as gameport joysticks (up to two), plus USB keyboard and a USB mouse right next to your touchpad; on-board USB and a USB card work side by side</td></tr>
 <tr><td><picture><img src="docs/90s/icon-joystick.gif" width="56" alt="joystick"></picture></td><td><b>The pad presses each game's own keys</b>: jump, fire, pogo, menu, for over 3500 DOS games, in DOS and Windows 98</td></tr>
 <tr><td><picture><img src="docs/90s/icon-win98.gif" width="56" alt="Windows 98 PC"></picture></td><td><b>Windows 98</b>: SB / OPL3 / MPU for DOS boxes, a "NUKED SB-EMU" MIDI device, a joystick + game port for every game, and barely any CPU while idle</td></tr>
 <tr><td><picture><img src="docs/90s/icon-menu.gif" width="56" alt="menu screen"></picture></td><td><b>Menus for everything</b>: seven colour styles, 3D screens (menu, settings, CD images, GAMETEST, MIDI player), game profiles, tests</td></tr>
 <tr><td><picture><img src="docs/90s/icon-note.gif" width="56" alt="music note"></picture></td><td><b>MIDPLAY</b>: a full-screen MIDI player with playlist, search, file browser, a live SC-55 front panel and a smooth 3D view. Plays game music straight from the game files (Doom .MUS, HMI .HMP, Miles .XMI), with key change, A-B loop and a sleep timer</td></tr>
 <tr><td><picture><img src="docs/90s/icon-sc55.gif" width="56" alt="sound module"></picture></td><td><b>Your real synth over USB</b>: class-compliant USB MIDI cables and keyboards play the MPU-401 music</td></tr>
-<tr><td><picture><img src="docs/90s/icon-bug.gif" width="56" alt="bug"></picture></td><td><b>One-key bug report</b>, start-up logs and a live load meter</td></tr>
+<tr><td><picture><img src="docs/90s/icon-bug.gif" width="56" alt="bug"></picture></td><td><b>One-key bug report</b>, start-up logs, a live load meter and a flight recorder that keeps SBEMU's last steps for a crash report</td></tr>
 </table>
 
 <details>
@@ -527,14 +527,16 @@ Every release gets tried on real iron here, plus a whole fleet of emulated PCs:
 - <picture><img src="docs/90s/ball-blue.gif" width="14" alt="o"></picture> Creative Sound Blaster Audigy
 - <picture><img src="docs/90s/ball-green.gif" width="14" alt="o"></picture> 2 GB RAM
 - <picture><img src="docs/90s/ball-gold.gif" width="14" alt="o"></picture> 3X DVD-ROM
-- <picture><img src="docs/90s/ball-red.gif" width="14" alt="o"></picture> NEC uPD720101 USB 2.0 card + official wired Xbox 360 pad
+- <picture><img src="docs/90s/ball-red.gif" width="14" alt="o"></picture> Belkin USB 2.0 card (NEC uPD720101) + official wired Xbox 360 pad
 
 </td>
 </tr>
 </table>
 
 **Emulated:** 86Box (Celeron 366 for "how slow can it go?", Pentium II with Windows 98 SE) and QEMU, with custom
-add-ons: a fake USB Xbox 360 pad, a joystick driven from a file and scripted keys and screenshots.
+add-ons: a fake USB Xbox 360 pad, a joystick driven from a file and scripted keys and screenshots. A one-command test harness
+boots FreeDOS and MS-DOS 7.1 machines from ready-made images in seconds and reads back PASS/FAIL, and a game
+mount + install matrix runs every CD image type and USB port type (UHCI, OHCI, EHCI, xHCI) in both SBEMU modes.
 **And on the bench:** every ROM set at every output rate through a dropped-note test and a sound recorder (beats on time,
 no gaps, no clipping, the right ROM set really loaded), memory checkers (AddressSanitizer / UBSan) over MIDPLAY's player,
 file formats and 3D view, thousands of deliberately damaged music files, and an offline SC-55 renderer to judge the sound.
