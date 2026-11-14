@@ -9,6 +9,8 @@
 #   HC   uhci (PIIX3), ohci (pci-ohci), ehci (ICH9 EHCI, high speed), ehcic (ICH9 EHCI + UHCI companions, sticks
 #        behind a full-speed hub -> companion), xhci (qemu-xhci, USB 2 ports)
 #   PLUG before = sticks hot-plugged before SBEMU starts, after = after SBEMU is resident (spare letters)
+#   MIDI=1 (beta.114): testrig/fakemidi.py's real-M-Audio-Uno fake on port 3 from boot (usbredir; not on uhci - 2 ports),
+#        SBEMU gets /MUSB:1, every MPUTEST play goes to it: "MIDIEV n" = MIDI events it got (all.sh wants >= 50)
 # Sticks from mkstick.sh in $ST (default /home/claude/vm/st): s1 FAT16+FAT32, s2 exFAT+NTFS; s1 is then swapped for
 # s3 (FAT16) on the same port. Per ISO (dos/ONE.BAT): UCDD mount from the stick, install (COPY to C:), play
 # (MPUTEST through SBEMU's MPU-401, TimGM6mb SoundFont /VSF), unmount. DOS signals the host through COM1.
@@ -28,6 +30,10 @@ else cp $R/testrig/rufus/res/freedos/KERNEL.SYS $R/testrig/rufus/res/freedos/COM
 { if [ $MODE = x32 ]; then printf 'DEVICE=C:\\HIMEM.SYS\r\nDOS=HIGH\r\n'; else printf 'DEVICE=C:\\JEMM\\JEMMEX.EXE NOEMS\r\nDOS=HIGH,UMB\r\n'; fi
   printf 'FILES=40\r\nLASTDRIVE=Z\r\n'; } > $C/CONFIG.SYS
 SB="C:\SC55\SBEMU.EXE /JOY:1 /USBDISK:1 /VSF:C:\SC55\SF2\T.SF2 ${SBX:-}"
+MX=""; [ "${MIDI:-}" = 1 ] && [ $HC = uhci ] && { echo "MIDI: skipped on uhci (2 root ports, both sticks)"; MIDI=0; }
+if [ "${MIDI:-}" = 1 ]; then SB="$SB /MUSB:1"; MP=$((5800 + $(echo "$D$MODE$HC$PLUG" | cksum | cut -c1-3) % 150))
+  python3 $R/testrig/fakemidi.py $MP $W/fakemidi.log & FMP=$!; sleep 0.5
+  MX="-chardev socket,id=midi,host=127.0.0.1,port=$MP,reconnect=1 -device usb-redir,chardev=midi,id=midi,bus=BUSX,port=3"; fi
 { printf '@ECHO OFF\r\nSET PATH=C:\\;C:\\SC55\r\nSET SBEMULOG=C:\\SB.TXT\r\nVER > C:\\UT.TXT\r\nMEM >> C:\\UT.TXT\r\n'
   [ $MODE = j16 ] && printf 'C:\\JEMM\\JLOAD.EXE C:\\JEMM\\QPIEMU.DLL >> C:\\UT.TXT\r\nC:\\HDPMI\\HDPMI16I.EXE -r >> C:\\UT.TXT\r\n'
   printf 'C:\\HDPMI\\HDPMI32I.EXE -r -x >> C:\\UT.TXT\r\nECHO PLUG1> COM1\r\nDELAY\r\n%s > C:\\SB.TXT\r\n' "$SB"
@@ -42,6 +48,7 @@ case $HC in
   ehci|ehcic) QX="-device ich9-usb-ehci1,id=ehci,addr=1d.7,multifunction=on -device ich9-usb-uhci1,masterbus=ehci.0,firstport=0,addr=1d.0,multifunction=on -device ich9-usb-uhci2,masterbus=ehci.0,firstport=2,addr=1d.1,multifunction=on -device ich9-usb-uhci3,masterbus=ehci.0,firstport=4,addr=1d.2,multifunction=on"; BUS=ehci.0;;
 esac
 cp $ST/s1.img $ST/s2.img $ST/s3.img $W/
+QX="$QX ${MX//BUSX/$BUS}"
 MON=$W/mon.sock; M() { echo "$1" | socat - UNIX-CONNECT:$MON >/dev/null 2>&1; }
 timeout ${TMO:-420} qemu-system-i386 -m 64 -display none -no-reboot -audiodev wav,id=a,path=$W/out.wav${AUDX-,timer-period=2000} -device AC97,audiodev=a \
   -drive file=$W/q.img,format=raw,if=ide,index=0 $QX -serial file:$W/com1.txt \
@@ -60,9 +67,10 @@ done
 [ $st = 2 ] || M "screendump $W/screen.ppm"; wait $QP 2>/dev/null
 python3 $R/testrig/mkdisk.py get $W/q.img UT.TXT $W/UT.TXT >/dev/null 2>&1; python3 $R/testrig/mkdisk.py get $W/q.img SB.TXT $W/SB.TXT >/dev/null 2>&1; python3 $R/testrig/mkdisk.py get $W/q.img SBDETAIL.TXT $W/SBDETAIL.TXT >/dev/null 2>&1; python3 $R/testrig/mkdisk.py get $W/q.img SC55\\SBDIAG.TXT $W/SBDIAG.TXT >/dev/null 2>&1; python3 $R/testrig/mkdisk.py get $W/q.img SBDIAG.TXT $W/SBDIAG.TXT >/dev/null 2>&1
 grep -q '^DONE' <(tr -d '\r' < $W/com1.txt 2>/dev/null) || echo "TIMEOUT (stage $st)"
+if [ "${MIDI:-}" = 1 ]; then kill $FMP 2>/dev/null; echo "MIDIEV $(grep -c ' MIDI ' $W/fakemidi.log)" >> $W/UT.TXT; fi
 # byte check of each install against the stick's DATA.BIN
 for d in $(tr -d '\r' < $W/UT.TXT 2>/dev/null | awk '/^CASE/{l=$2; p=$4} /^INSTALL OK/{print p l}'); do
   python3 $R/testrig/mkdisk.py get $W/q.img "$d\\DATA.BIN" $W/d.bin >/dev/null 2>&1
   cmp -s $W/d.bin $ST/data.bin && echo "BYTES $d OK" >> $W/UT.TXT || echo "BYTES $d BAD" >> $W/UT.TXT; done
 python3 -I $T/wavrms.py $W/out.wav >> $W/UT.TXT 2>/dev/null
-tr -d '\r' < $W/UT.TXT 2>/dev/null | grep -E '^(CASE|DISC|MOUNT|INSTALL|PLAY|UNMOUNT|BYTES|DONE|WAV)' | tr '\n' ' '; echo
+tr -d '\r' < $W/UT.TXT 2>/dev/null | grep -E '^(CASE|DISC|MOUNT|INSTALL|PLAY|UNMOUNT|BYTES|DONE|WAV|MIDIEV)' | tr '\n' ' '; echo

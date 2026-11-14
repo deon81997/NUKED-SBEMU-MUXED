@@ -1,4 +1,39 @@
 VM store (2026-11-13): ready VMs in deon81997/priavte store-dos71, store-freedos, store-w98qi-qemu, store-w98qi-86box (Win98 QI v1.1.0 /P i + /P j), store-86box-irq (440BX/VIA/SiS + SB16|AWE64 + ES1371 + CMI8738); see vms/README.md. Test downloads: FD13-LiteUSB.zip (ibiblio FreeDOS 1.3).
+## beta.114 (2026-11-13, DOS session): M-Audio Uno froze the P5PE-VM - USB MIDI watchdog, [midi] step logs, real-Uno fake
+- Report (user, beta.113): the Uno froze the ASUS P5PE-VM (first said D810) on every port, with any or no other USB
+  hardware; boot = Win98 > MS-DOS 7.1, HIMEM only (no QEMM/JEMM), HDPMI32I + SC55.BAT. Which program / when: not given.
+- Real Uno 0763:0150 rev 1.25 (usb-devices dump, xed.ch/help/midi.html): bcdUSB 1.00, ep0 64, Atr C0 0 mA, no serial,
+  bulk IN 81h before bulk OUT 02h, 64 bytes; no Linux quirk except IN running-status CIN 4. Old MidiSport 0763:1010 etc.
+  (EZ-USB firmware, vendor protocol) now refused by name. testrig/fakemidi.py default = that shape + UART pacing.
+- QEMU does NOT reproduce (uhci, ohci, ehcicc, xhci; MS-DOS 7.1 HIMEM-only and FreeDOS JEMM). Audit found: USBTEST's
+  note-off flush waited for ever (`while (USBPAD_MidiPending()) USBPAD_Poll();`) - a device that never takes OUT hung
+  USBTEST; no OUT watchdog (a NAKing OUT stayed busy for ever, CLEAR_FEATURE retried without limit, all in SBEMU's
+  sound interrupt); Shutdown flush read P[-1] when the device went away; trace not on disk until USBTEST's init ended.
+  Descriptor walk, MidiByte, MPU trap, interrupts (all off), FIFO: already bounded.
+- Fix (usbpad.c): OUT watchdog - not taken in 0.5 s: taken back (UHCI QH emptied, OHCI ED / EHCI QH restarted, toggle
+  0), CLEAR_FEATURE; 3 in a row or 8 stalls in a row: both MIDI pipes stopped, "[midi] ... not used any more" - the PC
+  keeps running, unplug/replug retries. [midi] lines: device/config summary, every descriptor, pipes, first OUT +
+  done, timeouts, stalls, CLEAR_FEATURE, drop, shutdown. USBTEST: steps on disk per line (fsync) from the start,
+  USBTEST.TXT without a file name too, M = raw descriptors, flush bounded 1 s. MIDPLAY /USB: USBMIDI.TXT the same way.
+  SBEMU: start-up lines in SBDETAIL (committed), runtime ones via the flight recorder (SBTRACE.TXT).
+- Tests: testrig/midi/unomatrix.sh (rig.py --dos71 = store-dos71 MS-DOS 7.1 HIMEM only): normal Uno USBTEST / SBEMU
+  /MUSB + MIDPLAY with unplug at 15 s / MIDPLAY /USB, hostile OUT nak / stall, bLength 0, long wTotalLength, no
+  endpoints, MidiSport 1010, beta.108 fake: 37 PASS + 2 QEMU-LIMIT (MIDPLAY /USB on QEMU OHCI, see below) on
+  the release binaries; every hostile case reaches DONE with the reason logged.
+- QEMU limits: its OHCI keeps one packet in flight and stops a multi-packet OUT when the answer is late (matrix: pacing
+  off on ohci); it also loses appended OUT TDs like the NEC (lost-TD check must stay for OUT: removing it = 0 events);
+  ED rewrites with an async usbredir packet in flight sometimes abort QEMU (usb_cancel_packet assertion) - QEMU bug.
+  86Box: no USB pass-through device, the fake cannot run there.
+- MENU matrix: run.sh MIDI=1 (fake on port 3, /MUSB:1, MPUTEST plays to it, MIDIEV >= 50; not uhci): 71 x32 (HIMEM only) +
+  j32 on ohci and ehcic, before: all 4 PASS (disks A/B, 7 plays, 424 MIDI events each).
+- Speed (86Box P2B-LS PII-450 ES1371, midi/perf.sh, /JOY:1 /VMPU:1): beta.113 = beta.114 344 int/s, avg 0.02 ms, 1%.
+  SC55LOG.EXE byte-identical (md5 8cc1f00a..). 86Box rebuilt @ 0935207 + diffs (SDL, automation) in /tmp/dl/86box.
+- Test downloads: DJGPP v3.4 gcc12.2, rufus (FreeDOS kernel), TimGM6mb (apt), 86Box 0935207, Linux sound/usb sources.
+- Zip: beta.113 zip + all 17 EXE/COM rebuilt (VERSION beta.114), README.TXT, HWTEST.TXT. Personal pack: not built.
+- Open (P5PE-VM, ask once): HWTEST.TXT beta.114 item (USBTEST first with SBEMU unloaded, MIDPLAY /USB, SC55 /MUSB game,
+  then the NEC card): the last [midi]/[usb] line of USBTEST.TXT / USBMIDI.TXT / SBDETAIL.TXT names the step if it
+  still freezes; USBTEST M dump = the real descriptors (compare with fakemidi.py).
+
 ## beta.113 (DOS session, 2026-11-13): MENU 3D everywhere + MENU bug hunt fixes - RELEASED from wip/menu3d-2026-11-13
 Tests: host menurun.sh (menuasan + m3menu, ASan/UBSan) PASS; 30-min soaks (soak.py, ~3000 inputs, no CRASH.TXT):
 QEMU hd, QEMU jem, 86Box PII-450 hd, 86Box jem PASS; Win98 SE (QI stock) DOS box via D:\LOOP.BAT, soak.py w 15 min.

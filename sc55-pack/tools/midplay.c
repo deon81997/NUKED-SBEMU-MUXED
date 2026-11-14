@@ -166,6 +166,9 @@ static int g_usb;
 #include "dpmi/dpmi.h"
 void TRACE_Event(int kind, const char* fmt, ...) { (void)kind; (void)fmt; }   /* usbpad.c's flight-recorder calls (SBEMU only) */
 static void usb_poll(void) { if (g_usb) USBPAD_Poll(); }
+/* beta.114: every USB step into USBMIDI.TXT (current folder) before it runs: after a freeze its last line names it */
+static FILE* g_usblog;
+static void usb_step(const char* l) { if (g_usblog) { fputs(l, g_usblog); fflush(g_usblog); fsync(fileno(g_usblog)); } }
 static int usb_start(void)
 {
     const char* msg = "";
@@ -177,7 +180,9 @@ static int usb_start(void)
     cps = (rdtsc64() - a) * 18206 / 4000;
     printf("USB MIDI: looking for the device (up to 3 s)... ");
     fflush(stdout);
-    if (!USBPAD_Init(cps, 3000, USBPAD_F_MIDI, &msg)) { printf("%s.\n", msg); return 0; }
+    g_usblog = fopen("USBMIDI.TXT", "w");
+    if (g_usblog) { fputs("MIDPLAY /USB - USB steps as they happen (the last line is the one running if the PC froze)\n", g_usblog); USBPAD_SetTraceHook(usb_step); }
+    if (!USBPAD_Init(cps, 3000, USBPAD_F_MIDI, &msg)) { printf("%s.\n", msg); usb_step(msg); return 0; }
     if (!(USBPAD_Have() & USBPAD_HAVE_MIDI))
     {
         uint64_t end = rdtsc64() + cps * 2;                   /* a hub or a slow device: a little longer */

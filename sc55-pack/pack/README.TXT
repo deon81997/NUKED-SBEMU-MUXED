@@ -1186,6 +1186,17 @@ CONTENTS
    - USBTEST lists the device and plays a test note (middle C) as soon as
      it is found; N plays it again. Notes from its MIDI IN socket are
      shown live ("MIDI IN: 90 3C 64").
+   - beta.114: a device that does not take MIDI (no answer for 0.5 s
+     three times, or 8 stalls in a row) is dropped - the PC keeps running,
+     MIDI stops; unplug it and plug it back in to try again. Every USB MIDI
+     step is logged, each line on disk before the step runs ("[midi]"
+     lines): USBTEST in USBTEST.TXT (also when started without a file
+     name), MIDPLAY /USB in USBMIDI.TXT (current folder), SBEMU's start-up
+     in SBDETAIL.TXT and later events in SBTRACE.TXT. After a freeze the
+     last line names the step. USBTEST M writes the device's descriptors.
+   - The old M-Audio MidiSport / MidiSport Uno (0763:1010 etc., needs a
+     firmware download) is not class compliant: USBTEST says so by name.
+     The USB Uno (0763:0150) is the class-compliant one.
 
 
 =============================================================================

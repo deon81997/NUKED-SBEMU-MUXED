@@ -1,4 +1,15 @@
-# USB MIDI test rig (beta.108)
+# USB MIDI test rig (beta.108, real-Uno fake + matrix beta.114)
+
+beta.114: `../fakemidi.py` now looks like the real M-Audio USB Uno 0763:0150 rev 1.25 (usb-devices dump at
+xed.ch/help/midi.html: bcdUSB 1.00, ep0 64 bytes, no serial, Atr C0 / 0 mA, bulk IN 81h listed before bulk OUT 02h,
+64 bytes, interval 0) and paces OUT like its 31250-baud UART (late answers = NAKs); `FAKEMIDI_OLD=1` = the beta.108
+fake. Hostile modes: `FAKEMIDI_OUT=nak|stall`, `FAKEMIDI_BAD=zero|long|nojack`, `FAKEMIDI_PID=1010` (pre-firmware
+MidiSport). `rig.py ... --dos71` boots MS-DOS 7.1 + HIMEM only + HDPMI32I (the user's setup) from the VM store image.
+`unomatrix.sh [quick]` (ONLY=regex for a subset) runs USBTEST / SBEMU /MUSB + MIDPLAY with unplug at 15 s / MIDPLAY /USB
+on uhci, ohci, ehcicc, xhci in dos71 and jem, plus the hostile devices; results.txt, last line PASS/FAIL.
+QEMU's OHCI cannot take a late OUT answer (it stops sending the rest of a multi-packet TD; a cancel then trips
+usb_cancel_packet's assertion): on ohci the matrix runs the Uno shape with `FAKEMIDI_PACE=0`. 86Box has no USB
+pass-through device, so the fake cannot run there.
 
 `../fakemidi.py` is a pretend class-compliant USB MIDI interface (M-Audio Uno 0763:0150: audio-control interface +
 MIDIStreaming interface, bulk OUT 02h / bulk IN 81h, 64 bytes; `FAKEMIDI_SPEED=high`: high speed, 512 bytes) on QEMU's

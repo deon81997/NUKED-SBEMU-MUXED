@@ -108,4 +108,5 @@ int  USBPAD_MidiPending(void);             /* packets queued, not sent yet */
 typedef void (*USBPAD_MidiInFn)(const uint8_t* msg, int len);   /* MIDI IN: 1-3 bytes (one piece of a message), from Poll */
 void USBPAD_SetMidiIn(USBPAD_MidiInFn fn);
 void USBPAD_MidiStats(uint32_t* sent, uint32_t* dropped, uint32_t* errors, uint32_t* in);   /* packets; NULL = not wanted */
+int  USBPAD_MidiDescriptors(const uint8_t** p);   /* raw device + config descriptors of the last USB MIDI / M-Audio device seen; bytes (0 = none) */
 #endif

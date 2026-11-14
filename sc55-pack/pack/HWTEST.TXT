@@ -1,4 +1,4 @@
-NUKED SB-EMU - REAL HARDWARE CHECKLIST (beta.108)
+NUKED SB-EMU - REAL HARDWARE CHECKLIST (beta.114)
 Things an emulator cannot confirm. Tick each one; for any failure keep
 C:\SC55\BUGREP.TXT (MENU > Tests > Bug report) and CRASH.TXT if there is one.
 
@@ -22,6 +22,22 @@ DELL LATITUDE D810 (ICH6 UHCI + EHCI, SigmaTel AC'97, Dell keyboard controller)
 [ ] A 3D DOS game (Quake / Descent / Duke 3D) with SB sound + pad: no glitches.
 
 ASUS P5PE-VM (+ NEC uPD720101 USB card, wired Xbox 360 pad, Logitech receiver)
+[ ] beta.114 M-Audio Uno (froze the PC in beta.113 on every port). Boot as
+    usual (Win98 boot menu > command prompt, HIMEM only, no QEMM/JEMM),
+    Uno plugged into a board port, nothing else needed. In this order:
+    1. HDPMI32I as always, then C:\SC55\USBTEST (do NOT run SC55 first).
+       Wait for the middle C; press N (again), M (descriptors), unplug
+       the Uno and plug it back in, N, then Esc.
+       Freeze? Reboot, send C:\SC55\USBTEST.TXT (its last line = the step).
+       Works? Send USBTEST.TXT anyway (the M dump = the real Uno).
+    2. CD \SC55, then MIDPLAY /USB with a MIDI file; unplug / replug the
+       Uno while it plays; Esc.  Freeze? Send C:\SC55\USBMIDI.TXT.
+    3. SETTINGS > MIDI synth > USB MIDI device, SC55.BAT, a General MIDI
+       game; unplug / replug while it plays; quit the game.
+       Freeze? Reboot, send C:\SC55\SBDETAIL.TXT and C:\SC55\SBTRACE.TXT.
+    4. Steps 1-3 again with the Uno on the NEC card.
+    If the device misbehaves now, it is dropped instead of the PC: the
+    files say "[midi] ... USB MIDI device not used any more" and why.
 [ ] beta.110: board USB AND the NEC card both on, keyboard, mouse, stick
     plugged in: SC55.BAT starts (no freeze). If it freezes: reboot, send
     C:\SC55\SBDETAIL.TXT (last "[usb]" line = where). Then try
@@ -39,7 +55,8 @@ BOTH
 [ ] beta.108 USB MIDI (M-Audio Uno): USBTEST (no SBEMU) lists "USB MIDI
     out 0763:..." and the synth plays a short middle C; N plays it again;
     a key on the synth's MIDI OUT -> Uno MIDI IN shows "MIDI IN: 90 ..".
-    D810 (ICH6) and the NEC card; through a hub too.
+    D810 (ICH6) and the NEC card; through a hub too. (P5PE-VM: see its
+    beta.114 item first.)
 [ ] SETTINGS > MIDI synth > USB MIDI device, then a General MIDI game and
     MIDPLAY: music on the external synth, no stuck notes; pull the Uno out
     and back in while it plays - the music comes back.
