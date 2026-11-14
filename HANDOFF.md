@@ -1,3 +1,20 @@
+## beta.121 (2026-11-14, DOS session): WCSET write-combining shipped (Fast video)
+- Done: WCSET.EXE in the zip (rezip.py NEW list adds new EXEs), MENU Settings "Fast video (WCSET)" = WCSET /ASK,
+  Tests "Video speed (WCSET)" = WCSET /BENCH (view WCBENCH.TXT); README.TXT "FAST VIDEO" under 3D MENU; README news
+  (5 on top, beta.116 moved to Older). Zip = beta.120 zip + rezip.py (all EXEs rebuilt as beta.121).
+- Tested: 86Box P3B-F PII-450 + Voodoo3 3000 PCI (testrig/wcset/86box/86box.cfg; the CL-GD5446 cfg has no VBE LFB):
+  pm (real mode) + rm (JEMM) PASS, WC write path works: MTRR 1 = WC DE000000 16 MB set, cleared, slot free after
+  MENU/MIDPLAY exit; 86Box does not model WC speed (bench x1.00, fps equal). QEMU pm/rm PASS (SeaBIOS UC MTRR ->
+  refused, correct). testrig/menustat 5/5 PASS. SBEMU code unchanged (WCSET only in tools/) -> no SBDIAG/SC55LOG cost.
+- Hardware steps (D810 Radeon X300, P5PE-VM GeForce 6800), boot as usual (HIMEM + SC55, or JEMM):
+  1. MENU > Tests > Video speed (WCSET): send WCBENCH.TXT (expect WC on >> off for stosd if the BIOS leaves a free MTRR).
+  2. C:\SC55> WCSET : send the screen/LIST output (MTRRs, frame buffer range, "WC possible" or why not).
+  3. SET M3PROF=1, MENU, F8 (3D) ~20 s, Esc; again with SET WCSET=OFF: send both M3PROF.TXT (fps).
+  4. Any game in a VESA mode after WCSET ON (kept): glitches? Then WCSET OFF. SBDETAIL.TXT "[wc]" lines.
+- Open: boards with default WB + UC MTRR over the PCI hole get no WC (PAT idea, not started).
+- Next 3 steps: (1) hardware results above -> tune (e.g. offer PAT when MTRRs are taken); (2) D810 48 kHz task
+  (PLAYBOOK prompt); (3) MIDPLAY vector/voxel modes could use WC numbers from step 1.
+
 ## beta.120 (2026-11-14, DOS session): P5PE-VM froze with ICH5 SATA "Enhanced" (user; "Compatible" fine)
 - Cause (likely): Enhanced = SATA in native PCI mode, IRQ shared with the Audigy. EMU10K irq_routine returned
   non-zero for ANY IPR bit (MIDI bits nearly always set) -> SBEMU claimed the shared IRQ, EOI, no chain -> disk wait hung.
@@ -15,7 +32,7 @@
 - Next 3 steps: 1) P5PE-VM result above; 2) if still frozen, check the other P5PE-VM drivers that may claim foreign
   bits (USB host ISRs on the same IRQ); 3) continue the WCSET section's steps (86Box WC path, then pack it).
 
-## WCSET write-combining (2026-11-14, DOS session, STOPPED mid-task, no release): faster DOS graphics via MTRR WC on the VESA LFB
+## WCSET write-combining (2026-11-14, DOS session; finished and released in beta.121, see above): faster DOS graphics via MTRR WC on the VESA LFB
 - Done (main, unreleased): tools/wcset.h (shared: CPUID/MTRRcap/phys-width checks, real-mode stub via DPMI 0301h for
   RDMSR/WRMSR/CR0/WBINVD = real mode under HDPMI raw, V86 under JEMM (Jemm EMU.ASM emulates them); EMM386/QEMM V86 and
   Windows/NT/OS2 boxes refused; free variable MTRR only, any overlap with a set MTRR = left alone; SBDETAIL "[wc]" line,

@@ -13,4 +13,7 @@ for i in z.infolist():
     else: w.writestr(i,z.read(n))
 add=[b for b in sorted(os.listdir(P)) if b.upper() not in seen and os.path.isfile(P+b)]
 for b in add: w.write(P+b,'NUKEDSB/FILES/SC55/'+b); sw+=1
+NEW=['wcset.exe']  # new tools the old zip lacks (beta.120: WCSET.EXE)
+for b in NEW:
+    if b.upper() not in seen: w.write(O+b,'NUKEDSB/FILES/SC55/'+b.upper()); sw+=1; add.append(b.upper())
 w.close(); print('swapped/added',sw,'new:',add)

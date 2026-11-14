@@ -380,6 +380,9 @@ static void build_menu(void)
         " Carousel, Module), F4 screen mode, F6 colours, F7 look, F1 keys. F8 comes back to the text menu; holding"
         " Shift at start always gives the text menu.",
         IT_M3D, NULL, 0, 0, NULL);
+    add(C_SETTINGS, "Fast video (WCSET)", "Write-combining on the VESA frame buffer (an MTRR): faster 3D menu and MIDPLAY"
+        " pictures on Pentium Pro/II/III/M and newer. Shows the CPU's MTRRs, then asks: AUTO (on while MENU and MIDPLAY"
+        " run, the default), ON (kept for games too), OFF. Not under EMM386/QEMM or Windows.", IT_BAT, "WCSET.EXE /ASK", 0, 1, NULL);
     snprintf(c, sizeof c, "CALL %s\\SETTINGS.BAT /PAGE:JOY", g_home);
     add(C_SETTINGS, "Joystick (USB pad)", "A wired USB Xbox 360 pad (or compatible) as the gameport joystick (/JOY): sticks, buttons, dead zone,"
         " pad keys (Start = Enter, Back = Esc). Any USB controller or hub. On by default; turn it off if you"
@@ -409,6 +412,8 @@ static void build_menu(void)
     add(C_TESTS, "Game test (GAMETEST)", "Runs Duke 3D, Doom and Doom II with each SBEMU option you pick and measures the"
         " music timing. Unattended: the games quit by themselves. Remembers the best settings for each game, which Play uses.",
         IT_BAT, "GAMETEST.EXE", 1, 0, NULL);
+    add(C_TESTS, "Video speed (WCSET)", "Measures how fast the CPU writes to the VESA frame buffer (640x480) with"
+        " write-combining off and on. A few seconds; the result is added to WCBENCH.TXT.", IT_BAT, "WCSET.EXE /BENCH", 0, 1, "WCBENCH.TXT");
     add(C_TESTS, "SBDIAG: start measuring", "Starts SBEMU's self-measurement. Then play a game for a minute, quit it, and pick"
         " 'SBDIAG: report' to see why music would play too slow.", IT_BAT, "SBDIAG.EXE START", 1, 0, NULL);
     add(C_TESTS, "SBDIAG: report", "Reads the last measurement: lost timer ticks, how long SBEMU's sound interrupt takes,"

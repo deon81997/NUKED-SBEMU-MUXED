@@ -1,7 +1,7 @@
 #!/bin/sh
 # run.sh ZIP [-e 86box -c CFG] CASES... - WCSET tests (beta.120): WCSET list/bench/on/off, MENU 3D (M3PROF) and
 # MIDPLAY 3D (/T stats) fps with WCSET=OFF vs AUTO, SBDETAIL [wc] lines. CASES: pm rm. Run from sc55-pack after make.
-# Example: sh testrig/wcset/run.sh ../release/NUKED-SB-EMU-*.zip pm rm ; EMU="-e 86box -c /home/claude/vms/dos71/86box/86box.cfg" ...
+# Example: sh testrig/wcset/run.sh ../release/NUKED-SB-EMU-*.zip pm rm ; EMU="-e 86box -c testrig/wcset/86box/86box.cfg" ... (Voodoo3 3000 PCI: VBE LFB; the CL-GD5446 cfg has none)
 set -u
 H=$(cd "$(dirname "$0")" && pwd); W=/tmp/wcsetrig
 ZIP=$1; shift
